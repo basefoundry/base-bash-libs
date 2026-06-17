@@ -9,5 +9,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate repository baseline
+      - name: Install validation tools
+        run: brew install bats-core shellcheck
+      - name: Validate repository
         run: ./tests/validate.sh
