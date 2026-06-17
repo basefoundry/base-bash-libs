@@ -1,0 +1,13 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository baseline
+        run: ./tests/validate.sh
