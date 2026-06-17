@@ -10,3 +10,6 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Added
 
 - Initialized the repository with the Base-managed repo baseline.
+- Added the standalone Bash `std`, `file`, and `git` libraries copied from
+  Base, including BATS coverage, ShellCheck validation, and a standalone usage
+  example.
