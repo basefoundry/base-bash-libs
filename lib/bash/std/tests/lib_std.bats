@@ -909,6 +909,29 @@ EOF
     [ -d "$second" ]
 }
 
+@test "safe_mkdir warns when no directories are provided" {
+    local stderr_file="$TEST_TMPDIR/safe-mkdir-empty.err"
+
+    safe_mkdir 2>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *"safe_mkdir: No directories provided to create."* ]]
+}
+
+@test "safe_mkdir rejects invalid options" {
+    local stderr_file="$TEST_TMPDIR/safe-mkdir-option.err"
+    local rc
+
+    if (cd "$TEST_TMPDIR" && safe_mkdir -z 2>"$stderr_file"); then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"safe_mkdir: invalid option '-z'"* ]]
+    [ ! -e "$TEST_TMPDIR/-z" ]
+}
+
 @test "safe_mkdir exits when directory creation fails" {
     local script="$TEST_TMPDIR/safe-mkdir-fail.sh"
 
