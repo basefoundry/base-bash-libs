@@ -33,6 +33,15 @@ file_mode() {
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\nsecond\n# END' ]
 }
 
+@test "update_file_section appends to an empty file without a leading blank line" {
+    local target="$TEST_TMPDIR/config.txt"
+    touch "$target"
+
+    update_file_section "$target" "# BEGIN" "# END" "first"
+
+    [ "$(cat "$target")" = $'# BEGIN\nfirst\n# END' ]
+}
+
 @test "update_file_section preserves normal file mode when appending" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
@@ -203,6 +212,25 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"Asymmetric markers in '$target': 0 start, 1 end. Manual repair needed."* ]]
     [ "$(cat "$target")" = $'before\norphaned\n# END' ]
+}
+
+@test "update_file_section rejects end markers before start markers" {
+    local before
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# END
+middle
+# BEGIN
+after
+EOF
+    before="$(cat "$target")"
+
+    bats_run update_file_section "$target" "# BEGIN" "# END" "new"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Misordered markers in '$target'. Manual repair needed."* ]]
+    [ "$(cat "$target")" = "$before" ]
 }
 
 @test "update_file_section is a no-op for a missing target file" {
