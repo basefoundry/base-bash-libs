@@ -17,7 +17,7 @@ The library improves Bash-based scripting in a few practical ways:
   another command may pipe or capture.
 - **Readable failures**: fatal errors include a message and Bash stack trace
   instead of a mysterious non-zero exit.
-- **Safe command execution**: `run` preserves argument boundaries, supports
+- **Safe command execution**: `std_run` preserves argument boundaries, supports
   dry-run mode, and can either exit or return a status.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
@@ -140,11 +140,11 @@ itself is fine and the user simply gave invalid arguments.
 
 ## Running Commands Safely
 
-`run` is the preferred helper for simple external command execution:
+`std_run` is the preferred helper for simple external command execution:
 
 ```bash
-run git status --short
-run touch "file with spaces.txt"
+std_run git status --short
+std_run touch "file with spaces.txt"
 ```
 
 It improves on ad hoc command strings because it:
@@ -158,17 +158,17 @@ Dry-run mode:
 
 ```bash
 DRY_RUN=true
-run brew install jq
+std_run brew install jq
 ```
 
 `DRY_RUN` and `dry_run` both accept `true`, `1`, `yes`, and `on`. Use
 `is_dry_run` when a script needs to branch on the same normalized dry-run state
-without executing a command through `run`.
+without executing a command through `std_run`.
 
 Handle a failing command yourself with `--no-exit`:
 
 ```bash
-if ! run --no-exit grep "needle" "$file"; then
+if ! std_run --no-exit grep "needle" "$file"; then
     log_info "needle was not present; continuing"
 fi
 ```
@@ -177,14 +177,18 @@ For expected probe failures where the caller handles the status, add `--quiet`
 to suppress the warning:
 
 ```bash
-if ! run --no-exit --quiet test -f "$optional_file"; then
+if ! std_run --no-exit --quiet test -f "$optional_file"; then
     log_debug "Optional file is absent."
 fi
 ```
 
-Use `run` for commands plus arguments. Keep shell features such as pipelines,
-redirection, process substitution, and complex conditionals explicit in the
-calling script so the code remains clear.
+Use `std_run` for commands plus arguments. Keep shell features such as
+pipelines, redirection, process substitution, and complex conditionals explicit
+in the calling script so the code remains clear.
+
+`run` remains available as a compatibility wrapper for existing callers, but new
+code should use `std_run` to avoid collisions with test frameworks and other
+Bash libraries that define their own `run` helper.
 
 ## Importing Other Bash Libraries
 
@@ -308,7 +312,7 @@ main() {
 
     assert_command_exists git
     log_info "Checking project '$project'."
-    run git status --short
+    std_run git status --short
 }
 
 main "$@"
@@ -325,7 +329,7 @@ source "/path/to/base/lib/bash/std/lib_std.sh"
 
 main() {
     set_log_level DEBUG
-    run echo "hello"
+    std_run echo "hello"
 }
 
 main "$@"

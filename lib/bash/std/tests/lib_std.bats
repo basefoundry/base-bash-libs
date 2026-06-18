@@ -745,31 +745,36 @@ EOF
     [[ "$output" == *"fatal boom"* ]]
 }
 
-@test "run returns an error when no command is provided" {
+@test "std_run is the preferred command runner and run remains compatible" {
+    [ "$(type -t std_run)" = "function" ]
+    [ "$(type -t run)" = "function" ]
+}
+
+@test "std_run returns an error when no command is provided" {
     local stderr_file="$TEST_TMPDIR/run-empty.err"
     local rc
 
-    if run 2>"$stderr_file"; then
+    if std_run 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"run: No command provided."* ]]
+    [[ "$(cat "$stderr_file")" == *"std_run: No command provided."* ]]
 }
 
-@test "run honors dry-run mode without executing the command" {
+@test "std_run honors dry-run mode without executing the command" {
     local target="$TEST_TMPDIR/dry-run.txt"
     DRY_RUN=true
 
-    run touch "$target"
+    std_run touch "$target"
 
     [ "$?" -eq 0 ]
     [ ! -e "$target" ]
 }
 
-@test "run treats common truthy dry-run values as dry-run mode" {
+@test "std_run treats common truthy dry-run values as dry-run mode" {
     local case_name target value var_name
 
     for case_name in \
@@ -787,18 +792,18 @@ EOF
         export "$var_name"
         target="$TEST_TMPDIR/dry-run-${var_name}-${value}.txt"
 
-        run touch "$target"
+        std_run touch "$target"
 
         [ "$?" -eq 0 ]
         [ ! -e "$target" ]
     done
 }
 
-@test "run --no-exit returns the underlying failure status" {
+@test "std_run --no-exit returns the underlying failure status" {
     local stderr_file="$TEST_TMPDIR/run-no-exit.err"
     local rc
 
-    if run --no-exit bash -c 'exit 7' 2>"$stderr_file"; then
+    if std_run --no-exit bash -c 'exit 7' 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -808,8 +813,39 @@ EOF
     [[ "$(cat "$stderr_file")" == *"continuing"* ]]
 }
 
-@test "run --no-exit --quiet suppresses failure warning" {
+@test "std_run --no-exit --quiet suppresses failure warning" {
     local stderr_file="$TEST_TMPDIR/run-no-exit-quiet.err"
+    local rc
+
+    if std_run --no-exit --quiet bash -c 'exit 7' 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 7 ]
+    [ ! -s "$stderr_file" ]
+}
+
+@test "std_run exits the script on failure by default" {
+    local script="$TEST_TMPDIR/run-fail.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_run bash -c 'exit 9'
+echo "after"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 9 ]
+    [[ "$output" == *"Command failed (exit 9)"* ]]
+    [[ "$output" != *"after"* ]]
+}
+
+@test "run compatibility wrapper delegates to std_run behavior" {
+    local stderr_file="$TEST_TMPDIR/run-compat.err"
     local rc
 
     if run --no-exit --quiet bash -c 'exit 7' 2>"$stderr_file"; then
@@ -820,23 +856,6 @@ EOF
 
     [ "$rc" -eq 7 ]
     [ ! -s "$stderr_file" ]
-}
-
-@test "run exits the script on failure by default" {
-    local script="$TEST_TMPDIR/run-fail.sh"
-
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$STDLIB_PATH"
-run bash -c 'exit 9'
-echo "after"
-EOF
-
-    bats_run bash "$script"
-
-    [ "$status" -eq 9 ]
-    [[ "$output" == *"Command failed (exit 9)"* ]]
-    [[ "$output" != *"after"* ]]
 }
 
 @test "safe_mkdir creates directories and tolerates existing paths with -p" {

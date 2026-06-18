@@ -14,5 +14,5 @@ printf 'example\n' > "$example_file"
 update_file_section "$example_file" "# BEGIN base-bash-libs" "# END base-bash-libs" "managed=true"
 
 log_info "Validated standalone Base Bash library usage."
-run --no-exit --quiet test -f "$example_file"
+std_run --no-exit --quiet test -f "$example_file"
 print_message "example_file=$example_file"

@@ -24,7 +24,7 @@
 #   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
 #
 # Core helpers:
-#   run [--no-exit] [--quiet] cmd ...
+#   std_run [--no-exit] [--quiet] cmd ...
 #                                # Safe command runner with dry-run & failure handling.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
@@ -35,7 +35,7 @@
 #   assert_* utilities           # Validation helpers (assert_not_null / assert_integer / ...).
 #
 # Patterns:
-#   run some_cmd                 # exits on failure; DRY_RUN=true/1/yes/on prints instead.
+#   std_run some_cmd             # exits on failure; DRY_RUN=true/1/yes/on prints instead.
 #   some_cmd || fatal_error ...  # preserves failing exit code before terminating.
 #   add_to_path -p "/opt/tools"  # inject directories without duplicates.
 #
@@ -632,7 +632,7 @@ is_dry_run() {
 }
 
 #
-# run - Safely executes a simple command with its arguments.
+# std_run - Safely executes a simple command with its arguments.
 #
 # This function is designed to be a secure and robust replacement for using
 # `eval` or simple command execution. It correctly handles arguments with
@@ -652,7 +652,7 @@ is_dry_run() {
 #     failures and is most useful with `--no-exit`.
 #
 # Usage:
-#   run [options] command [arg1] [arg2] ...
+#   std_run [options] command [arg1] [arg2] ...
 #
 # Options:
 #   --no-exit   If provided as an initial argument, the script will not
@@ -663,22 +663,24 @@ is_dry_run() {
 #
 # Examples:
 #   # Run a simple command. Exits if `ls` fails.
-#   run ls -l /tmp
+#   std_run ls -l /tmp
 #
 #   # Run a command with spaces in an argument.
-#   run touch "a file with spaces.txt"
+#   std_run touch "a file with spaces.txt"
 #
 #   # Run a command but don't exit the script on failure.
-#   if ! run --no-exit grep "not_found" /etc/hosts; then
+#   if ! std_run --no-exit grep "not_found" /etc/hosts; then
 #       log "INFO" "The text was not found, but we are continuing."
 #   fi
 #
 #   # In a script where DRY_RUN=true, this will only print the command.
 #   DRY_RUN=true
-#   run rm -rf /some/important/path
+#   std_run rm -rf /some/important/path
 #
 ################################################################################
-run() {
+__std_run_impl__() {
+    local helper_name="$1"
+    shift
     local exit_on_failure=1 quiet=0
 
     # Parse optional run flags before the command.
@@ -704,7 +706,7 @@ run() {
 
     # Check if the command is empty.
     if [[ $# -eq 0 ]]; then
-        log_error "run: No command provided."
+        log_error "$helper_name: No command provided."
         return 1
     fi
 
@@ -739,6 +741,14 @@ run() {
     fi
 
     return 0
+}
+
+std_run() {
+    __std_run_impl__ std_run "$@"
+}
+
+run() {
+    __std_run_impl__ run "$@"
 }
 
 ############################################## FILE AND DIRECTORY HANDLING ############################################
