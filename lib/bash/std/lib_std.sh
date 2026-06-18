@@ -357,6 +357,7 @@ __init_colors__() {
 # Arguments:
 #   level: One of FATAL, ERROR, WARN, INFO, DEBUG, VERBOSE. Default is INFO.
 #   -l logger_name: (Optional) Specify a named logger. Default is 'default'.
+# Invalid levels return 1 and leave the existing logger level unchanged.
 #
 set_log_level() {
     local logger=default in_level l
@@ -364,25 +365,27 @@ set_log_level() {
         if [[ -z "${2-}" ]]; then
             printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
                 "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
-            return 0
+            return 1
         fi
         logger=$2
         shift 2 2>/dev/null
     fi
     in_level="${1:-INFO}"
-    if [[ $logger ]]; then
-        l="${_log_levels[$in_level]}"
-        if [[ $l ]]; then
-            _loggers_level_map[$logger]=$l
-        else
-            printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-                "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for logger '$logger'; setting to INFO" >&2
-            _loggers_level_map[$logger]=3
-        fi
-    else
+    if [[ -z "$logger" ]]; then
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
             "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+        return 1
     fi
+
+    if [[ -n "${_log_levels[$in_level]+set}" ]]; then
+        l="${_log_levels[$in_level]}"
+        _loggers_level_map[$logger]=$l
+        return 0
+    fi
+
+    printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+        "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for logger '$logger'" >&2
+    return 1
 }
 
 #

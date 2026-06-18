@@ -446,15 +446,40 @@ EOF
     [ -z "${COLOR_RED:-}" ]
 }
 
-@test "set_log_level updates named loggers and falls back for unknown levels" {
+@test "set_log_level updates loggers and rejects invalid input without changing levels" {
     local stderr_file="$TEST_TMPDIR/set-log-level.err"
+    local rc
 
+    set_log_level DEBUG
+    [ "${_loggers_level_map[default]}" -eq 4 ]
     set_log_level -l custom DEBUG
     [ "${_loggers_level_map[custom]}" -eq 4 ]
 
-    set_log_level -l custom NOPE 2>"$stderr_file"
-    [ "${_loggers_level_map[custom]}" -eq 3 ]
+    if set_log_level -l 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"Option '-l' needs an argument"* ]]
+
+    if set_log_level NOPE 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_loggers_level_map[default]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE'"* ]]
+
+    if set_log_level -l custom NOPE 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_loggers_level_map[custom]}" -eq 4 ]
+    [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE' for logger 'custom'"* ]]
 }
 
 @test "_print_log requires a log level" {
