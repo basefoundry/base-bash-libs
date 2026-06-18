@@ -7,6 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Changed
+
+- Documented Homebrew tap trust and standalone Homebrew install usage.
+
 ## [0.1.0] - 2026-06-17
 
 ### Added

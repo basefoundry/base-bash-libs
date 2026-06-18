@@ -19,6 +19,24 @@ adopting the full Base workspace control plane.
 
 ## Usage
 
+Install the library package from the Base Homebrew tap:
+
+```bash
+brew trust codeforester/base
+brew install codeforester/base/base-bash-libs
+```
+
+The trust step is required on Homebrew versions that block formulae from
+non-official taps until the tap is trusted. It is safe to run again on machines
+that already trust `codeforester/base`.
+
+Source the installed stdlib from the Homebrew prefix:
+
+```bash
+base_bash_libs_prefix="$(brew --prefix codeforester/base/base-bash-libs)"
+source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
+```
+
 Source the stdlib from an absolute path:
 
 ```bash
