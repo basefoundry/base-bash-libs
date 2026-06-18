@@ -1208,8 +1208,28 @@ ask_yes_no() {
 #   $1: (Optional) The prompt to display. Defaults to "Press Enter to continue".
 #
 wait_for_enter() {
-    local prompt=${1:-"Press Enter to continue"}
-    read -r -s -p "$prompt" </dev/tty
+    if (("$#" > 1)); then
+        log_error "wait_for_enter: invalid arguments"
+        log_info "Usage: wait_for_enter [prompt_message]"
+        return 1
+    fi
+
+    local prompt=${1:-"Press Enter to continue"} tty_fd read_status
+    if ! exec {tty_fd}</dev/tty 2>/dev/null; then
+        log_error "wait_for_enter: /dev/tty is not available"
+        return 1
+    fi
+
+    read -r -s -p "$prompt" <&"$tty_fd"
+    read_status=$?
+    exec {tty_fd}<&-
+
+    if ((read_status != 0)); then
+        log_error "wait_for_enter: failed to read from /dev/tty"
+        return "$read_status"
+    fi
+
+    return 0
 }
 
 #################################################### END OF FUNCTIONS ##################################################

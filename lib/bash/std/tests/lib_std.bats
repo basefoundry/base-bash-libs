@@ -1273,5 +1273,41 @@ EOF
 }
 
 @test "wait_for_enter returns after receiving a newline on a tty" {
-    skip "wait_for_enter reads from /dev/tty and needs a more reliable pseudo-tty harness on macOS."
+    local normalized
+    local script="$TEST_TMPDIR/wait-enter.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+wait_for_enter "Continue" || exit \$?
+printf 'after-wait\n'
+EOF
+
+    run_pty_command $'\n' "$script"
+    normalized="${output//$'\r'/}"
+
+    [ "$status" -eq 0 ]
+    [[ "$normalized" == *"after-wait"* ]]
+}
+
+@test "wait_for_enter validates argument count" {
+    local stderr_file="$TEST_TMPDIR/wait-for-enter.err"
+    local rc
+
+    if wait_for_enter "one" "two" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"wait_for_enter: invalid arguments"* ]]
+    [[ "$(cat "$stderr_file")" == *"Usage: wait_for_enter [prompt_message]"* ]]
+}
+
+@test "wait_for_enter fails clearly when terminal is unavailable" {
+    bats_run wait_for_enter "Continue"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"wait_for_enter: /dev/tty is not available"* ]]
 }
