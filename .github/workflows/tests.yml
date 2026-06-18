@@ -2,14 +2,61 @@ name: Tests
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
   validate:
-    runs-on: macos-latest
+    name: Validate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install validation tools
-        run: brew install bats-core shellcheck
+
+      - name: Install validation tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash bats-core shellcheck
+          echo "$(brew --prefix bash)/bin" >> "$GITHUB_PATH"
+
+      - name: Install validation tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats shellcheck
+
       - name: Validate repository
         run: ./tests/validate.sh
+
+      - name: Smoke supported runner Bash
+        run: |
+          bash -c '
+            source "$1"
+            check_bash_version
+          ' bash "$PWD/lib/bash/std/lib_std.sh"
+
+      # Hosted runners do not provide Bash 4.2 directly. The BATS suite covers
+      # the lower-bound comparison logic; this macOS smoke exercises the known
+      # unsupported system Bash 3.2 path when it is available.
+      - name: Smoke unsupported macOS system Bash
+        if: runner.os == 'macOS'
+        run: |
+          if ! /bin/bash -c '((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2)))'; then
+            echo "/bin/bash is supported on this runner; skipping unsupported-Bash smoke."
+            exit 0
+          fi
+
+          set +e
+          output="$(/bin/bash -c 'source "$1"' bash "$PWD/lib/bash/std/lib_std.sh" 2>&1)"
+          status=$?
+          set -e
+
+          test "$status" -ne 0
+          grep -F "requires Bash 4.2 or higher" <<<"$output"
+          ! grep -F "syntax error" <<<"$output"
