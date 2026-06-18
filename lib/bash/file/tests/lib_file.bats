@@ -59,6 +59,15 @@ file_mode() {
     [ "$(type -t update_file_section)" = "function" ]
 }
 
+@test "lib_file fails clearly when sourced without stdlib" {
+    bats_run bash -c 'source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/file/lib_file.sh"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lib_file.sh requires lib_std.sh to be sourced first"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+    [[ "$output" != *"command not found"* ]]
+}
+
 @test "update_file_section writes option-like markers literally" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
