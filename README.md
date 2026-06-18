@@ -17,7 +17,9 @@ adopting the full Base workspace control plane.
 - `lib/bash/git/lib_git.sh`
   Git helper functions built on the stdlib.
 
-## Usage
+## Installation and Usage
+
+### Homebrew
 
 Install the library package from the Base Homebrew tap:
 
@@ -38,17 +40,43 @@ source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
-Source the stdlib from an absolute path:
+### Source Checkout
+
+You can use a git checkout, tarball extract, or copied source tree without
+Homebrew. Keep the repository layout intact so `lib_std.sh` can find the root
+`VERSION` file:
 
 ```bash
-source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
+git clone https://github.com/codeforester/base-bash-libs.git vendor/base-bash-libs
 ```
 
-Load companion libraries with absolute imports:
+Source the stdlib from that checkout:
 
 ```bash
-import "/path/to/base-bash-libs/lib/bash/file/lib_file.sh"
-import "/path/to/base-bash-libs/lib/bash/git/lib_git.sh"
+base_bash_libs_dir="$PWD/vendor/base-bash-libs"
+source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
+printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
+```
+
+Load companion libraries with absolute imports from the same checkout:
+
+```bash
+import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+```
+
+### Vendored or Submodule Layout
+
+For projects that vendor dependencies or use git submodules, place this
+repository anywhere stable inside your project and source it by absolute path:
+
+```bash
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+base_bash_libs_dir="$project_root/vendor/base-bash-libs"
+
+source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
+import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
@@ -75,6 +103,9 @@ brew install bats-core shellcheck
 ## Base
 
 This repository is managed by [Base](https://github.com/codeforester/base).
+Base is useful for developing this repository, but it is not required to consume
+the Bash libraries from Homebrew, a source checkout, a vendored copy, or a git
+submodule.
 
 Common commands:
 
