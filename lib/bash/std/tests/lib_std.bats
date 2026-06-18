@@ -992,6 +992,24 @@ EOF
     [[ "$output" == *"is not a valid integer"* ]]
 }
 
+@test "assert_integer rejects invalid variable names without echoing values" {
+    local script="$TEST_TMPDIR/assert-integer-name.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+secret="not-a-var-name"
+assert_integer "\$secret"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_integer expects variable names"* ]]
+    [[ "$output" != *"not-a-var-name"* ]]
+    [[ "$output" != *"invalid variable name"* ]]
+}
+
 @test "assert_integer_range enforces range bounds" {
     local count=5
     local script="$TEST_TMPDIR/assert-range.sh"
@@ -1009,6 +1027,24 @@ EOF
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"is out of range [1, 10]"* ]]
+}
+
+@test "assert_integer_range rejects invalid variable names without echoing values" {
+    local script="$TEST_TMPDIR/assert-range-name.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+secret="bad-range-name"
+assert_integer_range "\$secret" 1 10
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_integer_range expects a variable name"* ]]
+    [[ "$output" != *"bad-range-name"* ]]
+    [[ "$output" != *"invalid variable name"* ]]
 }
 
 @test "assert_arg_count accepts exact and ranged matches" {
@@ -1193,6 +1229,24 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"dir=$expected_dir"* ]]
+}
+
+@test "get_my_source_dir rejects invalid result variable names" {
+    local script="$TEST_TMPDIR/get-source-dir-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+get_my_source_dir "bad-name"
+echo "after"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"get_my_source_dir: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" != *"invalid variable name"* ]]
+    [[ "$output" != *"after"* ]]
 }
 
 @test "ask_yes_no accepts yes input" {

@@ -842,6 +842,11 @@ safe_truncate() {
 
 ####################################################### ASSERTIONS ####################################################
 
+__is_valid_variable_name__() {
+    local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
+    [[ "$var_name" =~ $var_name_re ]]
+}
+
 #
 # assert_not_null - Checks that one or more variables are not empty.
 #
@@ -861,13 +866,13 @@ safe_truncate() {
 #   $@: One or more variable names to check.
 #
 assert_not_null() {
-    local unset_vars=() var_name var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
+    local unset_vars=() var_name
     if (($# == 0)); then
         fatal_error "assert_not_null: No variable names provided for validation."
     fi
 
     for var_name in "$@"; do
-        if ! [[ "$var_name" =~ $var_name_re ]]; then
+        if ! __is_valid_variable_name__ "$var_name"; then
             fatal_error "assert_not_null expects variable names, not values; one or more arguments are not valid Bash variable names."
         fi
         # Use indirection to get the value of the variable whose name is stored in var_name.
@@ -892,6 +897,9 @@ assert_integer() {
     local var_name int_re='^[-+]?[0-9]+$'
     (($# == 0)) && fatal_error "assert_integer: No variable names provided."
     for var_name in "$@"; do
+        if ! __is_valid_variable_name__ "$var_name"; then
+            fatal_error "assert_integer expects variable names, not values; one or more arguments are not valid Bash variable names."
+        fi
         local value="${!var_name-}"
         ! [[ "$value" =~ $int_re ]] && fatal_error "Variable '$var_name' with value '$value' is not a valid integer."
     done
@@ -909,6 +917,9 @@ assert_integer() {
 assert_integer_range() {
     local var_name="${1-}" min="${2-}" max="${3-}"
     (($# != 3)) && fatal_error "assert_integer_range: Expected 3 arguments, got $#."
+    if ! __is_valid_variable_name__ "$var_name"; then
+        fatal_error "assert_integer_range expects a variable name as its first argument."
+    fi
     local value="${!var_name-}"
     assert_integer "$var_name" min max
     ((value < min || value > max)) && fatal_error "Variable '$var_name' ($value) is out of range [$min, $max]."
@@ -1134,6 +1145,9 @@ safe_unalias() {
 get_my_source_dir() {
     local result_name="${1-}"
     [[ -n "$result_name" ]] || fatal_error "get_my_source_dir: No result variable name provided."
+    if ! __is_valid_variable_name__ "$result_name"; then
+        fatal_error "get_my_source_dir: result variable name must be a valid Bash variable name."
+    fi
     local source_dir
     # Reference: https://stackoverflow.com/a/246128/6862601
     source_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" >/dev/null 2>&1 && pwd -P)" ||

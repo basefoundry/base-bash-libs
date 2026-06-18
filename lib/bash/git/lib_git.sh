@@ -226,6 +226,10 @@ git_get_current_branch() {
         log_error "Usage: git_get_current_branch <directory> <result_variable_name>"
         return 1
     fi
+    if ! __is_valid_variable_name__ "$result_var_name"; then
+        log_error "git_get_current_branch: result variable name must be a valid Bash variable name."
+        return 1
+    fi
 
     printf -v "$result_var_name" '%s' ""
 

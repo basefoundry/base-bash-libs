@@ -55,6 +55,18 @@ setup() {
     [[ "$output" != *"Usage: get_git_branch"* ]]
 }
 
+@test "git_get_current_branch rejects invalid result variable names" {
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$repo"
+
+    bats_run git_get_current_branch "$repo" "bad-name"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"git_get_current_branch: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" != *"invalid variable name"* ]]
+}
+
 @test "git_update_repo skips dirty repositories when no dirty path is allowed" {
     local repo="$TEST_TMPDIR/repo"
 
