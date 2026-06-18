@@ -360,12 +360,68 @@ __join_message__() {
 }
 
 #
+# __log_timestamp__ - Store the current log timestamp in a named variable.
+#
+__log_timestamp__() {
+    local result_name="$1"
+
+    if [[ "${LOG_UTC:-}" == 1 ]]; then
+        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+    else
+        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+    fi
+}
+
+#
+# __log_source_location__ - Store the first non-stdlib caller location.
+#
+__log_source_location__() {
+    local result_name="$1"
+    local fallback_path="${2:-}" fallback_line="${3:-0}"
+    local source_path="" source_line=""
+    local frame=1 max_caller_frames=20 caller_info caller_line _caller_func caller_file
+
+    while ((frame <= max_caller_frames)) && caller_info=$(caller "$frame"); do
+        read -r caller_line _caller_func caller_file <<<"$caller_info"
+        if [[ -n "$caller_file" && "$caller_file" != "$__LIB_STD_PATH__" ]]; then
+            source_path="$caller_file"
+            source_line="$caller_line"
+            break
+        fi
+        ((frame++))
+    done
+
+    if [[ -z "$source_path" ]]; then
+        source_path="${fallback_path:-${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]:-unknown}}}}"
+        source_line="${fallback_line:-${BASH_LINENO[1]:-${BASH_LINENO[0]:-0}}}"
+    fi
+
+    source_path="${source_path#"$__SCRIPT_DIR__"/}"
+    source_path="${source_path#./}"
+    printf -v "$result_name" '%s:%s' "$source_path" "$source_line"
+}
+
+#
+# __print_log_record__ - Compose and write a structured log record.
+#
+__print_log_record__() {
+    local color="$1" in_level="$2" source_location="$3"
+    shift 3
+    local message timestamp log_line
+
+    message="$(__join_message__ "$@")"
+    __log_timestamp__ timestamp
+    printf -v log_line '%s %-7s %s %s' "$timestamp" "$in_level" "$source_location" "$message"
+    printf '%b%s%b\n' "$color" "$log_line" "$COLOR_OFF" >&2
+}
+
+#
 # __init_colors__ - Initialize colors used for logging
 # This is called from __stdlib_init__
 #
 __init_colors__() {
-    # If --color was not passed, or if the log stream is not a terminal, disable colors.
-    if [[ "$__color__" != 1 || ! -t 2 ]]; then
+    # If --color was not passed, NO_COLOR is set, or the log stream is not a terminal, disable colors.
+    if [[ "$__color__" != 1 || -n "${NO_COLOR+x}" || ! -t 2 ]]; then
         COLOR_BOLD=""
         COLOR_RED=""
         COLOR_GREEN=""
@@ -436,7 +492,7 @@ _print_log() {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
-    local logger=default log_level_set log_level color
+    local logger=default log_level_set log_level color source_location
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
             printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
@@ -458,42 +514,8 @@ _print_log() {
             *)           color="";; # No color for VERBOSE or others
         esac
 
-        local source_path="${BASH_SOURCE[2]:-}" source_line="${BASH_LINENO[1]:-0}"
-        local frame=1 max_caller_frames=20 caller_info caller_line _caller_func caller_file
-        if [[ -z "$source_path" || "$source_path" == "$__LIB_STD_PATH__" ]]; then
-            source_path=""
-            source_line=""
-            while ((frame <= max_caller_frames)) && caller_info=$(caller "$frame"); do
-                read -r caller_line _caller_func caller_file <<<"$caller_info"
-                if [[ -n "$caller_file" && "$caller_file" != "$__LIB_STD_PATH__" ]]; then
-                    source_path="$caller_file"
-                    source_line="$caller_line"
-                    break
-                fi
-                ((frame++))
-            done
-        fi
-
-        if [[ -z "$source_path" ]]; then
-            source_path="${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]:-unknown}}}"
-            source_line="${BASH_LINENO[1]:-${BASH_LINENO[0]:-0}}"
-        fi
-
-        source_path="${source_path#"$__SCRIPT_DIR__"/}"
-        source_path="${source_path#./}"
-
-        local message
-        message="$(__join_message__ "$@")"
-        {
-            printf '%b' "$color"
-            if [[ "${LOG_UTC:-}" == 1 ]]; then
-                TZ=UTC0 printf '%(%Y-%m-%d %H:%M:%S)T %-7s %s ' -1 "$in_level" "${source_path}:${source_line}"
-            else
-                printf '%(%Y-%m-%d %H:%M:%S)T %-7s %s ' -1 "$in_level" "${source_path}:${source_line}"
-            fi
-            printf '%s' "$message"
-            printf '%b\n' "$COLOR_OFF"
-        } >&2
+        __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
+        __print_log_record__ "$color" "$in_level" "$source_location" "$@"
     fi
 }
 
@@ -524,7 +546,9 @@ _print_log_file()   {
             cat -- "$file" >&2
         fi
     else
-        printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[2]}:${BASH_LINENO[1]} Unknown logger '$logger'" >&2
+        local source_location
+        __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
+        __print_log_record__ "$COLOR_YELLOW" WARN "$source_location" "Unknown logger '$logger'"
     fi
 }
 

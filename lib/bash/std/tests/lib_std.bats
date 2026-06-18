@@ -112,7 +112,7 @@ PY
 setup() {
     setup_test_tmpdir
     PATH="$BASE_TEST_ORIG_PATH"
-    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC BASE_BASH_BOOTSTRAP_SOURCE
+    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE
     source "$STDLIB_PATH"
 }
 
@@ -310,6 +310,28 @@ EOF
     [ ! -s "$stdout_file" ]
 }
 
+@test "NO_COLOR disables explicit tty color output" {
+    local script="$TEST_TMPDIR/no-color.sh"
+    local normalized
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+export NO_COLOR=1
+source "$STDLIB_PATH"
+if [[ -n "\${COLOR_RED:-}" ]]; then
+    echo "colors=enabled"
+else
+    echo "colors=disabled"
+fi
+EOF
+
+    run_tty_script "$script" --color
+    normalized="$(normalize_tty_output "$output")"
+
+    [ "$status" -eq 0 ]
+    [[ "$normalized" == *"colors=disabled"* ]]
+}
+
 @test "import loads relative and absolute libraries" {
     local relative_dir="$TEST_TMPDIR/helpers"
     local absolute_lib="$TEST_TMPDIR/absolute.sh"
@@ -502,6 +524,12 @@ EOF
     [ "$output" = "" ]
 }
 
+@test "_print_log emits structured records through one final printf" {
+    bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$color" "$log_line" "$COLOR_OFF"' "$STDLIB_PATH"
+
+    [ "$status" -eq 0 ]
+}
+
 @test "log wrappers respect the configured log level" {
     local stderr_file="$TEST_TMPDIR/log-wrappers.err"
 
@@ -599,6 +627,8 @@ EOF
 
     _print_log_file INFO -l missing "$target" 2>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"Unknown logger 'missing'"* ]]
+    [[ "$(cat "$stderr_file")" != *"lib_std.sh:"* ]]
+    [[ "$(cat "$stderr_file")" != *":0 "* ]]
 }
 
 @test "enter and leave logging helpers include the caller name" {

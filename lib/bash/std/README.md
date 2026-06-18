@@ -117,7 +117,10 @@ print_message "plain stdout message"
 ```
 
 `log_*`, `print_error`, `print_warn`, `print_info`, and `print_success` write to
-stderr. `print_message` writes to stdout.
+stderr. `print_bold` and `print_message` write to stdout.
+
+Colors are only enabled for terminal stderr when `--color` is passed. Set
+`NO_COLOR` to disable colored output even when `--color` is present.
 
 ## Error Handling
 
