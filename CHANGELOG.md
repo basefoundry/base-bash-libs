@@ -7,6 +7,18 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-18
+
+### Changed
+
+- Changed the project license from AGPL-3.0-or-later to Apache-2.0 for broader
+  generic library adoption.
+- Refreshed the top-level README entry point with release metadata, direct
+  links to each library README, and clearer Homebrew companion-library imports.
+- Added `NOTICE` so Apache-2.0 attribution is carried in a dedicated file.
+- Added validation that keeps the README version strip aligned with the
+  repo-root `VERSION` file.
+
 ## [0.2.0] - 2026-06-18
 
 ### Added
