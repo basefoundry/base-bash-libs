@@ -12,6 +12,7 @@ required_files=(
   .github/pull_request_template.md
   .github/base-project.yml
   LICENSE
+  NOTICE
   base_manifest.yaml
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
@@ -36,6 +37,17 @@ for file in "${required_files[@]}"; do
 done
 
 printf 'Repository baseline is present.\n'
+
+version=""
+IFS= read -r version < VERSION || {
+  printf 'Unable to read VERSION.\n' >&2
+  exit 1
+}
+
+if ! grep -F "| \`$version\` | [Apache-2.0](LICENSE) |" README.md >/dev/null; then
+  printf 'README.md top strip does not match VERSION (%s) and Apache-2.0 license metadata.\n' "$version" >&2
+  exit 1
+fi
 
 for command in shellcheck bats; do
   command -v "$command" >/dev/null 2>&1 || {

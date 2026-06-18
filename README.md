@@ -1,21 +1,30 @@
 # base-bash-libs
 
+| Version | License | Install | Release notes |
+| --- | --- | --- | --- |
+| `0.2.1` | [Apache-2.0](LICENSE) | `brew install codeforester/base/base-bash-libs` | [v0.2.1](https://github.com/codeforester/base-bash-libs/releases/tag/v0.2.1) |
+
 Reusable Bash libraries extracted from
 [Base](https://github.com/codeforester/base).
 
-This repository provides sourceable Bash libraries for scripts that want Base's
-logging, command execution, filesystem, and Git helper conventions without
-adopting the full Base workspace control plane.
+This repository provides sourceable Bash libraries for scripts that want
+consistent logging, command execution, filesystem editing, Git helper behavior,
+and import conventions without adopting the full Base workspace control plane.
 
 ## Libraries
 
-- `lib/bash/std/lib_std.sh`
+- [`lib/bash/std/lib_std.sh`](lib/bash/std/README.md)
   Foundation helpers for logging, error handling, command execution, PATH
-  updates, assertions, prompts, and imports.
-- `lib/bash/file/lib_file.sh`
-  File editing helpers built on the stdlib.
-- `lib/bash/git/lib_git.sh`
-  Git helper functions built on the stdlib.
+  updates, assertions, prompts, imports, and the public
+  `BASE_BASH_LIBS_VERSION` constant.
+- [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
+  File editing helpers built on the stdlib, including idempotent
+  marker-delimited file section updates.
+- [`lib/bash/git/lib_git.sh`](lib/bash/git/README.md)
+  Git helper functions built on the stdlib for lightweight repository
+  inspection, update, and script freshness checks.
+
+See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 
 ## Installation and Usage
 
@@ -38,6 +47,13 @@ Source the installed stdlib from the Homebrew prefix:
 base_bash_libs_prefix="$(brew --prefix codeforester/base/base-bash-libs)"
 source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
+```
+
+Load companion libraries with absolute imports from the same package:
+
+```bash
+import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
+import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
 ```
 
 ### Source Checkout
@@ -85,6 +101,17 @@ that readonly constant when they need to require a minimum library version.
 
 See `examples/std-usage.sh` for a small standalone script that sources the
 stdlib, imports the file helpers, logs progress, and runs a checked command.
+
+## Versioning
+
+The repo-root `VERSION` file is the source of truth for the package version.
+The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
+are validated against that file.
+
+## License
+
+base-bash-libs is licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for
+the project copyright notice.
 
 ## Validation
 
