@@ -35,6 +35,7 @@ Source the installed stdlib from the Homebrew prefix:
 ```bash
 base_bash_libs_prefix="$(brew --prefix codeforester/base/base-bash-libs)"
 source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
+printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
 Source the stdlib from an absolute path:
@@ -49,6 +50,10 @@ Load companion libraries with absolute imports:
 import "/path/to/base-bash-libs/lib/bash/file/lib_file.sh"
 import "/path/to/base-bash-libs/lib/bash/git/lib_git.sh"
 ```
+
+After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
+version from the repository/package `VERSION` file. Downstream scripts can use
+that readonly constant when they need to require a minimum library version.
 
 See `examples/std-usage.sh` for a small standalone script that sources the
 stdlib, imports the file helpers, logs progress, and runs a checked command.

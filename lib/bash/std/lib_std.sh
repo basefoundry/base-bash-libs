@@ -20,6 +20,8 @@
 #   source "<repo>/lib/bash/std/lib_std.sh"
 #
 # Caller-visible globals:
+#   BASE_BASH_LIBS_VERSION
+#                    Package version read from the repository/package VERSION file.
 #   __SCRIPT_ARGS__   Original "$@" before lib_std consumed global flags.
 #   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
 #
@@ -70,6 +72,41 @@ unset -f __lib_std_require_supported_bash__
 [[ -n "${__stdlib_sourced__-}" ]] && return
 __stdlib_sourced__=1
 readonly __LIB_STD_PATH__="${BASH_SOURCE[0]}"
+
+__BASE_BASH_LIBS_ROOT__="$(
+    cd -- "$(dirname -- "$__LIB_STD_PATH__")/../../.." &>/dev/null && pwd -P
+)" || {
+    printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$__LIB_STD_PATH__'." >&2
+    return 1 2>/dev/null || exit 1
+}
+readonly __BASE_BASH_LIBS_ROOT__
+
+__lib_std_read_package_version__() {
+    local version_file="$1" version
+
+    if [[ ! -r "$version_file" ]]; then
+        printf '%s\n' "Error: base-bash-libs VERSION file is not readable: $version_file" >&2
+        return 1
+    fi
+
+    IFS= read -r version < "$version_file" || [[ -n "$version" ]] || {
+        printf '%s\n' "Error: Unable to read base-bash-libs version from: $version_file" >&2
+        return 1
+    }
+
+    if [[ -z "$version" ]]; then
+        printf '%s\n' "Error: base-bash-libs VERSION file is empty: $version_file" >&2
+        return 1
+    fi
+
+    printf '%s' "$version"
+}
+
+BASE_BASH_LIBS_VERSION="$(__lib_std_read_package_version__ "$__BASE_BASH_LIBS_ROOT__/VERSION")" || {
+    return 1 2>/dev/null || exit 1
+}
+readonly BASE_BASH_LIBS_VERSION
+unset -f __lib_std_read_package_version__
 
 #
 # Memorize the original script arguments at the very beginning.

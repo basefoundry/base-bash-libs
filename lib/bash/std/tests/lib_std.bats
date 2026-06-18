@@ -165,6 +165,15 @@ EOF
     [[ "$output" == *"script_dir=$expected_dir"* ]]
 }
 
+@test "stdlib exposes readonly package version from root VERSION" {
+    local expected_version
+
+    IFS= read -r expected_version < "$BASE_REPO_ROOT/VERSION"
+
+    [ "${BASE_BASH_LIBS_VERSION:-}" = "$expected_version" ]
+    readonly -p BASE_BASH_LIBS_VERSION >/dev/null
+}
+
 @test "is_interactive is false in a non-interactive subprocess" {
     local script="$TEST_TMPDIR/non-interactive.sh"
 
