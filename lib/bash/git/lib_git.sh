@@ -267,7 +267,8 @@ git_get_current_branch() {
 #
 # Checks whether a script appears up to date with its git upstream and logs status.
 #
-# @param $1 script_path The path to a script file tracked in a git repo.
+# @param $1 Optional --fetch to refresh remote-tracking refs before comparing.
+# @param $2 script_path The path to a script file tracked in a git repo.
 #
 # Returns:
 #   - 0 if up to date or the check is skipped (no git, no upstream, not a repo).
@@ -276,11 +277,18 @@ git_get_current_branch() {
 #   - 3 if the script has local modifications.
 #
 check_script_up_to_date() {
-    local script_path="$1"
-    if [[ -z "$script_path" ]]; then
-        log_error "Usage: check_script_up_to_date <script_path>"
+    local fetch_before_check=false script_path
+
+    if [[ "${1:-}" == "--fetch" ]]; then
+        fetch_before_check=true
+        shift
+    fi
+
+    if (($# != 1)); then
+        log_error "Usage: check_script_up_to_date [--fetch] <script_path>"
         return 1
     fi
+    script_path="$1"
 
     if [[ ! -e "$script_path" ]]; then
         log_warn "Script '$script_path' not found; skipping latest-version check."
@@ -325,6 +333,16 @@ check_script_up_to_date() {
         log_info "No upstream branch configured; skipping latest-version check."
         return 0
     }
+
+    if [[ "$fetch_before_check" == true ]]; then
+        if git -C "$repo_root" fetch --quiet; then
+            log_info "Fetched upstream state before latest-version check."
+        else
+            log_warn "Unable to fetch upstream state; using local remote-tracking refs."
+        fi
+    else
+        log_info "Using local remote-tracking refs; pass --fetch for a live remote check."
+    fi
 
     behind=$(git -C "$repo_root" rev-list --count HEAD.."$upstream" 2>/dev/null)
     ahead=$(git -C "$repo_root" rev-list --count "$upstream"..HEAD 2>/dev/null)

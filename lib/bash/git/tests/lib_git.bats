@@ -382,6 +382,50 @@ setup() {
     [[ "$output" == *"Repository is up to date with origin/master."* ]]
 }
 
+@test "check_script_up_to_date uses local remote-tracking refs by default" {
+    local other="$TEST_TMPDIR/other"
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git clone "$remote" "$other" >/dev/null 2>&1
+    git -C "$other" config user.name "Bats Test"
+    git -C "$other" config user.email "bats@example.com"
+    printf 'echo remote\n' >> "$other/scripts/tool.sh"
+    git -C "$other" add scripts/tool.sh
+    git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
+    git -C "$other" push origin master >/dev/null 2>&1
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"local remote-tracking refs"* ]]
+    [[ "$output" == *"Repository is up to date with origin/master."* ]]
+}
+
+@test "check_script_up_to_date fetches before comparing when requested" {
+    local other="$TEST_TMPDIR/other"
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git clone "$remote" "$other" >/dev/null 2>&1
+    git -C "$other" config user.name "Bats Test"
+    git -C "$other" config user.email "bats@example.com"
+    printf 'echo remote\n' >> "$other/scripts/tool.sh"
+    git -C "$other" add scripts/tool.sh
+    git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
+    git -C "$other" push origin master >/dev/null 2>&1
+
+    bats_run check_script_up_to_date --fetch "$script_path"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Fetched upstream state before latest-version check."* ]]
+    [[ "$output" == *"Repository is 1 commit(s) behind origin/master"* ]]
+}
+
 @test "check_script_up_to_date returns 3 for a dirty tracked script" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
