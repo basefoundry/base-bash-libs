@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 #
 # lib_std.sh - Foundation library for Bash scripts
-#              Base entrypoints require Bash 4.2 or higher before sourcing this library.
+#              Requires Bash 4.2 or higher.
 #
 # This library provides a standardized set of functions for common tasks,
 # ensuring consistency and robustness across multiple scripts.
@@ -45,6 +45,23 @@
 #
 
 ################################################# INITIALIZATION #######################################################
+
+__lib_std_require_supported_bash__() {
+    if [[ -z "${BASH_VERSION:-}" ]]; then
+        printf '%s\n' "Error: This script requires Bash 4.2 or higher." >&2
+        printf '%s\n' "Your shell is not Bash." >&2
+        return 1
+    fi
+
+    if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2))); then
+        printf '%s\n' "Error: This script requires Bash 4.2 or higher." >&2
+        printf '%s\n' "Your version ($BASH_VERSION) is not compatible." >&2
+        return 1
+    fi
+}
+
+__lib_std_require_supported_bash__ || return 1 2>/dev/null || exit 1
+unset -f __lib_std_require_supported_bash__
 
 #
 # Make sure we do nothing in case the library is sourced more than once in the same shell.

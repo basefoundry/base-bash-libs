@@ -240,6 +240,22 @@ EOF
     [[ "$output" == *"requires Bash 4.2 or higher"* ]]
 }
 
+@test "sourcing stdlib fails cleanly under unsupported /bin/bash" {
+    [[ -x /bin/bash ]] || skip "/bin/bash is not available."
+
+    if ! /bin/bash -c '((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2)))'; then
+        skip "/bin/bash is supported on this host."
+    fi
+
+    bats_run /bin/bash -c 'source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"requires Bash 4.2 or higher"* ]]
+    [[ "$output" == *"Your version"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+    [[ "$output" != *"syntax error"* ]]
+}
+
 @test "color initialization honors tty mode when --color is passed" {
     local script="$TEST_TMPDIR/tty-colors.sh"
     local normalized
