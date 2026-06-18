@@ -821,11 +821,25 @@ run() {
 # Usage: safe_mkdir [-p] dir1 dir2 ...
 #
 safe_mkdir() {
-    local dir failed_dirs=() mkdir_args=()
-    if [[ "${1-}" == "-p" ]]; then
-        shift
-        mkdir_args=(-p)
+    local dir opt failed_dirs=() mkdir_args=()
+
+    OPTIND=1
+    while getopts ":p" opt; do
+        case "$opt" in
+            p) mkdir_args=(-p) ;;
+            \?)
+                log_error "safe_mkdir: invalid option '-$OPTARG'"
+                return 1
+                ;;
+        esac
+    done
+    shift $((OPTIND - 1))
+
+    if (($# == 0)); then
+        log_warn "safe_mkdir: No directories provided to create."
+        return 0
     fi
+
     for dir; do
         [[ -d "$dir" ]] && continue
         if ! mkdir "${mkdir_args[@]}" -- "$dir"; then

@@ -91,8 +91,13 @@ _git_update_repo_finish() {
 
 _git_pull_with_retry() {
     local git_log="$1"
-    local max_attempts=2
+    local max_attempts="${BASE_GIT_PULL_MAX_ATTEMPTS:-2}"
     local attempt=1
+
+    if [[ ! "$max_attempts" =~ ^[0-9]+$ ]] || ((max_attempts < 1)); then
+        log_warn "BASE_GIT_PULL_MAX_ATTEMPTS must be a positive integer; using 2."
+        max_attempts=2
+    fi
 
     while ((attempt <= max_attempts)); do
         if git pull --ff-only >"$git_log" 2>&1; then
@@ -106,7 +111,11 @@ _git_pull_with_retry() {
             return 1
         fi
 
-        log_warn "git pull failed on attempt $attempt; retrying once."
+        if ((max_attempts == 2)); then
+            log_warn "git pull failed on attempt $attempt; retrying once."
+        else
+            log_warn "git pull failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
+        fi
         [[ -s "$git_log" ]] && log_debug_file "$git_log"
         attempt=$((attempt + 1))
     done
@@ -202,7 +211,7 @@ git_update_repo() {
 }
 
 #
-# Gets the currently checked-out branch of a Git repository without using a subshell.
+# Gets the currently checked-out branch of a Git repository without changing directories.
 #
 # This function safely checks a directory, determines if it's a Git repository,
 # and returns the current branch name via a name reference (nameref).
@@ -234,21 +243,12 @@ git_get_current_branch() {
     printf -v "$result_var_name" '%s' ""
 
     if [[ ! -d "$target_dir" ]]; then
-        return 1
-    fi
-
-    # --- Core Logic without Subshell ---
-    # Use pushd to change directory and add the current dir to a stack.
-    # Redirect output to /dev/null to keep it clean.
-    if ! pushd "$target_dir" > /dev/null; then
-        # If cd fails, we can't proceed.
-        return 1
+        return 0
     fi
 
     # Check if we are inside a Git repository.
-    if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    if ! git -C "$target_dir" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
         # Not a Git repo, result is already an empty string.
-        popd >/dev/null || return 1
         return 0
     fi
 
@@ -256,7 +256,7 @@ git_get_current_branch() {
     # It's the most reliable way to distinguish a branch from a detached HEAD.
     # -q (--quiet) suppresses errors and returns a non-zero exit code on failure.
     local branch_name
-    if branch_name=$(git symbolic-ref --short -q HEAD); then
+    if branch_name=$(git -C "$target_dir" symbolic-ref --short -q HEAD); then
         # Success: We are on a named branch.
         printf -v "$result_var_name" '%s' "$branch_name"
     else
@@ -264,7 +264,6 @@ git_get_current_branch() {
         printf -v "$result_var_name" '%s' "detached head"
     fi
 
-    popd >/dev/null || return 1
     return 0
 }
 

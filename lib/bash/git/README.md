@@ -34,6 +34,11 @@ log_info "Current branch: $branch"
 ## Behavior Notes
 
 - `git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
+- `git_update_repo` retries `git pull --ff-only` twice by default. Set
+  `BASE_GIT_PULL_MAX_ATTEMPTS` to a positive integer to change the retry count.
+- `git_get_current_branch` uses `git -C` so it does not change the caller's
+  working directory or directory stack. Missing directories and non-Git
+  directories return success with an empty result variable.
 - `check_script_up_to_date` treats missing git state, untracked scripts, or missing upstreams as skip conditions rather than hard failures.
 - `check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
 - `check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first, then compares against the refreshed upstream ref. If fetch fails, the helper logs a warning and falls back to local remote-tracking refs.

@@ -254,6 +254,9 @@ These helpers are useful in setup scripts where a partially completed operation
 should fail loudly and explain which path could not be created, touched, or
 entered.
 
+`safe_mkdir` accepts only `-p` as an option. Calling it without directory
+arguments logs a warning and returns success without creating anything.
+
 ## Validation Helpers
 
 Use assertions near the top of functions to make assumptions explicit:

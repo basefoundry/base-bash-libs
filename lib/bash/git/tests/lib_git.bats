@@ -47,6 +47,45 @@ setup() {
     [ "$branch" = "detached head" ]
 }
 
+@test "git_get_current_branch leaves missing directories as empty success" {
+    local branch="sentinel"
+    local rc
+
+    if git_get_current_branch "$TEST_TMPDIR/missing" branch; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 0 ]
+    [ "$branch" = "" ]
+}
+
+@test "git_get_current_branch does not use pushd or popd" {
+    local repo="$TEST_TMPDIR/repo"
+    local branch="" rc
+
+    init_git_repo "$repo"
+    pushd() {
+        printf 'unexpected pushd\n' >&2
+        return 99
+    }
+    popd() {
+        printf 'unexpected popd\n' >&2
+        return 99
+    }
+
+    if git_get_current_branch "$repo" branch; then
+        rc=0
+    else
+        rc=$?
+    fi
+    unset -f pushd popd
+
+    [ "$rc" -eq 0 ]
+    [ "$branch" = "master" ]
+}
+
 @test "git_get_current_branch usage names the current function" {
     bats_run git_get_current_branch
 
@@ -352,6 +391,34 @@ setup() {
     [ "$(cat "$pull_count")" = "2" ]
     [[ "$output" == *"git pull failed on attempt 1; retrying once."* ]]
     [ "$(cat "$git_log")" = "pull attempt 2" ]
+}
+
+@test "_git_pull_with_retry honors configured max attempts" {
+    local git_log="$TEST_TMPDIR/git.log"
+    local pull_count="$TEST_TMPDIR/pull-count"
+
+    printf '0\n' > "$pull_count"
+    git() {
+        local count
+
+        if [[ "${1:-}" == "pull" ]]; then
+            count="$(cat "$pull_count")"
+            count=$((count + 1))
+            printf '%s\n' "$count" > "$pull_count"
+            printf 'pull attempt %s\n' "$count" >&2
+            [[ "$count" -ge 3 ]]
+            return $?
+        fi
+        command git "$@"
+    }
+
+    BASE_GIT_PULL_MAX_ATTEMPTS=3 bats_run _git_pull_with_retry "$git_log"
+    unset -f git
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$pull_count")" = "3" ]
+    [[ "$output" == *"git pull failed on attempt 2; retrying (attempt 3 of 3)."* ]]
+    [ "$(cat "$git_log")" = "pull attempt 3" ]
 }
 
 @test "_git_pull_with_retry fails after two pull attempts" {
