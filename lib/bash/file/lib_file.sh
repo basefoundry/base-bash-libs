@@ -4,6 +4,10 @@
 #
 
 [[ -n "${__lib_file_sourced__:-}" ]] && return 0
+if ! declare -F log_error >/dev/null || ! declare -F log_debug >/dev/null; then
+    printf '%s\n' "Error: lib_file.sh requires lib_std.sh to be sourced first." >&2
+    return 1 2>/dev/null || exit 1
+fi
 readonly __lib_file_sourced__=1
 
 __file_mode__() {

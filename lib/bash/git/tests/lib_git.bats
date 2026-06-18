@@ -8,6 +8,21 @@ setup() {
     source "$BASE_BASH_DIR/git/lib_git.sh"
 }
 
+@test "lib_git can be sourced more than once" {
+    source "$BASE_BASH_DIR/git/lib_git.sh"
+
+    [ "$(type -t git_update_repo)" = "function" ]
+}
+
+@test "lib_git fails clearly when sourced without stdlib" {
+    bats_run bash -c 'source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/git/lib_git.sh"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lib_git.sh requires lib_std.sh to be sourced first"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+    [[ "$output" != *"command not found"* ]]
+}
+
 @test "git_get_current_branch returns the current branch name" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
