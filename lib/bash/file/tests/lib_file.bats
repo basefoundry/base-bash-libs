@@ -16,6 +16,14 @@ file_inode() {
     fi
 }
 
+file_mode() {
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
+}
+
 @test "update_file_section appends a new marked block when markers are absent" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
@@ -23,6 +31,17 @@ file_inode() {
     update_file_section "$target" "# BEGIN" "# END" "first" "second"
 
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\nsecond\n# END' ]
+}
+
+@test "update_file_section preserves normal file mode when appending" {
+    local target="$TEST_TMPDIR/config.txt"
+    printf 'line-one' > "$target"
+    chmod 0644 "$target"
+
+    update_file_section "$target" "# BEGIN" "# END" "first"
+
+    [ "$(file_mode "$target")" = "644" ]
+    [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\n# END' ]
 }
 
 @test "lib_file can be sourced more than once" {
@@ -53,6 +72,23 @@ EOF
     update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
+}
+
+@test "update_file_section preserves executable file mode when replacing" {
+    local target="$TEST_TMPDIR/script.sh"
+    cat <<'EOF' > "$target"
+#!/usr/bin/env bash
+# BEGIN
+echo old
+# END
+EOF
+    chmod 0755 "$target"
+
+    update_file_section "$target" "# BEGIN" "# END" "echo new"
+
+    [ -x "$target" ]
+    [ "$(file_mode "$target")" = "755" ]
+    [ "$(cat "$target")" = $'#!/usr/bin/env bash\n# BEGIN\necho new\n# END' ]
 }
 
 @test "update_file_section replaces an existing section with multi-line content" {

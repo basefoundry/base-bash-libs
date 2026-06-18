@@ -6,6 +6,27 @@
 [[ -n "${__lib_file_sourced__:-}" ]] && return 0
 readonly __lib_file_sourced__=1
 
+__file_mode__() {
+    local file_path="$1" mode
+
+    if mode=$(stat -c '%a' "$file_path" 2>/dev/null); then
+        printf '%s\n' "$mode"
+        return 0
+    fi
+
+    stat -f '%Lp' "$file_path"
+}
+
+__preserve_file_mode__() {
+    local source_file="$1" target_file="$2" source_mode
+
+    if ! source_mode="$(__file_mode__ "$source_file")"; then
+        return 1
+    fi
+
+    chmod "$source_mode" "$target_file"
+}
+
 #
 # update_file_section - Idempotently manages a block of text within a file,
 #                       demarcated by start and end markers.
@@ -157,6 +178,11 @@ update_file_section() {
     if [[ ! -f "$temp_file" ]]; then
         log_error "Failed to create temporary file for '$target_file'."
         rm -f "$new_content_file"
+        return 1
+    fi
+    if ! __preserve_file_mode__ "$target_file" "$temp_file"; then
+        log_error "Failed to preserve permissions for '$target_file'."
+        rm -f "$temp_file" "$new_content_file"
         return 1
     fi
 
