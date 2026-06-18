@@ -27,6 +27,39 @@ __preserve_file_mode__() {
     chmod "$source_mode" "$target_file"
 }
 
+__file_section_markers_ordered__() {
+    local target_file="$1" beginning_marker="$2" end_marker="$3"
+
+    awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
+    BEGIN {
+        in_section = 0
+        invalid = 0
+    }
+    $0 == START_M {
+        if (in_section == 1) {
+            invalid = 1
+            exit
+        }
+        in_section = 1
+        next
+    }
+    $0 == END_M {
+        if (in_section == 0) {
+            invalid = 1
+            exit
+        }
+        in_section = 0
+        next
+    }
+    END {
+        if (in_section == 1) {
+            invalid = 1
+        }
+        exit invalid
+    }
+    ' "$target_file"
+}
+
 #
 # update_file_section - Idempotently manages a block of text within a file,
 #                       demarcated by start and end markers.
@@ -34,6 +67,8 @@ __preserve_file_mode__() {
 # This function can add, update, or remove a section of text in a file.
 # It is designed to be safe to run multiple times. If the section already
 # exists, it will be replaced. If it doesn't exist, it will be appended.
+# If the target file itself does not exist, this returns success without
+# creating the file.
 #
 # Usage:
 #   update_file_section [options] <target_file> <start_marker> <end_marker> [content_lines...]
@@ -98,6 +133,10 @@ update_file_section() {
     end_marker_count=$(grep -cF -- "$end_marker" "$target_file" || true)
     if ((beginning_marker_count != end_marker_count)); then
         log_error "Asymmetric markers in '$target_file': $beginning_marker_count start, $end_marker_count end. Manual repair needed."
+        return 1
+    fi
+    if ((beginning_marker_count > 0)) && ! __file_section_markers_ordered__ "$target_file" "$beginning_marker" "$end_marker"; then
+        log_error "Misordered markers in '$target_file'. Manual repair needed."
         return 1
     fi
 
@@ -241,7 +280,7 @@ update_file_section() {
             return 1
         fi
 
-        if [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
+        if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
             if ! printf '\n' >> "$temp_file"; then
                 log_error "Failed to add trailing newline to '$temp_file'."
                 rm -f "$temp_file" "$new_content_file"
