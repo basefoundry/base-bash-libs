@@ -106,6 +106,14 @@ setup() {
     [[ "$output" != *"invalid variable name"* ]]
 }
 
+@test "git_update_repo usage names the current function" {
+    bats_run git_update_repo
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
+    [[ "$output" != *"Usage: update_repo"* ]]
+}
+
 @test "git_update_repo skips dirty repositories when no dirty path is allowed" {
     local repo="$TEST_TMPDIR/repo"
 
@@ -119,6 +127,20 @@ setup() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
+}
+
+@test "git_update_repo treats branch mismatch as a skip" {
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    set_log_level DEBUG
+
+    bats_run git_update_repo "$repo" "" main
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"not 'main'. Skipping update"* ]]
 }
 
 @test "git_update_repo fails clearly when origin remote is missing" {
@@ -421,6 +443,40 @@ setup() {
     [ "$(cat "$git_log")" = "pull attempt 3" ]
 }
 
+@test "_git_pull_with_retry falls back for invalid configured max attempts" {
+    local git_log="$TEST_TMPDIR/git.log"
+    local max_attempts
+    local pull_count="$TEST_TMPDIR/pull-count"
+
+    git() {
+        local count
+
+        if [[ "${1:-}" == "pull" ]]; then
+            count="$(cat "$pull_count")"
+            count=$((count + 1))
+            printf '%s\n' "$count" > "$pull_count"
+            printf 'pull attempt %s\n' "$count" >&2
+            [[ "$count" -ge 2 ]]
+            return $?
+        fi
+        command git "$@"
+    }
+
+    for max_attempts in abc 0 -1; do
+        printf '0\n' > "$pull_count"
+        : > "$git_log"
+
+        BASE_GIT_PULL_MAX_ATTEMPTS="$max_attempts" bats_run _git_pull_with_retry "$git_log"
+
+        [ "$status" -eq 0 ]
+        [ "$(cat "$pull_count")" = "2" ]
+        [[ "$output" == *"BASE_GIT_PULL_MAX_ATTEMPTS must be a positive integer; using 2."* ]]
+        [[ "$output" == *"git pull failed on attempt 1; retrying once."* ]]
+        [ "$(cat "$git_log")" = "pull attempt 2" ]
+    done
+    unset -f git
+}
+
 @test "_git_pull_with_retry fails after two pull attempts" {
     local git_log="$TEST_TMPDIR/git.log"
     local pull_count="$TEST_TMPDIR/pull-count"
@@ -479,7 +535,22 @@ setup() {
     bats_run check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"local remote-tracking refs"* ]]
+    [[ "$output" != *"Using local remote-tracking refs"* ]]
+    [[ "$output" == *"Repository is up to date with origin/master."* ]]
+}
+
+@test "check_script_up_to_date reports local remote-tracking refs at debug level" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    set_log_level DEBUG
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Using local remote-tracking refs; pass --fetch for a live remote check."* ]]
     [[ "$output" == *"Repository is up to date with origin/master."* ]]
 }
 

@@ -137,7 +137,7 @@ git_update_repo() {
 
     if [[ -z "$git_repo" ]]; then
         log_error "No git repository path provided."
-        log_info "Usage: update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
+        log_info "Usage: git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
         return 1
     fi
 
@@ -150,6 +150,8 @@ git_update_repo() {
         log_error "Unable to create temporary git log file."
         return 1
     }
+    # git_update_repo intentionally works inside the target repository because
+    # the submodule update sequence below needs the repository as its cwd.
     if ! pushd "$git_repo" > /dev/null; then
         # If cd fails, we can't proceed.
         _git_update_repo_finish "$git_log" false 1
@@ -169,7 +171,7 @@ git_update_repo() {
     current_branch=$(git rev-parse --abbrev-ref HEAD)
     if [[ "$current_branch" != "$expected_branch" ]]; then
         log_debug "Current branch of '$git_repo' is '${current_branch}', not '$expected_branch'. Skipping update."
-        _git_update_repo_finish "$git_log" true 1
+        _git_update_repo_finish "$git_log" true 0
         return $?
     fi
 
@@ -344,7 +346,7 @@ check_script_up_to_date() {
             log_warn "Unable to fetch upstream state; using local remote-tracking refs."
         fi
     else
-        log_info "Using local remote-tracking refs; pass --fetch for a live remote check."
+        log_debug "Using local remote-tracking refs; pass --fetch for a live remote check."
     fi
 
     behind=$(git -C "$repo_root" rev-list --count HEAD.."$upstream" 2>/dev/null)
