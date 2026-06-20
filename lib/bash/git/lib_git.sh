@@ -73,7 +73,7 @@ _git_expected_update_branch() {
         return 0
     fi
 
-    printf '%s\n' master
+    printf '%s\n' main
 }
 
 _git_update_repo_finish() {
@@ -223,7 +223,7 @@ git_update_repo() {
 #                          that will receive the output.
 #
 # Returns:
-#   - The branch name (e.g., "master", "feature/login") is stored in the result variable.
+#   - The branch name (e.g., "main", "feature/login") is stored in the result variable.
 #   - "detached head" if the repository is in a detached HEAD state.
 #   - An empty string "" if the directory doesn't exist or is not a Git repo.
 #   - The function itself returns an exit code of 0 on success, 1 on invalid usage.

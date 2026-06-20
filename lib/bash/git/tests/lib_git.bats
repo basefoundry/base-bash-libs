@@ -30,7 +30,7 @@ setup() {
     init_git_repo "$repo"
     git_get_current_branch "$repo" branch
 
-    [ "$branch" = "master" ]
+    [ "$branch" = "main" ]
 }
 
 @test "git_get_current_branch reports detached head" {
@@ -83,7 +83,7 @@ setup() {
     unset -f pushd popd
 
     [ "$rc" -eq 0 ]
-    [ "$branch" = "master" ]
+    [ "$branch" = "main" ]
 }
 
 @test "git_get_current_branch usage names the current function" {
@@ -137,10 +137,10 @@ setup() {
     commit_all "$repo" "Initial commit"
     set_log_level DEBUG
 
-    bats_run git_update_repo "$repo" "" main
+    bats_run git_update_repo "$repo" "" release
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"not 'main'. Skipping update"* ]]
+    [[ "$output" == *"not 'release'. Skipping update"* ]]
 }
 
 @test "git_update_repo fails clearly when origin remote is missing" {
@@ -152,7 +152,7 @@ setup() {
     commit_all "$repo" "Initial commit"
     before_head="$(git -C "$repo" rev-parse HEAD)"
 
-    bats_run git_update_repo "$repo" "" master
+    bats_run git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -170,7 +170,7 @@ setup() {
     before_head="$(git -C "$repo" rev-parse HEAD)"
     git -C "$repo" remote set-url origin "$TEST_TMPDIR/missing-remote.git"
 
-    bats_run git_update_repo "$repo" "" master
+    bats_run git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -194,9 +194,9 @@ setup() {
     printf 'rewritten remote\n' > "$other/data.txt"
     git -C "$other" add data.txt
     git -C "$other" commit --amend -m "Rewrite remote history" >/dev/null 2>&1
-    git -C "$other" push --force origin master >/dev/null 2>&1
+    git -C "$other" push --force origin main >/dev/null 2>&1
 
-    bats_run git_update_repo "$repo" "" master
+    bats_run git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -219,10 +219,10 @@ setup() {
     printf 'incoming tracked\n' > "$other/local-notes.md"
     git -C "$other" add local-notes.md
     git -C "$other" commit -m "Add tracked notes" >/dev/null 2>&1
-    git -C "$other" push origin master >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
     printf 'local untracked\n' > "$repo/local-notes.md"
 
-    bats_run git_update_repo "$repo" "" master
+    bats_run git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -245,7 +245,7 @@ setup() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
-    [[ "$output" != *"not 'master'"* ]]
+    [[ "$output" != *"not 'main'"* ]]
 }
 
 @test "_git_expected_update_branch returns main when origin has main" {
@@ -257,7 +257,7 @@ setup() {
     commit_all "$repo" "Initial commit"
     git -C "$repo" update-ref refs/remotes/origin/main HEAD
     git -C "$repo" checkout --detach >/dev/null 2>&1
-    git -C "$repo" branch -D master >/dev/null 2>&1
+    git -C "$repo" branch -D main >/dev/null 2>&1
 
     pushd "$repo" >/dev/null
     branch="$(_git_expected_update_branch)"
@@ -275,7 +275,7 @@ setup() {
     commit_all "$repo" "Initial commit"
     git -C "$repo" update-ref refs/remotes/origin/master HEAD
     git -C "$repo" checkout --detach >/dev/null 2>&1
-    git -C "$repo" branch -D master >/dev/null 2>&1
+    git -C "$repo" branch -D main >/dev/null 2>&1
 
     pushd "$repo" >/dev/null
     branch="$(_git_expected_update_branch)"
@@ -284,7 +284,7 @@ setup() {
     [ "$branch" = "master" ]
 }
 
-@test "_git_expected_update_branch falls back to master without main or master refs" {
+@test "_git_expected_update_branch falls back to main without main or master refs" {
     local repo="$TEST_TMPDIR/repo"
     local branch
 
@@ -294,7 +294,7 @@ setup() {
     branch="$(_git_expected_update_branch)"
     popd >/dev/null
 
-    [ "$branch" = "master" ]
+    [ "$branch" = "main" ]
 }
 
 @test "_git_only_path_dirty accepts multiple dirty files under an allowed directory" {
@@ -514,7 +514,7 @@ setup() {
     bats_run check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Repository is up to date with origin/master."* ]]
+    [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
 @test "check_script_up_to_date uses local remote-tracking refs by default" {
@@ -530,13 +530,13 @@ setup() {
     printf 'echo remote\n' >> "$other/scripts/tool.sh"
     git -C "$other" add scripts/tool.sh
     git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
-    git -C "$other" push origin master >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
 
     bats_run check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"Using local remote-tracking refs"* ]]
-    [[ "$output" == *"Repository is up to date with origin/master."* ]]
+    [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
 @test "check_script_up_to_date reports local remote-tracking refs at debug level" {
@@ -551,7 +551,7 @@ setup() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Using local remote-tracking refs; pass --fetch for a live remote check."* ]]
-    [[ "$output" == *"Repository is up to date with origin/master."* ]]
+    [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
 @test "check_script_up_to_date fetches before comparing when requested" {
@@ -567,13 +567,13 @@ setup() {
     printf 'echo remote\n' >> "$other/scripts/tool.sh"
     git -C "$other" add scripts/tool.sh
     git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
-    git -C "$other" push origin master >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
 
     bats_run check_script_up_to_date --fetch "$script_path"
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"Fetched upstream state before latest-version check."* ]]
-    [[ "$output" == *"Repository is 1 commit(s) behind origin/master"* ]]
+    [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
 
 @test "check_script_up_to_date returns 3 for a dirty tracked script" {

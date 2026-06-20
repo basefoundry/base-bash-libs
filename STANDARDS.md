@@ -1,9 +1,9 @@
 # base-bash-libs Standards
 
 `base-bash-libs` inherits the Base shell standards as its upstream policy. See
-[Base Standards](https://github.com/basefoundry/base/blob/master/STANDARDS.md),
+[Base Standards](https://github.com/basefoundry/base/blob/HEAD/STANDARDS.md),
 especially the
-[single-file library boundary](https://github.com/basefoundry/base/blob/master/STANDARDS.md#single-file-library-boundary)
+[single-file library boundary](https://github.com/basefoundry/base/blob/HEAD/STANDARDS.md#single-file-library-boundary)
 guidance.
 
 ## Shell Library Shape

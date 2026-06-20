@@ -54,10 +54,11 @@ setup_test_tmpdir() {
 
 init_git_repo() {
     local repo_dir="$1"
+    local default_branch="${2:-main}"
 
     mkdir -p "$repo_dir"
     git init "$repo_dir" >/dev/null 2>&1
-    git -C "$repo_dir" checkout -B master >/dev/null 2>&1
+    git -C "$repo_dir" checkout -B "$default_branch" >/dev/null 2>&1
     git -C "$repo_dir" config user.name "Bats Test"
     git -C "$repo_dir" config user.email "bats@example.com"
 }
@@ -75,13 +76,15 @@ create_tracked_repo_with_upstream() {
     local remote_dir="$2"
     local rel_path="$3"
     local content="${4:-sample content}"
+    local default_branch="${5:-main}"
 
-    init_git_repo "$repo_dir"
+    init_git_repo "$repo_dir" "$default_branch"
     mkdir -p "$(dirname "$repo_dir/$rel_path")"
     printf '%s\n' "$content" > "$repo_dir/$rel_path"
     commit_all "$repo_dir" "Initial commit"
 
     git init --bare "$remote_dir" >/dev/null 2>&1
     git -C "$repo_dir" remote add origin "$remote_dir"
-    git -C "$repo_dir" push -u origin master >/dev/null 2>&1
+    git -C "$repo_dir" push -u origin "$default_branch" >/dev/null 2>&1
+    git -C "$remote_dir" symbolic-ref HEAD "refs/heads/$default_branch"
 }
