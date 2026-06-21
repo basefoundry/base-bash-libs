@@ -21,6 +21,8 @@ The library improves Bash-based scripting in a few practical ways:
   dry-run mode, and can either exit or return a status.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
+- **Composable cleanup**: scripts can register exit cleanup without replacing
+  an already-installed `EXIT` trap.
 - **Simple library imports**: scripts can import helpers relative to their own
   source directory.
 - **Predictable PATH edits**: PATH additions avoid duplicates and can prepend or
@@ -260,6 +262,35 @@ entered.
 `safe_mkdir` accepts only `-p` as an option. Calling it without directory
 arguments logs a warning and returns success without creating anything.
 
+## Cleanup Helpers
+
+Use cleanup registration when a script creates transient state that should be
+removed on exit:
+
+```bash
+workspace="$(mktemp -d)"
+std_register_cleanup_path "$workspace"
+```
+
+Cleanup paths are removed with `rm -rf --` from a shared `EXIT` trap. Empty
+paths, root paths, and current/parent directory traversal components are
+rejected before registration.
+
+For custom cleanup, register a function name:
+
+```bash
+cleanup_workspace() {
+    rm -rf -- "$workspace"
+}
+
+std_register_cleanup_hook cleanup_workspace
+std_unregister_cleanup_hook cleanup_workspace
+```
+
+Hooks run in registration order and duplicate registrations are ignored. If an
+`EXIT` trap already exists when the first cleanup hook or path is registered,
+that existing trap is preserved and runs before the stdlib cleanup hooks.
+
 ## Validation Helpers
 
 Use assertions near the top of functions to make assumptions explicit:
@@ -358,6 +389,7 @@ main "$@"
 - imports
 - validation
 - simple filesystem safety wrappers
+- exit cleanup registration
 
 Domain-specific behavior should live in other libraries or command modules. For
 example, Git helpers belong in a Git library, file editing helpers belong in a

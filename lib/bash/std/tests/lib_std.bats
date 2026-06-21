@@ -1017,6 +1017,82 @@ EOF
     [[ "$output" == *"Failed to truncate the following files"* ]]
 }
 
+@test "cleanup hooks run on exit without replacing an existing EXIT trap" {
+    local script="$TEST_TMPDIR/cleanup-hooks.sh"
+    local log_file="$TEST_TMPDIR/cleanup-hooks.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "existing\n" >> "$log_file"' EXIT
+cleanup_one() { printf "cleanup-one\n" >> "$log_file"; }
+cleanup_two() { printf "cleanup-two\n" >> "$log_file"; }
+std_register_cleanup_hook cleanup_one
+std_register_cleanup_hook cleanup_two
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = $'existing\ncleanup-one\ncleanup-two' ]
+}
+
+@test "cleanup hook registration ignores duplicates and supports removal" {
+    local script="$TEST_TMPDIR/cleanup-hook-remove.sh"
+    local log_file="$TEST_TMPDIR/cleanup-hook-remove.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+cleanup_keep() { printf "keep\n" >> "$log_file"; }
+cleanup_drop() { printf "drop\n" >> "$log_file"; }
+std_register_cleanup_hook cleanup_keep
+std_register_cleanup_hook cleanup_keep
+std_register_cleanup_hook cleanup_drop
+std_unregister_cleanup_hook cleanup_drop
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "keep" ]
+}
+
+@test "cleanup path registration removes files and directories on exit" {
+    local script="$TEST_TMPDIR/cleanup-paths.sh"
+    local target_file="$TEST_TMPDIR/cleanup-file.txt"
+    local target_dir="$TEST_TMPDIR/cleanup-dir"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+mkdir -p "$target_dir"
+printf 'sample\n' > "$target_file"
+printf 'nested\n' > "$target_dir/nested.txt"
+std_register_cleanup_path "$target_file" "$target_dir"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ ! -e "$target_file" ]
+    [ ! -e "$target_dir" ]
+}
+
+@test "cleanup path registration rejects dangerous paths" {
+    local stderr_file="$TEST_TMPDIR/cleanup-path.err"
+    local rc
+
+    if std_register_cleanup_path "" "/" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"

@@ -32,6 +32,8 @@
 #                                # Safe command runner with dry-run & failure handling.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
+#   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
+#   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -125,6 +127,10 @@ __SCRIPT_DIR__=$(
     cd -- "$(dirname -- "${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]}}" )" &>/dev/null && pwd -P
 )
 readonly __SCRIPT_DIR__
+declare -ga __std_cleanup_hooks=()
+declare -ga __std_cleanup_paths=()
+declare -g __std_cleanup_dispatcher_installed=0
+declare -g __std_original_exit_trap=""
 
 ############################################ BASH VERSION CHECKER #######################################################
 
@@ -926,6 +932,166 @@ safe_truncate() {
         fatal_error "Failed to truncate the following files: ${failed_files[*]}"
     fi
 
+    return 0
+}
+
+######################################################## CLEANUP #######################################################
+
+__std_get_exit_trap_command__() {
+    local result_name="$1" trap_spec=""
+
+    trap_spec="$(trap -p EXIT || true)"
+    if [[ "$trap_spec" =~ ^trap\ --\ \'(.*)\'\ EXIT$ ]]; then
+        printf -v "$result_name" '%s' "${BASH_REMATCH[1]}"
+    else
+        printf -v "$result_name" '%s' ""
+    fi
+}
+
+__std_return_status__() {
+    return "$1"
+}
+
+__std_run_cleanup_hooks__() {
+    local exit_status=$? hook cleanup_path
+
+    if [[ -n "${__std_original_exit_trap:-}" ]]; then
+        __std_return_status__ "$exit_status"
+        eval "$__std_original_exit_trap"
+    fi
+
+    for hook in "${__std_cleanup_hooks[@]}"; do
+        if ! "$hook"; then
+            log_warn "Cleanup hook '$hook' failed."
+        fi
+    done
+
+    for cleanup_path in "${__std_cleanup_paths[@]}"; do
+        [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || continue
+        if ! rm -rf -- "$cleanup_path"; then
+            log_warn "Cleanup path '$cleanup_path' could not be removed."
+        fi
+    done
+
+    return "$exit_status" 2>/dev/null || exit "$exit_status"
+}
+
+__std_install_cleanup_dispatcher__() {
+    if ((__std_cleanup_dispatcher_installed)); then
+        return 0
+    fi
+
+    __std_get_exit_trap_command__ __std_original_exit_trap
+    trap '__std_run_cleanup_hooks__' EXIT
+    __std_cleanup_dispatcher_installed=1
+    return 0
+}
+
+#
+# std_register_cleanup_hook - Registers a function to run from the shared EXIT trap.
+#
+# Cleanup hooks run after any EXIT trap that existed before the first cleanup hook
+# registration. Hooks are function names, not shell command strings.
+#
+# Usage:
+#   cleanup_workspace() { rm -rf -- "$workspace"; }
+#   std_register_cleanup_hook cleanup_workspace
+#
+std_register_cleanup_hook() {
+    local hook="${1-}" existing_hook
+
+    if (($# != 1)); then
+        log_error "std_register_cleanup_hook: expected exactly one function name."
+        return 1
+    fi
+    if ! __is_valid_variable_name__ "$hook" || ! declare -F "$hook" >/dev/null; then
+        log_error "std_register_cleanup_hook: '$hook' is not a defined cleanup function."
+        return 1
+    fi
+
+    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+        [[ "$existing_hook" == "$hook" ]] && return 0
+    done
+
+    __std_cleanup_hooks+=("$hook")
+    __std_install_cleanup_dispatcher__
+    return 0
+}
+
+#
+# std_unregister_cleanup_hook - Removes a function from the shared EXIT cleanup hook list.
+#
+# Usage:
+#   std_unregister_cleanup_hook cleanup_workspace
+#
+std_unregister_cleanup_hook() {
+    local hook="${1-}" existing_hook
+    local -a remaining_hooks=()
+
+    if (($# != 1)); then
+        log_error "std_unregister_cleanup_hook: expected exactly one function name."
+        return 1
+    fi
+
+    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+        [[ "$existing_hook" == "$hook" ]] && continue
+        remaining_hooks+=("$existing_hook")
+    done
+    __std_cleanup_hooks=("${remaining_hooks[@]}")
+    return 0
+}
+
+__std_is_safe_cleanup_path__() {
+    local path="${1-}"
+
+    [[ -n "$path" ]] || return 1
+    [[ "$path" =~ ^/+$ ]] && return 1
+    case "$path" in
+        . | .. | */.. | */../* | */. | */./*)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+#
+# std_register_cleanup_path - Registers files or directories for removal at shell exit.
+#
+# Paths are removed with `rm -rf --` from the shared EXIT trap. Empty paths, root
+# paths, and paths containing current/parent directory traversal components are
+# rejected to avoid broad accidental deletion.
+#
+# Usage:
+#   workspace="$(mktemp -d)"
+#   std_register_cleanup_path "$workspace"
+#
+std_register_cleanup_path() {
+    local path existing_path
+
+    if (($# == 0)); then
+        log_warn "std_register_cleanup_path: No paths provided."
+        return 0
+    fi
+
+    for path; do
+        if ! __std_is_safe_cleanup_path__ "$path"; then
+            log_error "std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
+            return 1
+        fi
+    done
+
+    for path; do
+        local already_registered=0
+        for existing_path in "${__std_cleanup_paths[@]}"; do
+            if [[ "$existing_path" == "$path" ]]; then
+                already_registered=1
+                break
+            fi
+        done
+        ((already_registered)) || __std_cleanup_paths+=("$path")
+    done
+
+    __std_install_cleanup_dispatcher__
     return 0
 }
 

@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
   join, and membership helpers.
 - Added a documented stdlib-loaded marker for companion-library dependency
   guards.
+- Added stdlib cleanup hook and cleanup path registration backed by a shared
+  `EXIT` trap.
 
 ## [0.2.1] - 2026-06-18
 
