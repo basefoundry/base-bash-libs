@@ -4,13 +4,14 @@
 | --- | --- | --- | --- |
 | `1.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.0.0) |
 
-Reusable Bash libraries extracted from
-[Base](https://github.com/basefoundry/base).
+Reusable Bash standard library for reliable shell scripts.
 
-This repository provides sourceable Bash libraries for scripts that want
-consistent logging, command execution, filesystem editing, Git helper behavior,
-string handling, and import conventions without adopting the full Base
-workspace control plane.
+base-bash-libs provides sourceable Bash libraries for logging, error handling,
+safe command execution, filesystem edits, Git helpers, string utilities, temp
+paths, cleanup hooks, and import conventions. It is extracted from
+[Base](https://github.com/basefoundry/base), but can be installed and used
+independently through Homebrew, source checkouts, vendored copies, or git
+submodules.
 
 Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 
