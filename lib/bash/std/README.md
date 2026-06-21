@@ -382,6 +382,7 @@ Use assertions near the top of functions to make assumptions explicit:
 
 ```bash
 assert_arg_count "$#" 2
+assert_variable_name result_var array_var
 assert_not_null BASE_HOME project_name
 assert_integer retry_count
 assert_integer_range retry_count 0 5
@@ -396,6 +397,9 @@ assert_dir_exists "$project_root"
 `assert_not_null TOKEN`, not `assert_not_null "$TOKEN"`. When an argument is not
 a valid Bash variable name, `assert_not_null` reports likely misuse without
 echoing the invalid value.
+
+Use `assert_variable_name` when a helper accepts variable names but does not
+require those variables to exist or contain values.
 
 The assertions favor clear failure messages over scattered one-off tests. Some
 helpers check all provided values and report all missing items together.

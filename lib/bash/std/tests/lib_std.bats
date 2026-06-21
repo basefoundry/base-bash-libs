@@ -1344,6 +1344,27 @@ EOF
     [[ "$output" != *"not-valid"* ]]
 }
 
+@test "assert_variable_name accepts valid Bash variable names" {
+    assert_variable_name value_name _value_name VALUE_NAME value_name_2
+}
+
+@test "assert_variable_name exits for invalid variable names without echoing values" {
+    local script="$TEST_TMPDIR/assert-variable-name-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+secret="not-valid"
+assert_variable_name value_name "\$secret"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"

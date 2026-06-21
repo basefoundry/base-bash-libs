@@ -11,31 +11,47 @@ fi
 readonly __lib_str_sourced__=1
 
 str_lower() {
-    local value="${1-}"
-    printf '%s' "${value,,}"
+    local __str_var_name="${1-}" __str_value
+
+    assert_arg_count "$#" 1
+    assert_variable_name "$__str_var_name"
+    __str_value="${!__str_var_name-}"
+    printf -v "$__str_var_name" '%s' "${__str_value,,}"
 }
 
 str_upper() {
-    local value="${1-}"
-    printf '%s' "${value^^}"
+    local __str_var_name="${1-}" __str_value
+
+    assert_arg_count "$#" 1
+    assert_variable_name "$__str_var_name"
+    __str_value="${!__str_var_name-}"
+    printf -v "$__str_var_name" '%s' "${__str_value^^}"
 }
 
 str_ltrim() {
-    local value="${1-}"
-    value="${value#"${value%%[![:space:]]*}"}"
-    printf '%s' "$value"
+    local __str_var_name="${1-}" __str_value
+
+    assert_arg_count "$#" 1
+    assert_variable_name "$__str_var_name"
+    __str_value="${!__str_var_name-}"
+    __str_value="${__str_value#"${__str_value%%[![:space:]]*}"}"
+    printf -v "$__str_var_name" '%s' "$__str_value"
 }
 
 str_rtrim() {
-    local value="${1-}"
-    value="${value%"${value##*[![:space:]]}"}"
-    printf '%s' "$value"
+    local __str_var_name="${1-}" __str_value
+
+    assert_arg_count "$#" 1
+    assert_variable_name "$__str_var_name"
+    __str_value="${!__str_var_name-}"
+    __str_value="${__str_value%"${__str_value##*[![:space:]]}"}"
+    printf -v "$__str_var_name" '%s' "$__str_value"
 }
 
 str_trim() {
-    local value="${1-}"
-    value="$(str_ltrim "$value")"
-    str_rtrim "$value"
+    assert_arg_count "$#" 1
+    str_ltrim "$1"
+    str_rtrim "$1"
 }
 
 str_contains() {
@@ -56,10 +72,8 @@ str_ends_with() {
 str_split() {
     local result_name="${1-}" value="${2-}" separator="${3-}"
 
-    if ! __is_valid_variable_name__ "$result_name"; then
-        log_error "str_split: result variable name must be a valid Bash variable name."
-        return 1
-    fi
+    assert_arg_count "$#" 3
+    assert_variable_name "$result_name"
 
     local -a fields=()
     local remainder="$value"
@@ -80,14 +94,8 @@ str_split() {
 str_join() {
     local result_name="${1-}" separator="${2-}" array_name="${3-}"
 
-    if ! __is_valid_variable_name__ "$array_name"; then
-        log_error "str_join: array variable name must be a valid Bash variable name."
-        return 1
-    fi
-    if ! __is_valid_variable_name__ "$result_name"; then
-        log_error "str_join: result variable name must be a valid Bash variable name."
-        return 1
-    fi
+    assert_arg_count "$#" 3
+    assert_variable_name "$result_name" "$array_name"
 
     local __str_join_joined="" index
     local -a __str_join_values=()
@@ -107,10 +115,8 @@ str_join() {
 str_in_array() {
     local needle="${1-}" array_name="${2-}" item
 
-    if ! __is_valid_variable_name__ "$array_name"; then
-        log_error "str_in_array: array variable name must be a valid Bash variable name."
-        return 1
-    fi
+    assert_arg_count "$#" 2
+    assert_variable_name "$array_name"
 
     local -a __str_in_array_values=()
     eval "__str_in_array_values=(\"\${${array_name}[@]}\")"
