@@ -7,6 +7,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `lib/bash/str/lib_str.sh` with string case, trim, predicate, split,
+  join, and membership helpers.
+
 ## [0.2.1] - 2026-06-18
 
 ### Changed

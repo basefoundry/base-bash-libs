@@ -9,7 +9,8 @@ Reusable Bash libraries extracted from
 
 This repository provides sourceable Bash libraries for scripts that want
 consistent logging, command execution, filesystem editing, Git helper behavior,
-and import conventions without adopting the full Base workspace control plane.
+string handling, and import conventions without adopting the full Base
+workspace control plane.
 
 Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 
@@ -25,6 +26,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/git/lib_git.sh`](lib/bash/git/README.md)
   Git helper functions built on the stdlib for lightweight repository
   inspection, update, and script freshness checks.
+- [`lib/bash/str/lib_str.sh`](lib/bash/str/README.md)
+  String helpers built on the stdlib for case conversion, trimming,
+  predicates, splitting, joining, and array membership checks.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 
@@ -56,6 +60,7 @@ Load companion libraries with absolute imports from the same package:
 ```bash
 import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
 ```
 
 ### Source Checkout
@@ -81,6 +86,7 @@ Load companion libraries with absolute imports from the same checkout:
 ```bash
 import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 ```
 
 ### Vendored or Submodule Layout
@@ -95,6 +101,7 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
