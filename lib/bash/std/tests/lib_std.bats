@@ -888,6 +888,91 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
+@test "std_run_with_timeout runs commands and preserves arguments" {
+    local output_file="$TEST_TMPDIR/timeout-output.txt"
+
+    std_run_with_timeout 5 bash -c 'printf "%s\n" "$1" > "$2"' _ "hello world" "$output_file"
+
+    [ "$(cat "$output_file")" = "hello world" ]
+}
+
+@test "std_run_with_timeout --no-exit returns 124 when the command times out" {
+    local stderr_file="$TEST_TMPDIR/timeout.err"
+    local rc
+
+    if std_run_with_timeout --no-exit --quiet 1 sleep 2 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 124 ]
+    [ ! -s "$stderr_file" ]
+}
+
+@test "std_run_with_timeout exits on command failure by default" {
+    local script="$TEST_TMPDIR/timeout-fail.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_run_with_timeout 5 bash -c 'exit 6'
+echo "after"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 6 ]
+    [[ "$output" == *"Command failed (exit 6)"* ]]
+    [[ "$output" != *"after"* ]]
+}
+
+@test "std_run_with_timeout honors dry-run mode without executing the command" {
+    local target="$TEST_TMPDIR/timeout-dry-run.txt"
+    DRY_RUN=true
+
+    std_run_with_timeout 1 touch "$target"
+
+    [ "$?" -eq 0 ]
+    [ ! -e "$target" ]
+}
+
+@test "std_run_with_timeout falls back when timeout binaries are absent" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
+    local output_file="$TEST_TMPDIR/timeout-fallback-output.txt"
+    local script="$TEST_TMPDIR/timeout-fallback.sh"
+
+    mkdir -p "$fake_bin"
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v sleep)" "$fake_bin/sleep"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+PATH="$fake_bin"
+std_run_with_timeout --no-exit 5 /bin/echo fallback > "$output_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$output_file")" = "fallback" ]
+}
+
+@test "std_run_with_timeout rejects invalid timeouts" {
+    local stderr_file="$TEST_TMPDIR/timeout-invalid.err"
+    local rc
+
+    if std_run_with_timeout --no-exit nope bash -c 'exit 0' 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_run_with_timeout: timeout seconds must be a positive integer."* ]]
+}
+
 @test "run compatibility wrapper delegates to std_run behavior" {
     local stderr_file="$TEST_TMPDIR/run-compat.err"
     local rc
@@ -1091,6 +1176,172 @@ EOF
 
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
+}
+
+@test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
+    local script="$TEST_TMPDIR/temp-file.sh"
+    local temp_root="$TEST_TMPDIR/temp-root"
+    local path_file="$TEST_TMPDIR/temp-file.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_file temp_file sample
+[[ -f "\$temp_file" ]] || exit 44
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/sample.* ]]
+    [ ! -e "$created_path" ]
+}
+
+@test "std_make_temp_dir creates a directory under TMPDIR and cleans it up" {
+    local script="$TEST_TMPDIR/temp-dir.sh"
+    local temp_root="$TEST_TMPDIR/temp-dir-root"
+    local path_file="$TEST_TMPDIR/temp-dir.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_dir temp_dir workspace
+[[ -d "\$temp_dir" ]] || exit 44
+printf '%s\n' "\$temp_dir" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/workspace.* ]]
+    [ ! -e "$created_path" ]
+}
+
+@test "std_make_temp_file --keep leaves the created file in place" {
+    local script="$TEST_TMPDIR/temp-file-keep.sh"
+    local temp_root="$TEST_TMPDIR/temp-keep-root"
+    local path_file="$TEST_TMPDIR/temp-file-keep.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_file --keep temp_file kept
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/kept.* ]]
+    [ -f "$created_path" ]
+}
+
+@test "std_make_temp helpers reject invalid result variable names" {
+    local stderr_file="$TEST_TMPDIR/temp-invalid.err"
+    local rc
+
+    if std_make_temp_file "not-valid" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_make_temp_file: result variable name must be a valid Bash variable name."* ]]
+
+    if std_make_temp_dir "also-not-valid" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
+}
+
+@test "std_command_path stores executable paths and returns nonzero for missing commands" {
+    local command_path=""
+
+    std_command_path command_path bash
+
+    [ -n "$command_path" ]
+    [ -x "$command_path" ]
+
+    if std_command_path command_path "__base_missing_command__$RANDOM"; then
+        return 1
+    fi
+
+    [ "$command_path" = "" ]
+}
+
+@test "std_command_path rejects invalid result variable names" {
+    local stderr_file="$TEST_TMPDIR/command-path.err"
+    local rc
+
+    if std_command_path "not-valid" bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_command_path: result variable name must be a valid Bash variable name."* ]]
+}
+
+@test "std_function_exists checks defined Bash functions" {
+    local missing_name="__missing_function__$RANDOM"
+
+    sample_introspection_function() { return 0; }
+
+    std_function_exists sample_introspection_function
+    ! std_function_exists "$missing_name"
+    ! std_function_exists "not-valid"
+}
+
+@test "assert_function_exists accepts defined functions and exits for missing ones" {
+    local script="$TEST_TMPDIR/assert-function-exists.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+defined_function() { return 0; }
+assert_function_exists defined_function missing_function
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Required functions are not defined: missing_function"* ]]
+}
+
+@test "assert_function_exists rejects invalid names without echoing values" {
+    local script="$TEST_TMPDIR/assert-function-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+secret="not-valid"
+assert_function_exists "\$secret"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_function_exists expects function names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 }
 
 @test "assert_not_null accepts populated variables" {
