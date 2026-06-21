@@ -11,6 +11,15 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Added `lib/bash/str/lib_str.sh` with string case, trim, predicate, split,
   join, and membership helpers.
+- Added a documented stdlib-loaded marker for companion-library dependency
+  guards.
+- Added stdlib cleanup hook and cleanup path registration backed by a shared
+  `EXIT` trap.
+- Added portable stdlib temporary file and directory helpers with default exit
+  cleanup.
+- Added stdlib command path and function introspection helpers.
+- Added `std_run_with_timeout` for bounded command execution with macOS/Linux
+  fallback behavior.
 
 ## [0.2.1] - 2026-06-18
 

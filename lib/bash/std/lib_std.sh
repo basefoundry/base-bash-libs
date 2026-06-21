@@ -22,14 +22,24 @@
 # Caller-visible globals:
 #   BASE_BASH_LIBS_VERSION
 #                    Package version read from the repository/package VERSION file.
+#   BASE_BASH_LIBS_STDLIB_LOADED
+#                    Set to 1 after lib_std.sh has initialized successfully.
 #   __SCRIPT_ARGS__   Original "$@" before lib_std consumed global flags.
 #   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
 #
 # Core helpers:
 #   std_run [--no-exit] [--quiet] cmd ...
 #                                # Safe command runner with dry-run & failure handling.
+#   std_run_with_timeout [opts] seconds cmd ...
+#                                # Safe command runner with a timeout.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
+#   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
+#   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
+#   std_make_temp_file var [pfx] # Create a temp file and store its path in var.
+#   std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
+#   std_command_path var cmd     # Resolve an external command path without exiting.
+#   std_function_exists fn       # Predicate for defined Bash functions.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -123,6 +133,10 @@ __SCRIPT_DIR__=$(
     cd -- "$(dirname -- "${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]}}" )" &>/dev/null && pwd -P
 )
 readonly __SCRIPT_DIR__
+declare -ga __std_cleanup_hooks=()
+declare -ga __std_cleanup_paths=()
+declare -g __std_cleanup_dispatcher_installed=0
+declare -g __std_original_exit_trap=""
 
 ############################################ BASH VERSION CHECKER #######################################################
 
@@ -814,6 +828,127 @@ run() {
     __std_run_impl__ run "$@"
 }
 
+__std_sleep_interval__() {
+    if [[ -x /bin/sleep ]]; then
+        /bin/sleep "$1"
+    else
+        sleep "$1"
+    fi
+}
+
+__std_run_with_timeout_fallback__() {
+    local timeout_seconds="$1"
+    shift
+    local timeout_marker command_pid timer_pid command_status
+
+    timeout_marker="$(mktemp "${TMPDIR:-/tmp}/base-bash-libs-timeout.XXXXXXXXXX" 2>/dev/null)" || return 127
+
+    "$@" &
+    command_pid=$!
+
+    (
+        __std_sleep_interval__ "$timeout_seconds"
+        printf '1' > "$timeout_marker"
+        kill -TERM "$command_pid" 2>/dev/null || true
+    ) &
+    timer_pid=$!
+
+    wait "$command_pid"
+    command_status=$?
+
+    if kill -0 "$timer_pid" 2>/dev/null; then
+        kill "$timer_pid" 2>/dev/null || true
+    fi
+    wait "$timer_pid" 2>/dev/null || true
+
+    if [[ -s "$timeout_marker" ]]; then
+        command_status=124
+    fi
+    rm -f -- "$timeout_marker"
+
+    return "$command_status"
+}
+
+#
+# std_run_with_timeout - Safely executes a command with a timeout.
+#
+# This helper mirrors `std_run` option handling while bounding the command
+# runtime. It prefers `timeout` or `gtimeout` when available and otherwise uses
+# a Bash fallback so callers have portable behavior on macOS and Linux.
+#
+# Usage:
+#   std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ...
+#
+std_run_with_timeout() {
+    local exit_on_failure=1 quiet=0 timeout_seconds timeout_path="" exit_code printable_command message
+
+    while (($#)); do
+        case "${1-}" in
+            --no-exit)
+                exit_on_failure=0
+                shift
+                ;;
+            --quiet)
+                quiet=1
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# < 2)); then
+        log_error "std_run_with_timeout: usage: std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ..."
+        return 1
+    fi
+
+    timeout_seconds="$1"
+    shift
+    if [[ ! "$timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+        log_error "std_run_with_timeout: timeout seconds must be a positive integer."
+        return 1
+    fi
+
+    printf -v printable_command "%q " "$@"
+    printable_command="${printable_command% }"
+
+    if is_dry_run; then
+        log_info "[DRY-RUN] Would run with ${timeout_seconds}s timeout: ${printable_command}"
+        return 0
+    fi
+
+    if std_command_path timeout_path timeout || std_command_path timeout_path gtimeout; then
+        "$timeout_path" "$timeout_seconds" "$@"
+    else
+        __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
+    fi
+    exit_code=$?
+
+    if ((exit_code)); then
+        if ((exit_code == 124)); then
+            message="Command timed out after ${timeout_seconds}s: ${printable_command}"
+        else
+            message="Command failed (exit $exit_code): ${printable_command}"
+        fi
+
+        if ((exit_on_failure)); then
+            exit_if_error "$exit_code" "$message"
+        else
+            if ((! quiet)); then
+                log_warn "$message (continuing)."
+            fi
+            return "$exit_code"
+        fi
+    fi
+
+    return 0
+}
+
 ############################################## FILE AND DIRECTORY HANDLING ############################################
 
 #
@@ -927,11 +1062,335 @@ safe_truncate() {
     return 0
 }
 
+######################################################## CLEANUP #######################################################
+
+__std_get_exit_trap_command__() {
+    local result_name="$1" trap_spec=""
+
+    trap_spec="$(trap -p EXIT || true)"
+    if [[ "$trap_spec" =~ ^trap\ --\ \'(.*)\'\ EXIT$ ]]; then
+        printf -v "$result_name" '%s' "${BASH_REMATCH[1]}"
+    else
+        printf -v "$result_name" '%s' ""
+    fi
+}
+
+__std_return_status__() {
+    return "$1"
+}
+
+__std_run_cleanup_hooks__() {
+    local exit_status=$? hook cleanup_path
+
+    if [[ -n "${__std_original_exit_trap:-}" ]]; then
+        __std_return_status__ "$exit_status"
+        eval "$__std_original_exit_trap"
+    fi
+
+    for hook in "${__std_cleanup_hooks[@]}"; do
+        if ! "$hook"; then
+            log_warn "Cleanup hook '$hook' failed."
+        fi
+    done
+
+    for cleanup_path in "${__std_cleanup_paths[@]}"; do
+        [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || continue
+        if ! rm -rf -- "$cleanup_path"; then
+            log_warn "Cleanup path '$cleanup_path' could not be removed."
+        fi
+    done
+
+    return "$exit_status" 2>/dev/null || exit "$exit_status"
+}
+
+__std_install_cleanup_dispatcher__() {
+    if ((__std_cleanup_dispatcher_installed)); then
+        return 0
+    fi
+
+    __std_get_exit_trap_command__ __std_original_exit_trap
+    trap '__std_run_cleanup_hooks__' EXIT
+    __std_cleanup_dispatcher_installed=1
+    return 0
+}
+
+#
+# std_register_cleanup_hook - Registers a function to run from the shared EXIT trap.
+#
+# Cleanup hooks run after any EXIT trap that existed before the first cleanup hook
+# registration. Hooks are function names, not shell command strings.
+#
+# Usage:
+#   cleanup_workspace() { rm -rf -- "$workspace"; }
+#   std_register_cleanup_hook cleanup_workspace
+#
+std_register_cleanup_hook() {
+    local hook="${1-}" existing_hook
+
+    if (($# != 1)); then
+        log_error "std_register_cleanup_hook: expected exactly one function name."
+        return 1
+    fi
+    if ! __is_valid_variable_name__ "$hook" || ! declare -F "$hook" >/dev/null; then
+        log_error "std_register_cleanup_hook: '$hook' is not a defined cleanup function."
+        return 1
+    fi
+
+    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+        [[ "$existing_hook" == "$hook" ]] && return 0
+    done
+
+    __std_cleanup_hooks+=("$hook")
+    __std_install_cleanup_dispatcher__
+    return 0
+}
+
+#
+# std_unregister_cleanup_hook - Removes a function from the shared EXIT cleanup hook list.
+#
+# Usage:
+#   std_unregister_cleanup_hook cleanup_workspace
+#
+std_unregister_cleanup_hook() {
+    local hook="${1-}" existing_hook
+    local -a remaining_hooks=()
+
+    if (($# != 1)); then
+        log_error "std_unregister_cleanup_hook: expected exactly one function name."
+        return 1
+    fi
+
+    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+        [[ "$existing_hook" == "$hook" ]] && continue
+        remaining_hooks+=("$existing_hook")
+    done
+    __std_cleanup_hooks=("${remaining_hooks[@]}")
+    return 0
+}
+
+__std_is_safe_cleanup_path__() {
+    local path="${1-}"
+
+    [[ -n "$path" ]] || return 1
+    [[ "$path" =~ ^/+$ ]] && return 1
+    case "$path" in
+        . | .. | */.. | */../* | */. | */./*)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+#
+# std_register_cleanup_path - Registers files or directories for removal at shell exit.
+#
+# Paths are removed with `rm -rf --` from the shared EXIT trap. Empty paths, root
+# paths, and paths containing current/parent directory traversal components are
+# rejected to avoid broad accidental deletion.
+#
+# Usage:
+#   workspace="$(mktemp -d)"
+#   std_register_cleanup_path "$workspace"
+#
+std_register_cleanup_path() {
+    local path existing_path
+
+    if (($# == 0)); then
+        log_warn "std_register_cleanup_path: No paths provided."
+        return 0
+    fi
+
+    for path; do
+        if ! __std_is_safe_cleanup_path__ "$path"; then
+            log_error "std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
+            return 1
+        fi
+    done
+
+    for path; do
+        local already_registered=0
+        for existing_path in "${__std_cleanup_paths[@]}"; do
+            if [[ "$existing_path" == "$path" ]]; then
+                already_registered=1
+                break
+            fi
+        done
+        ((already_registered)) || __std_cleanup_paths+=("$path")
+    done
+
+    __std_install_cleanup_dispatcher__
+    return 0
+}
+
+######################################################## TEMP FILES ####################################################
+
+__std_make_temp_path__() {
+    local helper_name="$1" path_kind="$2"
+    shift 2
+    local keep=0 result_name prefix temp_root template temp_path
+
+    while (($#)); do
+        case "${1-}" in
+            --keep)
+                keep=1
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# < 1 || $# > 2)); then
+        log_error "$helper_name: usage: $helper_name [--keep] <result_variable_name> [prefix]"
+        return 1
+    fi
+
+    result_name="$1"
+    prefix="${2:-base-bash-libs}"
+
+    if ! __is_valid_variable_name__ "$result_name"; then
+        log_error "$helper_name: result variable name must be a valid Bash variable name."
+        return 1
+    fi
+    if [[ -z "$prefix" || "$prefix" == */* ]]; then
+        log_error "$helper_name: prefix must be a non-empty filename prefix without '/'."
+        return 1
+    fi
+
+    temp_root="${TMPDIR:-/tmp}"
+    temp_root="${temp_root%/}"
+    if [[ -z "$temp_root" || ! -d "$temp_root" ]]; then
+        log_error "$helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+        return 1
+    fi
+
+    template="$temp_root/$prefix.XXXXXXXXXX"
+    if [[ "$path_kind" == "dir" ]]; then
+        temp_path="$(mktemp -d "$template" 2>/dev/null)" || {
+            log_error "$helper_name: failed to create temporary directory."
+            return 1
+        }
+    else
+        temp_path="$(mktemp "$template" 2>/dev/null)" || {
+            log_error "$helper_name: failed to create temporary file."
+            return 1
+        }
+    fi
+
+    if ((! keep)); then
+        if ! std_register_cleanup_path "$temp_path"; then
+            rm -rf -- "$temp_path"
+            return 1
+        fi
+    fi
+
+    printf -v "$result_name" '%s' "$temp_path"
+    return 0
+}
+
+#
+# std_make_temp_file - Creates a temporary file and stores its path in a named variable.
+#
+# The created file is registered for exit cleanup unless `--keep` is provided.
+#
+# Usage:
+#   std_make_temp_file [--keep] <result_variable_name> [prefix]
+#
+std_make_temp_file() {
+    __std_make_temp_path__ std_make_temp_file file "$@"
+}
+
+#
+# std_make_temp_dir - Creates a temporary directory and stores its path in a named variable.
+#
+# The created directory is registered for exit cleanup unless `--keep` is provided.
+#
+# Usage:
+#   std_make_temp_dir [--keep] <result_variable_name> [prefix]
+#
+std_make_temp_dir() {
+    __std_make_temp_path__ std_make_temp_dir dir "$@"
+}
+
 ####################################################### ASSERTIONS ####################################################
 
 __is_valid_variable_name__() {
     local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
     [[ "$var_name" =~ $var_name_re ]]
+}
+
+##################################################### INTROSPECTION ###################################################
+
+#
+# std_command_path - Resolves an external command path without exiting the caller.
+#
+# Usage:
+#   if std_command_path git_path git; then
+#       std_run "$git_path" status --short
+#   fi
+#
+std_command_path() {
+    local result_name="${1-}" command_name="${2-}" resolved_path=""
+
+    if (($# != 2)); then
+        log_error "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
+        return 1
+    fi
+    if ! __is_valid_variable_name__ "$result_name"; then
+        log_error "std_command_path: result variable name must be a valid Bash variable name."
+        return 1
+    fi
+
+    if [[ -n "$command_name" ]]; then
+        resolved_path="$(type -P "$command_name" 2>/dev/null || true)"
+    fi
+    printf -v "$result_name" '%s' "$resolved_path"
+    [[ -n "$resolved_path" ]]
+}
+
+#
+# std_function_exists - Checks whether a Bash function is currently defined.
+#
+std_function_exists() {
+    local function_name="${1-}"
+
+    (($# == 1)) || return 1
+    __is_valid_variable_name__ "$function_name" || return 1
+    declare -F "$function_name" >/dev/null
+}
+
+#
+# assert_function_exists - Verifies that one or more Bash functions are defined.
+#
+# Usage:
+#   assert_function_exists main cleanup_workspace
+#
+assert_function_exists() {
+    local missing_functions=() function_name
+
+    if (($# == 0)); then
+        fatal_error "assert_function_exists: No function names provided for validation."
+    fi
+
+    for function_name in "$@"; do
+        if ! __is_valid_variable_name__ "$function_name"; then
+            fatal_error "assert_function_exists expects function names; one or more arguments are not valid Bash function names."
+        fi
+        if ! std_function_exists "$function_name"; then
+            missing_functions+=("$function_name")
+        fi
+    done
+
+    if ((${#missing_functions[@]} > 0)); then
+        fatal_error "Required functions are not defined: ${missing_functions[*]}"
+    fi
+
+    return 0
 }
 
 #
@@ -1345,6 +1804,7 @@ wait_for_enter() {
 # The only function that would be called upon sourcing of the library
 #
 __stdlib_init__
+readonly BASE_BASH_LIBS_STDLIB_LOADED=1
 
 # This is the crucial step: it resets the positional parameters ($@, $1, etc.)
 # of the *calling script* to the new, filtered list of arguments.
