@@ -19,6 +19,8 @@ The library improves Bash-based scripting in a few practical ways:
   instead of a mysterious non-zero exit.
 - **Safe command execution**: `std_run` preserves argument boundaries, supports
   dry-run mode, and can either exit or return a status.
+- **Bounded command execution**: `std_run_with_timeout` applies the same command
+  runner conventions with a timeout.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
 - **Composable cleanup**: scripts can register exit cleanup without replacing
@@ -204,6 +206,26 @@ in the calling script so the code remains clear.
 `run` remains available as a compatibility wrapper for existing callers, but new
 code should use `std_run` to avoid collisions with test frameworks and other
 Bash libraries that define their own `run` helper.
+
+Use `std_run_with_timeout` when a command must finish within a bounded number of
+seconds:
+
+```bash
+std_run_with_timeout 30 curl -fsSL "$health_url"
+```
+
+It accepts the same initial `--no-exit` and `--quiet` options as `std_run`:
+
+```bash
+if ! std_run_with_timeout --no-exit --quiet 5 nc -z localhost 5432; then
+    log_warn "database port did not open within 5 seconds"
+fi
+```
+
+Timeouts return status `124`. The helper prefers `timeout` or `gtimeout` when
+available and otherwise uses a Bash fallback so scripts work on macOS and Linux.
+As with `std_run`, command arguments are executed as an argument array and
+dry-run mode logs without running the command.
 
 ## Importing Other Bash Libraries
 
