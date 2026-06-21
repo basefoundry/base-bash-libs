@@ -22,6 +22,8 @@
 # Caller-visible globals:
 #   BASE_BASH_LIBS_VERSION
 #                    Package version read from the repository/package VERSION file.
+#   BASE_BASH_LIBS_STDLIB_LOADED
+#                    Set to 1 after lib_std.sh has initialized successfully.
 #   __SCRIPT_ARGS__   Original "$@" before lib_std consumed global flags.
 #   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
 #
@@ -1345,6 +1347,7 @@ wait_for_enter() {
 # The only function that would be called upon sourcing of the library
 #
 __stdlib_init__
+readonly BASE_BASH_LIBS_STDLIB_LOADED=1
 
 # This is the crucial step: it resets the positional parameters ($@, $1, etc.)
 # of the *calling script* to the new, filtered list of arguments.

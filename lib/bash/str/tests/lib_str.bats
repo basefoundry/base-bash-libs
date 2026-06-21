@@ -23,6 +23,14 @@ setup() {
     [[ "$output" != *"command not found"* ]]
 }
 
+@test "lib_str requires the stdlib loaded marker" {
+    bats_run bash -c 'log_error() { :; }; log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/str/lib_str.sh"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lib_str.sh requires lib_std.sh to be sourced first"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+}
+
 @test "string case helpers transform text without changing other characters" {
     [ "$(str_lower "Alpha BETA 123!?")" = "alpha beta 123!?" ]
     [ "$(str_upper "Alpha beta 123!?")" = "ALPHA BETA 123!?" ]

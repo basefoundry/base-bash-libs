@@ -11,6 +11,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Added `lib/bash/str/lib_str.sh` with string case, trim, predicate, split,
   join, and membership helpers.
+- Added a documented stdlib-loaded marker for companion-library dependency
+  guards.
 
 ## [0.2.1] - 2026-06-18
 

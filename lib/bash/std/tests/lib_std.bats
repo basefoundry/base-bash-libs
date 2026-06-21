@@ -174,6 +174,11 @@ EOF
     readonly -p BASE_BASH_LIBS_VERSION >/dev/null
 }
 
+@test "stdlib exposes readonly loaded marker" {
+    [ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" = "1" ]
+    readonly -p BASE_BASH_LIBS_STDLIB_LOADED >/dev/null
+}
+
 @test "is_interactive is false in a non-interactive subprocess" {
     local script="$TEST_TMPDIR/non-interactive.sh"
 

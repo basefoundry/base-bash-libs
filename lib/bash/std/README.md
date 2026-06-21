@@ -56,6 +56,7 @@ Sourcing `lib_std.sh` runs a small one-time initializer:
 - records the original script arguments in `__SCRIPT_ARGS__`
 - derives the caller's source directory in `__SCRIPT_DIR__`
 - exposes the package version in `BASE_BASH_LIBS_VERSION`
+- exposes the successful stdlib load marker in `BASE_BASH_LIBS_STDLIB_LOADED`
 - consumes Base wrapper flags such as `--debug-wrapper`, `--verbose-wrapper`,
   `--utc-wrapper`, and `--color`
 - resets the caller's positional parameters to the filtered argument list
@@ -64,6 +65,8 @@ Caller-visible globals:
 
 - `BASE_BASH_LIBS_VERSION`: readonly package version read from the root
   `VERSION` file
+- `BASE_BASH_LIBS_STDLIB_LOADED`: readonly marker set to `1` after
+  `lib_std.sh` has initialized successfully
 - `__SCRIPT_ARGS__`: original arguments before wrapper flags were stripped
 - `__SCRIPT_DIR__`: absolute source directory for the script being bootstrapped
 

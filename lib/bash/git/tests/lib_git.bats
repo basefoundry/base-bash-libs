@@ -23,6 +23,14 @@ setup() {
     [[ "$output" != *"command not found"* ]]
 }
 
+@test "lib_git requires the stdlib loaded marker" {
+    bats_run bash -c 'log_error() { :; }; log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/git/lib_git.sh"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lib_git.sh requires lib_std.sh to be sourced first"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+}
+
 @test "git_get_current_branch returns the current branch name" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
