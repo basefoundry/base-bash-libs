@@ -11,6 +11,8 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   Git-related helpers built on top of the stdlib.
 - `file/`
   File-editing helpers built on top of the stdlib.
+- `str/`
+  String helpers built on top of the stdlib.
 - `tests/`
   Common BATS helpers for Bash library test suites.
 

@@ -68,6 +68,14 @@ file_mode() {
     [[ "$output" != *"command not found"* ]]
 }
 
+@test "lib_file requires the stdlib loaded marker" {
+    bats_run bash -c 'log_error() { :; }; log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/file/lib_file.sh"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lib_file.sh requires lib_std.sh to be sourced first"* ]]
+    [[ "$output" == *"source-rc=1"* ]]
+}
+
 @test "update_file_section writes option-like markers literally" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"

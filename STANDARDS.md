@@ -14,6 +14,7 @@ physical `.sh` file at its library boundary:
 - `lib/bash/std/lib_std.sh`
 - `lib/bash/file/lib_file.sh`
 - `lib/bash/git/lib_git.sh`
+- `lib/bash/str/lib_str.sh`
 
 Do not split one library into internal concern files such as separate logging,
 path, string, prompt, or command-runner fragments. That kind of split adds a
