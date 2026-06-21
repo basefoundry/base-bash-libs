@@ -10,15 +10,15 @@ helpers are available.
 ## Public API
 
 - `str_lower`
-  Print a string converted to lowercase.
+  Convert a named variable's value to lowercase in place.
 - `str_upper`
-  Print a string converted to uppercase.
+  Convert a named variable's value to uppercase in place.
 - `str_trim`
-  Print a string with leading and trailing whitespace removed.
+  Remove leading and trailing whitespace from a named variable in place.
 - `str_ltrim`
-  Print a string with leading whitespace removed.
+  Remove leading whitespace from a named variable in place.
 - `str_rtrim`
-  Print a string with trailing whitespace removed.
+  Remove trailing whitespace from a named variable in place.
 - `str_contains`
   Return success when a string contains a substring.
 - `str_starts_with`
@@ -38,10 +38,11 @@ helpers are available.
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 source "/absolute/path/to/lib/bash/str/lib_str.sh"
 
-name="$(str_trim "  Example Project  ")"
-slug="$(str_lower "$name")"
+name="  Example Project  "
+str_trim name
+str_lower name
 
-if str_starts_with "$slug" "example"; then
+if str_starts_with "$name" "example"; then
     log_info "Example project detected."
 fi
 
@@ -56,11 +57,13 @@ str_join joined "|" parts
 
 - Case conversion uses Bash's native `${value,,}` and `${value^^}` expansions.
 - Trim helpers remove Bash character-class whitespace from the requested side.
+- String transformation helpers mutate the named variable in place and do not
+  print transformed values for command substitution.
 - Predicate helpers return shell status and do not print output.
 - `str_split` preserves empty fields between repeated delimiters.
 - `str_join` preserves empty array elements, including trailing empty elements.
-- Named result and array arguments must be valid Bash variable names.
+- Named string, result, and array arguments must be valid Bash variable names.
 
 ## Tests
 
-BATS coverage lives in `tests/lib_str.bats`.
+BATS coverage lives in `lib/bash/str/tests/lib_str.bats`.

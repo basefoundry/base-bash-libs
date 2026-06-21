@@ -40,6 +40,7 @@
 #   std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
 #   std_command_path var cmd     # Resolve an external command path without exiting.
 #   std_function_exists fn       # Predicate for defined Bash functions.
+#   assert_variable_name name    # Validate Bash variable-name arguments.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -1322,6 +1323,31 @@ std_make_temp_dir() {
 __is_valid_variable_name__() {
     local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
     [[ "$var_name" =~ $var_name_re ]]
+}
+
+#
+# assert_variable_name - Verifies that one or more arguments are valid Bash variable names.
+#
+# This validates the names themselves. It does not require the named variables to
+# exist or have non-empty values.
+#
+# Usage:
+#   assert_variable_name result_name array_name
+#
+assert_variable_name() {
+    local var_name
+
+    if (($# == 0)); then
+        fatal_error "assert_variable_name: No variable names provided for validation."
+    fi
+
+    for var_name in "$@"; do
+        if ! __is_valid_variable_name__ "$var_name"; then
+            fatal_error "assert_variable_name expects valid Bash variable names; one or more arguments are invalid."
+        fi
+    done
+
+    return 0
 }
 
 ##################################################### INTROSPECTION ###################################################

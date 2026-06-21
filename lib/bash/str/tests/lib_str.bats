@@ -8,6 +8,12 @@ setup() {
     source "$BASE_BASH_DIR/str/lib_str.sh"
 }
 
+create_script() {
+    local script_path="$1"
+    cat > "$script_path"
+    chmod +x "$script_path"
+}
+
 @test "lib_str can be sourced more than once" {
     source "$BASE_BASH_DIR/str/lib_str.sh"
 
@@ -32,16 +38,52 @@ setup() {
 }
 
 @test "string case helpers transform text without changing other characters" {
-    [ "$(str_lower "Alpha BETA 123!?")" = "alpha beta 123!?" ]
-    [ "$(str_upper "Alpha beta 123!?")" = "ALPHA BETA 123!?" ]
+    local value="Alpha BETA 123!?"
+    local stdout_file="$TEST_TMPDIR/case.stdout"
+
+    str_lower value >"$stdout_file"
+
+    [ "$value" = "alpha beta 123!?" ]
+    [ ! -s "$stdout_file" ]
+
+    str_upper value >"$stdout_file"
+
+    [ "$value" = "ALPHA BETA 123!?" ]
+    [ ! -s "$stdout_file" ]
 }
 
 @test "string trim helpers remove leading and trailing whitespace" {
     local value=$' \t  hello world  \t '
+    local left=$' \t  hello world  \t '
+    local right=$' \t  hello world  \t '
+    local stdout_file="$TEST_TMPDIR/trim.stdout"
 
-    [ "$(str_trim "$value")" = "hello world" ]
-    [ "$(str_ltrim "$value")" = $'hello world  \t ' ]
-    [ "$(str_rtrim "$value")" = $' \t  hello world' ]
+    str_trim value >"$stdout_file"
+    str_ltrim left >"$stdout_file"
+    str_rtrim right >"$stdout_file"
+
+    [ "$value" = "hello world" ]
+    [ "$left" = $'hello world  \t ' ]
+    [ "$right" = $' \t  hello world' ]
+    [ ! -s "$stdout_file" ]
+}
+
+@test "string transform helpers reject invalid variable names" {
+    local script="$TEST_TMPDIR/string-transform-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+secret="not-valid"
+str_trim "\$secret"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 }
 
 @test "string predicate helpers check contains prefix and suffix" {
@@ -73,17 +115,21 @@ setup() {
 }
 
 @test "str_split rejects invalid result variable names" {
-    local stderr_file="$TEST_TMPDIR/str-split.err"
-    local rc
+    local script="$TEST_TMPDIR/str-split-invalid.sh"
 
-    if str_split "not-valid" "alpha,beta" "," 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+secret="not-valid"
+str_split "\$secret" "alpha,beta" ","
+EOF
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"str_split: result variable name must be a valid Bash variable name."* ]]
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 }
 
 @test "str_join writes joined array values to a named result variable" {
@@ -96,27 +142,37 @@ setup() {
 }
 
 @test "str_join rejects invalid variable names" {
-    local -a values=("alpha")
-    local stderr_file="$TEST_TMPDIR/str-join.err"
-    local rc
+    local script="$TEST_TMPDIR/str-join-invalid-array.sh"
 
-    if str_join joined " " "not-valid" 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+secret="not-valid"
+str_join joined " " "\$secret"
+EOF
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"str_join: array variable name must be a valid Bash variable name."* ]]
+    bats_run bash "$script"
 
-    if str_join "not-valid" " " values 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"str_join: result variable name must be a valid Bash variable name."* ]]
+    script="$TEST_TMPDIR/str-join-invalid-result.sh"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+declare -a values=("alpha")
+secret="not-valid"
+str_join "\$secret" " " values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 }
 
 @test "str_in_array checks membership in a named array" {
@@ -132,15 +188,19 @@ setup() {
 }
 
 @test "str_in_array rejects invalid array variable names" {
-    local stderr_file="$TEST_TMPDIR/str-in-array.err"
-    local rc
+    local script="$TEST_TMPDIR/str-in-array-invalid.sh"
 
-    if str_in_array "alpha" "not-valid" 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+secret="not-valid"
+str_in_array "alpha" "\$secret"
+EOF
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"str_in_array: array variable name must be a valid Bash variable name."* ]]
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" != *"not-valid"* ]]
 }
