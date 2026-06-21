@@ -25,6 +25,8 @@ The library improves Bash-based scripting in a few practical ways:
   an already-installed `EXIT` trap.
 - **Portable temp state**: scripts can create temp files or directories under
   `TMPDIR` and register them for cleanup in one call.
+- **Non-fatal introspection**: scripts can resolve command paths and check
+  function availability without turning every probe into a hard exit.
 - **Simple library imports**: scripts can import helpers relative to their own
   source directory.
 - **Predictable PATH edits**: PATH additions avoid duplicates and can prepend or
@@ -322,6 +324,36 @@ The optional prefix is a filename prefix, not a directory path. It must be
 non-empty and must not contain `/`. Set `TMPDIR` before calling the helper when
 the temp root should be somewhere other than `/tmp`.
 
+## Introspection Helpers
+
+Use `std_command_path` when a script needs the path to an external command but
+wants to decide what to do if it is absent:
+
+```bash
+if std_command_path git_path git; then
+    std_run "$git_path" status --short
+else
+    log_warn "git is not available; skipping repository status."
+fi
+```
+
+The helper stores an executable path in the named result variable and returns
+nonzero with an empty result when the command is not found.
+
+Use `std_function_exists` for predicate-style checks:
+
+```bash
+if std_function_exists cleanup_workspace; then
+    std_register_cleanup_hook cleanup_workspace
+fi
+```
+
+Use `assert_function_exists` when missing functions should be fatal:
+
+```bash
+assert_function_exists main cleanup_workspace
+```
+
 ## Validation Helpers
 
 Use assertions near the top of functions to make assumptions explicit:
@@ -332,6 +364,7 @@ assert_not_null BASE_HOME project_name
 assert_integer retry_count
 assert_integer_range retry_count 0 5
 assert_command_exists git brew
+assert_function_exists main cleanup_workspace
 assert_file_exists "$manifest_path"
 assert_executable "$project_root/bin/build"
 assert_dir_exists "$project_root"
@@ -422,6 +455,7 @@ main "$@"
 - simple filesystem safety wrappers
 - exit cleanup registration
 - temporary file and directory creation
+- command and function introspection
 
 Domain-specific behavior should live in other libraries or command modules. For
 example, Git helpers belong in a Git library, file editing helpers belong in a

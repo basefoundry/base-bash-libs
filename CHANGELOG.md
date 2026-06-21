@@ -17,6 +17,7 @@ and versions are tracked in the repo-root `VERSION` file.
   `EXIT` trap.
 - Added portable stdlib temporary file and directory helpers with default exit
   cleanup.
+- Added stdlib command path and function introspection helpers.
 
 ## [0.2.1] - 2026-06-18
 

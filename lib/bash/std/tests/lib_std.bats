@@ -1187,6 +1187,78 @@ EOF
     [[ "$(cat "$stderr_file")" == *"std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
 }
 
+@test "std_command_path stores executable paths and returns nonzero for missing commands" {
+    local command_path=""
+
+    std_command_path command_path bash
+
+    [ -n "$command_path" ]
+    [ -x "$command_path" ]
+
+    if std_command_path command_path "__base_missing_command__$RANDOM"; then
+        return 1
+    fi
+
+    [ "$command_path" = "" ]
+}
+
+@test "std_command_path rejects invalid result variable names" {
+    local stderr_file="$TEST_TMPDIR/command-path.err"
+    local rc
+
+    if std_command_path "not-valid" bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_command_path: result variable name must be a valid Bash variable name."* ]]
+}
+
+@test "std_function_exists checks defined Bash functions" {
+    local missing_name="__missing_function__$RANDOM"
+
+    sample_introspection_function() { return 0; }
+
+    std_function_exists sample_introspection_function
+    ! std_function_exists "$missing_name"
+    ! std_function_exists "not-valid"
+}
+
+@test "assert_function_exists accepts defined functions and exits for missing ones" {
+    local script="$TEST_TMPDIR/assert-function-exists.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+defined_function() { return 0; }
+assert_function_exists defined_function missing_function
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Required functions are not defined: missing_function"* ]]
+}
+
+@test "assert_function_exists rejects invalid names without echoing values" {
+    local script="$TEST_TMPDIR/assert-function-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+secret="not-valid"
+assert_function_exists "\$secret"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assert_function_exists expects function names"* ]]
+    [[ "$output" != *"not-valid"* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"
