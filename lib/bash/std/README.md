@@ -19,12 +19,16 @@ The library improves Bash-based scripting in a few practical ways:
   instead of a mysterious non-zero exit.
 - **Safe command execution**: `std_run` preserves argument boundaries, supports
   dry-run mode, and can either exit or return a status.
+- **Bounded command execution**: `std_run_with_timeout` applies the same command
+  runner conventions with a timeout.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
 - **Composable cleanup**: scripts can register exit cleanup without replacing
   an already-installed `EXIT` trap.
 - **Portable temp state**: scripts can create temp files or directories under
   `TMPDIR` and register them for cleanup in one call.
+- **Non-fatal introspection**: scripts can resolve command paths and check
+  function availability without turning every probe into a hard exit.
 - **Simple library imports**: scripts can import helpers relative to their own
   source directory.
 - **Predictable PATH edits**: PATH additions avoid duplicates and can prepend or
@@ -203,6 +207,26 @@ in the calling script so the code remains clear.
 code should use `std_run` to avoid collisions with test frameworks and other
 Bash libraries that define their own `run` helper.
 
+Use `std_run_with_timeout` when a command must finish within a bounded number of
+seconds:
+
+```bash
+std_run_with_timeout 30 curl -fsSL "$health_url"
+```
+
+It accepts the same initial `--no-exit` and `--quiet` options as `std_run`:
+
+```bash
+if ! std_run_with_timeout --no-exit --quiet 5 nc -z localhost 5432; then
+    log_warn "database port did not open within 5 seconds"
+fi
+```
+
+Timeouts return status `124`. The helper prefers `timeout` or `gtimeout` when
+available and otherwise uses a Bash fallback so scripts work on macOS and Linux.
+As with `std_run`, command arguments are executed as an argument array and
+dry-run mode logs without running the command.
+
 ## Importing Other Bash Libraries
 
 Use `import` to source helper libraries:
@@ -322,6 +346,36 @@ The optional prefix is a filename prefix, not a directory path. It must be
 non-empty and must not contain `/`. Set `TMPDIR` before calling the helper when
 the temp root should be somewhere other than `/tmp`.
 
+## Introspection Helpers
+
+Use `std_command_path` when a script needs the path to an external command but
+wants to decide what to do if it is absent:
+
+```bash
+if std_command_path git_path git; then
+    std_run "$git_path" status --short
+else
+    log_warn "git is not available; skipping repository status."
+fi
+```
+
+The helper stores an executable path in the named result variable and returns
+nonzero with an empty result when the command is not found.
+
+Use `std_function_exists` for predicate-style checks:
+
+```bash
+if std_function_exists cleanup_workspace; then
+    std_register_cleanup_hook cleanup_workspace
+fi
+```
+
+Use `assert_function_exists` when missing functions should be fatal:
+
+```bash
+assert_function_exists main cleanup_workspace
+```
+
 ## Validation Helpers
 
 Use assertions near the top of functions to make assumptions explicit:
@@ -332,6 +386,7 @@ assert_not_null BASE_HOME project_name
 assert_integer retry_count
 assert_integer_range retry_count 0 5
 assert_command_exists git brew
+assert_function_exists main cleanup_workspace
 assert_file_exists "$manifest_path"
 assert_executable "$project_root/bin/build"
 assert_dir_exists "$project_root"
@@ -422,6 +477,7 @@ main "$@"
 - simple filesystem safety wrappers
 - exit cleanup registration
 - temporary file and directory creation
+- command and function introspection
 
 Domain-specific behavior should live in other libraries or command modules. For
 example, Git helpers belong in a Git library, file editing helpers belong in a

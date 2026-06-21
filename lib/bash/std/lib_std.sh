@@ -30,12 +30,16 @@
 # Core helpers:
 #   std_run [--no-exit] [--quiet] cmd ...
 #                                # Safe command runner with dry-run & failure handling.
+#   std_run_with_timeout [opts] seconds cmd ...
+#                                # Safe command runner with a timeout.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
 #   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
 #   std_make_temp_file var [pfx] # Create a temp file and store its path in var.
 #   std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
+#   std_command_path var cmd     # Resolve an external command path without exiting.
+#   std_function_exists fn       # Predicate for defined Bash functions.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -824,6 +828,127 @@ run() {
     __std_run_impl__ run "$@"
 }
 
+__std_sleep_interval__() {
+    if [[ -x /bin/sleep ]]; then
+        /bin/sleep "$1"
+    else
+        sleep "$1"
+    fi
+}
+
+__std_run_with_timeout_fallback__() {
+    local timeout_seconds="$1"
+    shift
+    local timeout_marker command_pid timer_pid command_status
+
+    timeout_marker="$(mktemp "${TMPDIR:-/tmp}/base-bash-libs-timeout.XXXXXXXXXX" 2>/dev/null)" || return 127
+
+    "$@" &
+    command_pid=$!
+
+    (
+        __std_sleep_interval__ "$timeout_seconds"
+        printf '1' > "$timeout_marker"
+        kill -TERM "$command_pid" 2>/dev/null || true
+    ) &
+    timer_pid=$!
+
+    wait "$command_pid"
+    command_status=$?
+
+    if kill -0 "$timer_pid" 2>/dev/null; then
+        kill "$timer_pid" 2>/dev/null || true
+    fi
+    wait "$timer_pid" 2>/dev/null || true
+
+    if [[ -s "$timeout_marker" ]]; then
+        command_status=124
+    fi
+    rm -f -- "$timeout_marker"
+
+    return "$command_status"
+}
+
+#
+# std_run_with_timeout - Safely executes a command with a timeout.
+#
+# This helper mirrors `std_run` option handling while bounding the command
+# runtime. It prefers `timeout` or `gtimeout` when available and otherwise uses
+# a Bash fallback so callers have portable behavior on macOS and Linux.
+#
+# Usage:
+#   std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ...
+#
+std_run_with_timeout() {
+    local exit_on_failure=1 quiet=0 timeout_seconds timeout_path="" exit_code printable_command message
+
+    while (($#)); do
+        case "${1-}" in
+            --no-exit)
+                exit_on_failure=0
+                shift
+                ;;
+            --quiet)
+                quiet=1
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# < 2)); then
+        log_error "std_run_with_timeout: usage: std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ..."
+        return 1
+    fi
+
+    timeout_seconds="$1"
+    shift
+    if [[ ! "$timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+        log_error "std_run_with_timeout: timeout seconds must be a positive integer."
+        return 1
+    fi
+
+    printf -v printable_command "%q " "$@"
+    printable_command="${printable_command% }"
+
+    if is_dry_run; then
+        log_info "[DRY-RUN] Would run with ${timeout_seconds}s timeout: ${printable_command}"
+        return 0
+    fi
+
+    if std_command_path timeout_path timeout || std_command_path timeout_path gtimeout; then
+        "$timeout_path" "$timeout_seconds" "$@"
+    else
+        __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
+    fi
+    exit_code=$?
+
+    if ((exit_code)); then
+        if ((exit_code == 124)); then
+            message="Command timed out after ${timeout_seconds}s: ${printable_command}"
+        else
+            message="Command failed (exit $exit_code): ${printable_command}"
+        fi
+
+        if ((exit_on_failure)); then
+            exit_if_error "$exit_code" "$message"
+        else
+            if ((! quiet)); then
+                log_warn "$message (continuing)."
+            fi
+            return "$exit_code"
+        fi
+    fi
+
+    return 0
+}
+
 ############################################## FILE AND DIRECTORY HANDLING ############################################
 
 #
@@ -1197,6 +1322,75 @@ std_make_temp_dir() {
 __is_valid_variable_name__() {
     local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
     [[ "$var_name" =~ $var_name_re ]]
+}
+
+##################################################### INTROSPECTION ###################################################
+
+#
+# std_command_path - Resolves an external command path without exiting the caller.
+#
+# Usage:
+#   if std_command_path git_path git; then
+#       std_run "$git_path" status --short
+#   fi
+#
+std_command_path() {
+    local result_name="${1-}" command_name="${2-}" resolved_path=""
+
+    if (($# != 2)); then
+        log_error "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
+        return 1
+    fi
+    if ! __is_valid_variable_name__ "$result_name"; then
+        log_error "std_command_path: result variable name must be a valid Bash variable name."
+        return 1
+    fi
+
+    if [[ -n "$command_name" ]]; then
+        resolved_path="$(type -P "$command_name" 2>/dev/null || true)"
+    fi
+    printf -v "$result_name" '%s' "$resolved_path"
+    [[ -n "$resolved_path" ]]
+}
+
+#
+# std_function_exists - Checks whether a Bash function is currently defined.
+#
+std_function_exists() {
+    local function_name="${1-}"
+
+    (($# == 1)) || return 1
+    __is_valid_variable_name__ "$function_name" || return 1
+    declare -F "$function_name" >/dev/null
+}
+
+#
+# assert_function_exists - Verifies that one or more Bash functions are defined.
+#
+# Usage:
+#   assert_function_exists main cleanup_workspace
+#
+assert_function_exists() {
+    local missing_functions=() function_name
+
+    if (($# == 0)); then
+        fatal_error "assert_function_exists: No function names provided for validation."
+    fi
+
+    for function_name in "$@"; do
+        if ! __is_valid_variable_name__ "$function_name"; then
+            fatal_error "assert_function_exists expects function names; one or more arguments are not valid Bash function names."
+        fi
+        if ! std_function_exists "$function_name"; then
+            missing_functions+=("$function_name")
+        fi
+    done
+
+    if ((${#missing_functions[@]} > 0)); then
+        fatal_error "Required functions are not defined: ${missing_functions[*]}"
+    fi
+
+    return 0
 }
 
 #
