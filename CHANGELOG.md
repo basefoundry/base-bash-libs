@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-21
+
 ### Added
 
 - Added `lib/bash/str/lib_str.sh` with string case, trim, predicate, split,
@@ -20,6 +22,11 @@ and versions are tracked in the repo-root `VERSION` file.
 - Added stdlib command path and function introspection helpers.
 - Added `std_run_with_timeout` for bounded command execution with macOS/Linux
   fallback behavior.
+
+### Fixed
+
+- Made the Tests workflow run on `main` pushes after the default-branch
+  migration.
 
 ## [0.2.1] - 2026-06-18
 

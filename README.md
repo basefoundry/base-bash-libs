@@ -2,7 +2,7 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `0.2.1` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v0.2.1](https://github.com/basefoundry/base-bash-libs/releases/tag/v0.2.1) |
+| `1.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.0.0) |
 
 Reusable Bash libraries extracted from
 [Base](https://github.com/basefoundry/base).
