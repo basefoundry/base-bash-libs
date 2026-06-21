@@ -63,6 +63,11 @@ if [[ -n "$stale_base_refs" ]]; then
   exit 1
 fi
 
+if ! grep -F '      - main' .github/workflows/tests.yml >/dev/null; then
+  printf 'Tests workflow must run push validation on the main branch.\n' >&2
+  exit 1
+fi
+
 fix_comments="$(grep -R -n '# FIX:' lib/bash || true)"
 if [[ -n "$fix_comments" ]]; then
   printf 'Production library files must not contain development # FIX: comments:\n%s\n' "$fix_comments" >&2
