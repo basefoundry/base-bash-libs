@@ -34,6 +34,8 @@
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
 #   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
+#   std_make_temp_file var [pfx] # Create a temp file and store its path in var.
+#   std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -1093,6 +1095,101 @@ std_register_cleanup_path() {
 
     __std_install_cleanup_dispatcher__
     return 0
+}
+
+######################################################## TEMP FILES ####################################################
+
+__std_make_temp_path__() {
+    local helper_name="$1" path_kind="$2"
+    shift 2
+    local keep=0 result_name prefix temp_root template temp_path
+
+    while (($#)); do
+        case "${1-}" in
+            --keep)
+                keep=1
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# < 1 || $# > 2)); then
+        log_error "$helper_name: usage: $helper_name [--keep] <result_variable_name> [prefix]"
+        return 1
+    fi
+
+    result_name="$1"
+    prefix="${2:-base-bash-libs}"
+
+    if ! __is_valid_variable_name__ "$result_name"; then
+        log_error "$helper_name: result variable name must be a valid Bash variable name."
+        return 1
+    fi
+    if [[ -z "$prefix" || "$prefix" == */* ]]; then
+        log_error "$helper_name: prefix must be a non-empty filename prefix without '/'."
+        return 1
+    fi
+
+    temp_root="${TMPDIR:-/tmp}"
+    temp_root="${temp_root%/}"
+    if [[ -z "$temp_root" || ! -d "$temp_root" ]]; then
+        log_error "$helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+        return 1
+    fi
+
+    template="$temp_root/$prefix.XXXXXXXXXX"
+    if [[ "$path_kind" == "dir" ]]; then
+        temp_path="$(mktemp -d "$template" 2>/dev/null)" || {
+            log_error "$helper_name: failed to create temporary directory."
+            return 1
+        }
+    else
+        temp_path="$(mktemp "$template" 2>/dev/null)" || {
+            log_error "$helper_name: failed to create temporary file."
+            return 1
+        }
+    fi
+
+    if ((! keep)); then
+        if ! std_register_cleanup_path "$temp_path"; then
+            rm -rf -- "$temp_path"
+            return 1
+        fi
+    fi
+
+    printf -v "$result_name" '%s' "$temp_path"
+    return 0
+}
+
+#
+# std_make_temp_file - Creates a temporary file and stores its path in a named variable.
+#
+# The created file is registered for exit cleanup unless `--keep` is provided.
+#
+# Usage:
+#   std_make_temp_file [--keep] <result_variable_name> [prefix]
+#
+std_make_temp_file() {
+    __std_make_temp_path__ std_make_temp_file file "$@"
+}
+
+#
+# std_make_temp_dir - Creates a temporary directory and stores its path in a named variable.
+#
+# The created directory is registered for exit cleanup unless `--keep` is provided.
+#
+# Usage:
+#   std_make_temp_dir [--keep] <result_variable_name> [prefix]
+#
+std_make_temp_dir() {
+    __std_make_temp_path__ std_make_temp_dir dir "$@"
 }
 
 ####################################################### ASSERTIONS ####################################################

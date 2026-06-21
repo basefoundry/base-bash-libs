@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
   guards.
 - Added stdlib cleanup hook and cleanup path registration backed by a shared
   `EXIT` trap.
+- Added portable stdlib temporary file and directory helpers with default exit
+  cleanup.
 
 ## [0.2.1] - 2026-06-18
 

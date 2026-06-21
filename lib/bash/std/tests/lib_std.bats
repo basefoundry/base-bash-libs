@@ -1093,6 +1093,100 @@ EOF
     [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
 }
 
+@test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
+    local script="$TEST_TMPDIR/temp-file.sh"
+    local temp_root="$TEST_TMPDIR/temp-root"
+    local path_file="$TEST_TMPDIR/temp-file.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_file temp_file sample
+[[ -f "\$temp_file" ]] || exit 44
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/sample.* ]]
+    [ ! -e "$created_path" ]
+}
+
+@test "std_make_temp_dir creates a directory under TMPDIR and cleans it up" {
+    local script="$TEST_TMPDIR/temp-dir.sh"
+    local temp_root="$TEST_TMPDIR/temp-dir-root"
+    local path_file="$TEST_TMPDIR/temp-dir.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_dir temp_dir workspace
+[[ -d "\$temp_dir" ]] || exit 44
+printf '%s\n' "\$temp_dir" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/workspace.* ]]
+    [ ! -e "$created_path" ]
+}
+
+@test "std_make_temp_file --keep leaves the created file in place" {
+    local script="$TEST_TMPDIR/temp-file-keep.sh"
+    local temp_root="$TEST_TMPDIR/temp-keep-root"
+    local path_file="$TEST_TMPDIR/temp-file-keep.path"
+    local created_path
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR="$temp_root"
+std_make_temp_file --keep temp_file kept
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [[ "$created_path" == "$temp_root"/kept.* ]]
+    [ -f "$created_path" ]
+}
+
+@test "std_make_temp helpers reject invalid result variable names" {
+    local stderr_file="$TEST_TMPDIR/temp-invalid.err"
+    local rc
+
+    if std_make_temp_file "not-valid" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_make_temp_file: result variable name must be a valid Bash variable name."* ]]
+
+    if std_make_temp_dir "also-not-valid" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"

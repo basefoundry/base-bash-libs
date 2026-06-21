@@ -23,6 +23,8 @@ The library improves Bash-based scripting in a few practical ways:
   would happen" logic.
 - **Composable cleanup**: scripts can register exit cleanup without replacing
   an already-installed `EXIT` trap.
+- **Portable temp state**: scripts can create temp files or directories under
+  `TMPDIR` and register them for cleanup in one call.
 - **Simple library imports**: scripts can import helpers relative to their own
   source directory.
 - **Predictable PATH edits**: PATH additions avoid duplicates and can prepend or
@@ -291,6 +293,35 @@ Hooks run in registration order and duplicate registrations are ignored. If an
 `EXIT` trap already exists when the first cleanup hook or path is registered,
 that existing trap is preserved and runs before the stdlib cleanup hooks.
 
+## Temporary Path Helpers
+
+Use temp helpers when a script needs a scratch file or directory and wants the
+path stored in a variable:
+
+```bash
+std_make_temp_file temp_file base
+std_make_temp_dir temp_dir workspace
+```
+
+Both helpers create paths under `${TMPDIR:-/tmp}` using `mktemp` templates that
+work on macOS/BSD and GNU systems. The created path is registered for exit
+cleanup by default:
+
+```bash
+std_make_temp_dir workspace_dir
+printf 'payload\n' > "$workspace_dir/input.txt"
+```
+
+Pass `--keep` when the caller intentionally owns cleanup:
+
+```bash
+std_make_temp_file --keep report_path report
+```
+
+The optional prefix is a filename prefix, not a directory path. It must be
+non-empty and must not contain `/`. Set `TMPDIR` before calling the helper when
+the temp root should be somewhere other than `/tmp`.
+
 ## Validation Helpers
 
 Use assertions near the top of functions to make assumptions explicit:
@@ -390,6 +421,7 @@ main "$@"
 - validation
 - simple filesystem safety wrappers
 - exit cleanup registration
+- temporary file and directory creation
 
 Domain-specific behavior should live in other libraries or command modules. For
 example, Git helpers belong in a Git library, file editing helpers belong in a
