@@ -82,6 +82,19 @@ When a Base wrapper preloads the stdlib for another command, it can set
 `BASE_BASH_BOOTSTRAP_SOURCE` so `__SCRIPT_DIR__` still points at the command
 script rather than the wrapper.
 
+## Version Requirements
+
+Use `base_bash_libs_require_version` when a downstream script depends on APIs
+added after the first public release:
+
+```bash
+base_bash_libs_require_version 1.1.0
+```
+
+The helper compares dotted numeric versions, returns silently when the loaded
+library is new enough, and exits with a clear fatal error when the loaded
+`BASE_BASH_LIBS_VERSION` is too old.
+
 ## Logging
 
 Use structured logging for operational messages:

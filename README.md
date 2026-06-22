@@ -107,7 +107,12 @@ import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
 version from the repository/package `VERSION` file. Downstream scripts can use
-that readonly constant when they need to require a minimum library version.
+that readonly constant when they need to display the loaded library version.
+Use `base_bash_libs_require_version` to require a minimum library version:
+
+```bash
+base_bash_libs_require_version 1.1.0
+```
 
 See `examples/std-usage.sh` for a small standalone script that sources the
 stdlib, imports the file helpers, logs progress, and runs a checked command.

@@ -41,6 +41,8 @@
 #   std_command_path var cmd     # Resolve an external command path without exiting.
 #   std_function_exists fn       # Predicate for defined Bash functions.
 #   assert_variable_name name    # Validate Bash variable-name arguments.
+#   base_bash_libs_require_version min_version
+#                                # Exit clearly if the loaded library is too old.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
 #   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
@@ -120,6 +122,64 @@ BASE_BASH_LIBS_VERSION="$(__lib_std_read_package_version__ "$__BASE_BASH_LIBS_RO
 }
 readonly BASE_BASH_LIBS_VERSION
 unset -f __lib_std_read_package_version__
+
+__base_bash_libs_is_dotted_numeric_version__() {
+    local version="${1-}" version_re='^[0-9]+([.][0-9]+)*$'
+    [[ "$version" =~ $version_re ]]
+}
+
+__base_bash_libs_version_at_least__() {
+    local actual_version="$1" minimum_version="$2"
+    local -a actual_parts=() minimum_parts=()
+    local index max_parts actual_part minimum_part actual_number minimum_number
+
+    IFS=. read -r -a actual_parts <<<"$actual_version"
+    IFS=. read -r -a minimum_parts <<<"$minimum_version"
+
+    max_parts="${#actual_parts[@]}"
+    if ((${#minimum_parts[@]} > max_parts)); then
+        max_parts="${#minimum_parts[@]}"
+    fi
+
+    for ((index = 0; index < max_parts; index++)); do
+        actual_part="${actual_parts[$index]:-0}"
+        minimum_part="${minimum_parts[$index]:-0}"
+        actual_number=$((10#$actual_part))
+        minimum_number=$((10#$minimum_part))
+
+        if ((actual_number > minimum_number)); then
+            return 0
+        fi
+        if ((actual_number < minimum_number)); then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+#
+# base_bash_libs_require_version - Requires a minimum base-bash-libs version.
+#
+# Usage:
+#   base_bash_libs_require_version 1.1.0
+#
+base_bash_libs_require_version() {
+    local minimum_version="${1-}"
+
+    assert_arg_count "$#" 1
+
+    if ! __base_bash_libs_is_dotted_numeric_version__ "$minimum_version" ||
+        ! __base_bash_libs_is_dotted_numeric_version__ "$BASE_BASH_LIBS_VERSION"; then
+        fatal_error "base_bash_libs_require_version expects dotted numeric versions."
+    fi
+
+    if ! __base_bash_libs_version_at_least__ "$BASE_BASH_LIBS_VERSION" "$minimum_version"; then
+        fatal_error "base-bash-libs $minimum_version or newer is required; loaded version is $BASE_BASH_LIBS_VERSION."
+    fi
+
+    return 0
+}
 
 #
 # Memorize the original script arguments at the very beginning.

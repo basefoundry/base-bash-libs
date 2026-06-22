@@ -174,6 +174,46 @@ EOF
     readonly -p BASE_BASH_LIBS_VERSION >/dev/null
 }
 
+@test "base_bash_libs_require_version accepts the loaded version and older versions" {
+    local stdout_file="$TEST_TMPDIR/version-check.out"
+
+    base_bash_libs_require_version "$BASE_BASH_LIBS_VERSION" >"$stdout_file"
+    base_bash_libs_require_version "0.1.0" >>"$stdout_file"
+
+    [ ! -s "$stdout_file" ]
+}
+
+@test "base_bash_libs_require_version exits when the loaded version is too old" {
+    local script="$TEST_TMPDIR/version-too-old.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+base_bash_libs_require_version "999.0.0"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"base-bash-libs 999.0.0 or newer is required"* ]]
+    [[ "$output" == *"loaded version is $BASE_BASH_LIBS_VERSION"* ]]
+}
+
+@test "base_bash_libs_require_version exits for invalid version strings" {
+    local script="$TEST_TMPDIR/version-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+base_bash_libs_require_version "1.two.0"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"base_bash_libs_require_version expects dotted numeric versions"* ]]
+}
+
 @test "stdlib exposes readonly loaded marker" {
     [ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" = "1" ]
     readonly -p BASE_BASH_LIBS_STDLIB_LOADED >/dev/null
