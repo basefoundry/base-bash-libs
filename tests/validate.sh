@@ -17,6 +17,8 @@ required_files=(
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   examples/std-usage.sh
+  examples/cookbook-cleanup-temp.sh
+  examples/cookbook-args-lists-strings.sh
   lib/bash/README.md
   lib/bash/std/lib_std.sh
   lib/bash/std/tests/lib_std.bats
@@ -90,6 +92,8 @@ done
 shellcheck --severity=error \
   tests/validate.sh \
   examples/std-usage.sh \
+  examples/cookbook-cleanup-temp.sh \
+  examples/cookbook-args-lists-strings.sh \
   lib/bash/std/lib_std.sh \
   lib/bash/file/lib_file.sh \
   lib/bash/git/lib_git.sh \
@@ -107,5 +111,7 @@ bats \
   lib/bash/list/tests/lib_list.bats
 
 examples/std-usage.sh >/dev/null
+examples/cookbook-cleanup-temp.sh >/dev/null
+examples/cookbook-args-lists-strings.sh >/dev/null
 
 printf 'Bash library validation passed.\n'

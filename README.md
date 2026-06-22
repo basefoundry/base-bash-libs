@@ -126,8 +126,17 @@ Use `base_bash_libs_require_version` to require a minimum library version:
 base_bash_libs_require_version 1.1.0
 ```
 
-See `examples/std-usage.sh` for a small standalone script that sources the
-stdlib, imports the file helpers, logs progress, and runs a checked command.
+## Examples
+
+- [`examples/std-usage.sh`](examples/std-usage.sh)
+  Small standalone script that sources the stdlib, imports the file helpers,
+  logs progress, and runs a checked command.
+- [`examples/cookbook-cleanup-temp.sh`](examples/cookbook-cleanup-temp.sh)
+  Cleanup hooks, temp paths, version checks, command resolution, and timeout
+  command execution.
+- [`examples/cookbook-args-lists-strings.sh`](examples/cookbook-args-lists-strings.sh)
+  Argument parsing, list helpers, and in-place string transformations working
+  together.
 
 ## Versioning
 
