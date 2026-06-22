@@ -15,6 +15,8 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   String helpers built on top of the stdlib.
 - `arg/`
   Argument parsing helpers built on top of the stdlib.
+- `list/`
+  Indexed-array helpers built on top of the stdlib.
 - `tests/`
   Common BATS helpers for Bash library test suites.
 

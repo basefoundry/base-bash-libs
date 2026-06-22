@@ -33,6 +33,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/arg/lib_arg.sh`](lib/bash/arg/README.md)
   Argument parsing helpers built on the stdlib for exact flag and value
   options without hidden parser globals.
+- [`lib/bash/list/lib_list.sh`](lib/bash/list/README.md)
+  Indexed-array helpers built on the stdlib for in-place mutation,
+  membership checks, deduplication, and length results.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 
@@ -66,6 +69,7 @@ import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
+import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
 ```
 
 ### Source Checkout
@@ -93,6 +97,7 @@ import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
 import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 ### Vendored or Submodule Layout
@@ -109,6 +114,7 @@ import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
 import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
