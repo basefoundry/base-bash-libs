@@ -100,6 +100,21 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
 }
 
+@test "update_file_section ignores marker substrings embedded in longer lines" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+echo # BEGIN
+old
+echo # END
+after
+EOF
+
+    update_file_section "$target" "# BEGIN" "# END" "new"
+
+    [ "$(cat "$target")" = $'before\necho # BEGIN\nold\necho # END\nafter\n# BEGIN\nnew\n# END' ]
+}
+
 @test "update_file_section preserves executable file mode when replacing" {
     local target="$TEST_TMPDIR/script.sh"
     cat <<'EOF' > "$target"
@@ -199,6 +214,25 @@ EOF
     update_file_section -r "$target" "# BEGIN" "# END"
 
     [ "$(cat "$target")" = $'before\nafter' ]
+}
+
+@test "update_file_section removes only the first matching marked block with -r" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+remove-me
+# END
+middle
+# BEGIN
+keep-me
+# END
+after
+EOF
+
+    update_file_section -r "$target" "# BEGIN" "# END"
+
+    [ "$(cat "$target")" = $'before\nmiddle\n# BEGIN\nkeep-me\n# END\nafter' ]
 }
 
 @test "update_file_section rejects a section with only a start marker" {

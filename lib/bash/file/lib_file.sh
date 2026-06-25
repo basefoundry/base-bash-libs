@@ -70,9 +70,9 @@ __file_section_markers_ordered__() {
 #
 # This function can add, update, or remove a section of text in a file.
 # It is designed to be safe to run multiple times. If the section already
-# exists, it will be replaced. If it doesn't exist, it will be appended.
-# If the target file itself does not exist, this returns success without
-# creating the file.
+# exists, the first full-line marker pair will be replaced. If it doesn't
+# exist, it will be appended. If the target file itself does not exist, this
+# returns success without creating the file.
 #
 # Usage:
 #   update_file_section [options] <target_file> <start_marker> <end_marker> [content_lines...]
@@ -133,8 +133,8 @@ update_file_section() {
     fi
 
     local beginning_marker_count end_marker_count
-    beginning_marker_count=$(grep -cF -- "$beginning_marker" "$target_file" || true)
-    end_marker_count=$(grep -cF -- "$end_marker" "$target_file" || true)
+    beginning_marker_count=$(grep -cxF -- "$beginning_marker" "$target_file" || true)
+    end_marker_count=$(grep -cxF -- "$end_marker" "$target_file" || true)
     if ((beginning_marker_count != end_marker_count)); then
         log_error "Asymmetric markers in '$target_file': $beginning_marker_count start, $end_marker_count end. Manual repair needed."
         return 1
@@ -232,9 +232,16 @@ update_file_section() {
     if [[ "$section_exists" == true ]]; then
         if [[ "$remove_section" == true ]]; then
             if awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
-            BEGIN { in_section = 0 }
-            $0 == START_M { in_section = 1; next }
-            $0 == END_M   { in_section = 0; next }
+            BEGIN {
+                in_section = 0
+                processed = 0
+            }
+            $0 == START_M && processed == 0 { in_section = 1; next }
+            $0 == END_M && in_section == 1 {
+                in_section = 0
+                processed = 1
+                next
+            }
             {
                 if (in_section == 0) {
                     print $0

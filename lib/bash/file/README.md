@@ -25,7 +25,8 @@ update_file_section ~/.bash_profile "# BEGIN APP" "# END APP" \
 ## Behavior Notes
 
 - Returns success when the target file does not exist and there is nothing to remove.
-- Replaces only the first matching marked section when markers already exist.
+- Replaces or removes only the first matching marked section when markers already exist.
+- Treats markers as exact full lines; marker text embedded in longer lines is ignored.
 - Appends the marked block when markers are not present.
 
 ## Tests
