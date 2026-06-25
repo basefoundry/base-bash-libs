@@ -93,6 +93,22 @@ create_script() {
     [ "$parse_status" -eq 2 ]
 }
 
+@test "arg_parse rejects registered options as missing option values" {
+    local -a specs=(
+        "verbose|flag|--verbose|-v"
+        "output|value|--output|-o"
+    )
+    local -A options=()
+    local -a positionals=()
+    local parse_status=0
+
+    arg_parse options positionals specs -- --output --verbose || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+    [ -z "${options[output]+set}" ]
+    [ -z "${options[verbose]+set}" ]
+}
+
 @test "arg_parse rejects invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/arg-invalid-vars.sh"
 

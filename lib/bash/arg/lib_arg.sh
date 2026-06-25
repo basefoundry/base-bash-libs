@@ -162,6 +162,10 @@ arg_parse() {
                 log_error "arg_parse: option '$__arg_option_token' requires a value."
                 return 2
             fi
+            if [[ -n "${__arg_token_kind[$1]+set}" ]]; then
+                log_error "arg_parse: option '$__arg_option_token' requires a value before option '$1'."
+                return 2
+            fi
 
             __arg_option_value="$1"
             shift
