@@ -15,9 +15,15 @@ readonly __lib_git_sourced__=1
 #
 # @param $1 allowed_path Path in repository root that may be dirty (for example "shared").
 #
+_git_path_matches_allowed_path() {
+    local path="$1" allowed_path="$2"
+
+    [[ "$path" == "$allowed_path" || "$path" == "$allowed_path/"* ]]
+}
+
 _git_only_path_dirty() {
     local allowed_path="$1"
-    local status_output line path
+    local status_output line path source_path destination_path
 
     status_output="$(git status --porcelain --untracked-files=no --ignore-submodules=none)"
     [[ -z "$status_output" ]] && return 1
@@ -26,9 +32,15 @@ _git_only_path_dirty() {
         [[ -z "$line" ]] && continue
         path="${line:3}"
         if [[ "$path" == *" -> "* ]]; then
-            path="${path#* -> }"
+            source_path="${path%% -> *}"
+            destination_path="${path#* -> }"
+            if ! _git_path_matches_allowed_path "$source_path" "$allowed_path" ||
+                ! _git_path_matches_allowed_path "$destination_path" "$allowed_path"; then
+                return 1
+            fi
+            continue
         fi
-        if [[ "$path" != "$allowed_path" && "$path" != "$allowed_path/"* ]]; then
+        if ! _git_path_matches_allowed_path "$path" "$allowed_path"; then
             return 1
         fi
     done <<< "$status_output"
@@ -353,6 +365,9 @@ check_script_up_to_date() {
     ahead=$(git -C "$repo_root" rev-list --count "$upstream"..HEAD 2>/dev/null)
     if [[ -n "$behind" && "$behind" -gt 0 ]]; then
         log_warn "Repository is $behind commit(s) behind $upstream. Script may be out of date."
+        if [[ "$dirty" == true ]]; then
+            return 3
+        fi
         return 2
     elif [[ -n "$ahead" && "$ahead" -gt 0 ]]; then
         log_info "Repository is $ahead commit(s) ahead of $upstream."

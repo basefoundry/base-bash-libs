@@ -41,9 +41,16 @@ log_info "Current branch: $branch"
   directories return success with an empty result variable.
 - `git_update_repo` changes into the target repository while it runs because
   its submodule update sequence depends on repository-relative execution.
+- `git_update_repo` only treats an allowed dirty path as safe when every tracked
+  change stays within that path. Rename records must have both source and
+  destination inside the allowed path.
 - `check_script_up_to_date` treats missing git state, untracked scripts, or missing upstreams as skip conditions rather than hard failures.
 - `check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
 - `check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first, then compares against the refreshed upstream ref. If fetch fails, the helper logs a warning and falls back to local remote-tracking refs.
+- `check_script_up_to_date` returns `2` when the repository is behind upstream,
+  and `3` when the script has local modifications. If both are true, local
+  modifications take precedence and the helper returns `3` after logging both
+  conditions.
 
 ## Tests
 

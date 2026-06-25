@@ -347,6 +347,44 @@ setup() {
     [ "$rc" -eq 1 ]
 }
 
+@test "_git_only_path_dirty rejects renames from outside the allowed path" {
+    local repo="$TEST_TMPDIR/repo"
+    local rc
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/shared" "$repo/src"
+    printf 'one\n' > "$repo/src/one.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" mv src/one.txt shared/one.txt
+
+    pushd "$repo" >/dev/null
+    set +e
+    _git_only_path_dirty "shared"
+    rc=$?
+    set -e
+    popd >/dev/null
+
+    [ "$rc" -eq 1 ]
+}
+
+@test "_git_only_path_dirty accepts renames inside the allowed path" {
+    local repo="$TEST_TMPDIR/repo"
+    local rc
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/shared"
+    printf 'one\n' > "$repo/shared/one.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" mv shared/one.txt shared/two.txt
+
+    pushd "$repo" >/dev/null
+    _git_only_path_dirty "shared"
+    rc=$?
+    popd >/dev/null
+
+    [ "$rc" -eq 0 ]
+}
+
 @test "git_update_repo cleans up temp log without changing RETURN trap" {
     local repo="$TEST_TMPDIR/repo"
     local temp_dir="$TEST_TMPDIR/git-temp"
@@ -596,4 +634,27 @@ setup() {
 
     [ "$status" -eq 3 ]
     [[ "$output" == *"has local modifications"* ]]
+}
+
+@test "check_script_up_to_date returns 3 when a script is both behind and dirty" {
+    local other="$TEST_TMPDIR/other"
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git clone "$remote" "$other" >/dev/null 2>&1
+    git -C "$other" config user.name "Bats Test"
+    git -C "$other" config user.email "bats@example.com"
+    printf 'echo remote\n' >> "$other/scripts/tool.sh"
+    git -C "$other" add scripts/tool.sh
+    git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
+    printf 'echo dirty\n' >> "$script_path"
+
+    bats_run check_script_up_to_date --fetch "$script_path"
+
+    [ "$status" -eq 3 ]
+    [[ "$output" == *"has local modifications"* ]]
+    [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
