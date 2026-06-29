@@ -7,12 +7,20 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `std_run --timeout`, `--max-attempts`, and `--retry-delay` execution
+  policy options for timeout-only, retry-only, and timeout-plus-retry command
+  execution.
+
 ### Changed
 
 - Changed string case and trim helpers to mutate named variables in place
   instead of requiring command substitution.
 - Added public `assert_variable_name` validation for helpers that accept Bash
   variable names.
+- Deprecated `std_run_with_timeout` in documentation for new code; it remains as
+  a compatibility wrapper around `std_run --timeout`.
 
 ## [1.0.0] - 2026-06-21
 
