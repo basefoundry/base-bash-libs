@@ -28,10 +28,10 @@
 #   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
 #
 # Core helpers:
-#   std_run [--no-exit] [--quiet] cmd ...
-#                                # Safe command runner with dry-run & failure handling.
+#   std_run [opts] cmd ...
+#                                # Safe command runner with dry-run, timeout, retry & failure handling.
 #   std_run_with_timeout [opts] seconds cmd ...
-#                                # Safe command runner with a timeout.
+#                                # Compatibility wrapper for std_run --timeout.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
@@ -51,6 +51,10 @@
 #
 # Patterns:
 #   std_run some_cmd             # exits on failure; DRY_RUN=true/1/yes/on prints instead.
+#   std_run --timeout 30 some_cmd
+#                                # bounds the command attempt to 30 seconds.
+#   std_run --max-attempts 3 --retry-delay 2 some_cmd
+#                                # retries transient failures.
 #   some_cmd || fatal_error ...  # preserves failing exit code before terminating.
 #   add_to_path -p "/opt/tools"  # inject directories without duplicates.
 #
@@ -769,6 +773,59 @@ is_dry_run() {
     return 1
 }
 
+__std_is_positive_integer__() {
+    [[ "${1-}" =~ ^[1-9][0-9]*$ ]]
+}
+
+__std_is_non_negative_integer__() {
+    [[ "${1-}" =~ ^[0-9]+$ ]]
+}
+
+__std_join_run_policy__() {
+    local result_name="$1" timeout_seconds="$2" max_attempts="$3" retry_delay="$4"
+    local policies=()
+    local policy joined_policy=""
+
+    [[ -n "$timeout_seconds" ]] && policies+=("${timeout_seconds}s timeout")
+    ((max_attempts > 1)) && policies+=("${max_attempts} attempts")
+    ((retry_delay > 0)) && policies+=("${retry_delay}s retry delay")
+
+    for policy in "${policies[@]}"; do
+        if [[ -n "$joined_policy" ]]; then
+            joined_policy+=", "
+        fi
+        joined_policy+="$policy"
+    done
+
+    printf -v "$result_name" '%s' "$joined_policy"
+}
+
+__std_run_once__() {
+    local timeout_seconds="$1"
+    shift
+    local timeout_path=""
+
+    if [[ -n "$timeout_seconds" ]]; then
+        if std_command_path timeout_path timeout || std_command_path timeout_path gtimeout; then
+            "$timeout_path" "$timeout_seconds" "$@"
+        else
+            __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
+        fi
+    else
+        "$@"
+    fi
+}
+
+__std_run_status_message__() {
+    local result_name="$1" exit_code="$2" timeout_seconds="$3" printable_command="$4"
+
+    if ((exit_code == 124)) && [[ -n "$timeout_seconds" ]]; then
+        printf -v "$result_name" 'Command timed out after %ss: %s' "$timeout_seconds" "$printable_command"
+    else
+        printf -v "$result_name" 'Command failed (exit %s): %s' "$exit_code" "$printable_command"
+    fi
+}
+
 #
 # std_run - Safely executes a simple command with its arguments.
 #
@@ -781,6 +838,9 @@ is_dry_run() {
 #   - Argument Safe: Correctly handles spaces and special characters in arguments.
 #   - Dry-Run Mode: If the global variable DRY_RUN (or dry_run) is truthy, it
 #     prints the command instead of running it.
+#   - Optional Timeout: `--timeout N` bounds each command attempt to N seconds.
+#   - Optional Retry: `--max-attempts N` retries failed commands up to N total
+#     attempts, optionally sleeping `--retry-delay N` seconds between attempts.
 #   - Exit on Failure: By default, it will exit the script if the command
 #     returns a non-zero exit code.
 #   - Optional No-Exit: If an initial argument is `--no-exit`, the function
@@ -798,6 +858,14 @@ is_dry_run() {
 #               command's original exit code.
 #   --quiet     If provided as an initial argument with `--no-exit`, suppress
 #               the warning normally logged when the command fails.
+#   --timeout N
+#               Bound each command attempt to N seconds.
+#   --max-attempts N
+#               Try the command up to N total times. Defaults to 1.
+#   --retry-attempts N
+#               Alias for --max-attempts.
+#   --retry-delay N
+#               Sleep N seconds between failed attempts. Defaults to 0.
 #
 # Examples:
 #   # Run a simple command. Exits if `ls` fails.
@@ -819,7 +887,7 @@ is_dry_run() {
 __std_run_impl__() {
     local helper_name="$1"
     shift
-    local exit_on_failure=1 quiet=0
+    local exit_on_failure=1 quiet=0 timeout_seconds="" max_attempts=1 retry_delay=0
 
     # Parse optional run flags before the command.
     while (($#)); do
@@ -830,6 +898,33 @@ __std_run_impl__() {
                 ;;
             --quiet)
                 quiet=1
+                shift
+                ;;
+            --timeout)
+                shift
+                if (($# == 0)) || ! __std_is_positive_integer__ "${1-}"; then
+                    log_error "$helper_name: timeout seconds must be a positive integer."
+                    return 1
+                fi
+                timeout_seconds="$1"
+                shift
+                ;;
+            --max-attempts | --retry-attempts)
+                shift
+                if (($# == 0)) || ! __std_is_positive_integer__ "${1-}"; then
+                    log_error "$helper_name: max attempts must be a positive integer."
+                    return 1
+                fi
+                max_attempts="$1"
+                shift
+                ;;
+            --retry-delay)
+                shift
+                if (($# == 0)) || ! __std_is_non_negative_integer__ "${1-}"; then
+                    log_error "$helper_name: retry delay seconds must be a non-negative integer."
+                    return 1
+                fi
+                retry_delay="$1"
                 shift
                 ;;
             --)
@@ -854,10 +949,17 @@ __std_run_impl__() {
 
     # --- Dry-Run Handling ---
     if is_dry_run; then
+        local policy_description
+        __std_join_run_policy__ policy_description "$timeout_seconds" "$max_attempts" "$retry_delay"
+
         # Use printf with the %q format specifier. This is the safest way to
         # print a command and its arguments in a way that is unambiguous and
         # could be copied and pasted back into a shell.
-        log_info "[DRY-RUN] Would run: ${printable_command}"
+        if [[ -n "$policy_description" ]]; then
+            log_info "[DRY-RUN] Would run with ${policy_description}: ${printable_command}"
+        else
+            log_info "[DRY-RUN] Would run: ${printable_command}"
+        fi
         return 0
     fi
 
@@ -865,14 +967,42 @@ __std_run_impl__() {
     # Execute the command. Using "$@" is the key. It expands each argument
     # as a separate, quoted string, preserving spaces and special characters.
     # This is the safe, modern alternative to using `eval`.
-    "$@"
-    local exit_code=$?
+    local attempt=1 exit_code=0 message
+    while ((attempt <= max_attempts)); do
+        if __std_run_once__ "$timeout_seconds" "$@"; then
+            return 0
+        else
+            exit_code=$?
+        fi
+
+        if ((attempt < max_attempts)); then
+            if ((! quiet)); then
+                __std_run_status_message__ message "$exit_code" "$timeout_seconds" "$printable_command"
+                log_warn "${message} (attempt ${attempt} of ${max_attempts}; retrying)."
+            fi
+            if ((retry_delay > 0)); then
+                __std_sleep_interval__ "$retry_delay"
+            fi
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
     if ((exit_code)); then
+        if ((max_attempts > 1)); then
+            if ((exit_code == 124)) && [[ -n "$timeout_seconds" ]]; then
+                message="Command timed out after ${timeout_seconds}s on final attempt (${max_attempts} attempts): ${printable_command}"
+            else
+                message="Command failed after ${max_attempts} attempts (exit ${exit_code}): ${printable_command}"
+            fi
+        else
+            __std_run_status_message__ message "$exit_code" "$timeout_seconds" "$printable_command"
+        fi
         if ((exit_on_failure)); then
-            exit_if_error "$exit_code" "Command failed (exit $exit_code): ${printable_command}"
+            exit_if_error "$exit_code" "$message"
         else
             if ((! quiet)); then
-                log_warn "Command failed (exit $exit_code): ${printable_command} (continuing)."
+                log_warn "$message (continuing)."
             fi
             return $exit_code
         fi
@@ -941,16 +1071,17 @@ __std_run_with_timeout_fallback__() {
 #   std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ...
 #
 std_run_with_timeout() {
-    local exit_on_failure=1 quiet=0 timeout_seconds timeout_path="" exit_code printable_command message
+    local timeout_seconds
+    local run_options=()
 
     while (($#)); do
         case "${1-}" in
             --no-exit)
-                exit_on_failure=0
+                run_options+=("--no-exit")
                 shift
                 ;;
             --quiet)
-                quiet=1
+                run_options+=("--quiet")
                 shift
                 ;;
             --)
@@ -970,44 +1101,12 @@ std_run_with_timeout() {
 
     timeout_seconds="$1"
     shift
-    if [[ ! "$timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+    if ! __std_is_positive_integer__ "$timeout_seconds"; then
         log_error "std_run_with_timeout: timeout seconds must be a positive integer."
         return 1
     fi
 
-    printf -v printable_command "%q " "$@"
-    printable_command="${printable_command% }"
-
-    if is_dry_run; then
-        log_info "[DRY-RUN] Would run with ${timeout_seconds}s timeout: ${printable_command}"
-        return 0
-    fi
-
-    if std_command_path timeout_path timeout || std_command_path timeout_path gtimeout; then
-        "$timeout_path" "$timeout_seconds" "$@"
-    else
-        __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
-    fi
-    exit_code=$?
-
-    if ((exit_code)); then
-        if ((exit_code == 124)); then
-            message="Command timed out after ${timeout_seconds}s: ${printable_command}"
-        else
-            message="Command failed (exit $exit_code): ${printable_command}"
-        fi
-
-        if ((exit_on_failure)); then
-            exit_if_error "$exit_code" "$message"
-        else
-            if ((! quiet)); then
-                log_warn "$message (continuing)."
-            fi
-            return "$exit_code"
-        fi
-    fi
-
-    return 0
+    __std_run_impl__ std_run_with_timeout "${run_options[@]}" --timeout "$timeout_seconds" -- "$@"
 }
 
 ############################################## FILE AND DIRECTORY HANDLING ############################################

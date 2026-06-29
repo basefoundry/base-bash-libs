@@ -18,9 +18,7 @@ The library improves Bash-based scripting in a few practical ways:
 - **Readable failures**: fatal errors include a message and Bash stack trace
   instead of a mysterious non-zero exit.
 - **Safe command execution**: `std_run` preserves argument boundaries, supports
-  dry-run mode, and can either exit or return a status.
-- **Bounded command execution**: `std_run_with_timeout` applies the same command
-  runner conventions with a timeout.
+  dry-run mode, timeout, retry, and can either exit or return a status.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
 - **Composable cleanup**: scripts can register exit cleanup without replacing
@@ -170,7 +168,7 @@ itself is fine and the user simply gave invalid arguments.
 
 ## Running Commands Safely
 
-`std_run` is the preferred helper for simple external command execution:
+`std_run` is the preferred helper for external command execution:
 
 ```bash
 std_run git status --short
@@ -182,6 +180,8 @@ It improves on ad hoc command strings because it:
 - executes commands as argument arrays, not through `eval`
 - preserves spaces and special characters
 - logs a copy-pastable command in dry-run mode
+- can bound each attempt with `--timeout`
+- can retry transient failures with `--max-attempts` and `--retry-delay`
 - exits through `exit_if_error` by default when a command fails
 
 Dry-run mode:
@@ -212,6 +212,39 @@ if ! std_run --no-exit --quiet test -f "$optional_file"; then
 fi
 ```
 
+Add a per-attempt timeout when a command must finish within a bounded number of
+seconds:
+
+```bash
+std_run --timeout 30 curl -fsSL "$health_url"
+```
+
+Timeouts return status `124` when the caller uses `--no-exit`:
+
+```bash
+if ! std_run --no-exit --quiet --timeout 5 nc -z localhost 5432; then
+    log_warn "database port did not open within 5 seconds"
+fi
+```
+
+Retry transient failures by setting the total attempt count. `--retry-delay`
+adds a fixed sleep between failed attempts:
+
+```bash
+std_run --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
+```
+
+Timeout and retry compose directly. The timeout is per attempt, not a total
+budget for all attempts:
+
+```bash
+std_run --timeout 30 --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
+```
+
+`--retry-attempts` is accepted as an alias for `--max-attempts`, but new code
+should prefer `--max-attempts` because it makes clear that the value is the total
+number of attempts, not retries after the first attempt.
+
 Use `std_run` for commands plus arguments. Keep shell features such as
 pipelines, redirection, process substitution, and complex conditionals explicit
 in the calling script so the code remains clear.
@@ -220,25 +253,10 @@ in the calling script so the code remains clear.
 code should use `std_run` to avoid collisions with test frameworks and other
 Bash libraries that define their own `run` helper.
 
-Use `std_run_with_timeout` when a command must finish within a bounded number of
-seconds:
-
-```bash
-std_run_with_timeout 30 curl -fsSL "$health_url"
-```
-
-It accepts the same initial `--no-exit` and `--quiet` options as `std_run`:
-
-```bash
-if ! std_run_with_timeout --no-exit --quiet 5 nc -z localhost 5432; then
-    log_warn "database port did not open within 5 seconds"
-fi
-```
-
-Timeouts return status `124`. The helper prefers `timeout` or `gtimeout` when
-available and otherwise uses a Bash fallback so scripts work on macOS and Linux.
-As with `std_run`, command arguments are executed as an argument array and
-dry-run mode logs without running the command.
+`std_run_with_timeout` remains available as a compatibility wrapper, but new
+code should use `std_run --timeout N ...`. Timeout execution prefers `timeout`
+or `gtimeout` when available and otherwise uses a Bash fallback so scripts work
+on macOS and Linux.
 
 ## Importing Other Bash Libraries
 

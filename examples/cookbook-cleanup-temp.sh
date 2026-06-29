@@ -20,7 +20,7 @@ cleanup_marker() {
 std_register_cleanup_hook cleanup_marker
 
 printf 'workspace=%s\n' "$workspace_dir" >"$report_file"
-std_run_with_timeout --no-exit --quiet 5 test -s "$report_file"
+std_run --no-exit --quiet --timeout 5 test -s "$report_file"
 
 printf_path=""
 if std_command_path printf_path printf; then

@@ -928,6 +928,110 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
+@test "std_run --timeout returns 124 when the command times out" {
+    local stderr_file="$TEST_TMPDIR/run-timeout.err"
+    local rc
+
+    if std_run --no-exit --quiet --timeout 1 sleep 2 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 124 ]
+    [ ! -s "$stderr_file" ]
+}
+
+@test "std_run --max-attempts retries until the command succeeds" {
+    local counter_file="$TEST_TMPDIR/retry-count.txt"
+    local script="$TEST_TMPDIR/retry-eventual-success.sh"
+
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$1" ]] && count="$(cat "$1")"
+count=$((count + 1))
+printf '%s\n' "$count" > "$1"
+((count >= 3))
+EOF
+
+    std_run --no-exit --quiet --max-attempts 3 bash "$script" "$counter_file"
+
+    [ "$?" -eq 0 ]
+    [ "$(cat "$counter_file")" = "3" ]
+}
+
+@test "std_run combines per-attempt timeout with retry" {
+    local counter_file="$TEST_TMPDIR/timeout-retry-count.txt"
+    local output_file="$TEST_TMPDIR/timeout-retry-output.txt"
+    local script="$TEST_TMPDIR/timeout-retry.sh"
+
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$1" ]] && count="$(cat "$1")"
+count=$((count + 1))
+printf '%s\n' "$count" > "$1"
+if ((count == 1)); then
+    sleep 2
+else
+    printf 'ok\n' > "$2"
+fi
+EOF
+
+    std_run --no-exit --quiet --timeout 1 --max-attempts 2 bash "$script" "$counter_file" "$output_file"
+
+    [ "$?" -eq 0 ]
+    [ "$(cat "$counter_file")" = "2" ]
+    [ "$(cat "$output_file")" = "ok" ]
+}
+
+@test "std_run rejects invalid execution policy options" {
+    local stderr_file="$TEST_TMPDIR/run-policy-invalid.err"
+    local rc
+
+    if std_run --timeout 0 true 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_run: timeout seconds must be a positive integer."* ]]
+
+    : > "$stderr_file"
+    if std_run --max-attempts 0 true 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_run: max attempts must be a positive integer."* ]]
+
+    : > "$stderr_file"
+    if std_run --retry-delay nope true 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_run: retry delay seconds must be a non-negative integer."* ]]
+}
+
+@test "std_run dry-run reports timeout and retry policy without executing" {
+    local target="$TEST_TMPDIR/dry-run-policy.txt"
+    local stderr_file="$TEST_TMPDIR/dry-run-policy.err"
+
+    DRY_RUN=true
+
+    std_run --timeout 30 --max-attempts 3 --retry-delay 2 touch "$target" 2>"$stderr_file"
+
+    [ "$?" -eq 0 ]
+    [ ! -e "$target" ]
+    [[ "$(cat "$stderr_file")" == *"30s timeout"* ]]
+    [[ "$(cat "$stderr_file")" == *"3 attempts"* ]]
+    [[ "$(cat "$stderr_file")" == *"2s retry delay"* ]]
+}
+
 @test "std_run_with_timeout runs commands and preserves arguments" {
     local output_file="$TEST_TMPDIR/timeout-output.txt"
 
@@ -1365,8 +1469,12 @@ EOF
     sample_introspection_function() { return 0; }
 
     std_function_exists sample_introspection_function
-    ! std_function_exists "$missing_name"
-    ! std_function_exists "not-valid"
+    if std_function_exists "$missing_name"; then
+        return 1
+    fi
+    if std_function_exists "not-valid"; then
+        return 1
+    fi
 }
 
 @test "assert_function_exists accepts defined functions and exits for missing ones" {
