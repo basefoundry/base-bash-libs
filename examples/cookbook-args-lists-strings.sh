@@ -11,6 +11,8 @@ import "$repo_root/lib/bash/str/lib_str.sh"
 
 declare -A options=()
 declare -a positionals=()
+# Passed by name to arg_parse.
+# shellcheck disable=SC2034
 declare -a specs=(
     "verbose|flag|--verbose|-v"
     "tag|value|--tag|-t"
@@ -22,7 +24,11 @@ tag="${options[tag]-default}"
 str_trim tag
 str_lower tag
 
+# Mutated by name through list helpers.
+# shellcheck disable=SC2034
 declare -a values=()
+# Mutated by name through list helpers.
+# shellcheck disable=SC2034
 declare -a unique_values=()
 summary=""
 count=""

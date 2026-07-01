@@ -6,11 +6,18 @@ if declare -f run >/dev/null 2>&1; then
     eval "$(declare -f run | sed '1 s/^run /bats_run /')"
 fi
 
-readonly BASE_BASH_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly BASE_BASH_DIR="$(cd "$BASE_BASH_TESTS_DIR/.." && pwd -P)"
-readonly BASE_REPO_ROOT="$(cd "$BASE_BASH_DIR/../.." && pwd -P)"
-readonly BASE_CLI_BASH_DIR="$BASE_REPO_ROOT/cli/bash"
-readonly BASE_TEST_ORIG_PATH="$PATH"
+BASE_BASH_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly BASE_BASH_TESTS_DIR
+BASE_BASH_DIR="$(cd "$BASE_BASH_TESTS_DIR/.." && pwd -P)"
+readonly BASE_BASH_DIR
+BASE_REPO_ROOT="$(cd "$BASE_BASH_DIR/../.." && pwd -P)"
+# Used by BATS suites loaded after this helper.
+# shellcheck disable=SC2034
+readonly BASE_REPO_ROOT
+# Used by BATS suites loaded after this helper.
+BASE_TEST_ORIG_PATH="$PATH"
+# shellcheck disable=SC2034
+readonly BASE_TEST_ORIG_PATH
 
 unset_base_runtime_env() {
     local var_name
@@ -57,10 +64,14 @@ capture_command() {
 
     set +e
     "$@" >"$capture_file" 2>&1
+    # BATS-compatible globals consumed by individual test cases after capture_command returns.
+    # shellcheck disable=SC2034
     status=$?
     set -e
 
+    # shellcheck disable=SC2034
     output="$(cat "$capture_file")"
+    # shellcheck disable=SC2034
     IFS=$'\n' read -r -d '' -a lines < "$capture_file" || true
 }
 
