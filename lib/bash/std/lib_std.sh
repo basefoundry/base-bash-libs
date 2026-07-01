@@ -1031,6 +1031,7 @@ __std_run_with_timeout_fallback__() {
     local timeout_seconds="$1"
     shift
     local timeout_marker command_pid timer_pid command_status
+    local kill_grace_seconds=1
 
     timeout_marker="$(mktemp "${TMPDIR:-/tmp}/base-bash-libs-timeout.XXXXXXXXXX" 2>/dev/null)" || return 127
 
@@ -1041,10 +1042,12 @@ __std_run_with_timeout_fallback__() {
         __std_sleep_interval__ "$timeout_seconds"
         printf '1' > "$timeout_marker"
         kill -TERM "$command_pid" 2>/dev/null || true
+        __std_sleep_interval__ "$kill_grace_seconds"
+        kill -0 "$command_pid" 2>/dev/null && kill -KILL "$command_pid" 2>/dev/null || true
     ) &
     timer_pid=$!
 
-    wait "$command_pid"
+    wait "$command_pid" 2>/dev/null
     command_status=$?
 
     if kill -0 "$timer_pid" 2>/dev/null; then

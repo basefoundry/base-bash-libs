@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
   a compatibility wrapper around `std_run --timeout`.
 - Changed cleanup path registration to require absolute paths so exit cleanup
   cannot drift after a script changes directory.
+- Changed the Bash timeout fallback to kill TERM-ignoring commands after a short
+  grace period.
 
 ## [1.0.0] - 2026-06-21
 

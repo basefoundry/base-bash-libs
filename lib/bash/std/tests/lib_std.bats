@@ -942,6 +942,36 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
+@test "std_run fallback timeout kills commands that ignore TERM" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
+    local marker_file="$TEST_TMPDIR/term-ignored.marker"
+    local rc_file="$TEST_TMPDIR/term-ignored.rc"
+    local script="$TEST_TMPDIR/term-ignored-timeout.sh"
+
+    mkdir -p "$fake_bin"
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v rm)" "$fake_bin/rm"
+    ln -s "$(command -v sleep)" "$fake_bin/sleep"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+PATH="$fake_bin"
+if std_run --no-exit --quiet --timeout 1 /bin/bash -c 'trap "" TERM; sleep 3; printf completed > "\$1"' _ "$marker_file"; then
+    printf '0\n' > "$rc_file"
+else
+    printf '%s\n' "\$?" > "$rc_file"
+fi
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "" ]
+    [ "$(cat "$rc_file")" = "124" ]
+    [ ! -e "$marker_file" ]
+}
+
 @test "std_run --max-attempts retries until the command succeeds" {
     local counter_file="$TEST_TMPDIR/retry-count.txt"
     local script="$TEST_TMPDIR/retry-eventual-success.sh"
