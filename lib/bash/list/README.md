@@ -38,9 +38,11 @@ if list_contains "shellcheck" packages; then
 fi
 ```
 
-Mutating helpers update the caller-owned array in place. Result helpers accept
-the name of the output variable, validate it with `assert_variable_name`, and
-avoid stdout capture for caller state.
+Mutating helpers update the caller-owned array in place. Array arguments and
+array result variables must already be declared as indexed arrays, for example
+with `declare -a values=()`. Scalar result helpers accept the name of the output
+variable, validate it with `assert_variable_name`, and avoid stdout capture for
+caller state.
 
 ## Tests
 

@@ -1577,6 +1577,40 @@ EOF
     [[ "$output" != *"not-valid"* ]]
 }
 
+@test "assert_indexed_array accepts declared indexed arrays" {
+    local -a values=("alpha")
+
+    assert_indexed_array values
+}
+
+@test "assert_indexed_array rejects scalar and associative variables" {
+    local script="$TEST_TMPDIR/assert-indexed-array-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+values="alpha"
+assert_indexed_array values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'values' must be an indexed array declared by the caller."* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+declare -A values=([alpha]="one")
+assert_indexed_array values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'values' must be an indexed array declared by the caller."* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"

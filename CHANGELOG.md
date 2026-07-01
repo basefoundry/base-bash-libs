@@ -25,6 +25,8 @@ and versions are tracked in the repo-root `VERSION` file.
   cannot drift after a script changes directory.
 - Changed the Bash timeout fallback to kill TERM-ignoring commands after a short
   grace period.
+- Changed list and string array helpers to require caller-declared indexed arrays
+  instead of silently coercing scalar variables.
 
 ## [1.0.0] - 2026-06-21
 

@@ -19,6 +19,7 @@ list_append() {
     fi
 
     assert_variable_name "$__list_array_name"
+    assert_indexed_array "$__list_array_name"
     shift
     __list_values=("$@")
     eval "$__list_array_name+=(\"\${__list_values[@]}\")"
@@ -33,6 +34,7 @@ list_prepend() {
     fi
 
     assert_variable_name "$__list_array_name"
+    assert_indexed_array "$__list_array_name"
     shift
     __list_values=("$@")
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
@@ -45,6 +47,7 @@ list_remove() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_array_name"
+    assert_indexed_array "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
     for __list_item in "${__list_current[@]}"; do
@@ -61,6 +64,7 @@ list_contains() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_array_name"
+    assert_indexed_array "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
     for __list_item in "${__list_current[@]}"; do
@@ -77,6 +81,7 @@ list_unique() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_result_name" "$__list_array_name"
+    assert_indexed_array "$__list_result_name" "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
     for __list_item in "${__list_current[@]}"; do
@@ -95,6 +100,7 @@ list_length() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_result_name" "$__list_array_name"
+    assert_indexed_array "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
     printf -v "$__list_result_name" '%s' "${#__list_current[@]}"

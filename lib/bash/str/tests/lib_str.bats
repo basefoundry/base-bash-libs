@@ -238,3 +238,47 @@ EOF
     [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
+
+@test "string array helpers reject non-indexed arrays" {
+    local script="$TEST_TMPDIR/str-non-indexed.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+parts=""
+str_split parts "alpha,beta" ","
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+declare -A values=([alpha]="one")
+joined=""
+str_join joined "," values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+values="alpha"
+str_in_array "alpha" values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+}

@@ -10,13 +10,6 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly __lib_arg_sourced__=1
 
-__arg_declares_array_kind__() {
-    local variable_name="${1-}" array_kind="${2-}" declaration
-
-    declaration="$(declare -p "$variable_name" 2>/dev/null)" || return 1
-    [[ "$declaration" == declare\ -*"$array_kind"* ]]
-}
-
 __arg_set_assoc_value__() {
     local array_name="$1" key="$2" value="$3"
 
@@ -96,15 +89,15 @@ arg_parse() {
 
     assert_variable_name "$options_name" "$positionals_name" "$specs_name"
 
-    if ! __arg_declares_array_kind__ "$options_name" "A"; then
+    if ! __std_declares_array_kind__ "$options_name" "A"; then
         log_error "arg_parse: options variable must be an associative array declared by the caller."
         return 2
     fi
-    if ! __arg_declares_array_kind__ "$positionals_name" "a"; then
+    if ! __std_declares_array_kind__ "$positionals_name" "a"; then
         log_error "arg_parse: positionals variable must be an indexed array declared by the caller."
         return 2
     fi
-    if ! __arg_declares_array_kind__ "$specs_name" "a"; then
+    if ! __std_declares_array_kind__ "$specs_name" "a"; then
         log_error "arg_parse: specs variable must be an indexed array declared by the caller."
         return 2
     fi

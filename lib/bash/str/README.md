@@ -64,6 +64,8 @@ str_join joined "|" parts
 - `str_split` preserves empty fields between repeated delimiters.
 - `str_join` preserves empty array elements, including trailing empty elements.
 - Named string, result, and array arguments must be valid Bash variable names.
+- Array arguments and array result variables must already be declared as indexed
+  arrays, for example with `declare -a parts=()`.
 
 ## Tests
 

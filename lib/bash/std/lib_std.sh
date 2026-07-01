@@ -1519,6 +1519,42 @@ assert_variable_name() {
     return 0
 }
 
+__std_declares_array_kind__() {
+    local variable_name="${1-}" array_kind="${2-}" declaration attributes
+
+    declaration="$(declare -p "$variable_name" 2>/dev/null)" || return 1
+    attributes="${declaration#declare -}"
+    attributes="${attributes%% *}"
+    [[ "$attributes" == *"$array_kind"* ]]
+}
+
+#
+# assert_indexed_array - Verifies that one or more variables are declared indexed arrays.
+#
+# This validates that callers declared the named variables with indexed-array
+# semantics before passing them to helpers that mutate or read arrays in place.
+#
+# Usage:
+#   declare -a values=()
+#   assert_indexed_array values
+#
+assert_indexed_array() {
+    local var_name
+
+    if (($# == 0)); then
+        fatal_error "assert_indexed_array: No variable names provided for validation."
+    fi
+
+    for var_name in "$@"; do
+        assert_variable_name "$var_name"
+        if ! __std_declares_array_kind__ "$var_name" "a"; then
+            fatal_error "Variable '$var_name' must be an indexed array declared by the caller."
+        fi
+    done
+
+    return 0
+}
+
 ##################################################### INTROSPECTION ###################################################
 
 #
