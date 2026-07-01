@@ -44,6 +44,8 @@ boundary.
 Useful commands:
 
 ```bash
+./tests/validate.sh
+tests/lint-warnings.sh
 basectl check base-bash-libs
 basectl doctor base-bash-libs
 basectl test base-bash-libs
