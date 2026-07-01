@@ -21,6 +21,8 @@ and versions are tracked in the repo-root `VERSION` file.
   variable names.
 - Deprecated `std_run_with_timeout` in documentation for new code; it remains as
   a compatibility wrapper around `std_run --timeout`.
+- Changed cleanup path registration to require absolute paths so exit cleanup
+  cannot drift after a script changes directory.
 
 ## [1.0.0] - 2026-06-21
 

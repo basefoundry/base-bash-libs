@@ -1322,6 +1322,22 @@ EOF
     [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
 }
 
+@test "cleanup path registration rejects relative paths" {
+    local script="$TEST_TMPDIR/cleanup-relative.sh"
+    local stderr_file="$TEST_TMPDIR/cleanup-relative.err"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "relative-path" 2>"$stderr_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path 'relative-path'."* ]]
+}
+
 @test "cleanup path registration keeps valid paths from mixed batches" {
     local target_file="$TEST_TMPDIR/cleanup-valid-file.txt"
     local target_dir="$TEST_TMPDIR/cleanup-valid-dir"

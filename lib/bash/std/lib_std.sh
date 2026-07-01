@@ -1332,6 +1332,7 @@ __std_is_safe_cleanup_path__() {
     local path="${1-}"
 
     [[ -n "$path" ]] || return 1
+    [[ "$path" == /* ]] || return 1
     [[ "$path" =~ ^/+$ ]] && return 1
     case "$path" in
         . | .. | */.. | */../* | */. | */./*)
@@ -1344,11 +1345,12 @@ __std_is_safe_cleanup_path__() {
 #
 # std_register_cleanup_path - Registers files or directories for removal at shell exit.
 #
-# Paths are removed with `rm -rf --` from the shared EXIT trap. Empty paths,
-# root paths, and paths containing current/parent directory traversal components
-# are rejected to avoid broad accidental deletion. Safe paths in the same call
-# are still registered, and the function returns nonzero if any path was
-# rejected.
+# Paths are removed with `rm -rf --` from the shared EXIT trap. Paths must be
+# absolute so cleanup cannot drift when a script changes directory after
+# registration. Empty paths, root paths, and paths containing current/parent
+# directory traversal components are rejected to avoid broad accidental
+# deletion. Safe paths in the same call are still registered, and the function
+# returns nonzero if any path was rejected.
 #
 # Usage:
 #   workspace="$(mktemp -d)"
