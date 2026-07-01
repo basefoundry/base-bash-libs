@@ -329,10 +329,12 @@ workspace="$(mktemp -d)"
 std_register_cleanup_path "$workspace"
 ```
 
-Cleanup paths are removed with `rm -rf --` from a shared `EXIT` trap. Empty
-paths, root paths, and current/parent directory traversal components are
-rejected before registration. When one call mixes safe and unsafe paths, safe
-paths are registered, unsafe paths are rejected, and the helper returns nonzero.
+Cleanup paths are removed with `rm -rf --` from a shared `EXIT` trap. Paths must
+be absolute so cleanup cannot drift when a script changes directory after
+registration. Empty paths, root paths, and current/parent directory traversal
+components are rejected before registration. When one call mixes safe and unsafe
+paths, safe paths are registered, unsafe paths are rejected, and the helper
+returns nonzero.
 
 For custom cleanup, register a function name:
 
