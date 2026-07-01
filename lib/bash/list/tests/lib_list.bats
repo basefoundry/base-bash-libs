@@ -112,3 +112,46 @@ EOF
     [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
+
+@test "list helpers reject non-indexed arrays" {
+    local script="$TEST_TMPDIR/list-non-indexed.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/list/lib_list.sh"
+values="alpha"
+list_append values "beta"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/list/lib_list.sh"
+declare -A values=([alpha]="one")
+list_contains "one" values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/list/lib_list.sh"
+declare -a values=("alpha")
+list_unique unique values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+}

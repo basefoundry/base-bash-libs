@@ -80,6 +80,7 @@ str_split() {
 
     assert_arg_count "$#" 3
     assert_variable_name "$__str_split_result_name"
+    assert_indexed_array "$__str_split_result_name"
 
     local -a __str_split_fields=()
     local __str_split_remainder="$__str_split_value"
@@ -102,6 +103,7 @@ str_join() {
 
     assert_arg_count "$#" 3
     assert_variable_name "$result_name" "$array_name"
+    assert_indexed_array "$array_name"
 
     local __str_join_joined="" index
     local -a __str_join_values=()
@@ -123,6 +125,7 @@ str_in_array() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$array_name"
+    assert_indexed_array "$array_name"
 
     local -a __str_in_array_values=()
     eval "__str_in_array_values=(\"\${${array_name}[@]}\")"
