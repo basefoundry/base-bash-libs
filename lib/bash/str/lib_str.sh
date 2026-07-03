@@ -119,20 +119,3 @@ str_join() {
 
     printf -v "$result_name" '%s' "$__str_join_joined"
 }
-
-str_in_array() {
-    local needle="${1-}" array_name="${2-}" item
-
-    assert_arg_count "$#" 2
-    assert_variable_name "$array_name"
-    assert_indexed_array "$array_name"
-
-    local -a __str_in_array_values=()
-    eval "__str_in_array_values=(\"\${${array_name}[@]}\")"
-
-    for item in "${__str_in_array_values[@]}"; do
-        [[ "$item" == "$needle" ]] && return 0
-    done
-
-    return 1
-}

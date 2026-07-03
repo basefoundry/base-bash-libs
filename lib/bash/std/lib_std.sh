@@ -30,8 +30,6 @@
 # Core helpers:
 #   std_run [opts] cmd ...
 #                                # Safe command runner with dry-run, timeout, retry & failure handling.
-#   std_run_with_timeout [opts] seconds cmd ...
-#                                # Compatibility wrapper for std_run --timeout.
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
@@ -1019,10 +1017,6 @@ std_run() {
     __std_run_impl__ std_run "$@"
 }
 
-run() {
-    __std_run_impl__ run "$@"
-}
-
 __std_sleep_interval__() {
     if [[ -x /bin/sleep ]]; then
         /bin/sleep "$1"
@@ -1065,55 +1059,6 @@ __std_run_with_timeout_fallback__() {
     rm -f -- "$timeout_marker"
 
     return "$command_status"
-}
-
-#
-# std_run_with_timeout - Safely executes a command with a timeout.
-#
-# This helper mirrors `std_run` option handling while bounding the command
-# runtime. It prefers `timeout` or `gtimeout` when available and otherwise uses
-# a Bash fallback so callers have portable behavior on macOS and Linux.
-#
-# Usage:
-#   std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ...
-#
-std_run_with_timeout() {
-    local timeout_seconds
-    local run_options=()
-
-    while (($#)); do
-        case "${1-}" in
-            --no-exit)
-                run_options+=("--no-exit")
-                shift
-                ;;
-            --quiet)
-                run_options+=("--quiet")
-                shift
-                ;;
-            --)
-                shift
-                break
-                ;;
-            *)
-                break
-                ;;
-        esac
-    done
-
-    if (($# < 2)); then
-        log_error "std_run_with_timeout: usage: std_run_with_timeout [--no-exit] [--quiet] <seconds> command [arg1] ..."
-        return 1
-    fi
-
-    timeout_seconds="$1"
-    shift
-    if ! __std_is_positive_integer__ "$timeout_seconds"; then
-        log_error "std_run_with_timeout: timeout seconds must be a positive integer."
-        return 1
-    fi
-
-    __std_run_impl__ std_run_with_timeout "${run_options[@]}" --timeout "$timeout_seconds" -- "$@"
 }
 
 ############################################## FILE AND DIRECTORY HANDLING ############################################

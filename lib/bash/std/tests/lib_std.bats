@@ -829,9 +829,24 @@ EOF
     [[ "$output" == *"fatal boom"* ]]
 }
 
-@test "std_run is the preferred command runner and run remains compatible" {
-    [ "$(type -t std_run)" = "function" ]
-    [ "$(type -t run)" = "function" ]
+@test "stdlib exposes std_run without compatibility aliases" {
+    local script="$TEST_TMPDIR/std-run-api.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+printf 'std_run=%s\n' "\$(type -t std_run || true)"
+printf 'run=%s\n' "\$(type -t run || true)"
+printf 'std_run_with_timeout=%s\n' "\$(type -t std_run_with_timeout || true)"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"std_run=function"* ]]
+    [[ "$output" == *$'run=\n'* ]]
+    [[ "$output" == *"std_run_with_timeout="* ]]
+    [[ "$output" != *"std_run_with_timeout=function"* ]]
 }
 
 @test "std_run returns an error when no command is provided" {
@@ -1115,105 +1130,6 @@ EOF
     [[ "$(cat "$stderr_file")" == *"30s timeout"* ]]
     [[ "$(cat "$stderr_file")" == *"3 attempts"* ]]
     [[ "$(cat "$stderr_file")" == *"2s retry delay"* ]]
-}
-
-@test "std_run_with_timeout runs commands and preserves arguments" {
-    local output_file="$TEST_TMPDIR/timeout-output.txt"
-
-    std_run_with_timeout 5 bash -c 'printf "%s\n" "$1" > "$2"' _ "hello world" "$output_file"
-
-    [ "$(cat "$output_file")" = "hello world" ]
-}
-
-@test "std_run_with_timeout --no-exit returns 124 when the command times out" {
-    local stderr_file="$TEST_TMPDIR/timeout.err"
-    local rc
-
-    if std_run_with_timeout --no-exit --quiet 1 sleep 2 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
-
-    [ "$rc" -eq 124 ]
-    [ ! -s "$stderr_file" ]
-}
-
-@test "std_run_with_timeout exits on command failure by default" {
-    local script="$TEST_TMPDIR/timeout-fail.sh"
-
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$STDLIB_PATH"
-std_run_with_timeout 5 bash -c 'exit 6'
-echo "after"
-EOF
-
-    bats_run bash "$script"
-
-    [ "$status" -eq 6 ]
-    [[ "$output" == *"Command failed (exit 6)"* ]]
-    [[ "$output" != *"after"* ]]
-}
-
-@test "std_run_with_timeout honors dry-run mode without executing the command" {
-    local target="$TEST_TMPDIR/timeout-dry-run.txt"
-    DRY_RUN=true
-
-    std_run_with_timeout 1 touch "$target"
-
-    [ "$?" -eq 0 ]
-    [ ! -e "$target" ]
-}
-
-@test "std_run_with_timeout falls back when timeout binaries are absent" {
-    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
-    local output_file="$TEST_TMPDIR/timeout-fallback-output.txt"
-    local script="$TEST_TMPDIR/timeout-fallback.sh"
-
-    mkdir -p "$fake_bin"
-    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
-    ln -s "$(command -v sleep)" "$fake_bin/sleep"
-
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$STDLIB_PATH"
-PATH="$fake_bin"
-std_run_with_timeout --no-exit 5 /bin/echo fallback > "$output_file"
-EOF
-
-    bats_run bash "$script"
-
-    [ "$status" -eq 0 ]
-    [ "$(cat "$output_file")" = "fallback" ]
-}
-
-@test "std_run_with_timeout rejects invalid timeouts" {
-    local stderr_file="$TEST_TMPDIR/timeout-invalid.err"
-    local rc
-
-    if std_run_with_timeout --no-exit nope bash -c 'exit 0' 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
-
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run_with_timeout: timeout seconds must be a positive integer."* ]]
-}
-
-@test "run compatibility wrapper delegates to std_run behavior" {
-    local stderr_file="$TEST_TMPDIR/run-compat.err"
-    local rc
-
-    if run --no-exit --quiet bash -c 'exit 7' 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
-
-    [ "$rc" -eq 7 ]
-    [ ! -s "$stderr_file" ]
 }
 
 @test "safe_mkdir creates directories and tolerates existing paths with -p" {
