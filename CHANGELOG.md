@@ -7,7 +7,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-07-02
+## [1.1.0] - 2026-07-03
 
 ### Added
 
