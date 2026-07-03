@@ -141,6 +141,9 @@ _git_pull_with_retry() {
 # @param $2 allowed_dirty_path Optional repo-relative path that may be dirty.
 # @param $3 expected_branch    Optional branch name to require instead of auto-detecting.
 #
+# Environment:
+#   BASE_GIT_PULL_MAX_ATTEMPTS Positive integer retry count for `git pull --ff-only`; defaults to 2.
+#
 git_update_repo() {
     local git_repo="$1"
     local allowed_dirty_path="${2:-}"
