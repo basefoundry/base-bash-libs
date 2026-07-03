@@ -9,6 +9,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Added the `base-bash` launcher for standalone scripts that want the
+  base-bash-libs stdlib preloaded from a shebang.
 - Added `std_run --timeout`, `--max-attempts`, and `--retry-delay` execution
   policy options for timeout-only, retry-only, and timeout-plus-retry command
   execution.

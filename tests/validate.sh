@@ -16,6 +16,7 @@ required_files=(
   base_manifest.yaml
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
+  bin/base-bash
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
   examples/cookbook-args-lists-strings.sh
@@ -36,6 +37,7 @@ required_files=(
   lib/bash/list/lib_list.sh
   lib/bash/list/tests/lib_list.bats
   lib/bash/tests/test_helper.sh
+  tests/launcher.bats
 )
 
 cd "$repo_root" || exit 1
@@ -90,6 +92,7 @@ for command in shellcheck bats; do
 done
 
 shellcheck --severity=error \
+  bin/base-bash \
   tests/validate.sh \
   examples/std-usage.sh \
   examples/cookbook-cleanup-temp.sh \
@@ -100,9 +103,11 @@ shellcheck --severity=error \
   lib/bash/str/lib_str.sh \
   lib/bash/arg/lib_arg.sh \
   lib/bash/list/lib_list.sh \
-  lib/bash/tests/test_helper.sh
+  lib/bash/tests/test_helper.sh \
+  tests/launcher.bats
 
 bats \
+  tests/launcher.bats \
   lib/bash/std/tests/lib_std.bats \
   lib/bash/file/tests/lib_file.bats \
   lib/bash/git/tests/lib_git.bats \
