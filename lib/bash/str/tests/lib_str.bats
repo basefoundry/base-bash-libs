@@ -209,34 +209,8 @@ EOF
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "str_in_array checks membership in a named array" {
-    local -a values=("alpha" "beta gamma" "")
-
-    str_in_array "alpha" values
-    str_in_array "beta gamma" values
-    str_in_array "" values
-
-    if str_in_array "delta" values; then
-        return 1
-    fi
-}
-
-@test "str_in_array rejects invalid array variable names" {
-    local script="$TEST_TMPDIR/str-in-array-invalid.sh"
-
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$BASE_BASH_DIR/std/lib_std.sh"
-source "$BASE_BASH_DIR/str/lib_str.sh"
-secret="not-valid"
-str_in_array "alpha" "\$secret"
-EOF
-
-    bats_run bash "$script"
-
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
-    [[ "$output" != *"not-valid"* ]]
+@test "lib_str does not define list membership aliases" {
+    [ "$(type -t str_in_array || true)" = "" ]
 }
 
 @test "string array helpers reject non-indexed arrays" {
@@ -269,16 +243,4 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"must be an indexed array declared by the caller"* ]]
 
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$BASE_BASH_DIR/std/lib_std.sh"
-source "$BASE_BASH_DIR/str/lib_str.sh"
-values="alpha"
-str_in_array "alpha" values
-EOF
-
-    bats_run bash "$script"
-
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
 }

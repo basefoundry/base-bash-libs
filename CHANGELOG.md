@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Removed
+
+- Removed early compatibility aliases `run`, `std_run_with_timeout`, and
+  `str_in_array`; use `std_run`, `std_run --timeout`, and `list_contains`
+  instead.
+
 ## [1.1.0] - 2026-07-03
 
 ### Added

@@ -273,14 +273,8 @@ first:
 std_run -- --command-name arg
 ```
 
-`run` remains available as a compatibility wrapper for existing callers, but new
-code should use `std_run` to avoid collisions with test frameworks and other
-Bash libraries that define their own `run` helper.
-
-`std_run_with_timeout` remains available as a compatibility wrapper, but new
-code should use `std_run --timeout N ...`. Timeout execution prefers `timeout`
-or `gtimeout` when available and otherwise uses a Bash fallback so scripts work
-on macOS and Linux.
+Timeout execution prefers `timeout` or `gtimeout` when available and otherwise
+uses a Bash fallback so scripts work on macOS and Linux.
 
 ## Importing Other Bash Libraries
 

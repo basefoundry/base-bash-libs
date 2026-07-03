@@ -29,8 +29,6 @@ helpers are available.
   Split a string by a delimiter into a caller-provided array variable.
 - `str_join`
   Join a caller-provided array variable into a caller-provided result variable.
-- `str_in_array`
-  Return success when a named array contains an exact string value.
 
 ## Usage
 
@@ -63,6 +61,8 @@ str_join joined "|" parts
   not print output.
 - `str_split` preserves empty fields between repeated delimiters.
 - `str_join` preserves empty array elements, including trailing empty elements.
+- Use `list_contains` from `lib/bash/list/lib_list.sh` for indexed-array
+  membership checks.
 - Named string, result, and array arguments must be valid Bash variable names.
 - Array arguments and array result variables must already be declared as indexed
   arrays, for example with `declare -a parts=()`.

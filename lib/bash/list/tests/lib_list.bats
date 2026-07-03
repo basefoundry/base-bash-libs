@@ -50,10 +50,16 @@ create_script() {
     [ "${values[3]}" = "" ]
 }
 
-@test "list_remove deletes matching values and preserves order" {
+@test "list_remove deletes all matching values and preserves order" {
     local -a values=("alpha" "beta" "alpha" "" "gamma")
 
     list_remove values "alpha"
+
+    [ "${#values[@]}" -eq 3 ]
+    [ "${values[0]}" = "beta" ]
+    [ "${values[1]}" = "" ]
+    [ "${values[2]}" = "gamma" ]
+
     list_remove values ""
 
     [ "${#values[@]}" -eq 2 ]
