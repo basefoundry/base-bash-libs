@@ -41,6 +41,9 @@ list_prepend() {
     eval "$__list_array_name=(\"\${__list_values[@]}\" \"\${__list_current[@]}\")"
 }
 
+#
+# Removes every exact match from a caller-owned indexed array in place.
+#
 list_remove() {
     local __list_array_name="${1-}" __list_needle="${2-}" __list_item
     local -a __list_current=() __list_filtered=()
