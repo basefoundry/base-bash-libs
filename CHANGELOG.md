@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-02
+
 ### Added
 
 - Added the `base-bash` launcher for standalone scripts that want the

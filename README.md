@@ -2,7 +2,7 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `1.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.0.0) |
+| `2.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0) |
 
 Reusable Bash standard library for reliable shell scripts.
 
