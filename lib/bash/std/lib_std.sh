@@ -1033,7 +1033,7 @@ __std_run_with_timeout_fallback__() {
     local timeout_marker command_pid timer_pid command_status
     local kill_grace_seconds=1
 
-    timeout_marker="$(mktemp "${TMPDIR:-/tmp}/base-bash-libs-timeout.XXXXXXXXXX" 2>/dev/null)" || return 127
+    std_make_temp_file timeout_marker base-bash-libs-timeout || return 127
 
     "$@" &
     command_pid=$!
@@ -1229,10 +1229,13 @@ safe_truncate() {
 
 __std_get_exit_trap_command__() {
     local result_name="$1" trap_spec=""
+    local trap_prefix="trap -- '" trap_suffix="' EXIT"
 
     trap_spec="$(trap -p EXIT || true)"
-    if [[ "$trap_spec" =~ ^trap\ --\ \'(.*)\'\ EXIT$ ]]; then
-        printf -v "$result_name" '%s' "${BASH_REMATCH[1]}"
+    if [[ "$trap_spec" == "$trap_prefix"*"$trap_suffix" ]]; then
+        trap_spec="${trap_spec#"$trap_prefix"}"
+        trap_spec="${trap_spec%"$trap_suffix"}"
+        printf -v "$result_name" '%s' "$trap_spec"
     else
         printf -v "$result_name" '%s' ""
     fi

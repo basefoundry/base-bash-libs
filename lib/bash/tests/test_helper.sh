@@ -52,6 +52,18 @@ setup_test_tmpdir() {
     mkdir -p "$TEST_TMPDIR"
 }
 
+capture_command() {
+    local capture_file="${TEST_TMPDIR:?}/captured-command.out"
+
+    set +e
+    "$@" >"$capture_file" 2>&1
+    status=$?
+    set -e
+
+    output="$(cat "$capture_file")"
+    IFS=$'\n' read -r -d '' -a lines < "$capture_file" || true
+}
+
 init_git_repo() {
     local repo_dir="$1"
     local default_branch="${2:-main}"

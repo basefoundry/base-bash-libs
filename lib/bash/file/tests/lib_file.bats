@@ -147,6 +147,32 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nfirst\nsecond\nthird\n# END\nafter' ]
 }
 
+@test "update_file_section registers internal temp files for cleanup" {
+    local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+old
+# END
+after
+EOF
+
+    eval "$(declare -f std_register_cleanup_path | sed '1s/std_register_cleanup_path/__orig_std_register_cleanup_path/')"
+    std_register_cleanup_path() {
+        printf '%s\n' "$@" >> "$registration_file"
+        __orig_std_register_cleanup_path "$@"
+    }
+
+    update_file_section "$target" "# BEGIN" "# END" "new"
+    unset -f std_register_cleanup_path __orig_std_register_cleanup_path
+
+    [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
+    [[ "$(cat "$registration_file")" == *"base-file-section-new."* ]]
+    [[ "$(cat "$registration_file")" == *"base-file-section-current."* ]]
+    [[ "$(cat "$registration_file")" == *"config.txt."* ]]
+}
+
 @test "update_file_section skips unchanged existing section" {
     local before_inode
     local target="$TEST_TMPDIR/config.txt"
@@ -160,7 +186,7 @@ after
 EOF
     before_inode="$(file_inode "$target")"
 
-    bats_run update_file_section "$target" "# BEGIN" "# END" "same" "content"
+    capture_command update_file_section "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"Updating '$target'"* ]]
@@ -168,7 +194,7 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nsame\ncontent\n# END\nafter' ]
 
     set_log_level DEBUG
-    bats_run update_file_section "$target" "# BEGIN" "# END" "same" "content"
+    capture_command update_file_section "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Section already up to date in '$target'."* ]]
@@ -201,7 +227,7 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nsecret\nvalue\n# END\nafter' ]
 }
 
-@test "update_file_section removes a marked block with -r" {
+@test "update_file_section removes a marked block with remove option" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -216,7 +242,7 @@ EOF
     [ "$(cat "$target")" = $'before\nafter' ]
 }
 
-@test "update_file_section removes only the first matching marked block with -r" {
+@test "update_file_section removes only the first matching marked block with remove option" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -287,7 +313,7 @@ EOF
 @test "update_file_section is a no-op for a missing target file" {
     local target="$TEST_TMPDIR/missing.txt"
 
-    bats_run update_file_section "$target" "# BEGIN" "# END" "value"
+    capture_command update_file_section "$target" "# BEGIN" "# END" "value"
 
     [ "$status" -eq 0 ]
     [ ! -e "$target" ]
@@ -312,7 +338,7 @@ EOF
         return 1
     }
 
-    bats_run update_file_section "$target" "# BEGIN" "# END" "value"
+    capture_command update_file_section "$target" "# BEGIN" "# END" "value"
     unset -f cp
 
     [ "$status" -eq 1 ]

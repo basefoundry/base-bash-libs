@@ -158,7 +158,7 @@ git_update_repo() {
         return 1
     fi
 
-    git_log="$(mktemp "${TMPDIR:-/tmp}/git_log.XXXXXX")" || {
+    std_make_temp_file git_log git_log || {
         log_error "Unable to create temporary git log file."
         return 1
     }
