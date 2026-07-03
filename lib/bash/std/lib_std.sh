@@ -932,6 +932,10 @@ __std_run_impl__() {
                 break
                 ;;
             *)
+                if [[ "${1-}" == --* ]]; then
+                    log_error "$helper_name: unknown option '$1'. Use -- before commands that begin with --."
+                    return 1
+                fi
                 break
                 ;;
         esac

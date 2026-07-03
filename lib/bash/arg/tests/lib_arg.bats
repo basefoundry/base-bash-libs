@@ -71,6 +71,18 @@ create_script() {
     [ "${positionals[0]}" = "item" ]
 }
 
+@test "arg_parse accepts -- as a value option value" {
+    local -a specs=("output|value|--output|-o")
+    local -A options=()
+    local -a positionals=()
+
+    arg_parse options positionals specs -- --output -- item
+
+    [ "${options[output]}" = "--" ]
+    [ "${#positionals[@]}" -eq 1 ]
+    [ "${positionals[0]}" = "item" ]
+}
+
 @test "arg_parse returns usage status for unknown options" {
     local -a specs=("verbose|flag|--verbose|-v")
     local -A options=()

@@ -39,8 +39,10 @@ Spec entries use `name|kind|token[|token...]`:
 - each `token` is an exact option token, such as `--verbose` or `-v`.
 
 The parser supports `--option value`, `--option=value`, repeated options where
-the last value wins, and `--` to stop option parsing. A value option followed by
-another registered option token is treated as missing its value; use
+the last value wins, and `--` to stop option parsing. When a value option is
+waiting for a value, a standalone `--` is treated as that value; use another
+`--` if you also need to stop option parsing after it. A value option followed
+by another registered option token is treated as missing its value; use
 `--option=value` when a value is intentionally option-like. Unknown options,
 malformed specs, and missing values return status `2`.
 
