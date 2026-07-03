@@ -115,7 +115,7 @@ setup() {
 }
 
 @test "git_update_repo usage names the current function" {
-    bats_run git_update_repo
+    capture_command git_update_repo
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Usage: git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
@@ -131,7 +131,7 @@ setup() {
     printf 'local change\n' > "$repo/data.txt"
     set_log_level DEBUG
 
-    bats_run git_update_repo "$repo"
+    capture_command git_update_repo "$repo"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
@@ -145,7 +145,7 @@ setup() {
     commit_all "$repo" "Initial commit"
     set_log_level DEBUG
 
-    bats_run git_update_repo "$repo" "" release
+    capture_command git_update_repo "$repo" "" release
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"not 'release'. Skipping update"* ]]
@@ -160,7 +160,7 @@ setup() {
     commit_all "$repo" "Initial commit"
     before_head="$(git -C "$repo" rev-parse HEAD)"
 
-    bats_run git_update_repo "$repo" "" main
+    capture_command git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -178,7 +178,7 @@ setup() {
     before_head="$(git -C "$repo" rev-parse HEAD)"
     git -C "$repo" remote set-url origin "$TEST_TMPDIR/missing-remote.git"
 
-    bats_run git_update_repo "$repo" "" main
+    capture_command git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -204,7 +204,7 @@ setup() {
     git -C "$other" commit --amend -m "Rewrite remote history" >/dev/null 2>&1
     git -C "$other" push --force origin main >/dev/null 2>&1
 
-    bats_run git_update_repo "$repo" "" main
+    capture_command git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -230,7 +230,7 @@ setup() {
     git -C "$other" push origin main >/dev/null 2>&1
     printf 'local untracked\n' > "$repo/local-notes.md"
 
-    bats_run git_update_repo "$repo" "" main
+    capture_command git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -249,7 +249,7 @@ setup() {
     printf 'local change\n' > "$repo/data.txt"
     set_log_level DEBUG
 
-    bats_run git_update_repo "$repo"
+    capture_command git_update_repo "$repo"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
@@ -397,13 +397,35 @@ setup() {
     printf 'local change\n' > "$repo/data.txt"
 
     trap 'printf "outer return trap\n"' RETURN
-    TMPDIR="$temp_dir" bats_run git_update_repo "$repo"
+    TMPDIR="$temp_dir" capture_command git_update_repo "$repo"
     return_trap="$(trap -p RETURN)"
     trap - RETURN
 
     [ "$status" -eq 0 ]
     [[ "$return_trap" == *"outer return trap"* ]]
     ! compgen -G "$temp_dir/git_log.*" >/dev/null
+}
+
+@test "git_update_repo registers temp log for cleanup" {
+    local repo="$TEST_TMPDIR/repo"
+    local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    printf 'local change\n' > "$repo/data.txt"
+
+    eval "$(declare -f std_register_cleanup_path | sed '1s/std_register_cleanup_path/__orig_std_register_cleanup_path/')"
+    std_register_cleanup_path() {
+        printf '%s\n' "$@" >> "$registration_file"
+        __orig_std_register_cleanup_path "$@"
+    }
+
+    capture_command git_update_repo "$repo"
+    unset -f std_register_cleanup_path __orig_std_register_cleanup_path
+
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$registration_file")" == *"git_log."* ]]
 }
 
 @test "_git_update_repo_finish removes temp log after success" {

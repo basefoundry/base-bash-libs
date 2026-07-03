@@ -31,6 +31,32 @@ __preserve_file_mode__() {
     chmod "$source_mode" "$target_file"
 }
 
+__file_remove_temp_paths__() {
+    local path
+
+    for path; do
+        [[ -n "$path" ]] && rm -f -- "$path"
+    done
+    return 0
+}
+
+__file_make_target_temp__() {
+    local result_name="$1" target_file="$2"
+    local target_dir target_base temp_dir temp_path
+
+    target_dir="$(dirname -- "$target_file")"
+    target_base="$(basename -- "$target_file")"
+    temp_dir="$(cd -- "$target_dir" && pwd -P)" || return 1
+
+    temp_path="$(mktemp "$temp_dir/$target_base.XXXXXX" 2>/dev/null)" || return 1
+    if ! std_register_cleanup_path "$temp_path"; then
+        rm -f -- "$temp_path"
+        return 1
+    fi
+
+    printf -v "$result_name" '%s' "$temp_path"
+}
+
 __file_section_markers_ordered__() {
     local target_file="$1" beginning_marker="$2" end_marker="$3"
 
@@ -165,24 +191,22 @@ update_file_section() {
 
     local current_content_file="" new_content_file="" temp_file
     if [[ "$remove_section" == false ]]; then
-        new_content_file=$(mktemp "${TMPDIR:-/tmp}/base-file-section-new.XXXXXX")
-        if [[ ! -f "$new_content_file" ]]; then
+        if ! std_make_temp_file new_content_file base-file-section-new; then
             log_error "Failed to create temporary content file for '$target_file'."
             return 1
         fi
 
         if ! printf '%s' "$new_content_string" > "$new_content_file"; then
             log_error "Failed to write replacement content for '$target_file'."
-            rm -f "$new_content_file"
+            __file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
     fi
 
     if [[ "$section_exists" == true && "$remove_section" == false ]]; then
-        current_content_file=$(mktemp "${TMPDIR:-/tmp}/base-file-section-current.XXXXXX")
-        if [[ ! -f "$current_content_file" ]]; then
+        if ! std_make_temp_file current_content_file base-file-section-current; then
             log_error "Failed to create temporary current content file for '$target_file'."
-            rm -f "$new_content_file"
+            __file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
 
@@ -204,28 +228,27 @@ update_file_section() {
         }
         ' "$target_file" > "$current_content_file"; then
             log_error "Failed to read existing section in '$target_file'."
-            rm -f "$current_content_file" "$new_content_file"
+            __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 1
         fi
 
         if cmp -s "$current_content_file" "$new_content_file"; then
             log_debug "Section already up to date in '$target_file'."
-            rm -f "$current_content_file" "$new_content_file"
+            __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 0
         fi
-        rm -f "$current_content_file"
+        __file_remove_temp_paths__ "$current_content_file"
     fi
 
     log_info "Updating '$target_file'"
-    temp_file=$(mktemp "${target_file}.XXXXXX")
-    if [[ ! -f "$temp_file" ]]; then
+    if ! __file_make_target_temp__ temp_file "$target_file"; then
         log_error "Failed to create temporary file for '$target_file'."
-        rm -f "$new_content_file"
+        __file_remove_temp_paths__ "$new_content_file"
         return 1
     fi
     if ! __preserve_file_mode__ "$target_file" "$temp_file"; then
         log_error "Failed to preserve permissions for '$target_file'."
-        rm -f "$temp_file" "$new_content_file"
+        __file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     fi
 
@@ -248,7 +271,7 @@ update_file_section() {
                 }
             }
             ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
-                rm -f "$new_content_file"
+                __file_remove_temp_paths__ "$new_content_file"
                 return 0
             fi
         else
@@ -274,26 +297,26 @@ update_file_section() {
                 print $0
             }
             ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
-                rm -f "$new_content_file"
+                __file_remove_temp_paths__ "$new_content_file"
                 return 0
             fi
         fi
 
         log_error "Failed to process sections in '$target_file'."
-        rm -f "$temp_file" "$new_content_file"
+        __file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     else
         # Markers not found in the file
         if ! cp "$target_file" "$temp_file"; then
             log_error "Failed to copy '$target_file' to '$temp_file'."
-            rm -f "$temp_file" "$new_content_file"
+            __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
         if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
             if ! printf '\n' >> "$temp_file"; then
                 log_error "Failed to add trailing newline to '$temp_file'."
-                rm -f "$temp_file" "$new_content_file"
+                __file_remove_temp_paths__ "$temp_file" "$new_content_file"
                 return 1
             fi
         fi
@@ -304,17 +327,17 @@ update_file_section() {
             printf '%s\n' "$end_marker"
         } >> "$temp_file"; then
             log_error "Failed to add new section to '$target_file'."
-            rm -f "$temp_file" "$new_content_file"
+            __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
         if ! mv -f "$temp_file" "$target_file"; then
             log_error "Failed to replace '$target_file' with '$temp_file'."
-            rm -f "$temp_file" "$new_content_file"
+            __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
-        rm -f "$new_content_file"
+        __file_remove_temp_paths__ "$new_content_file"
         return 0
     fi
 }

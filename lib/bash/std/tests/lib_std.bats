@@ -972,6 +972,31 @@ EOF
     [ ! -e "$marker_file" ]
 }
 
+@test "std_run fallback timeout marker is registered for cleanup" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
+    local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
+    local output_file="$TEST_TMPDIR/timeout-fallback-output.txt"
+    local old_path="$PATH"
+
+    mkdir -p "$fake_bin"
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v rm)" "$fake_bin/rm"
+    ln -s "$(command -v sleep)" "$fake_bin/sleep"
+
+    eval "$(declare -f std_register_cleanup_path | sed '1s/std_register_cleanup_path/__orig_std_register_cleanup_path/')"
+    std_register_cleanup_path() {
+        printf '%s\n' "$@" >> "$registration_file"
+        __orig_std_register_cleanup_path "$@"
+    }
+
+    PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
+    PATH="$old_path"
+    unset -f std_register_cleanup_path __orig_std_register_cleanup_path
+
+    [ "$(cat "$output_file")" = "fallback" ]
+    [[ "$(cat "$registration_file")" == *"base-bash-libs-timeout."* ]]
+}
+
 @test "std_run --max-attempts retries until the command succeeds" {
     local counter_file="$TEST_TMPDIR/retry-count.txt"
     local script="$TEST_TMPDIR/retry-eventual-success.sh"
@@ -1294,6 +1319,27 @@ EOF
 
     [ "$status" -eq 0 ]
     [ "$(cat "$log_file")" = $'existing\ncleanup-one\ncleanup-two' ]
+}
+
+@test "cleanup hooks preserve multi-line existing EXIT traps" {
+    local script="$TEST_TMPDIR/cleanup-multiline-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-multiline-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap '
+printf "existing-one\n" >> "$log_file"
+printf "existing-two\n" >> "$log_file"
+' EXIT
+cleanup_one() { printf "cleanup-one\n" >> "$log_file"; }
+std_register_cleanup_hook cleanup_one
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = $'existing-one\nexisting-two\ncleanup-one' ]
 }
 
 @test "cleanup hook registration ignores duplicates and supports removal" {
