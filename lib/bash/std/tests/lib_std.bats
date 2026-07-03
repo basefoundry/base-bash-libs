@@ -848,6 +848,36 @@ EOF
     [[ "$(cat "$stderr_file")" == *"std_run: No command provided."* ]]
 }
 
+@test "std_run rejects unknown long options before command execution" {
+    local stderr_file="$TEST_TMPDIR/run-unknown-option.err"
+    local rc
+
+    if std_run --typo echo "should not run" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_run: unknown option '--typo'."* ]]
+    [[ "$(cat "$stderr_file")" == *"Use -- before commands that begin with --."* ]]
+}
+
+@test "std_run allows command names beginning with -- after option terminator" {
+    local fake_bin="$TEST_TMPDIR/bin"
+    local output_file="$TEST_TMPDIR/option-like-command.out"
+
+    mkdir -p "$fake_bin"
+    create_script "$fake_bin/--record-command" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$1" > "$2"
+EOF
+
+    PATH="$fake_bin:$PATH" std_run -- --record-command "ran" "$output_file"
+
+    [ "$(cat "$output_file")" = "ran" ]
+}
+
 @test "std_run honors dry-run mode without executing the command" {
     local target="$TEST_TMPDIR/dry-run.txt"
     DRY_RUN=true

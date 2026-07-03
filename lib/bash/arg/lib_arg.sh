@@ -151,7 +151,7 @@ arg_parse() {
                 continue
             fi
 
-            if (($# == 0)) || [[ "${1-}" == "--" ]]; then
+            if (($# == 0)); then
                 log_error "arg_parse: option '$__arg_option_token' requires a value."
                 return 2
             fi

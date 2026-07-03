@@ -265,6 +265,14 @@ Use `std_run` for commands plus arguments. Keep shell features such as
 pipelines, redirection, process substitution, and complex conditionals explicit
 in the calling script so the code remains clear.
 
+Unknown `std_run` options beginning with `--` are rejected before command
+execution. If the command itself begins with `--`, terminate `std_run` options
+first:
+
+```bash
+std_run -- --command-name arg
+```
+
 `run` remains available as a compatibility wrapper for existing callers, but new
 code should use `std_run` to avoid collisions with test frameworks and other
 Bash libraries that define their own `run` helper.
