@@ -62,6 +62,22 @@ source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
+Homebrew installs the standalone `base-bash` launcher on `PATH`. Use it when a
+script should run with the stdlib preloaded from its shebang:
+
+```bash
+#!/usr/bin/env base-bash
+
+import_base_bash_lib str/lib_str.sh
+
+main() {
+    local name="  Example  "
+    str_trim name
+    log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
+    std_run echo "$name"
+}
+```
+
 Load companion libraries with absolute imports from the same package:
 
 ```bash
@@ -98,6 +114,12 @@ import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
 import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
 import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+```
+
+You can also run source-checkout scripts through the launcher:
+
+```bash
+vendor/base-bash-libs/bin/base-bash ./scripts/tool.sh
 ```
 
 ### Vendored or Submodule Layout

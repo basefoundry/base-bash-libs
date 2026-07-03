@@ -49,10 +49,26 @@ Standalone scripts can source the library directly:
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 ```
 
-Base entrypoints preload this library through Base's own runtime bootstrap.
-Standalone scripts should source it explicitly. Callers should run on Bash 4.2
-or newer; the library has passive Bash version helpers, but sourcing it does not
-prompt, install packages, or re-exec the caller.
+Standalone scripts can also use the `base-bash` launcher when it is installed on
+`PATH`:
+
+```bash
+#!/usr/bin/env base-bash
+
+import_base_bash_lib str/lib_str.sh
+
+main() {
+    local name="  Example  "
+    str_trim name
+    std_run echo "$name"
+}
+```
+
+Base entrypoints preload this library through Base's own runtime bootstrap. The
+`base-bash` launcher provides the same stdlib preload pattern without Base
+runtime state. Callers should run on Bash 4.2 or newer; the library has passive
+Bash version helpers, but sourcing it does not prompt, install packages, or
+re-exec the caller.
 
 ## Initialization Contract
 
