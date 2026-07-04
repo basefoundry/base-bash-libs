@@ -240,7 +240,11 @@ update_file_section() {
         __file_remove_temp_paths__ "$current_content_file"
     fi
 
-    log_info "Updating '$target_file'"
+    if [[ "$section_exists" == true ]]; then
+        log_info "Updating '$target_file'"
+    else
+        log_info "Adding section to '$target_file'"
+    fi
     if ! __file_make_target_temp__ temp_file "$target_file"; then
         log_error "Failed to create temporary file for '$target_file'."
         __file_remove_temp_paths__ "$new_content_file"

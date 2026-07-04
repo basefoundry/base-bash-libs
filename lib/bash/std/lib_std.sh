@@ -799,12 +799,11 @@ __std_join_run_policy__() {
 }
 
 __std_run_once__() {
-    local timeout_seconds="$1"
-    shift
-    local timeout_path=""
+    local timeout_seconds="$1" timeout_path="$2"
+    shift 2
 
     if [[ -n "$timeout_seconds" ]]; then
-        if std_command_path timeout_path timeout || std_command_path timeout_path gtimeout; then
+        if [[ -n "$timeout_path" ]]; then
             "$timeout_path" "$timeout_seconds" "$@"
         else
             __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
@@ -885,7 +884,7 @@ __std_run_status_message__() {
 __std_run_impl__() {
     local helper_name="$1"
     shift
-    local exit_on_failure=1 quiet=0 timeout_seconds="" max_attempts=1 retry_delay=0
+    local exit_on_failure=1 quiet=0 timeout_seconds="" timeout_path="" max_attempts=1 retry_delay=0
 
     # Parse optional run flags before the command.
     while (($#)); do
@@ -969,9 +968,13 @@ __std_run_impl__() {
     # Execute the command. Using "$@" is the key. It expands each argument
     # as a separate, quoted string, preserving spaces and special characters.
     # This is the safe, modern alternative to using `eval`.
+    if [[ -n "$timeout_seconds" ]]; then
+        std_command_path timeout_path timeout || std_command_path timeout_path gtimeout || timeout_path=""
+    fi
+
     local attempt=1 exit_code=0 message
     while ((attempt <= max_attempts)); do
-        if __std_run_once__ "$timeout_seconds" "$@"; then
+        if __std_run_once__ "$timeout_seconds" "$timeout_path" "$@"; then
             return 0
         else
             exit_code=$?
@@ -1031,7 +1034,7 @@ __std_run_with_timeout_fallback__() {
     local timeout_marker command_pid timer_pid command_status
     local kill_grace_seconds=1
 
-    std_make_temp_file timeout_marker base-bash-libs-timeout || return 127
+    std_make_temp_file timeout_marker base-bash-libs-timeout || return 1
 
     "$@" &
     command_pid=$!
@@ -1049,7 +1052,7 @@ __std_run_with_timeout_fallback__() {
     command_status=$?
 
     if kill -0 "$timer_pid" 2>/dev/null; then
-        kill "$timer_pid" 2>/dev/null || true
+        kill -KILL "$timer_pid" 2>/dev/null || true
     fi
     wait "$timer_pid" 2>/dev/null || true
 

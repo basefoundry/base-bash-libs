@@ -33,6 +33,26 @@ file_mode() {
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\nsecond\n# END' ]
 }
 
+@test "update_file_section logs adding when markers are absent" {
+    local script="$TEST_TMPDIR/add-log.sh"
+    local target="$TEST_TMPDIR/config.txt"
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/file/lib_file.sh"
+printf 'line-one' > "\$1"
+update_file_section "\$1" "# BEGIN" "# END" "first"
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script" "$target"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Adding section to '$target'"* ]]
+    [[ "$output" != *"Updating '$target'"* ]]
+    [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\n# END' ]
+}
+
 @test "update_file_section appends to an empty file without a leading blank line" {
     local target="$TEST_TMPDIR/config.txt"
     touch "$target"
