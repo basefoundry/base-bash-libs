@@ -44,6 +44,8 @@ and versions are tracked in the repo-root `VERSION` file.
   grace period.
 - Changed list and string array helpers to require caller-declared indexed arrays
   instead of silently coercing scalar variables.
+- Changed repository validation to run a warning-level ShellCheck profile for
+  production libraries, examples, validation scripts, and shared test helpers.
 
 ## [1.0.0] - 2026-06-21
 

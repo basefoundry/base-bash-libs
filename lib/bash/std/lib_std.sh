@@ -326,6 +326,7 @@ import() {
            import_path="$__SCRIPT_DIR__/$lib"
         fi
         if [[ -f "$import_path" ]]; then
+            # shellcheck disable=SC1090
             source "$import_path"
             exit_if_error $? "Import of library '$lib' not successful."
         else
@@ -1990,6 +1991,8 @@ wait_for_enter() {
 # The only function that would be called upon sourcing of the library
 #
 __stdlib_init__
+# Used by companion libraries as a source-order guard.
+# shellcheck disable=SC2034
 readonly BASE_BASH_LIBS_STDLIB_LOADED=1
 
 # This is the crucial step: it resets the positional parameters ($@, $1, etc.)

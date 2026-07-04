@@ -72,6 +72,8 @@ base_bash_ensure_supported_bash() {
     for candidate in "${candidates[@]}"; do
         [[ -x "$candidate" ]] || continue
         [[ "$candidate" == "${BASH:-}" ]] && continue
+        # Re-exec under a supported Bash; the current process should not continue.
+        # shellcheck disable=SC2093
         exec "$candidate" "$0" "$@"
     done
 
@@ -123,6 +125,8 @@ base_bash_source_stdlib() {
     local stdlib_path="$BASE_BASH_LIBS_DIR/std/lib_std.sh"
     shift
 
+    # Consumed by lib_std.sh while it is being sourced below.
+    # shellcheck disable=SC2034
     BASE_BASH_BOOTSTRAP_SOURCE="$script_path"
     # shellcheck source=/dev/null
     source "$stdlib_path" "$@" || exit $?

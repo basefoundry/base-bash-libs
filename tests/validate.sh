@@ -38,6 +38,7 @@ required_files=(
   lib/bash/list/tests/lib_list.bats
   lib/bash/tests/test_helper.sh
   tests/launcher.bats
+  tests/lint-warnings.sh
 )
 
 cd "$repo_root" || exit 1
@@ -94,6 +95,7 @@ done
 shellcheck --severity=error \
   bin/base-bash \
   tests/validate.sh \
+  tests/lint-warnings.sh \
   examples/std-usage.sh \
   examples/cookbook-cleanup-temp.sh \
   examples/cookbook-args-lists-strings.sh \
