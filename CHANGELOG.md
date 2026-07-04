@@ -7,6 +7,13 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Hardened `std_run --timeout` retry internals so timeout discovery is cached
+  per call, fallback setup failures return a generic error, and fallback timer
+  cleanup cannot remove the timeout marker before it is observed.
+- Clarified `update_file_section` logging when appending a new managed section.
+
 ### Removed
 
 - Removed early compatibility aliases `run`, `std_run_with_timeout`, and

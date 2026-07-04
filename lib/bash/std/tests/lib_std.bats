@@ -974,16 +974,25 @@ EOF
 }
 
 @test "std_run --timeout returns 124 when the command times out" {
+    local script="$TEST_TMPDIR/run-timeout.sh"
     local stderr_file="$TEST_TMPDIR/run-timeout.err"
-    local rc
+    local rc_file="$TEST_TMPDIR/run-timeout.rc"
 
-    if std_run --no-exit --quiet --timeout 1 sleep 2 2>"$stderr_file"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+if std_run --no-exit --quiet --timeout 1 /bin/sleep 2 2>"$stderr_file"; then
+    printf '0\n' > "$rc_file"
+else
+    printf '%s\n' "\$?" > "$rc_file"
+fi
+EOF
 
-    [ "$rc" -eq 124 ]
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "" ]
+    [ "$(cat "$rc_file")" = "124" ]
     [ ! -s "$stderr_file" ]
 }
 
@@ -1084,6 +1093,95 @@ EOF
     [ "$?" -eq 0 ]
     [ "$(cat "$counter_file")" = "2" ]
     [ "$(cat "$output_file")" = "ok" ]
+}
+
+@test "std_run discovers timeout binary once across retries" {
+    local fake_bin="$TEST_TMPDIR/timeout-bin"
+    local lookup_file="$TEST_TMPDIR/timeout-lookups.txt"
+    local counter_file="$TEST_TMPDIR/timeout-discovery-count.txt"
+    local script="$TEST_TMPDIR/timeout-discovery-command.sh"
+    local rc
+    local -a lookups=()
+
+    mkdir -p "$fake_bin"
+    create_script "$fake_bin/timeout" <<'EOF'
+#!/usr/bin/env bash
+shift
+"$@"
+EOF
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$1" ]] && count="$(cat "$1")"
+count=$((count + 1))
+printf '%s\n' "$count" > "$1"
+((count >= 3))
+EOF
+
+    eval "$(declare -f std_command_path | sed '1s/std_command_path/__orig_std_command_path/')"
+    std_command_path() {
+        if [[ "${2-}" == "timeout" || "${2-}" == "gtimeout" ]]; then
+            printf '%s\n' "$2" >> "$lookup_file"
+        fi
+        __orig_std_command_path "$@"
+    }
+
+    PATH="$fake_bin:$PATH" std_run --no-exit --quiet --timeout 5 --max-attempts 3 /bin/bash "$script" "$counter_file"
+    rc=$?
+    unset -f std_command_path __orig_std_command_path
+
+    [ "$rc" -eq 0 ]
+    mapfile -t lookups < "$lookup_file"
+    [ "${#lookups[@]}" -eq 1 ]
+    [ "${lookups[0]}" = "timeout" ]
+    [ "$(cat "$counter_file")" = "3" ]
+}
+
+@test "std_run fallback timeout returns 1 when marker creation fails" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
+    local stderr_file="$TEST_TMPDIR/timeout-marker-failure.err"
+    local rc
+
+    mkdir -p "$fake_bin"
+
+    eval "$(declare -f std_make_temp_file | sed '1s/std_make_temp_file/__orig_std_make_temp_file/')"
+    std_make_temp_file() {
+        return 1
+    }
+
+    if PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    unset -f std_make_temp_file __orig_std_make_temp_file
+
+    [ "$rc" -eq 1 ]
+}
+
+@test "std_run fallback timeout kills timer with SIGKILL after command exits" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-bin"
+    local kill_log="$TEST_TMPDIR/timeout-kill.log"
+    local output_file="$TEST_TMPDIR/timeout-kill-output.txt"
+    local rc
+
+    mkdir -p "$fake_bin"
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v rm)" "$fake_bin/rm"
+    ln -s "$(command -v sleep)" "$fake_bin/sleep"
+
+    kill() {
+        printf '%s\n' "$*" >> "$kill_log"
+        builtin kill "$@"
+    }
+
+    PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
+    rc=$?
+    unset -f kill
+
+    [ "$rc" -eq 0 ]
+    [ "$(cat "$output_file")" = "fallback" ]
+    [[ "$(cat "$kill_log")" == *"-KILL "* ]]
 }
 
 @test "std_run rejects invalid execution policy options" {
