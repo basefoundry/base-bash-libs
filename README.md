@@ -2,7 +2,7 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `1.1.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.1.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.1.0) |
+| `1.2.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.2.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.2.0) |
 
 Reusable Bash standard library for reliable shell scripts.
 
@@ -151,7 +151,7 @@ that readonly constant when they need to display the loaded library version.
 Use `base_bash_libs_require_version` to require a minimum library version:
 
 ```bash
-base_bash_libs_require_version 1.1.0
+base_bash_libs_require_version 1.2.0
 ```
 
 ## Examples

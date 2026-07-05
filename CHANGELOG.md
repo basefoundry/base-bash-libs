@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-04
+
 ### Added
 
 - Added `lib/bash/gh/lib_gh.sh` with generic GitHub CLI availability,
