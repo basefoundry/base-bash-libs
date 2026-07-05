@@ -15,6 +15,7 @@ lint_files=(
   lib/bash/std/lib_std.sh
   lib/bash/file/lib_file.sh
   lib/bash/git/lib_git.sh
+  lib/bash/gh/lib_gh.sh
   lib/bash/str/lib_str.sh
   lib/bash/arg/lib_arg.sh
   lib/bash/list/lib_list.sh

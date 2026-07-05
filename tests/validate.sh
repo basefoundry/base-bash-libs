@@ -27,6 +27,9 @@ required_files=(
   lib/bash/file/tests/lib_file.bats
   lib/bash/git/lib_git.sh
   lib/bash/git/tests/lib_git.bats
+  lib/bash/gh/README.md
+  lib/bash/gh/lib_gh.sh
+  lib/bash/gh/tests/lib_gh.bats
   lib/bash/str/README.md
   lib/bash/str/lib_str.sh
   lib/bash/str/tests/lib_str.bats
@@ -102,6 +105,7 @@ shellcheck --severity=error \
   lib/bash/std/lib_std.sh \
   lib/bash/file/lib_file.sh \
   lib/bash/git/lib_git.sh \
+  lib/bash/gh/lib_gh.sh \
   lib/bash/str/lib_str.sh \
   lib/bash/arg/lib_arg.sh \
   lib/bash/list/lib_list.sh \
@@ -113,6 +117,7 @@ bats \
   lib/bash/std/tests/lib_std.bats \
   lib/bash/file/tests/lib_file.bats \
   lib/bash/git/tests/lib_git.bats \
+  lib/bash/gh/tests/lib_gh.bats \
   lib/bash/str/tests/lib_str.bats \
   lib/bash/arg/tests/lib_arg.bats \
   lib/bash/list/tests/lib_list.bats

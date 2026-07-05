@@ -9,6 +9,8 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   shared Bash primitives.
 - `git/`
   Git-related helpers built on top of the stdlib.
+- `gh/`
+  GitHub CLI helpers built on top of the stdlib.
 - `file/`
   File-editing helpers built on top of the stdlib.
 - `str/`
