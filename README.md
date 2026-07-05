@@ -27,6 +27,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/git/lib_git.sh`](lib/bash/git/README.md)
   Git helper functions built on the stdlib for lightweight repository
   inspection, update, and script freshness checks.
+- [`lib/bash/gh/lib_gh.sh`](lib/bash/gh/README.md)
+  GitHub CLI helper functions built on the stdlib for command readiness,
+  authentication diagnostics, and checked `gh` execution.
 - [`lib/bash/str/lib_str.sh`](lib/bash/str/README.md)
   String helpers built on the stdlib for case conversion, trimming,
   predicates, splitting, and joining.
@@ -83,6 +86,7 @@ Load companion libraries with absolute imports from the same package:
 ```bash
 import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
 import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
@@ -111,6 +115,7 @@ Load companion libraries with absolute imports from the same checkout:
 ```bash
 import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
 import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
 import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
@@ -134,6 +139,7 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
 import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
 import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
 import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"

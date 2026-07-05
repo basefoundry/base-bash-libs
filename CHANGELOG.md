@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `lib/bash/gh/lib_gh.sh` with generic GitHub CLI availability,
+  authentication diagnostics, failure reporting, and checked command execution
+  helpers.
+
 ### Fixed
 
 - Hardened `std_run --timeout` retry internals so timeout discovery is cached
