@@ -120,7 +120,7 @@ gh_infer_repo_from_origin() {
 gh_detect_default_branch() {
     local repo_dir="$1"
     local result_var="${2:-}"
-    local default_branch
+    local detected_branch
 
     if [[ -z "$repo_dir" || -z "$result_var" ]]; then
         log_error "Usage: gh_detect_default_branch <repo_dir> <result_variable_name>"
@@ -128,10 +128,10 @@ gh_detect_default_branch() {
     fi
     assert_variable_name "$result_var"
 
-    if default_branch="$(git -C "$repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
-        default_branch="${default_branch#origin/}"
-        if [[ -n "$default_branch" ]]; then
-            printf -v "$result_var" '%s' "$default_branch"
+    if detected_branch="$(git -C "$repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+        detected_branch="${detected_branch#origin/}"
+        if [[ -n "$detected_branch" ]]; then
+            printf -v "$result_var" '%s' "$detected_branch"
             return 0
         fi
     fi
@@ -154,7 +154,7 @@ gh_detect_default_branch() {
 gh_repo_default_branch() {
     local repo="$1"
     local result_var="${2:-}"
-    local default_branch status
+    local remote_default_branch status
 
     if [[ -z "$repo" || -z "$result_var" ]]; then
         log_error "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
@@ -163,18 +163,18 @@ gh_repo_default_branch() {
     assert_variable_name "$result_var"
 
     gh_require_cli || return 1
-    default_branch="$(gh repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)"
+    remote_default_branch="$(gh repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)"
     status=$?
     if ((status != 0)); then
         gh_report_command_failure "$status" repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name
         return $?
     fi
-    if [[ -z "$default_branch" ]]; then
+    if [[ -z "$remote_default_branch" ]]; then
         log_error "GitHub repository '$repo' does not report a default branch."
         return 1
     fi
 
-    printf -v "$result_var" '%s' "$default_branch"
+    printf -v "$result_var" '%s' "$remote_default_branch"
 }
 
 __gh_api_failure_retryable() {

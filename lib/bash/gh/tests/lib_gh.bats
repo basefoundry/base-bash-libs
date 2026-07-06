@@ -194,6 +194,19 @@ EOF
     [ "$branch" = "main" ]
 }
 
+@test "gh_detect_default_branch supports default_branch as the result variable name" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local default_branch=""
+
+    init_git_repo "$repo_dir"
+    printf 'base\n' > "$repo_dir/data.txt"
+    commit_all "$repo_dir" "Initial commit"
+
+    gh_detect_default_branch "$repo_dir" default_branch
+
+    [ "$default_branch" = "main" ]
+}
+
 @test "gh_detect_default_branch reports failure when no default branch can be detected" {
     local repo_dir="$TEST_TMPDIR/repo"
     local branch="sentinel"
@@ -223,6 +236,23 @@ EOF
     gh_repo_default_branch "owner/repo" branch
 
     [ "$branch" = "develop" ]
+}
+
+@test "gh_repo_default_branch supports default_branch as the result variable name" {
+    local default_branch=""
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "repo" && "$2" == "view" ]]; then
+    printf 'develop\n'
+    exit 0
+fi
+exit 99
+EOF
+
+    gh_repo_default_branch "owner/repo" default_branch
+
+    [ "$default_branch" = "develop" ]
 }
 
 @test "gh_api_with_retry retries retryable API pressure once" {
