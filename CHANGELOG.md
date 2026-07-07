@@ -15,6 +15,7 @@ and versions are tracked in the repo-root `VERSION` file.
 - Hardened GitHub helper pass-by-name outputs against internal variable
   shadowing, added a non-optional `gh_infer_repo_from_origin` error message,
   and deduplicated worktree parsing loops.
+- Reused shared marker validation inside `update_file_section`.
 
 ## [1.2.0] - 2026-07-04
 
