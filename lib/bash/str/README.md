@@ -60,6 +60,8 @@ str_join joined "|" parts
 - Predicate helpers require exactly two arguments, return shell status, and do
   not print output.
 - `str_split` preserves empty fields between repeated delimiters.
+- `str_split` preserves a trailing empty field when the input ends with the
+  separator.
 - `str_join` preserves empty array elements, including trailing empty elements.
 - Use `list_contains` from `lib/bash/list/lib_list.sh` for indexed-array
   membership checks.
