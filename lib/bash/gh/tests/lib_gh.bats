@@ -120,6 +120,70 @@ EOF
     [[ "$output" == *"Run 'gh auth login -h github.com' and retry."* ]]
 }
 
+@test "gh_run reports command failure under set -e" {
+    local script="$TEST_TMPDIR/gh-run-set-e.sh"
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "auth" && "$2" == "status" ]]; then
+    printf 'not logged in\n' >&2
+    exit 1
+fi
+printf 'command failed\n' >&2
+exit 7
+EOF
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/gh/lib_gh.sh"
+PATH="$TEST_TMPDIR/bin:$BASE_TEST_ORIG_PATH"
+gh_run issue create --title Example
+printf 'after\n'
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 7 ]
+    [[ "$output" == *"command failed"* ]]
+    [[ "$output" == *"GitHub command failed: gh issue create --title Example"* ]]
+    [[ "$output" == *"gh auth status: not logged in"* ]]
+    [[ "$output" != *"after"* ]]
+}
+
+@test "gh_run quotes arguments when reporting command failure" {
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "auth" && "$2" == "status" ]]; then
+    exit 0
+fi
+exit 7
+EOF
+
+    bats_run gh_run issue create --title "Example Title" --body "body value"
+
+    [ "$status" -eq 7 ]
+    [[ "$output" == *"GitHub command failed: gh issue create --title Example\\ Title --body body\\ value"* ]]
+    [[ "$output" != *"GitHub command failed: gh issue create --title Example Title --body body value"* ]]
+}
+
+@test "gh_run returns 1 with an error when gh is not on PATH" {
+    mkdir -p "$TEST_TMPDIR/no-gh-bin"
+
+    bats_run "$BASH" -c '
+        source "$1"
+        source "$2"
+        PATH="$3"
+        gh_run issue list
+    ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" "$TEST_TMPDIR/no-gh-bin"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Required command 'gh' was not found on PATH."* ]]
+    [[ "$output" != *"GitHub command failed"* ]]
+    [[ "$output" != *"gh auth status"* ]]
+}
+
 @test "gh_repo_from_remote_url parses supported GitHub remotes" {
     local repo
 
