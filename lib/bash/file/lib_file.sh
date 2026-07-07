@@ -90,6 +90,134 @@ __file_section_markers_ordered__() {
     ' "$target_file"
 }
 
+__file_section_marker_counts__() {
+    local target_file="$1" beginning_marker="$2" end_marker="$3"
+    local beginning_count_var="$4" end_count_var="$5"
+    local section_beginning_marker_count section_end_marker_count
+
+    section_beginning_marker_count=$(grep -cxF -- "$beginning_marker" "$target_file" || true)
+    section_end_marker_count=$(grep -cxF -- "$end_marker" "$target_file" || true)
+
+    printf -v "$beginning_count_var" '%s' "$section_beginning_marker_count"
+    printf -v "$end_count_var" '%s' "$section_end_marker_count"
+
+    if ((section_beginning_marker_count != section_end_marker_count)); then
+        log_error "Asymmetric markers in '$target_file': $section_beginning_marker_count start, $section_end_marker_count end. Manual repair needed."
+        return 2
+    fi
+    if ((section_beginning_marker_count > 0)) && ! __file_section_markers_ordered__ "$target_file" "$beginning_marker" "$end_marker"; then
+        log_error "Misordered markers in '$target_file'. Manual repair needed."
+        return 2
+    fi
+
+    return 0
+}
+
+#
+# file_section_exists - Inspect whether a marker-delimited section is present.
+#
+# Returns:
+#   0 when the target file contains at least one valid marker pair.
+#   1 when the target file is missing or the marker pair is absent.
+#   2 when marker pairs are asymmetric or misordered and need manual repair.
+#
+file_section_exists() {
+    if [[ $# -ne 3 ]]; then
+        log_error "file_section_exists: expected <target_file> <beginning_marker> <end_marker>."
+        return 2
+    fi
+
+    local target_file="$1" beginning_marker="$2" end_marker="$3"
+    local beginning_marker_count end_marker_count
+
+    [[ -f "$target_file" ]] || return 1
+    __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
+        beginning_marker_count end_marker_count || return $?
+
+    ((beginning_marker_count > 0))
+}
+
+#
+# file_section_needs_update - Inspect whether add/update would change a section.
+#
+# Returns:
+#   0 when adding or updating the section would change the target file.
+#   1 when the first existing marker-delimited section already matches.
+#   2 when marker pairs are asymmetric or misordered and need manual repair.
+#
+file_section_needs_update() {
+    if [[ $# -lt 3 ]]; then
+        log_error "file_section_needs_update: expected <target_file> <beginning_marker> <end_marker> [content_lines...]."
+        return 2
+    fi
+
+    local target_file="$1" beginning_marker="$2" end_marker="$3"
+    local beginning_marker_count end_marker_count
+    local current_content_file="" new_content_file="" status=0
+    shift 3
+
+    [[ -f "$target_file" ]] || return 0
+    __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
+        beginning_marker_count end_marker_count || return $?
+    ((beginning_marker_count > 0)) || return 0
+
+    if ! std_make_temp_file new_content_file base-file-section-new; then
+        log_error "Failed to create temporary content file for '$target_file'."
+        return 2
+    fi
+    if (($# > 0)); then
+        if ! printf '%s\n' "$@" > "$new_content_file"; then
+            log_error "Failed to write replacement content for '$target_file'."
+            __file_remove_temp_paths__ "$new_content_file"
+            return 2
+        fi
+    elif ! : > "$new_content_file"; then
+        log_error "Failed to write replacement content for '$target_file'."
+        __file_remove_temp_paths__ "$new_content_file"
+        return 2
+    fi
+
+    if ! std_make_temp_file current_content_file base-file-section-current; then
+        log_error "Failed to create temporary current content file for '$target_file'."
+        __file_remove_temp_paths__ "$new_content_file"
+        return 2
+    fi
+
+    if ! awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
+    BEGIN {
+        in_section = 0
+        processed = 0
+    }
+    $0 == START_M && processed == 0 {
+        in_section = 1
+        next
+    }
+    $0 == END_M && in_section == 1 {
+        processed = 1
+        exit
+    }
+    in_section == 1 {
+        print $0
+    }
+    END {
+        if (processed == 0) {
+            exit 1
+        }
+    }
+    ' "$target_file" > "$current_content_file"; then
+        log_error "Failed to read existing section in '$target_file'."
+        __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
+        return 2
+    fi
+
+    if cmp -s "$current_content_file" "$new_content_file"; then
+        status=1
+    fi
+
+    __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
+    return "$status"
+}
+
 #
 # update_file_section - Idempotently manages a block of text within a file,
 #                       demarcated by start and end markers.
