@@ -75,6 +75,8 @@ str_ends_with() {
     [[ "$value" == *"$suffix" ]]
 }
 
+# Splits a value into a caller-owned indexed array. Empty fields are preserved,
+# including the final empty field produced by a trailing separator.
 str_split() {
     local __str_split_result_name="${1-}" __str_split_value="${2-}" __str_split_separator="${3-}"
 

@@ -137,6 +137,17 @@ EOF
     [ "${parts[3]}" = "gamma" ]
 }
 
+@test "str_split preserves a trailing empty field after a trailing separator" {
+    local -a parts=()
+
+    str_split parts "alpha,beta," ","
+
+    [ "${#parts[@]}" -eq 3 ]
+    [ "${parts[0]}" = "alpha" ]
+    [ "${parts[1]}" = "beta" ]
+    [ "${parts[2]}" = "" ]
+}
+
 @test "str_split can store results in an array named fields" {
     local -a fields=()
 
