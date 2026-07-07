@@ -96,61 +96,62 @@ gh_repo_from_remote_url() {
 }
 
 gh_infer_repo_from_origin() {
-    local repo_dir="$1"
-    local result_var="${2:-}"
-    local optional=0
-    local inferred_repo remote_url
+    local __gh_infer_repo_dir="$1"
+    local __gh_infer_result_name="${2:-}"
+    local __gh_infer_optional=0
+    local __gh_infer_repo __gh_infer_remote_url
 
-    if [[ -z "$repo_dir" || -z "$result_var" ]]; then
+    if [[ -z "$__gh_infer_repo_dir" || -z "$__gh_infer_result_name" ]]; then
         log_error "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 1
     fi
-    assert_variable_name "$result_var"
+    assert_variable_name "$__gh_infer_result_name"
 
     if [[ "${3:-}" == "--optional" ]]; then
-        optional=1
+        __gh_infer_optional=1
     fi
 
-    remote_url="$(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)"
-    if [[ -z "$remote_url" ]] || ! gh_repo_from_remote_url "$remote_url" inferred_repo; then
-        if ((optional)); then
-            printf -v "$result_var" '%s' ""
+    __gh_infer_remote_url="$(git -C "$__gh_infer_repo_dir" remote get-url origin 2>/dev/null || true)"
+    if [[ -z "$__gh_infer_remote_url" ]] || ! gh_repo_from_remote_url "$__gh_infer_remote_url" __gh_infer_repo; then
+        if ((__gh_infer_optional)); then
+            printf -v "$__gh_infer_result_name" '%s' ""
             return 0
         fi
+        log_error "Could not infer GitHub repository from '$__gh_infer_repo_dir' origin remote."
         return 1
     fi
 
-    printf -v "$result_var" '%s' "$inferred_repo"
+    printf -v "$__gh_infer_result_name" '%s' "$__gh_infer_repo"
 }
 
 gh_detect_default_branch() {
-    local repo_dir="$1"
-    local result_var="${2:-}"
-    local detected_branch
+    local __gh_detect_repo_dir="$1"
+    local __gh_detect_result_name="${2:-}"
+    local __gh_detect_branch
 
-    if [[ -z "$repo_dir" || -z "$result_var" ]]; then
+    if [[ -z "$__gh_detect_repo_dir" || -z "$__gh_detect_result_name" ]]; then
         log_error "Usage: gh_detect_default_branch <repo_dir> <result_variable_name>"
         return 1
     fi
-    assert_variable_name "$result_var"
+    assert_variable_name "$__gh_detect_result_name"
 
-    if detected_branch="$(git -C "$repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
-        detected_branch="${detected_branch#origin/}"
-        if [[ -n "$detected_branch" ]]; then
-            printf -v "$result_var" '%s' "$detected_branch"
+    if __gh_detect_branch="$(git -C "$__gh_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+        __gh_detect_branch="${__gh_detect_branch#origin/}"
+        if [[ -n "$__gh_detect_branch" ]]; then
+            printf -v "$__gh_detect_result_name" '%s' "$__gh_detect_branch"
             return 0
         fi
     fi
 
-    if git -C "$repo_dir" show-ref --verify --quiet refs/remotes/origin/main ||
-        git -C "$repo_dir" show-ref --verify --quiet refs/heads/main; then
-        printf -v "$result_var" '%s' main
+    if git -C "$__gh_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/main ||
+        git -C "$__gh_detect_repo_dir" show-ref --verify --quiet refs/heads/main; then
+        printf -v "$__gh_detect_result_name" '%s' main
         return 0
     fi
 
-    if git -C "$repo_dir" show-ref --verify --quiet refs/remotes/origin/master ||
-        git -C "$repo_dir" show-ref --verify --quiet refs/heads/master; then
-        printf -v "$result_var" '%s' master
+    if git -C "$__gh_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/master ||
+        git -C "$__gh_detect_repo_dir" show-ref --verify --quiet refs/heads/master; then
+        printf -v "$__gh_detect_result_name" '%s' master
         return 0
     fi
 
@@ -158,29 +159,28 @@ gh_detect_default_branch() {
 }
 
 gh_repo_default_branch() {
-    local repo="$1"
-    local result_var="${2:-}"
-    local remote_default_branch status
+    local __gh_repo="$1"
+    local __gh_repo_result_name="${2:-}"
+    local __gh_repo_default_branch __gh_repo_status=0
 
-    if [[ -z "$repo" || -z "$result_var" ]]; then
+    if [[ -z "$__gh_repo" || -z "$__gh_repo_result_name" ]]; then
         log_error "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 1
     fi
-    assert_variable_name "$result_var"
+    assert_variable_name "$__gh_repo_result_name"
 
     gh_require_cli || return 1
-    remote_default_branch="$(gh repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)"
-    status=$?
-    if ((status != 0)); then
-        gh_report_command_failure "$status" repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name
+    __gh_repo_default_branch="$(gh repo view "$__gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)" || __gh_repo_status=$?
+    if ((__gh_repo_status != 0)); then
+        gh_report_command_failure "$__gh_repo_status" repo view "$__gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name
         return $?
     fi
-    if [[ -z "$remote_default_branch" ]]; then
-        log_error "GitHub repository '$repo' does not report a default branch."
+    if [[ -z "$__gh_repo_default_branch" ]]; then
+        log_error "GitHub repository '$__gh_repo' does not report a default branch."
         return 1
     fi
 
-    printf -v "$result_var" '%s' "$remote_default_branch"
+    printf -v "$__gh_repo_result_name" '%s' "$__gh_repo_default_branch"
 }
 
 __gh_api_failure_retryable() {
@@ -255,43 +255,29 @@ gh_worktree_path_for_branch() {
     local repo_dir="${2:-}"
     local target_ref="refs/heads/$branch"
     local line path="" ref
+    local -a git_cmd=(git)
 
     [[ -n "$branch" ]] || {
         log_error "Usage: gh_worktree_path_for_branch <branch> [repo_dir]"
         return 1
     }
 
-    if [[ -n "$repo_dir" ]]; then
-        while IFS= read -r line; do
-            case "$line" in
-                "worktree "*)
-                    path="${line#worktree }"
-                    ;;
-                "branch "*)
-                    ref="${line#branch }"
-                    if [[ "$ref" == "$target_ref" ]]; then
-                        printf '%s\n' "$path"
-                        return 0
-                    fi
-                    ;;
-            esac
-        done < <(git -C "$repo_dir" worktree list --porcelain)
-    else
-        while IFS= read -r line; do
-            case "$line" in
-                "worktree "*)
-                    path="${line#worktree }"
-                    ;;
-                "branch "*)
-                    ref="${line#branch }"
-                    if [[ "$ref" == "$target_ref" ]]; then
-                        printf '%s\n' "$path"
-                        return 0
-                    fi
-                    ;;
-            esac
-        done < <(git worktree list --porcelain)
-    fi
+    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
+
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*)
+                path="${line#worktree }"
+                ;;
+            "branch "*)
+                ref="${line#branch }"
+                if [[ "$ref" == "$target_ref" ]]; then
+                    printf '%s\n' "$path"
+                    return 0
+                fi
+                ;;
+        esac
+    done < <("${git_cmd[@]}" worktree list --porcelain)
 
     return 1
 }
@@ -299,46 +285,28 @@ gh_worktree_path_for_branch() {
 gh_list_worktree_branches() {
     local repo_dir="${1:-}"
     local line path="" branch=""
+    local -a git_cmd=(git)
 
-    if [[ -n "$repo_dir" ]]; then
-        while IFS= read -r line; do
-            case "$line" in
-                "")
-                    if [[ -n "$path" && -n "$branch" ]]; then
-                        branch="${branch#refs/heads/}"
-                        printf '%s\t%s\n' "$path" "$branch"
-                    fi
-                    path=""
-                    branch=""
-                    ;;
-                "worktree "*)
-                    path="${line#worktree }"
-                    ;;
-                "branch "*)
-                    branch="${line#branch }"
-                    ;;
-            esac
-        done < <(git -C "$repo_dir" worktree list --porcelain; printf '\n')
-    else
-        while IFS= read -r line; do
-            case "$line" in
-                "")
-                    if [[ -n "$path" && -n "$branch" ]]; then
-                        branch="${branch#refs/heads/}"
-                        printf '%s\t%s\n' "$path" "$branch"
-                    fi
-                    path=""
-                    branch=""
-                    ;;
-                "worktree "*)
-                    path="${line#worktree }"
-                    ;;
-                "branch "*)
-                    branch="${line#branch }"
-                    ;;
-            esac
-        done < <(git worktree list --porcelain; printf '\n')
-    fi
+    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
+
+    while IFS= read -r line; do
+        case "$line" in
+            "")
+                if [[ -n "$path" && -n "$branch" ]]; then
+                    branch="${branch#refs/heads/}"
+                    printf '%s\t%s\n' "$path" "$branch"
+                fi
+                path=""
+                branch=""
+                ;;
+            "worktree "*)
+                path="${line#worktree }"
+                ;;
+            "branch "*)
+                branch="${line#branch }"
+                ;;
+        esac
+    done < <("${git_cmd[@]}" worktree list --porcelain; printf '\n')
 }
 
 gh_branch_upstream() {

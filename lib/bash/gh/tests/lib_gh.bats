@@ -226,6 +226,30 @@ EOF
     [ "$repo" = "owner/repo" ]
 }
 
+@test "gh_infer_repo_from_origin supports inferred_repo as the result variable name" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local inferred_repo=""
+
+    init_git_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "git@github.com:owner/repo.git"
+
+    gh_infer_repo_from_origin "$repo_dir" inferred_repo
+
+    [ "$inferred_repo" = "owner/repo" ]
+}
+
+@test "gh_infer_repo_from_origin supports remote_url as the result variable name" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local remote_url=""
+
+    init_git_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "git@github.com:owner/repo.git"
+
+    gh_infer_repo_from_origin "$repo_dir" remote_url
+
+    [ "$remote_url" = "owner/repo" ]
+}
+
 @test "gh_infer_repo_from_origin returns empty success for non-GitHub remotes when optional" {
     local repo_dir="$TEST_TMPDIR/repo"
     local repo="sentinel"
@@ -236,6 +260,20 @@ EOF
     gh_infer_repo_from_origin "$repo_dir" repo --optional
 
     [ "$repo" = "" ]
+}
+
+@test "gh_infer_repo_from_origin logs non-optional inference failures" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local repo="sentinel"
+
+    init_git_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://example.com/owner/repo.git"
+
+    bats_run gh_infer_repo_from_origin "$repo_dir" repo
+
+    [ "$status" -eq 1 ]
+    [ "$repo" = "sentinel" ]
+    [[ "$output" == *"Could not infer GitHub repository from '$repo_dir' origin remote."* ]]
 }
 
 @test "gh_detect_default_branch prefers origin HEAD and falls back to local main or master" {
@@ -269,6 +307,19 @@ EOF
     gh_detect_default_branch "$repo_dir" default_branch
 
     [ "$default_branch" = "main" ]
+}
+
+@test "gh_detect_default_branch supports detected_branch as the result variable name" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local detected_branch=""
+
+    init_git_repo "$repo_dir"
+    printf 'base\n' > "$repo_dir/data.txt"
+    commit_all "$repo_dir" "Initial commit"
+
+    gh_detect_default_branch "$repo_dir" detected_branch
+
+    [ "$detected_branch" = "main" ]
 }
 
 @test "gh_detect_default_branch reports failure when no default branch can be detected" {
@@ -317,6 +368,40 @@ EOF
     gh_repo_default_branch "owner/repo" default_branch
 
     [ "$default_branch" = "develop" ]
+}
+
+@test "gh_repo_default_branch supports remote_default_branch as the result variable name" {
+    local remote_default_branch=""
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "repo" && "$2" == "view" ]]; then
+    printf 'develop\n'
+    exit 0
+fi
+exit 99
+EOF
+
+    gh_repo_default_branch "owner/repo" remote_default_branch
+
+    [ "$remote_default_branch" = "develop" ]
+}
+
+@test "gh_repo_default_branch supports status as the result variable name" {
+    local status=""
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "repo" && "$2" == "view" ]]; then
+    printf 'develop\n'
+    exit 0
+fi
+exit 99
+EOF
+
+    gh_repo_default_branch "owner/repo" status
+
+    [ "$status" = "develop" ]
 }
 
 @test "gh_api_with_retry retries retryable API pressure once" {
@@ -380,6 +465,32 @@ EOF
     [ "$output" = "/tmp/feature" ]
 }
 
+@test "gh_worktree_path_for_branch uses repo_dir when provided" {
+    create_fake_git <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "-C" && "$3" == "worktree" && "$4" == "list" ]]; then
+    printf 'repo-dir=%s\n' "$2" > "${TEST_TMPDIR:?}/git-repo-dir"
+    cat <<'OUT'
+worktree /tmp/main
+HEAD abc123
+branch refs/heads/main
+
+worktree /tmp/feature
+HEAD def456
+branch refs/heads/feature/test
+OUT
+    exit 0
+fi
+exit 99
+EOF
+
+    capture_command gh_worktree_path_for_branch feature/test "$TEST_TMPDIR/repo"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "/tmp/feature" ]
+    [ "$(cat "$TEST_TMPDIR/git-repo-dir")" = "repo-dir=$TEST_TMPDIR/repo" ]
+}
+
 @test "gh_list_worktree_branches emits path and branch pairs" {
     create_fake_git <<'EOF'
 #!/usr/bin/env bash
@@ -403,6 +514,33 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *$'/tmp/main\tmain'* ]]
     [[ "$output" == *$'/tmp/feature\tfeature/test'* ]]
+}
+
+@test "gh_list_worktree_branches uses repo_dir when provided" {
+    create_fake_git <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "-C" && "$3" == "worktree" && "$4" == "list" ]]; then
+    printf 'repo-dir=%s\n' "$2" > "${TEST_TMPDIR:?}/git-repo-dir"
+    cat <<'OUT'
+worktree /tmp/main
+HEAD abc123
+branch refs/heads/main
+
+worktree /tmp/feature
+HEAD def456
+branch refs/heads/feature/test
+OUT
+    exit 0
+fi
+exit 99
+EOF
+
+    capture_command gh_list_worktree_branches "$TEST_TMPDIR/repo"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *$'/tmp/main\tmain'* ]]
+    [[ "$output" == *$'/tmp/feature\tfeature/test'* ]]
+    [ "$(cat "$TEST_TMPDIR/git-repo-dir")" = "repo-dir=$TEST_TMPDIR/repo" ]
 }
 
 @test "gh_branch_upstream prints the configured upstream" {

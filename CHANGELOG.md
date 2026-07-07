@@ -12,6 +12,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Made `gh_run` report failed GitHub CLI commands even when callers enable
   `set -e`, and preserved argument boundaries in GitHub command failure logs.
 - Documented and tested `str_split` trailing-separator behavior.
+- Hardened GitHub helper pass-by-name outputs against internal variable
+  shadowing, added a non-optional `gh_infer_repo_from_origin` error message,
+  and deduplicated worktree parsing loops.
 
 ## [1.2.0] - 2026-07-04
 
