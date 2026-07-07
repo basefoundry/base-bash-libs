@@ -220,6 +220,104 @@ EOF
     [[ "$output" == *"Section already up to date in '$target'."* ]]
 }
 
+@test "file_section_exists detects a present marked section" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+managed
+# END
+after
+EOF
+
+    capture_command file_section_exists "$target" "# BEGIN" "# END"
+
+    [ "$status" -eq 0 ]
+}
+
+@test "file_section_exists returns no-change for absent and missing target files" {
+    local target="$TEST_TMPDIR/config.txt"
+    printf 'plain\ncontent\n' > "$target"
+
+    capture_command file_section_exists "$target" "# BEGIN" "# END"
+    [ "$status" -eq 1 ]
+
+    capture_command file_section_exists "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END"
+    [ "$status" -eq 1 ]
+}
+
+@test "file_section_exists rejects asymmetric markers" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+orphaned
+EOF
+
+    bats_run file_section_exists "$target" "# BEGIN" "# END"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Asymmetric markers in '$target': 1 start, 0 end. Manual repair needed."* ]]
+}
+
+@test "file_section_exists rejects misordered markers" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# END
+middle
+# BEGIN
+after
+EOF
+
+    bats_run file_section_exists "$target" "# BEGIN" "# END"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Misordered markers in '$target'. Manual repair needed."* ]]
+}
+
+@test "file_section_needs_update detects changed marked section content" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+old
+# END
+after
+EOF
+
+    capture_command file_section_needs_update "$target" "# BEGIN" "# END" "new"
+
+    [ "$status" -eq 0 ]
+}
+
+@test "file_section_needs_update returns no-change for matching section content" {
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+same
+content
+# END
+after
+EOF
+
+    capture_command file_section_needs_update "$target" "# BEGIN" "# END" "same" "content"
+
+    [ "$status" -eq 1 ]
+}
+
+@test "file_section_needs_update returns change-needed for absent and missing target files" {
+    local target="$TEST_TMPDIR/config.txt"
+    printf 'plain\ncontent\n' > "$target"
+
+    capture_command file_section_needs_update "$target" "# BEGIN" "# END" "new"
+    [ "$status" -eq 0 ]
+
+    capture_command file_section_needs_update "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END" "new"
+    [ "$status" -eq 0 ]
+}
+
 @test "update_file_section does not export replacement content to awk" {
     local awk_log="$TEST_TMPDIR/awk-env.log"
     local target="$TEST_TMPDIR/config.txt"
