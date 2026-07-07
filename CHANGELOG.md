@@ -7,6 +7,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Made `gh_run` report failed GitHub CLI commands even when callers enable
+  `set -e`, and preserved argument boundaries in GitHub command failure logs.
+
 ## [1.2.0] - 2026-07-04
 
 ### Added

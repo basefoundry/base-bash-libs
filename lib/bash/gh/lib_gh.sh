@@ -38,18 +38,24 @@ gh_auth_status_diagnostics() {
 gh_report_command_failure() {
     local status="$1"
     shift
+    local printable_args=""
 
-    log_error "GitHub command failed: gh $*"
+    if (($#)); then
+        printf -v printable_args '%q ' "$@"
+        printable_args="${printable_args% }"
+        log_error "GitHub command failed: gh $printable_args"
+    else
+        log_error "GitHub command failed: gh"
+    fi
     gh_auth_status_diagnostics || true
     return "$status"
 }
 
 gh_run() {
-    local status
+    local status=0
 
     gh_require_cli || return 1
-    gh "$@"
-    status=$?
+    gh "$@" || status=$?
     ((status == 0)) && return 0
     gh_report_command_failure "$status" "$@"
 }
