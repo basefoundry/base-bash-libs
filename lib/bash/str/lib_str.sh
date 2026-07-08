@@ -101,23 +101,23 @@ str_split() {
 }
 
 str_join() {
-    local result_name="${1-}" separator="${2-}" array_name="${3-}"
+    local __str_join_result_name="${1-}" __str_join_separator="${2-}" __str_join_array_name="${3-}"
 
     assert_arg_count "$#" 3
-    assert_variable_name "$result_name" "$array_name"
-    assert_indexed_array "$array_name"
+    assert_variable_name "$__str_join_result_name" "$__str_join_array_name"
+    assert_indexed_array "$__str_join_array_name"
 
-    local __str_join_joined="" index
+    local __str_join_joined="" __str_join_index
     local -a __str_join_values=()
-    eval "__str_join_values=(\"\${${array_name}[@]}\")"
+    eval "__str_join_values=(\"\${${__str_join_array_name}[@]}\")"
 
-    for index in "${!__str_join_values[@]}"; do
-        if ((index == 0)); then
-            __str_join_joined="${__str_join_values[$index]}"
+    for __str_join_index in "${!__str_join_values[@]}"; do
+        if ((__str_join_index == 0)); then
+            __str_join_joined="${__str_join_values[$__str_join_index]}"
         else
-            __str_join_joined+="$separator${__str_join_values[$index]}"
+            __str_join_joined+="$__str_join_separator${__str_join_values[$__str_join_index]}"
         fi
     done
 
-    printf -v "$result_name" '%s' "$__str_join_joined"
+    printf -v "$__str_join_result_name" '%s' "$__str_join_joined"
 }

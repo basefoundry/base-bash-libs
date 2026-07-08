@@ -11,21 +11,21 @@ fi
 readonly __lib_arg_sourced__=1
 
 __arg_set_assoc_value__() {
-    local array_name="$1" key="$2" value="$3"
+    local __arg_assoc_name="$1" __arg_assoc_key="$2" __arg_assoc_value="$3"
 
     # The variable name is validated before callers reach this helper.
     # shellcheck disable=SC1087
-    printf -v "$array_name[$key]" '%s' "$value"
+    printf -v "$__arg_assoc_name[$__arg_assoc_key]" '%s' "$__arg_assoc_value"
 }
 
 __arg_parse_specs__() {
-    local specs_name="$1"
+    local __arg_specs_name="$1"
     local __arg_token_kind_name="$2" __arg_token_name_name="$3"
     local -a __arg_specs=() __arg_tokens=()
     local __arg_spec __arg_remainder __arg_name __arg_kind __arg_tokens_part __arg_token
     local __arg_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
 
-    eval "__arg_specs=(\"\${${specs_name}[@]}\")"
+    eval "__arg_specs=(\"\${${__arg_specs_name}[@]}\")"
 
     for __arg_spec in "${__arg_specs[@]}"; do
         __arg_name="${__arg_spec%%|*}"
@@ -76,7 +76,7 @@ __arg_parse_specs__() {
 #   arg_parse options positionals specs -- "$@"
 #
 arg_parse() {
-    local options_name="${1-}" positionals_name="${2-}" specs_name="${3-}"
+    local __arg_options_name="${1-}" __arg_positionals_name="${2-}" __arg_specs_name="${3-}"
     local __arg_current __arg_option_token __arg_option_value __arg_option_name __arg_option_kind
     local -a __arg_positionals=()
     local -A __arg_token_kind=() __arg_token_name=()
@@ -87,25 +87,25 @@ arg_parse() {
         return 2
     fi
 
-    assert_variable_name "$options_name" "$positionals_name" "$specs_name"
+    assert_variable_name "$__arg_options_name" "$__arg_positionals_name" "$__arg_specs_name"
 
-    if ! __std_declares_array_kind__ "$options_name" "A"; then
+    if ! __std_declares_array_kind__ "$__arg_options_name" "A"; then
         log_error "arg_parse: options variable must be an associative array declared by the caller."
         return 2
     fi
-    if ! __std_declares_array_kind__ "$positionals_name" "a"; then
+    if ! __std_declares_array_kind__ "$__arg_positionals_name" "a"; then
         log_error "arg_parse: positionals variable must be an indexed array declared by the caller."
         return 2
     fi
-    if ! __std_declares_array_kind__ "$specs_name" "a"; then
+    if ! __std_declares_array_kind__ "$__arg_specs_name" "a"; then
         log_error "arg_parse: specs variable must be an indexed array declared by the caller."
         return 2
     fi
 
-    __arg_parse_specs__ "$specs_name" __arg_token_kind __arg_token_name || return $?
+    __arg_parse_specs__ "$__arg_specs_name" __arg_token_kind __arg_token_name || return $?
 
-    eval "$options_name=()"
-    eval "$positionals_name=()"
+    eval "$__arg_options_name=()"
+    eval "$__arg_positionals_name=()"
     shift 4
 
     while (($# > 0)); do
@@ -132,7 +132,7 @@ arg_parse() {
                 return 2
             fi
 
-            __arg_set_assoc_value__ "$options_name" "$__arg_option_name" "$__arg_option_value"
+            __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "$__arg_option_value"
             continue
         fi
 
@@ -147,7 +147,7 @@ arg_parse() {
             fi
 
             if [[ "$__arg_option_kind" == "flag" ]]; then
-                __arg_set_assoc_value__ "$options_name" "$__arg_option_name" "1"
+                __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "1"
                 continue
             fi
 
@@ -162,13 +162,13 @@ arg_parse() {
 
             __arg_option_value="$1"
             shift
-            __arg_set_assoc_value__ "$options_name" "$__arg_option_name" "$__arg_option_value"
+            __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "$__arg_option_value"
             continue
         fi
 
         __arg_positionals+=("$__arg_current")
     done
 
-    eval "$positionals_name=(\"\${__arg_positionals[@]}\")"
+    eval "$__arg_positionals_name=(\"\${__arg_positionals[@]}\")"
     return 0
 }

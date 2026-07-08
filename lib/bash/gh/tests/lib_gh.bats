@@ -200,6 +200,17 @@ EOF
     [ "$repo" = "owner/repo" ]
 }
 
+@test "gh_repo_from_remote_url supports shadowing-prone output variable names" {
+    local result_var=""
+    local parsed_repo=""
+
+    gh_repo_from_remote_url "https://github.com/owner/repo.git" result_var
+    gh_repo_from_remote_url "git@github.com:other/project.git" parsed_repo
+
+    [ "$result_var" = "owner/repo" ]
+    [ "$parsed_repo" = "other/project" ]
+}
+
 @test "gh_repo_from_remote_url rejects non-GitHub and malformed remotes" {
     local repo="sentinel"
 

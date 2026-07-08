@@ -186,6 +186,19 @@ EOF
     [ "$joined" = "alpha|beta gamma|" ]
 }
 
+@test "str_join supports shadowing-prone result and source array names" {
+    local -a values=("alpha" "beta")
+    local -a array_name=("left" "right")
+    local result_name=""
+    local joined=""
+
+    str_join result_name "," values
+    str_join joined "|" array_name
+
+    [ "$result_name" = "alpha,beta" ]
+    [ "$joined" = "left|right" ]
+}
+
 @test "str_join rejects invalid variable names" {
     local script="$TEST_TMPDIR/str-join-invalid-array.sh"
 

@@ -1351,14 +1351,14 @@ std_register_cleanup_path() {
 ######################################################## TEMP FILES ####################################################
 
 __std_make_temp_path__() {
-    local helper_name="$1" path_kind="$2"
+    local __std_temp_helper_name="$1" __std_temp_path_kind="$2"
     shift 2
-    local keep=0 result_name prefix temp_root template temp_path
+    local __std_temp_keep=0 __std_temp_result_name __std_temp_prefix __std_temp_root __std_temp_template __std_temp_path
 
     while (($#)); do
         case "${1-}" in
             --keep)
-                keep=1
+                __std_temp_keep=1
                 shift
                 ;;
             --)
@@ -1372,50 +1372,50 @@ __std_make_temp_path__() {
     done
 
     if (($# < 1 || $# > 2)); then
-        log_error "$helper_name: usage: $helper_name [--keep] <result_variable_name> [prefix]"
+        log_error "$__std_temp_helper_name: usage: $__std_temp_helper_name [--keep] <result_variable_name> [prefix]"
         return 1
     fi
 
-    result_name="$1"
-    prefix="${2:-base-bash-libs}"
+    __std_temp_result_name="$1"
+    __std_temp_prefix="${2:-base-bash-libs}"
 
-    if ! __is_valid_variable_name__ "$result_name"; then
-        log_error "$helper_name: result variable name must be a valid Bash variable name."
+    if ! __is_valid_variable_name__ "$__std_temp_result_name"; then
+        log_error "$__std_temp_helper_name: result variable name must be a valid Bash variable name."
         return 1
     fi
-    if [[ -z "$prefix" || "$prefix" == */* ]]; then
-        log_error "$helper_name: prefix must be a non-empty filename prefix without '/'."
-        return 1
-    fi
-
-    temp_root="${TMPDIR:-/tmp}"
-    temp_root="${temp_root%/}"
-    if [[ -z "$temp_root" || ! -d "$temp_root" ]]; then
-        log_error "$helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+    if [[ -z "$__std_temp_prefix" || "$__std_temp_prefix" == */* ]]; then
+        log_error "$__std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
         return 1
     fi
 
-    template="$temp_root/$prefix.XXXXXXXXXX"
-    if [[ "$path_kind" == "dir" ]]; then
-        temp_path="$(mktemp -d "$template" 2>/dev/null)" || {
-            log_error "$helper_name: failed to create temporary directory."
+    __std_temp_root="${TMPDIR:-/tmp}"
+    __std_temp_root="${__std_temp_root%/}"
+    if [[ -z "$__std_temp_root" || ! -d "$__std_temp_root" ]]; then
+        log_error "$__std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+        return 1
+    fi
+
+    __std_temp_template="$__std_temp_root/$__std_temp_prefix.XXXXXXXXXX"
+    if [[ "$__std_temp_path_kind" == "dir" ]]; then
+        __std_temp_path="$(mktemp -d "$__std_temp_template" 2>/dev/null)" || {
+            log_error "$__std_temp_helper_name: failed to create temporary directory."
             return 1
         }
     else
-        temp_path="$(mktemp "$template" 2>/dev/null)" || {
-            log_error "$helper_name: failed to create temporary file."
+        __std_temp_path="$(mktemp "$__std_temp_template" 2>/dev/null)" || {
+            log_error "$__std_temp_helper_name: failed to create temporary file."
             return 1
         }
     fi
 
-    if ((! keep)); then
-        if ! std_register_cleanup_path "$temp_path"; then
-            rm -rf -- "$temp_path"
+    if ((! __std_temp_keep)); then
+        if ! std_register_cleanup_path "$__std_temp_path"; then
+            rm -rf -- "$__std_temp_path"
             return 1
         fi
     fi
 
-    printf -v "$result_name" '%s' "$temp_path"
+    printf -v "$__std_temp_result_name" '%s' "$__std_temp_path"
     return 0
 }
 
@@ -1522,22 +1522,22 @@ assert_indexed_array() {
 #   fi
 #
 std_command_path() {
-    local result_name="${1-}" command_name="${2-}" resolved_path=""
+    local __std_command_result_name="${1-}" __std_command_name="${2-}" __std_command_resolved_path=""
 
     if (($# != 2)); then
         log_error "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
         return 1
     fi
-    if ! __is_valid_variable_name__ "$result_name"; then
+    if ! __is_valid_variable_name__ "$__std_command_result_name"; then
         log_error "std_command_path: result variable name must be a valid Bash variable name."
         return 1
     fi
 
-    if [[ -n "$command_name" ]]; then
-        resolved_path="$(type -P "$command_name" 2>/dev/null || true)"
+    if [[ -n "$__std_command_name" ]]; then
+        __std_command_resolved_path="$(type -P "$__std_command_name" 2>/dev/null || true)"
     fi
-    printf -v "$result_name" '%s' "$resolved_path"
-    [[ -n "$resolved_path" ]]
+    printf -v "$__std_command_result_name" '%s' "$__std_command_resolved_path"
+    [[ -n "$__std_command_resolved_path" ]]
 }
 
 #
@@ -1882,16 +1882,16 @@ safe_unalias() {
 #   get_my_source_dir var_name
 #
 get_my_source_dir() {
-    local result_name="${1-}"
-    [[ -n "$result_name" ]] || fatal_error "get_my_source_dir: No result variable name provided."
-    if ! __is_valid_variable_name__ "$result_name"; then
+    local __std_source_result_name="${1-}"
+    [[ -n "$__std_source_result_name" ]] || fatal_error "get_my_source_dir: No result variable name provided."
+    if ! __is_valid_variable_name__ "$__std_source_result_name"; then
         fatal_error "get_my_source_dir: result variable name must be a valid Bash variable name."
     fi
-    local source_dir
+    local __std_source_dir
     # Reference: https://stackoverflow.com/a/246128/6862601
-    source_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" >/dev/null 2>&1 && pwd -P)" ||
+    __std_source_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" >/dev/null 2>&1 && pwd -P)" ||
         fatal_error "get_my_source_dir: Unable to resolve source directory."
-    printf -v "$result_name" '%s' "$source_dir"
+    printf -v "$__std_source_result_name" '%s' "$__std_source_dir"
 }
 
 #

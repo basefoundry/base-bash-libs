@@ -41,6 +41,20 @@ setup() {
     [ "$branch" = "main" ]
 }
 
+@test "git_get_current_branch supports shadowing-prone output variable names" {
+    local repo="$TEST_TMPDIR/repo"
+    local result_var_name=""
+    local branch_name=""
+
+    init_git_repo "$repo"
+
+    git_get_current_branch "$repo" result_var_name
+    git_get_current_branch "$repo" branch_name
+
+    [ "$result_var_name" = "main" ]
+    [ "$branch_name" = "main" ]
+}
+
 @test "git_get_current_branch reports detached head" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""

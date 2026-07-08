@@ -55,6 +55,22 @@ create_script() {
     [ "${positionals[2]}" = "gamma" ]
 }
 
+@test "arg_parse supports shadowing-prone caller array names" {
+    local -a specs_name=(
+        "verbose|flag|--verbose|-v"
+        "output|value|--output|-o"
+    )
+    local -A options_name=()
+    local -a positionals_name=()
+
+    arg_parse options_name positionals_name specs_name -- -v --output result.txt item
+
+    [ "${options_name[verbose]}" = "1" ]
+    [ "${options_name[output]}" = "result.txt" ]
+    [ "${#positionals_name[@]}" -eq 1 ]
+    [ "${positionals_name[0]}" = "item" ]
+}
+
 @test "arg_parse accepts long option equals values and repeated options" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
