@@ -286,20 +286,14 @@ update_file_section() {
         return 0
     fi
 
-    local beginning_marker_count end_marker_count
-    beginning_marker_count=$(grep -cxF -- "$beginning_marker" "$target_file" || true)
-    end_marker_count=$(grep -cxF -- "$end_marker" "$target_file" || true)
-    if ((beginning_marker_count != end_marker_count)); then
-        log_error "Asymmetric markers in '$target_file': $beginning_marker_count start, $end_marker_count end. Manual repair needed."
-        return 1
-    fi
-    if ((beginning_marker_count > 0)) && ! __file_section_markers_ordered__ "$target_file" "$beginning_marker" "$end_marker"; then
-        log_error "Misordered markers in '$target_file'. Manual repair needed."
+    local __file_update_beginning_marker_count __file_update_end_marker_count
+    if ! __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
+        __file_update_beginning_marker_count __file_update_end_marker_count; then
         return 1
     fi
 
     local section_exists=false
-    if ((beginning_marker_count > 0)); then
+    if ((__file_update_beginning_marker_count > 0)); then
         section_exists=true
     fi
 
