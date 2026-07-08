@@ -28,7 +28,8 @@ jobs:
       BASE_PROJECT_DEFAULT_SIZE: S
       BASE_PROJECT_DEFAULT_AREA: Product
       BASE_PROJECT_DEFAULT_INITIATIVE: Adoption Polish
-      GH_TOKEN: ${{ secrets.BASE_PROJECT_TOKEN || github.token }}
+      BASE_PROJECT_MIN_GRAPHQL_REMAINING: 500
+      GH_TOKEN: ${{ secrets.BASE_PROJECT_TOKEN }}
     steps:
       - name: Reconcile Project item
         shell: bash
@@ -38,6 +39,30 @@ jobs:
           issue_number="${BASE_PROJECT_ISSUE_NUMBER:-}"
           if [[ -z "$issue_number" ]]; then
             echo "::error::Issue number was not provided by the event or workflow_dispatch input."
+            exit 1
+          fi
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::BASE_PROJECT_TOKEN is required for Project intake because github.token cannot write org Project fields."
+            exit 1
+          fi
+
+          graphql_min_remaining="${BASE_PROJECT_MIN_GRAPHQL_REMAINING:-500}"
+          if ! [[ "$graphql_min_remaining" =~ ^[0-9]+$ ]] || (( graphql_min_remaining == 0 )); then
+            echo "::error::BASE_PROJECT_MIN_GRAPHQL_REMAINING must be a positive integer."
+            exit 1
+          fi
+
+          rate_limit_json="$(gh api graphql -f query='query { rateLimit { remaining resetAt } }')"
+          graphql_remaining="$(jq -r '.data.rateLimit.remaining // 0' <<<"$rate_limit_json")"
+          graphql_reset_at="$(jq -r '.data.rateLimit.resetAt // "unknown"' <<<"$rate_limit_json")"
+          if ! [[ "$graphql_remaining" =~ ^[0-9]+$ ]]; then
+            echo "::error::Unable to read GitHub GraphQL quota for Project intake."
+            exit 1
+          fi
+
+          if (( graphql_remaining < graphql_min_remaining )); then
+            echo "::error::GitHub GraphQL quota is too low for Project intake (${graphql_remaining} remaining; need at least ${graphql_min_remaining}; retry after ${graphql_reset_at})."
             exit 1
           fi
 
