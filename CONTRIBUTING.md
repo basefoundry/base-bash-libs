@@ -50,3 +50,23 @@ basectl check base-bash-libs
 basectl doctor base-bash-libs
 basectl test base-bash-libs
 ```
+
+## Project intake backfill
+
+The `Project Intake` workflow uses the `BASE_PROJECT_TOKEN` repository secret
+to write to the organization Project. If issues are missing from the Project,
+check GraphQL quota before starting a backfill:
+
+```bash
+gh api graphql -f query='query { rateLimit { remaining resetAt } }'
+```
+
+Dispatch missed issues slowly so Project field mutations do not exhaust the
+GraphQL quota:
+
+```bash
+for issue in <issue-numbers>; do
+  gh workflow run project-intake.yml --repo basefoundry/base-bash-libs -f issue_number="$issue"
+  sleep 12
+done
+```
