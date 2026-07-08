@@ -1547,6 +1547,21 @@ EOF
     [ -f "$created_path" ]
 }
 
+@test "std_make_temp helpers support shadowing-prone output variable names" {
+    local temp_root="$TEST_TMPDIR/temp-shadow-root"
+    local temp_path=""
+    local result_name=""
+
+    mkdir -p "$temp_root"
+    TMPDIR="$temp_root" std_make_temp_file --keep temp_path shadow-file
+    TMPDIR="$temp_root" std_make_temp_dir --keep result_name shadow-dir
+
+    [[ "$temp_path" == "$temp_root"/shadow-file.* ]]
+    [ -f "$temp_path" ]
+    [[ "$result_name" == "$temp_root"/shadow-dir.* ]]
+    [ -d "$result_name" ]
+}
+
 @test "std_make_temp helpers reject invalid result variable names" {
     local stderr_file="$TEST_TMPDIR/temp-invalid.err"
     local rc
@@ -1583,6 +1598,20 @@ EOF
     fi
 
     [ "$command_path" = "" ]
+}
+
+@test "std_command_path supports shadowing-prone output variable names" {
+    local result_name=""
+    local command_name=""
+    local resolved_path=""
+
+    std_command_path result_name bash
+    std_command_path command_name bash
+    std_command_path resolved_path bash
+
+    [ -x "$result_name" ]
+    [ -x "$command_name" ]
+    [ -x "$resolved_path" ]
 }
 
 @test "std_command_path rejects invalid result variable names" {
@@ -2029,6 +2058,30 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"dir=$expected_dir"* ]]
+}
+
+@test "get_my_source_dir supports shadowing-prone output variable names" {
+    local script="$TEST_TMPDIR/get-source-dir-shadow.sh"
+    local expected_dir
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+source_dir=""
+result_name=""
+get_my_source_dir source_dir
+get_my_source_dir result_name
+printf 'source_dir=%s\n' "\$source_dir"
+printf 'result_name=%s\n' "\$result_name"
+EOF
+
+    expected_dir="$(cd "$TEST_TMPDIR" && pwd -P)"
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"source_dir=$expected_dir"* ]]
+    [[ "$output" == *"result_name=$expected_dir"* ]]
 }
 
 @test "get_my_source_dir rejects invalid result variable names" {

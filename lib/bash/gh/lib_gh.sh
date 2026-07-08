@@ -61,38 +61,38 @@ gh_run() {
 }
 
 gh_repo_from_remote_url() {
-    local remote_url="$1"
-    local result_var="${2:-}"
-    local parsed_repo
+    local __gh_remote_url="$1"
+    local __gh_result_name="${2:-}"
+    local __gh_parsed_repo
 
-    if [[ -z "$remote_url" || -z "$result_var" ]]; then
+    if [[ -z "$__gh_remote_url" || -z "$__gh_result_name" ]]; then
         log_error "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
         return 1
     fi
-    assert_variable_name "$result_var"
+    assert_variable_name "$__gh_result_name"
 
-    case "$remote_url" in
+    case "$__gh_remote_url" in
         git@github.com:*.git)
-            parsed_repo="${remote_url#git@github.com:}"
-            parsed_repo="${parsed_repo%.git}"
+            __gh_parsed_repo="${__gh_remote_url#git@github.com:}"
+            __gh_parsed_repo="${__gh_parsed_repo%.git}"
             ;;
         git@github.com:*)
-            parsed_repo="${remote_url#git@github.com:}"
+            __gh_parsed_repo="${__gh_remote_url#git@github.com:}"
             ;;
         https://github.com/*.git)
-            parsed_repo="${remote_url#https://github.com/}"
-            parsed_repo="${parsed_repo%.git}"
+            __gh_parsed_repo="${__gh_remote_url#https://github.com/}"
+            __gh_parsed_repo="${__gh_parsed_repo%.git}"
             ;;
         https://github.com/*)
-            parsed_repo="${remote_url#https://github.com/}"
+            __gh_parsed_repo="${__gh_remote_url#https://github.com/}"
             ;;
         *)
             return 1
             ;;
     esac
 
-    [[ "$parsed_repo" == */* && "$parsed_repo" != */*/* ]] || return 1
-    printf -v "$result_var" '%s' "$parsed_repo"
+    [[ "$__gh_parsed_repo" == */* && "$__gh_parsed_repo" != */*/* ]] || return 1
+    printf -v "$__gh_result_name" '%s' "$__gh_parsed_repo"
 }
 
 gh_infer_repo_from_origin() {

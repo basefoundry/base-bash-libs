@@ -244,27 +244,27 @@ git_update_repo() {
 #   - The function itself returns an exit code of 0 on success, 1 on invalid usage.
 #
 git_get_current_branch() {
-    local target_dir="$1"
-    local result_var_name="${2:-}"
+    local __git_branch_target_dir="$1"
+    local __git_branch_result_name="${2:-}"
 
     # --- Argument Validation ---
-    if [[ -z "$target_dir" || -z "$result_var_name" ]]; then
+    if [[ -z "$__git_branch_target_dir" || -z "$__git_branch_result_name" ]]; then
         log_error "Usage: git_get_current_branch <directory> <result_variable_name>"
         return 1
     fi
-    if ! __is_valid_variable_name__ "$result_var_name"; then
+    if ! __is_valid_variable_name__ "$__git_branch_result_name"; then
         log_error "git_get_current_branch: result variable name must be a valid Bash variable name."
         return 1
     fi
 
-    printf -v "$result_var_name" '%s' ""
+    printf -v "$__git_branch_result_name" '%s' ""
 
-    if [[ ! -d "$target_dir" ]]; then
+    if [[ ! -d "$__git_branch_target_dir" ]]; then
         return 0
     fi
 
     # Check if we are inside a Git repository.
-    if ! git -C "$target_dir" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    if ! git -C "$__git_branch_target_dir" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
         # Not a Git repo, result is already an empty string.
         return 0
     fi
@@ -272,13 +272,13 @@ git_get_current_branch() {
     # Use 'git symbolic-ref' to get the branch name.
     # It's the most reliable way to distinguish a branch from a detached HEAD.
     # -q (--quiet) suppresses errors and returns a non-zero exit code on failure.
-    local branch_name
-    if branch_name=$(git -C "$target_dir" symbolic-ref --short -q HEAD); then
+    local __git_branch_name
+    if __git_branch_name=$(git -C "$__git_branch_target_dir" symbolic-ref --short -q HEAD); then
         # Success: We are on a named branch.
-        printf -v "$result_var_name" '%s' "$branch_name"
+        printf -v "$__git_branch_result_name" '%s' "$__git_branch_name"
     else
         # Failure: We are in a detached HEAD state.
-        printf -v "$result_var_name" '%s' "detached head"
+        printf -v "$__git_branch_result_name" '%s' "detached head"
     fi
 
     return 0
