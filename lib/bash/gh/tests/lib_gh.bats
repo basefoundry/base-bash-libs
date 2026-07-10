@@ -615,3 +615,25 @@ EOF
     [[ "$output" == *"main"* ]]
     [[ "$output" == *"feature/test"* ]]
 }
+
+@test "gh_list_remote_branches keeps sha loop variable local" {
+    local _sha="sentinel"
+
+    create_fake_git <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "-C" ]]; then
+    shift 2
+fi
+if [[ "$1" == "ls-remote" && "$2" == "--heads" && "$3" == "origin" ]]; then
+    printf 'abc\trefs/heads/main\n'
+    printf 'def\trefs/heads/feature/test\n'
+    exit 0
+fi
+exit 99
+EOF
+
+    capture_command gh_list_remote_branches "$TEST_TMPDIR/repo"
+
+    [ "$status" -eq 0 ]
+    [ "$_sha" = "sentinel" ]
+}
