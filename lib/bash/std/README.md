@@ -354,6 +354,15 @@ components are rejected before registration. When one call mixes safe and unsafe
 paths, safe paths are registered, unsafe paths are rejected, and the helper
 returns nonzero.
 
+When a script removes or moves a registered path before exit, unregister it so
+the shared cleanup registry only contains paths that may still need fallback
+cleanup:
+
+```bash
+rm -rf -- "$workspace"
+std_unregister_cleanup_path "$workspace"
+```
+
 For custom cleanup, register a function name:
 
 ```bash

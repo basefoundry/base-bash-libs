@@ -35,7 +35,10 @@ __file_remove_temp_paths__() {
     local path
 
     for path; do
-        [[ -n "$path" ]] && rm -f -- "$path"
+        if [[ -n "$path" ]]; then
+            rm -f -- "$path"
+            std_unregister_cleanup_path "$path"
+        fi
     done
     return 0
 }
@@ -397,6 +400,7 @@ update_file_section() {
                 }
             }
             ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
+                std_unregister_cleanup_path "$temp_file"
                 __file_remove_temp_paths__ "$new_content_file"
                 return 0
             fi
@@ -423,6 +427,7 @@ update_file_section() {
                 print $0
             }
             ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
+                std_unregister_cleanup_path "$temp_file"
                 __file_remove_temp_paths__ "$new_content_file"
                 return 0
             fi
@@ -463,6 +468,7 @@ update_file_section() {
             return 1
         fi
 
+        std_unregister_cleanup_path "$temp_file"
         __file_remove_temp_paths__ "$new_content_file"
         return 0
     fi

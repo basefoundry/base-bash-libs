@@ -1476,6 +1476,36 @@ EOF
     [[ " ${__std_cleanup_paths[*]} " != *" / "* ]]
 }
 
+@test "cleanup path registration supports unregistering eager cleanup paths" {
+    local keep_file="$TEST_TMPDIR/cleanup-keep-file.txt"
+    local drop_file="$TEST_TMPDIR/cleanup-drop-file.txt"
+
+    printf 'keep\n' > "$keep_file"
+    printf 'drop\n' > "$drop_file"
+
+    std_register_cleanup_path "$keep_file" "$drop_file"
+    rm -f -- "$drop_file"
+    std_unregister_cleanup_path "$drop_file"
+
+    [[ " ${__std_cleanup_paths[*]} " == *" $keep_file "* ]]
+    [[ " ${__std_cleanup_paths[*]} " != *" $drop_file "* ]]
+}
+
+@test "cleanup path unregister rejects dangerous paths without clearing valid registrations" {
+    local target_file="$TEST_TMPDIR/cleanup-unregister-valid-file.txt"
+    local stderr_file="$TEST_TMPDIR/cleanup-unregister-mixed.err"
+    local rc=0
+
+    printf 'sample\n' > "$target_file"
+    std_register_cleanup_path "$target_file"
+
+    std_unregister_cleanup_path "/" 2>"$stderr_file" || rc=$?
+
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '/'"* ]]
+    [[ " ${__std_cleanup_paths[*]} " == *" $target_file "* ]]
+}
+
 @test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
     local script="$TEST_TMPDIR/temp-file.sh"
     local temp_root="$TEST_TMPDIR/temp-root"

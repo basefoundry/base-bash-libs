@@ -34,6 +34,8 @@
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
 #   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
+#   std_unregister_cleanup_path p
+#                                # Drop files/directories from the shared EXIT cleanup list.
 #   std_make_temp_file var [pfx] # Create a temp file and store its path in var.
 #   std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
 #   std_command_path var cmd     # Resolve an external command path without exiting.
@@ -1062,6 +1064,7 @@ __std_run_with_timeout_fallback__() {
         command_status=124
     fi
     rm -f -- "$timeout_marker"
+    std_unregister_cleanup_path "$timeout_marker"
 
     return "$command_status"
 }
@@ -1346,6 +1349,56 @@ std_register_cleanup_path() {
     if ((had_valid_path)); then
         __std_install_cleanup_dispatcher__
     fi
+    return "$status"
+}
+
+#
+# std_unregister_cleanup_path - Removes files or directories from the shared EXIT cleanup path list.
+#
+# This is useful after eager cleanup removes or moves a path that was previously
+# registered for fallback cleanup. Paths use the same safety checks as
+# registration. Safe paths in a mixed call are still unregistered, and the
+# function returns nonzero if any path was rejected.
+#
+# Usage:
+#   rm -rf -- "$workspace"
+#   std_unregister_cleanup_path "$workspace"
+#
+std_unregister_cleanup_path() {
+    local path existing_path
+    local should_remove had_valid_path=0 status=0
+    local -a paths_to_remove=() remaining_paths=()
+
+    if (($# == 0)); then
+        log_warn "std_unregister_cleanup_path: No paths provided."
+        return 0
+    fi
+
+    for path; do
+        if ! __std_is_safe_cleanup_path__ "$path"; then
+            log_error "std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '$path'."
+            status=1
+            continue
+        fi
+
+        had_valid_path=1
+        paths_to_remove+=("$path")
+    done
+
+    if ((had_valid_path)); then
+        for existing_path in "${__std_cleanup_paths[@]}"; do
+            should_remove=0
+            for path in "${paths_to_remove[@]}"; do
+                if [[ "$existing_path" == "$path" ]]; then
+                    should_remove=1
+                    break
+                fi
+            done
+            ((should_remove)) || remaining_paths+=("$existing_path")
+        done
+        __std_cleanup_paths=("${remaining_paths[@]}")
+    fi
+
     return "$status"
 }
 
