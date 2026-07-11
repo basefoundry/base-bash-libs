@@ -79,7 +79,7 @@ arg_parse() {
     local __arg_options_name="${1-}" __arg_positionals_name="${2-}" __arg_specs_name="${3-}"
     local __arg_current __arg_option_token __arg_option_value __arg_option_name __arg_option_kind
     local -a __arg_positionals=()
-    local -A __arg_token_kind=() __arg_token_name=()
+    local -A __arg_options=() __arg_token_kind=() __arg_token_name=()
     local __arg_parse_options=1
 
     if (($# < 4)) || [[ "${4-}" != "--" ]]; then
@@ -104,8 +104,6 @@ arg_parse() {
 
     __arg_parse_specs__ "$__arg_specs_name" __arg_token_kind __arg_token_name || return $?
 
-    eval "$__arg_options_name=()"
-    eval "$__arg_positionals_name=()"
     shift 4
 
     while (($# > 0)); do
@@ -132,7 +130,7 @@ arg_parse() {
                 return 2
             fi
 
-            __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "$__arg_option_value"
+            __arg_set_assoc_value__ __arg_options "$__arg_option_name" "$__arg_option_value"
             continue
         fi
 
@@ -147,7 +145,7 @@ arg_parse() {
             fi
 
             if [[ "$__arg_option_kind" == "flag" ]]; then
-                __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "1"
+                __arg_set_assoc_value__ __arg_options "$__arg_option_name" "1"
                 continue
             fi
 
@@ -162,13 +160,17 @@ arg_parse() {
 
             __arg_option_value="$1"
             shift
-            __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "$__arg_option_value"
+            __arg_set_assoc_value__ __arg_options "$__arg_option_name" "$__arg_option_value"
             continue
         fi
 
         __arg_positionals+=("$__arg_current")
     done
 
+    eval "$__arg_options_name=()"
+    for __arg_option_name in "${!__arg_options[@]}"; do
+        __arg_set_assoc_value__ "$__arg_options_name" "$__arg_option_name" "${__arg_options[$__arg_option_name]}"
+    done
     eval "$__arg_positionals_name=(\"\${__arg_positionals[@]}\")"
     return 0
 }
