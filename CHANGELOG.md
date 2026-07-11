@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
   shell `sleep` aliases or functions cannot shadow retry delays.
 - Made `arg_parse` publish output arrays only after a parse succeeds, leaving
   caller-owned outputs unchanged on late parse failures.
+- Kept the warning-level ShellCheck profile clean for file section marker-count
+  validation.
 - Reused shared marker validation inside `update_file_section`.
 
 ## [1.2.0] - 2026-07-04
