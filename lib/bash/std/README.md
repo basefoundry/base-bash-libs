@@ -436,6 +436,7 @@ Use assertions near the top of functions to make assumptions explicit:
 assert_arg_count "$#" 2
 assert_variable_name result_var array_var
 assert_indexed_array values
+assert_associative_array options
 assert_not_null BASE_HOME project_name
 assert_integer retry_count
 assert_integer_range retry_count 0 5
@@ -457,6 +458,10 @@ require those variables to exist or contain values.
 Use `assert_indexed_array` when a helper accepts a caller-owned array by name.
 Callers should declare those variables with `declare -a` or an indexed-array
 assignment before passing them to array-mutating helpers.
+
+Use `assert_associative_array` when a helper accepts a caller-owned associative
+array by name. Callers should declare those variables with `declare -A` before
+passing them to map-mutating helpers.
 
 The assertions favor clear failure messages over scattered one-off tests. Some
 helpers check all provided values and report all missing items together.

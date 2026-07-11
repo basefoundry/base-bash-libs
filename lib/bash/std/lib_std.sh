@@ -39,6 +39,7 @@
 #   std_command_path var cmd     # Resolve an external command path without exiting.
 #   std_function_exists fn       # Predicate for defined Bash functions.
 #   assert_variable_name name    # Validate Bash variable-name arguments.
+#   assert_associative_array map # Validate caller-declared associative arrays.
 #   base_bash_libs_require_version min_version
 #                                # Exit clearly if the loaded library is too old.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
@@ -1505,6 +1506,33 @@ assert_indexed_array() {
         assert_variable_name "$var_name"
         if ! __std_declares_array_kind__ "$var_name" "a"; then
             fatal_error "Variable '$var_name' must be an indexed array declared by the caller."
+        fi
+    done
+
+    return 0
+}
+
+#
+# assert_associative_array - Verifies that one or more variables are declared associative arrays.
+#
+# This validates that callers declared the named variables with associative-array
+# semantics before passing them to helpers that mutate or read maps in place.
+#
+# Usage:
+#   declare -A options=()
+#   assert_associative_array options
+#
+assert_associative_array() {
+    local var_name
+
+    if (($# == 0)); then
+        fatal_error "assert_associative_array: No variable names provided for validation."
+    fi
+
+    for var_name in "$@"; do
+        assert_variable_name "$var_name"
+        if ! __std_declares_array_kind__ "$var_name" "A"; then
+            fatal_error "Variable '$var_name' must be an associative array declared by the caller."
         fi
     done
 

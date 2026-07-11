@@ -87,20 +87,8 @@ arg_parse() {
         return 2
     fi
 
-    assert_variable_name "$__arg_options_name" "$__arg_positionals_name" "$__arg_specs_name"
-
-    if ! __std_declares_array_kind__ "$__arg_options_name" "A"; then
-        log_error "arg_parse: options variable must be an associative array declared by the caller."
-        return 2
-    fi
-    if ! __std_declares_array_kind__ "$__arg_positionals_name" "a"; then
-        log_error "arg_parse: positionals variable must be an indexed array declared by the caller."
-        return 2
-    fi
-    if ! __std_declares_array_kind__ "$__arg_specs_name" "a"; then
-        log_error "arg_parse: specs variable must be an indexed array declared by the caller."
-        return 2
-    fi
+    assert_associative_array "$__arg_options_name"
+    assert_indexed_array "$__arg_positionals_name" "$__arg_specs_name"
 
     __arg_parse_specs__ "$__arg_specs_name" __arg_token_kind __arg_token_name || return $?
 

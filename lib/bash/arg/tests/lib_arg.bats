@@ -190,6 +190,40 @@ EOF
     [[ "$output" != *"not-valid"* ]]
 }
 
+@test "arg_parse asserts caller-owned array declarations" {
+    local script="$TEST_TMPDIR/arg-invalid-array-vars.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/arg/lib_arg.sh"
+declare -a options=()
+declare -a positionals=()
+declare -a specs=("verbose|flag|--verbose")
+arg_parse options positionals specs -- --verbose
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'options' must be an associative array declared by the caller."* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/arg/lib_arg.sh"
+declare -A options=()
+positionals=""
+declare -a specs=("verbose|flag|--verbose")
+arg_parse options positionals specs -- --verbose
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'positionals' must be an indexed array declared by the caller."* ]]
+}
+
 @test "arg_parse rejects malformed specs" {
     local -a specs=("verbose|maybe|--verbose")
     local -A options=()

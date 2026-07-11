@@ -1730,6 +1730,40 @@ EOF
     [[ "$output" == *"Variable 'values' must be an indexed array declared by the caller."* ]]
 }
 
+@test "assert_associative_array accepts declared associative arrays" {
+    local -A values=([alpha]="one")
+
+    assert_associative_array values
+}
+
+@test "assert_associative_array rejects scalar and indexed variables" {
+    local script="$TEST_TMPDIR/assert-associative-array-invalid.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+values="alpha"
+assert_associative_array values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'values' must be an associative array declared by the caller."* ]]
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+declare -a values=("alpha")
+assert_associative_array values
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Variable 'values' must be an associative array declared by the caller."* ]]
+}
+
 @test "assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"
