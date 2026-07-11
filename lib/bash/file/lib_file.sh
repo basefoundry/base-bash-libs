@@ -128,11 +128,11 @@ file_section_exists() {
     fi
 
     local target_file="$1" beginning_marker="$2" end_marker="$3"
-    local beginning_marker_count end_marker_count
+    local beginning_marker_count _end_marker_count
 
     [[ -f "$target_file" ]] || return 1
     __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
-        beginning_marker_count end_marker_count || return $?
+        beginning_marker_count _end_marker_count || return $?
 
     ((beginning_marker_count > 0))
 }
@@ -152,13 +152,13 @@ file_section_needs_update() {
     fi
 
     local target_file="$1" beginning_marker="$2" end_marker="$3"
-    local beginning_marker_count end_marker_count
+    local beginning_marker_count _end_marker_count
     local current_content_file="" new_content_file="" status=0
     shift 3
 
     [[ -f "$target_file" ]] || return 0
     __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
-        beginning_marker_count end_marker_count || return $?
+        beginning_marker_count _end_marker_count || return $?
     ((beginning_marker_count > 0)) || return 0
 
     if ! std_make_temp_file new_content_file base-file-section-new; then
