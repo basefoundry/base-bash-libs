@@ -245,7 +245,7 @@ gh_api_with_retry() {
             log_warn "GitHub API call failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
         fi
         delay="$(__gh_api_retry_delay_seconds "$output")"
-        sleep "$delay"
+        __std_sleep_interval__ "$delay"
         attempt=$((attempt + 1))
     done
 }

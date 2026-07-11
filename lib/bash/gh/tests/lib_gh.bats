@@ -438,6 +438,35 @@ EOF
     [ "$(cat "$TEST_TMPDIR/gh-api-count")" = "2" ]
 }
 
+@test "gh_api_with_retry avoids shadowed sleep functions between retries" {
+    local shadow_file="$TEST_TMPDIR/shadowed-sleep-called"
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+state_file="${TEST_TMPDIR:?}/gh-api-count"
+count=0
+[[ -f "$state_file" ]] && read -r count < "$state_file"
+count=$((count + 1))
+printf '%s\n' "$count" > "$state_file"
+if ((count == 1)); then
+    printf 'secondary rate limit; retry-after: 0\n' >&2
+    exit 1
+fi
+printf 'ok\n'
+EOF
+    sleep() {
+        printf 'shadowed sleep called\n' > "$shadow_file"
+        return 0
+    }
+
+    capture_command gh_api_with_retry repos/owner/repo --jq .name
+
+    unset -f sleep
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ok"* ]]
+    [ ! -e "$shadow_file" ]
+}
+
 @test "gh_api_with_retry preserves non-retryable failures" {
     create_fake_gh <<'EOF'
 #!/usr/bin/env bash

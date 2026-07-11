@@ -19,6 +19,8 @@ and versions are tracked in the repo-root `VERSION` file.
   and deduplicated worktree parsing loops.
 - Kept `gh_list_remote_branches` from leaking its internal SHA loop variable
   into caller scope.
+- Routed `gh_api_with_retry` retry sleeps through the stdlib sleep helper so
+  shell `sleep` aliases or functions cannot shadow retry delays.
 - Reused shared marker validation inside `update_file_section`.
 
 ## [1.2.0] - 2026-07-04
