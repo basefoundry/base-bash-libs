@@ -336,7 +336,7 @@ gh_branch_merged_to_ref() {
 
 gh_list_remote_branches() {
     local repo_dir="${1:-.}"
-    local output ref
+    local output ref _sha
 
     output="$(git -C "$repo_dir" ls-remote --heads origin)" || return 1
     while read -r _sha ref; do
