@@ -193,6 +193,29 @@ EOF
     [[ "$(cat "$registration_file")" == *"config.txt."* ]]
 }
 
+@test "update_file_section unregisters temp files after eager cleanup" {
+    local cleanup_path
+    local target="$TEST_TMPDIR/config.txt"
+    cat <<'EOF' > "$target"
+before
+# BEGIN
+old
+# END
+after
+EOF
+
+    update_file_section "$target" "# BEGIN" "# END" "new"
+
+    for cleanup_path in "${__std_cleanup_paths[@]}"; do
+        if [[ "$cleanup_path" == *"base-file-section-new."* ||
+            "$cleanup_path" == *"base-file-section-current."* ||
+            "$cleanup_path" == *"config.txt."* ]]; then
+            printf 'stale cleanup path: %s\n' "$cleanup_path" >&2
+            return 1
+        fi
+    done
+}
+
 @test "update_file_section skips unchanged existing section" {
     local before_inode
     local target="$TEST_TMPDIR/config.txt"
