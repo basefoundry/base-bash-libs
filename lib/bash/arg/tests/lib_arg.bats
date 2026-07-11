@@ -110,6 +110,21 @@ create_script() {
     [ "$parse_status" -eq 2 ]
 }
 
+@test "arg_parse preserves caller outputs when an unknown option follows accepted args" {
+    local -a specs=("verbose|flag|--verbose|-v")
+    local -A options=([existing]="keep")
+    local -a positionals=("old")
+    local parse_status=0
+
+    arg_parse options positionals specs -- --verbose item --unknown || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+    [ "${options[existing]}" = "keep" ]
+    [ -z "${options[verbose]+set}" ]
+    [ "${#positionals[@]}" -eq 1 ]
+    [ "${positionals[0]}" = "old" ]
+}
+
 @test "arg_parse returns usage status when option values are missing" {
     local -a specs=("output|value|--output|-o")
     local -A options=()
@@ -119,6 +134,25 @@ create_script() {
     arg_parse options positionals specs -- --output || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
+}
+
+@test "arg_parse preserves caller outputs when a value option fails late" {
+    local -a specs=(
+        "verbose|flag|--verbose|-v"
+        "output|value|--output|-o"
+    )
+    local -A options=([existing]="keep")
+    local -a positionals=("old")
+    local parse_status=0
+
+    arg_parse options positionals specs -- --verbose --output || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+    [ "${options[existing]}" = "keep" ]
+    [ -z "${options[verbose]+set}" ]
+    [ -z "${options[output]+set}" ]
+    [ "${#positionals[@]}" -eq 1 ]
+    [ "${positionals[0]}" = "old" ]
 }
 
 @test "arg_parse rejects registered options as missing option values" {

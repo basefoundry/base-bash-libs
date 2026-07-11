@@ -21,6 +21,8 @@ and versions are tracked in the repo-root `VERSION` file.
   into caller scope.
 - Routed `gh_api_with_retry` retry sleeps through the stdlib sleep helper so
   shell `sleep` aliases or functions cannot shadow retry delays.
+- Made `arg_parse` publish output arrays only after a parse succeeds, leaving
+  caller-owned outputs unchanged on late parse failures.
 - Reused shared marker validation inside `update_file_section`.
 
 ## [1.2.0] - 2026-07-04
