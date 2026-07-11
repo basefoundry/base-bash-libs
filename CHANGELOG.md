@@ -11,6 +11,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Hardened named-output helpers across std, string, arg, git, and GitHub
   libraries against caller variable names that collide with helper internals.
+- Aligned standards and stdlib documentation with the current sourceable
+  library surface and standalone checkout path.
 - Made `gh_run` report failed GitHub CLI commands even when callers enable
   `set -e`, and preserved argument boundaries in GitHub command failure logs.
 - Documented and tested `str_split` trailing-separator behavior.

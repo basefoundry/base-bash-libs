@@ -515,7 +515,7 @@ For standalone scripts that source the library directly:
 
 ```bash
 #!/usr/bin/env bash
-source "/path/to/base/lib/bash/std/lib_std.sh"
+source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
 
 main() {
     set_log_level DEBUG
