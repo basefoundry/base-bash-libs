@@ -210,6 +210,9 @@ EOF
     gh_repo_from_remote_url "git@github.com:owner/repo" repo
     [ "$repo" = "owner/repo" ]
 
+    gh_repo_from_remote_url "ssh://git@github.com/owner/repo.git" repo
+    [ "$repo" = "owner/repo" ]
+
     gh_repo_from_remote_url "https://github.com/owner/repo.git" repo
     [ "$repo" = "owner/repo" ]
 
@@ -237,6 +240,16 @@ EOF
     [ "$repo" = "sentinel" ]
 
     bats_run gh_repo_from_remote_url "https://github.com/owner" repo
+
+    [ "$status" -eq 1 ]
+    [ "$repo" = "sentinel" ]
+
+    bats_run gh_repo_from_remote_url "ssh://git@github.com//repo.git" repo
+
+    [ "$status" -eq 1 ]
+    [ "$repo" = "sentinel" ]
+
+    bats_run gh_repo_from_remote_url "https://github.com/owner/repo?query=1" repo
 
     [ "$status" -eq 1 ]
     [ "$repo" = "sentinel" ]
@@ -496,6 +509,32 @@ EOF
     [ "$status" -eq 4 ]
     [[ "$output" == *"not found"* ]]
     [[ "$output" != *"retrying"* ]]
+}
+
+@test "gh_api_with_retry captures failures under set -e" {
+    local script="$TEST_TMPDIR/gh-api-set-e.sh"
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+printf 'not found\n' >&2
+exit 4
+EOF
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -e
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/gh/lib_gh.sh"
+PATH="$TEST_TMPDIR/bin:$PATH"
+gh_api_with_retry repos/owner/missing
+printf 'after\n'
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 4 ]
+    [[ "$output" == *"not found"* ]]
+    [[ "$output" != *"after"* ]]
 }
 
 @test "gh_worktree_path_for_branch finds the worktree for a local branch" {

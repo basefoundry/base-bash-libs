@@ -92,12 +92,20 @@ _git_update_repo_finish() {
     local git_log="${1:-}"
     local should_popd="${2:-false}"
     local status="${3:-0}"
+    local submodule_log="${4:-}"
 
     if [[ "$should_popd" == true ]]; then
         popd >/dev/null || status=1
     fi
 
-    [[ -n "$git_log" ]] && rm -f "$git_log"
+    if [[ -n "$git_log" ]]; then
+        rm -f -- "$git_log"
+        std_unregister_cleanup_path "$git_log"
+    fi
+    if [[ -n "$submodule_log" ]]; then
+        rm -f -- "$submodule_log"
+        std_unregister_cleanup_path "$submodule_log"
+    fi
     return "$status"
 }
 
@@ -148,7 +156,7 @@ git_update_repo() {
     local git_repo="$1"
     local allowed_dirty_path="${2:-}"
     local expected_branch="${3:-}"
-    local git_log
+    local git_log submodule_log=""
 
     if [[ -z "$git_repo" ]]; then
         log_error "No git repository path provided."
@@ -215,15 +223,20 @@ git_update_repo() {
     fi
 
     # it is safe to run submodule commands even if the repo has no submodules
-    if ! { git submodule init && git submodule sync && git submodule update; } >/dev/null; then
-        log_error "git submodule update failed on repo '$git_repo'"
-        [[ -s "$git_log" ]] && log_info_file "$git_log"
+    if ! std_make_temp_file submodule_log git-submodule-log; then
+        log_error "Unable to create temporary submodule log file."
         _git_update_repo_finish "$git_log" true 1
+        return $?
+    fi
+    if ! { git submodule init && git submodule sync && git submodule update; } >"$submodule_log" 2>&1; then
+        log_error "git submodule update failed on repo '$git_repo'"
+        [[ -s "$submodule_log" ]] && log_info_file "$submodule_log"
+        _git_update_repo_finish "$git_log" true 1 "$submodule_log"
         return $?
     fi
 
     log_debug "Git repo '$git_repo' updated to latest '$expected_branch'"
-    _git_update_repo_finish "$git_log" true 0
+    _git_update_repo_finish "$git_log" true 0 "$submodule_log"
     return $?
 }
 

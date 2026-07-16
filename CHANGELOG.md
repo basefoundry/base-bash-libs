@@ -14,6 +14,9 @@ and versions are tracked in the repo-root `VERSION` file.
   caller-owned indexed-array outputs.
 - Hardened file-section marker validation, preserved symlink targets during
   atomic updates, and treated option-like target paths literally.
+- Made GitHub API failure capture safe under `set -e`, accepted canonical SSH
+  GitHub remotes, and separated submodule diagnostics from pull logs while
+  unregistering eagerly removed Git temp files.
 
 - Made fallback timeouts terminate descendant processes when a command is
   launched in its own process group.
