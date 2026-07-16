@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 
-set -e
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 cd "$repo_root" || exit 1
+
+run_stage() {
+  local label="$1"
+  local status
+  shift
+
+  if "$@"; then
+    return 0
+  else
+    status=$?
+  fi
+
+  printf 'Validation stage failed: %s (exit %s).\n' "$label" "$status" >&2
+  return "$status"
+}
 
 lint_files=(
   bin/base-bash
@@ -23,4 +36,4 @@ lint_files=(
   tests/launcher.bats
 )
 
-shellcheck --severity=warning "${lint_files[@]}"
+run_stage "ShellCheck warning profile" shellcheck --severity=warning "${lint_files[@]}" || exit $?

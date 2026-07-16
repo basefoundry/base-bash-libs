@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 
 required_files=(
@@ -46,6 +44,48 @@ required_files=(
 
 cd "$repo_root" || exit 1
 
+run_stage() {
+  local label="$1"
+  local status
+  shift
+
+  if "$@"; then
+    return 0
+  else
+    status=$?
+  fi
+
+  printf 'Validation stage failed: %s (exit %s).\n' "$label" "$status" >&2
+  return "$status"
+}
+
+check_no_strict_mode() {
+  local file matches status
+  local strict_mode_files=(
+    bin/base-bash
+    tests/validate.sh
+    tests/lint-warnings.sh
+    examples/*.sh
+    lib/bash/*/lib_*.sh
+  )
+
+  for file in "${strict_mode_files[@]}"; do
+    if matches="$(grep -n -E \
+      '^[[:space:]]*set[[:space:]]+-[^[:space:]]*[eu]([[:space:]]|$)|^[[:space:]]*set[[:space:]]+-o[[:space:]]+(errexit|nounset|pipefail)([[:space:]]|$)|^[[:space:]]*set[[:space:]]+.*[[:space:]]pipefail([[:space:]]|$)' \
+      "$file")"; then
+      printf 'Strict mode is not allowed in production or validation shell file %s:\n%s\n' \
+        "$file" "$matches" >&2
+      return 1
+    else
+      status=$?
+      if ((status != 1)); then
+        printf 'Unable to inspect %s for strict mode (exit %s).\n' "$file" "$status" >&2
+        return "$status"
+      fi
+    fi
+  done
+}
+
 for file in "${required_files[@]}"; do
   [[ -f "$file" ]] || {
     printf 'Missing required file: %s\n' "$file" >&2
@@ -54,6 +94,8 @@ for file in "${required_files[@]}"; do
 done
 
 printf 'Repository baseline is present.\n'
+
+run_stage "strict-mode guard" check_no_strict_mode || exit $?
 
 version=""
 IFS= read -r version < VERSION || {
@@ -125,7 +167,7 @@ for command in shellcheck bats; do
   }
 done
 
-shellcheck --severity=error \
+run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
   tests/validate.sh \
   tests/lint-warnings.sh \
@@ -142,18 +184,22 @@ shellcheck --severity=error \
   lib/bash/tests/test_helper.sh \
   tests/launcher.bats
 
-bats \
-  tests/launcher.bats \
-  lib/bash/std/tests/lib_std.bats \
-  lib/bash/file/tests/lib_file.bats \
-  lib/bash/git/tests/lib_git.bats \
-  lib/bash/gh/tests/lib_gh.bats \
-  lib/bash/str/tests/lib_str.bats \
-  lib/bash/arg/tests/lib_arg.bats \
+bats_files=(
+  tests/launcher.bats
+  lib/bash/std/tests/lib_std.bats
+  lib/bash/file/tests/lib_file.bats
+  lib/bash/git/tests/lib_git.bats
+  lib/bash/gh/tests/lib_gh.bats
+  lib/bash/str/tests/lib_str.bats
+  lib/bash/arg/tests/lib_arg.bats
   lib/bash/list/tests/lib_list.bats
+)
 
-examples/std-usage.sh >/dev/null
-examples/cookbook-cleanup-temp.sh >/dev/null
-examples/cookbook-args-lists-strings.sh >/dev/null
+run_stage "BATS test suites" bats \
+  "${bats_files[@]}" || exit $?
+
+run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
+run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
+run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?
 
 printf 'Bash library validation passed.\n'
