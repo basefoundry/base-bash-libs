@@ -9,6 +9,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Hardened `arg_parse` option specifications against duplicate, empty, and
+  unreachable tokens, and added repeatable value options with ordered,
+  caller-owned indexed-array outputs.
+
 - Made fallback timeouts terminate descendant processes when a command is
   launched in its own process group.
 - Isolated pre-existing EXIT trap control flow so return or exit cannot skip

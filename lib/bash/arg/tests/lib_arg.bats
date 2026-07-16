@@ -118,6 +118,34 @@ EOF
     [ "${positionals[0]}" = "item" ]
 }
 
+@test "arg_parse preserves repeatable values in caller-owned arrays" {
+    local -a specs=("include|repeatable|--include|-I")
+    local -a include=()
+    local -A options=()
+    local -a positionals=()
+
+    arg_parse options positionals specs -- --include first --include=second -I "" item
+
+    [ "${options[include]}" = "1" ]
+    [ "${#include[@]}" -eq 3 ]
+    [ "${include[0]}" = "first" ]
+    [ "${include[1]}" = "second" ]
+    [ "${include[2]}" = "" ]
+    [ "${positionals[0]}" = "item" ]
+}
+
+@test "arg_parse clears repeatable arrays when a successful parse has no values" {
+    local -a specs=("include|repeatable|--include")
+    local -a include=(old)
+    local -A options=([include]=old)
+    local -a positionals=()
+
+    arg_parse options positionals specs -- item
+
+    [ "${#include[@]}" -eq 0 ]
+    [ -z "${options[include]+set}" ]
+}
+
 @test "arg_parse returns usage status for unknown options" {
     local -a specs=("verbose|flag|--verbose|-v")
     local -A options=()
@@ -250,6 +278,37 @@ EOF
     local parse_status=0
 
     arg_parse options positionals specs -- --verbose || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+}
+
+@test "arg_parse rejects duplicate names and tokens without changing outputs" {
+    local -a specs=("first|flag|--first" "second|value|--first")
+    local -A options=([existing]=keep)
+    local -a positionals=(old)
+    local parse_status=0
+
+    arg_parse options positionals specs -- --first || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+    [ "${options[existing]}" = "keep" ]
+    [ "${#positionals[@]}" -eq 1 ]
+    [ "${positionals[0]}" = "old" ]
+}
+
+@test "arg_parse rejects unreachable and empty option tokens" {
+    local -A options=()
+    local -a positionals=()
+    local parse_status=0
+    local -a specs=("value|value|--value|--")
+
+    arg_parse options positionals specs -- --value x || parse_status=$?
+
+    [ "$parse_status" -eq 2 ]
+
+    parse_status=0
+    specs=("value|value|--value|")
+    arg_parse options positionals specs -- --value x || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 }
