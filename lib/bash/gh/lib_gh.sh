@@ -73,11 +73,16 @@ gh_repo_from_remote_url() {
     __std_assert_writable_output__ gh_repo_from_remote_url "$__gh_result_name" || return 1
 
     case "$__gh_remote_url" in
+        git@github.com:*.git)
+            __gh_parsed_repo="${__gh_remote_url#git@github.com:}"
+            __gh_parsed_repo="${__gh_parsed_repo%.git}"
+            ;;
         git@github.com:*)
             __gh_parsed_repo="${__gh_remote_url#git@github.com:}"
             ;;
-        ssh://git@github.com/*)
-            __gh_parsed_repo="${__gh_remote_url#ssh://git@github.com/}"
+        https://github.com/*.git)
+            __gh_parsed_repo="${__gh_remote_url#https://github.com/}"
+            __gh_parsed_repo="${__gh_parsed_repo%.git}"
             ;;
         https://github.com/*)
             __gh_parsed_repo="${__gh_remote_url#https://github.com/}"
@@ -87,8 +92,7 @@ gh_repo_from_remote_url() {
             ;;
     esac
 
-    __gh_parsed_repo="${__gh_parsed_repo%.git}"
-    [[ "$__gh_parsed_repo" =~ ^[^/[:space:]?#]+/[^/[:space:]?#]+$ ]] || return 1
+    [[ "$__gh_parsed_repo" == */* && "$__gh_parsed_repo" != */*/* ]] || return 1
     printf -v "$__gh_result_name" '%s' "$__gh_parsed_repo"
 }
 
@@ -227,11 +231,8 @@ gh_api_with_retry() {
     fi
 
     while ((attempt <= max_attempts)); do
-        if output="$(gh api "$@" 2>&1)"; then
-            status=0
-        else
-            status=$?
-        fi
+        output="$(gh api "$@" 2>&1)"
+        status=$?
         if ((status == 0)); then
             [[ -z "$output" ]] || printf '%s\n' "$output"
             return 0
