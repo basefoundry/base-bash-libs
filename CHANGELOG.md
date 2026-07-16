@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-16
+
 ### Fixed
 
 - Hardened `arg_parse` option specifications against duplicate, empty, and
