@@ -5,3 +5,18 @@ project:
 
 test:
   command: ./tests/validate.sh
+
+release:
+  version_file: VERSION
+  changelog: CHANGELOG.md
+  tag_prefix: v
+  github:
+    repository: basefoundry/base-bash-libs
+    release_title: "base-bash-libs v{version}"
+  homebrew:
+    required: true
+    tap_repository: basefoundry/homebrew-base
+    formula_path: Formula/base-bash-libs.rb
+    package: basefoundry/base/base-bash-libs
+
+artifacts: []
