@@ -8,30 +8,32 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
 
 ## Public API
 
-- `git_update_repo`
+- `git_update_repo <repo> [allowed_dirty_path] [expected_branch]`
   Update a repository on its detected default branch, optionally allowing tracked changes in one specific path.
-- `git_get_current_branch`
+- `git_get_current_branch <directory> <result_var>`
   Return the current branch name through a caller-provided variable, or `detached head`.
-- `git_detect_default_branch`
+- `git_detect_default_branch <repo> <result_var>`
   Detect a repository's default branch from its remote HEAD and standard local
   fallbacks.
-- `git_worktree_path_for_branch`
+- `git_worktree_path_for_branch <branch> [repo]`
   Print the worktree path attached to a local branch.
-- `git_list_worktree_branches`
+- `git_list_worktree_branches [repo]`
   Print tab-separated worktree path and branch rows.
-- `git_branch_upstream`
+- `git_branch_upstream <repo> <branch>`
   Print the configured upstream ref for a local branch.
-- `git_branch_merged_to_ref`
+- `git_branch_merged_to_ref <repo> <branch> <ref>`
   Check whether a local branch is an ancestor of a ref.
-- `git_list_remote_branches`
+- `git_list_remote_branches [repo]`
   Print branch names from the `origin` remote.
-- `check_script_up_to_date`
+- `check_script_up_to_date [--fetch] <script>`
   Check whether a tracked script appears current relative to its configured upstream.
 
-## Internal Helper
+## Internal Helpers
 
-- `_git_only_path_dirty`
-  Internal predicate used by `git_update_repo` when an allowed dirty path is provided.
+The `__git_*__` functions used by `git_update_repo` are implementation details
+and are not part of the public API. In particular, the path-dirty predicate
+checks whether tracked changes stay within an allowed path, while the update
+helpers manage branch selection, retries, and cleanup.
 
 ## Usage
 

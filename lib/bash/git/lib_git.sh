@@ -156,13 +156,13 @@ git_list_remote_branches() {
 #
 # @param $1 allowed_path Path in repository root that may be dirty (for example "shared").
 #
-_git_path_matches_allowed_path() {
+__git_path_matches_allowed_path__() {
     local path="$1" allowed_path="$2"
 
     [[ "$path" == "$allowed_path" || "$path" == "$allowed_path/"* ]]
 }
 
-_git_only_path_dirty() {
+__git_only_path_dirty__() {
     local allowed_path="$1"
     local status_output line path source_path destination_path
 
@@ -175,13 +175,13 @@ _git_only_path_dirty() {
         if [[ "$path" == *" -> "* ]]; then
             source_path="${path%% -> *}"
             destination_path="${path#* -> }"
-            if ! _git_path_matches_allowed_path "$source_path" "$allowed_path" ||
-                ! _git_path_matches_allowed_path "$destination_path" "$allowed_path"; then
+            if ! __git_path_matches_allowed_path__ "$source_path" "$allowed_path" ||
+                ! __git_path_matches_allowed_path__ "$destination_path" "$allowed_path"; then
                 return 1
             fi
             continue
         fi
-        if ! _git_path_matches_allowed_path "$path" "$allowed_path"; then
+        if ! __git_path_matches_allowed_path__ "$path" "$allowed_path"; then
             return 1
         fi
     done <<< "$status_output"
@@ -189,7 +189,7 @@ _git_only_path_dirty() {
     return 0
 }
 
-_git_expected_update_branch() {
+__git_expected_update_branch__() {
     local configured_branch="${1:-}"
     local default_branch
 
@@ -229,7 +229,7 @@ _git_expected_update_branch() {
     printf '%s\n' main
 }
 
-_git_update_repo_finish() {
+__git_update_repo_finish__() {
     local git_log="${1:-}"
     local should_popd="${2:-false}"
     local status="${3:-0}"
@@ -250,7 +250,7 @@ _git_update_repo_finish() {
     return "$status"
 }
 
-_git_pull_with_retry() {
+__git_pull_with_retry__() {
     local git_log="$1"
     local max_attempts="${BASE_GIT_PULL_MAX_ATTEMPTS:-2}"
     local attempt=1
@@ -318,24 +318,24 @@ git_update_repo() {
     # the submodule update sequence below needs the repository as its cwd.
     if ! pushd "$git_repo" > /dev/null; then
         # If cd fails, we can't proceed.
-        _git_update_repo_finish "$git_log" false 1
+        __git_update_repo_finish__ "$git_log" false 1
         return $?
     fi
 
     # Check if it's a valid git repo
     if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
         log_error "'$git_repo' is not a Git repository."
-        _git_update_repo_finish "$git_log" true 1
+        __git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
 
     # Make sure the current branch is the expected update branch.
     local current_branch
-    expected_branch="$(_git_expected_update_branch "$expected_branch")"
+    expected_branch="$(__git_expected_update_branch__ "$expected_branch")"
     current_branch=$(git rev-parse --abbrev-ref HEAD)
     if [[ "$current_branch" != "$expected_branch" ]]; then
         log_debug "Current branch of '$git_repo' is '${current_branch}', not '$expected_branch'. Skipping update."
-        _git_update_repo_finish "$git_log" true 0
+        __git_update_repo_finish__ "$git_log" true 0
         return $?
     fi
 
@@ -347,37 +347,37 @@ git_update_repo() {
         dirty=true
     fi
     if [[ "$dirty" == true ]]; then
-        if [[ -n "$allowed_dirty_path" ]] && _git_only_path_dirty "$allowed_dirty_path"; then
+        if [[ -n "$allowed_dirty_path" ]] && __git_only_path_dirty__ "$allowed_dirty_path"; then
             log_debug "Repo '$git_repo' only has tracked changes in '$allowed_dirty_path'; attempting git pull."
         else
             log_debug "Repo '$git_repo' has local changes; skipping auto-update. Commit or stash to enable git pull."
-            _git_update_repo_finish "$git_log" true 0
+        __git_update_repo_finish__ "$git_log" true 0
             return $?
         fi
     fi
 
-    if ! _git_pull_with_retry "$git_log"; then
+    if ! __git_pull_with_retry__ "$git_log"; then
         log_error "git pull failed on repo '$git_repo'"
         [[ -s "$git_log" ]] && log_info_file "$git_log"
-        _git_update_repo_finish "$git_log" true 1
+        __git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
 
     # it is safe to run submodule commands even if the repo has no submodules
     if ! std_make_temp_file submodule_log git-submodule-log; then
         log_error "Unable to create temporary submodule log file."
-        _git_update_repo_finish "$git_log" true 1
+        __git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
     if ! { git submodule init && git submodule sync && git submodule update; } >"$submodule_log" 2>&1; then
         log_error "git submodule update failed on repo '$git_repo'"
         [[ -s "$submodule_log" ]] && log_info_file "$submodule_log"
-        _git_update_repo_finish "$git_log" true 1 "$submodule_log"
+        __git_update_repo_finish__ "$git_log" true 1 "$submodule_log"
         return $?
     fi
 
     log_debug "Git repo '$git_repo' updated to latest '$expected_branch'"
-    _git_update_repo_finish "$git_log" true 0 "$submodule_log"
+    __git_update_repo_finish__ "$git_log" true 0 "$submodule_log"
     return $?
 }
 

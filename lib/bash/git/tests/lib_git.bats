@@ -377,7 +377,7 @@ EOF
     [[ "$output" != *"not 'main'"* ]]
 }
 
-@test "_git_expected_update_branch returns main when origin has main" {
+@test "__git_expected_update_branch__ returns main when origin has main" {
     local repo="$TEST_TMPDIR/repo"
     local branch
 
@@ -389,13 +389,13 @@ EOF
     git -C "$repo" branch -D main >/dev/null 2>&1
 
     pushd "$repo" >/dev/null
-    branch="$(_git_expected_update_branch)"
+    branch="$(__git_expected_update_branch__)"
     popd >/dev/null
 
     [ "$branch" = "main" ]
 }
 
-@test "_git_expected_update_branch returns master when origin only has master" {
+@test "__git_expected_update_branch__ returns master when origin only has master" {
     local repo="$TEST_TMPDIR/repo"
     local branch
 
@@ -407,26 +407,26 @@ EOF
     git -C "$repo" branch -D main >/dev/null 2>&1
 
     pushd "$repo" >/dev/null
-    branch="$(_git_expected_update_branch)"
+    branch="$(__git_expected_update_branch__)"
     popd >/dev/null
 
     [ "$branch" = "master" ]
 }
 
-@test "_git_expected_update_branch falls back to main without main or master refs" {
+@test "__git_expected_update_branch__ falls back to main without main or master refs" {
     local repo="$TEST_TMPDIR/repo"
     local branch
 
     init_git_repo "$repo"
 
     pushd "$repo" >/dev/null
-    branch="$(_git_expected_update_branch)"
+    branch="$(__git_expected_update_branch__)"
     popd >/dev/null
 
     [ "$branch" = "main" ]
 }
 
-@test "_git_only_path_dirty accepts multiple dirty files under an allowed directory" {
+@test "__git_only_path_dirty__ accepts multiple dirty files under an allowed directory" {
     local repo="$TEST_TMPDIR/repo"
     local rc
 
@@ -439,14 +439,14 @@ EOF
     printf 'local two\n' > "$repo/shared/two.txt"
 
     pushd "$repo" >/dev/null
-    _git_only_path_dirty "shared"
+    __git_only_path_dirty__ "shared"
     rc=$?
     popd >/dev/null
 
     [ "$rc" -eq 0 ]
 }
 
-@test "_git_only_path_dirty does not treat sibling path prefixes as allowed" {
+@test "__git_only_path_dirty__ does not treat sibling path prefixes as allowed" {
     local repo="$TEST_TMPDIR/repo"
     local rc
 
@@ -460,7 +460,7 @@ EOF
 
     pushd "$repo" >/dev/null
     set +e
-    _git_only_path_dirty "shared"
+    __git_only_path_dirty__ "shared"
     rc=$?
     set -e
     popd >/dev/null
@@ -468,7 +468,7 @@ EOF
     [ "$rc" -eq 1 ]
 }
 
-@test "_git_only_path_dirty rejects renames from outside the allowed path" {
+@test "__git_only_path_dirty__ rejects renames from outside the allowed path" {
     local repo="$TEST_TMPDIR/repo"
     local rc
 
@@ -480,7 +480,7 @@ EOF
 
     pushd "$repo" >/dev/null
     set +e
-    _git_only_path_dirty "shared"
+    __git_only_path_dirty__ "shared"
     rc=$?
     set -e
     popd >/dev/null
@@ -488,7 +488,7 @@ EOF
     [ "$rc" -eq 1 ]
 }
 
-@test "_git_only_path_dirty accepts renames inside the allowed path" {
+@test "__git_only_path_dirty__ accepts renames inside the allowed path" {
     local repo="$TEST_TMPDIR/repo"
     local rc
 
@@ -499,7 +499,7 @@ EOF
     git -C "$repo" mv shared/one.txt shared/two.txt
 
     pushd "$repo" >/dev/null
-    _git_only_path_dirty "shared"
+    __git_only_path_dirty__ "shared"
     rc=$?
     popd >/dev/null
 
@@ -549,25 +549,25 @@ EOF
     [[ "$(cat "$registration_file")" == *"git_log."* ]]
 }
 
-@test "_git_update_repo_finish removes temp log after success" {
+@test "__git_update_repo_finish__ removes temp log after success" {
     local git_log="$TEST_TMPDIR/git.log"
 
     printf 'pull output\n' > "$git_log"
 
-    bats_run _git_update_repo_finish "$git_log" false 0
+    bats_run __git_update_repo_finish__ "$git_log" false 0
 
     [ "$status" -eq 0 ]
     [ ! -e "$git_log" ]
 }
 
-@test "_git_update_repo_finish preserves an existing RETURN trap" {
+@test "__git_update_repo_finish__ preserves an existing RETURN trap" {
     local git_log="$TEST_TMPDIR/git.log"
     local return_trap
 
     printf 'pull output\n' > "$git_log"
     trap 'printf "outer return trap\n"' RETURN
 
-    bats_run _git_update_repo_finish "$git_log" false 0
+    bats_run __git_update_repo_finish__ "$git_log" false 0
     return_trap="$(trap -p RETURN)"
     trap - RETURN
 
@@ -576,7 +576,7 @@ EOF
     [ ! -e "$git_log" ]
 }
 
-@test "_git_update_repo_finish unregisters removed temp logs" {
+@test "__git_update_repo_finish__ unregisters removed temp logs" {
     local git_log="$TEST_TMPDIR/git.log"
     local unregister_file="$TEST_TMPDIR/unregistered-paths.txt"
 
@@ -587,7 +587,7 @@ EOF
         __orig_std_unregister_cleanup_path "$@"
     }
 
-    _git_update_repo_finish "$git_log" false 0
+    __git_update_repo_finish__ "$git_log" false 0
     unset -f std_unregister_cleanup_path __orig_std_unregister_cleanup_path
 
     [ "$(cat "$unregister_file")" = "$git_log" ]
@@ -616,7 +616,7 @@ EOF
     ! compgen -G "$TEST_TMPDIR/git-submodule-log.*" >/dev/null
 }
 
-@test "_git_pull_with_retry retries once after a transient pull failure" {
+@test "__git_pull_with_retry__ retries once after a transient pull failure" {
     local git_log="$TEST_TMPDIR/git.log"
     local pull_count="$TEST_TMPDIR/pull-count"
 
@@ -635,7 +635,7 @@ EOF
         command git "$@"
     }
 
-    bats_run _git_pull_with_retry "$git_log"
+    bats_run __git_pull_with_retry__ "$git_log"
     unset -f git
 
     [ "$status" -eq 0 ]
@@ -644,7 +644,7 @@ EOF
     [ "$(cat "$git_log")" = "pull attempt 2" ]
 }
 
-@test "_git_pull_with_retry honors configured max attempts" {
+@test "__git_pull_with_retry__ honors configured max attempts" {
     local git_log="$TEST_TMPDIR/git.log"
     local pull_count="$TEST_TMPDIR/pull-count"
 
@@ -663,7 +663,7 @@ EOF
         command git "$@"
     }
 
-    BASE_GIT_PULL_MAX_ATTEMPTS=3 bats_run _git_pull_with_retry "$git_log"
+    BASE_GIT_PULL_MAX_ATTEMPTS=3 bats_run __git_pull_with_retry__ "$git_log"
     unset -f git
 
     [ "$status" -eq 0 ]
@@ -672,7 +672,7 @@ EOF
     [ "$(cat "$git_log")" = "pull attempt 3" ]
 }
 
-@test "_git_pull_with_retry falls back for invalid configured max attempts" {
+@test "__git_pull_with_retry__ falls back for invalid configured max attempts" {
     local git_log="$TEST_TMPDIR/git.log"
     local max_attempts
     local pull_count="$TEST_TMPDIR/pull-count"
@@ -695,7 +695,7 @@ EOF
         printf '0\n' > "$pull_count"
         : > "$git_log"
 
-        BASE_GIT_PULL_MAX_ATTEMPTS="$max_attempts" bats_run _git_pull_with_retry "$git_log"
+        BASE_GIT_PULL_MAX_ATTEMPTS="$max_attempts" bats_run __git_pull_with_retry__ "$git_log"
 
         [ "$status" -eq 0 ]
         [ "$(cat "$pull_count")" = "2" ]
@@ -706,7 +706,7 @@ EOF
     unset -f git
 }
 
-@test "_git_pull_with_retry fails after two pull attempts" {
+@test "__git_pull_with_retry__ fails after two pull attempts" {
     local git_log="$TEST_TMPDIR/git.log"
     local pull_count="$TEST_TMPDIR/pull-count"
 
@@ -724,7 +724,7 @@ EOF
         command git "$@"
     }
 
-    bats_run _git_pull_with_retry "$git_log"
+    bats_run __git_pull_with_retry__ "$git_log"
     unset -f git
 
     [ "$status" -eq 1 ]

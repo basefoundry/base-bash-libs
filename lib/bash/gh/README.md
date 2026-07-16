@@ -43,8 +43,17 @@ import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
   502/503/504-style failures. `BASE_GH_API_MAX_ATTEMPTS` defaults to `2`.
   `BASE_GH_API_RETRY_DELAY_SECONDS` defaults to `2` when the error output does
   not include a `Retry-After` value.
+
+All GitHub helper failures return a nonzero status and preserve the underlying
+`gh` status where applicable. The remote parser and origin inference helpers
+leave caller-owned result variables unchanged on failure; use `--optional` with
+`gh_infer_repo_from_origin` when a missing or non-GitHub origin is expected.
 ## Boundary
 
 This library is intentionally generic. It does not know about Base branch
 names, issue categories, GitHub Project fields, repository baselines, generated
 pull request bodies, or any other Base workflow policy.
+
+## Tests
+
+BATS coverage lives in `lib/bash/gh/tests/lib_gh.bats`.

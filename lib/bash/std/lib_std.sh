@@ -592,13 +592,13 @@ set_log_level() {
 }
 
 #
-# _print_log - Core and private log printing logic.
+# __print_log__ - Core and private log printing logic.
 #
 # This is the internal engine for the logging functions. It formats the log
 # message with a timestamp, log level, and source location. It should not
 # be called directly; use the `log_*` helper functions instead.
 #
-_print_log() {
+__print_log__() {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
@@ -630,11 +630,11 @@ _print_log() {
 }
 
 #
-# _print_log_file - Core function for logging the contents of a file.
+# __print_log_file__ - Core function for logging the contents of a file.
 #
 # Internal helper to be called by `log_info_file`, etc.
 #
-_print_log_file()   {
+__print_log_file__()   {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
@@ -652,7 +652,7 @@ _print_log_file()   {
     log_level_set="${_loggers_level_map[$logger]}"
     if [[ $log_level_set ]]; then
         if ((log_level_set >= log_level)) && [[ -f $file ]]; then
-            _print_log "$in_level" -l "$logger" "Contents of file '$file':"
+            __print_log__ "$in_level" -l "$logger" "Contents of file '$file':"
             cat -- "$file" >&2
         fi
     else
@@ -666,29 +666,29 @@ _print_log_file()   {
 # Public logging functions.
 # These are the primary functions scripts should use for logging.
 #
-log_fatal()   { _print_log FATAL   "$@"; }
-log_error()   { _print_log ERROR   "$@"; }
-log_warn()    { _print_log WARN    "$@"; }
-log_info()    { _print_log INFO    "$@"; }
-log_debug()   { _print_log DEBUG   "$@"; }
-log_verbose() { _print_log VERBOSE "$@"; }
+log_fatal()   { __print_log__ FATAL   "$@"; }
+log_error()   { __print_log__ ERROR   "$@"; }
+log_warn()    { __print_log__ WARN    "$@"; }
+log_info()    { __print_log__ INFO    "$@"; }
+log_debug()   { __print_log__ DEBUG   "$@"; }
+log_verbose() { __print_log__ VERBOSE "$@"; }
 
 #
 # Public functions for logging the content of a file.
 #
-log_info_file()    { _print_log_file INFO    "$@"; }
-log_debug_file()   { _print_log_file DEBUG   "$@"; }
-log_verbose_file() { _print_log_file VERBOSE "$@"; }
+log_info_file()    { __print_log_file__ INFO    "$@"; }
+log_debug_file()   { __print_log_file__ DEBUG   "$@"; }
+log_verbose_file() { __print_log_file__ VERBOSE "$@"; }
 
 #
 # Public functions for logging function entry and exit points.
 #
-log_info_enter()    { _print_log INFO    "Entering function ${FUNCNAME[1]}"; }
-log_debug_enter()   { _print_log DEBUG   "Entering function ${FUNCNAME[1]}"; }
-log_verbose_enter() { _print_log VERBOSE "Entering function ${FUNCNAME[1]}"; }
-log_info_leave()    { _print_log INFO    "Leaving function ${FUNCNAME[1]}";  }
-log_debug_leave()   { _print_log DEBUG   "Leaving function ${FUNCNAME[1]}";  }
-log_verbose_leave() { _print_log VERBOSE "Leaving function ${FUNCNAME[1]}";  }
+log_info_enter()    { __print_log__ INFO    "Entering function ${FUNCNAME[1]}"; }
+log_debug_enter()   { __print_log__ DEBUG   "Entering function ${FUNCNAME[1]}"; }
+log_verbose_enter() { __print_log__ VERBOSE "Entering function ${FUNCNAME[1]}"; }
+log_info_leave()    { __print_log__ INFO    "Leaving function ${FUNCNAME[1]}";  }
+log_debug_leave()   { __print_log__ DEBUG   "Leaving function ${FUNCNAME[1]}";  }
+log_verbose_leave() { __print_log__ VERBOSE "Leaving function ${FUNCNAME[1]}";  }
 
 #
 # Simple print routines that do not prefix messages with timestamps or levels.

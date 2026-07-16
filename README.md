@@ -25,17 +25,18 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   File editing helpers built on the stdlib, including idempotent
   marker-delimited file section updates.
 - [`lib/bash/git/lib_git.sh`](lib/bash/git/README.md)
-  Git helper functions built on the stdlib for lightweight repository
-  inspection, update, and script freshness checks.
+  Git helper functions built on the stdlib for default-branch, worktree,
+  upstream, remote, repository update, and script freshness checks.
 - [`lib/bash/gh/lib_gh.sh`](lib/bash/gh/README.md)
   GitHub CLI helper functions built on the stdlib for command readiness,
-  authentication diagnostics, and checked `gh` execution.
+  authentication diagnostics, remote parsing, API retries, and checked `gh`
+  execution.
 - [`lib/bash/str/lib_str.sh`](lib/bash/str/README.md)
   String helpers built on the stdlib for case conversion, trimming,
   predicates, splitting, and joining.
 - [`lib/bash/arg/lib_arg.sh`](lib/bash/arg/README.md)
-  Argument parsing helpers built on the stdlib for exact flag and value
-  options without hidden parser globals.
+  Argument parsing helpers built on the stdlib for exact flag, scalar value,
+  and repeatable value options without hidden parser globals.
 - [`lib/bash/list/lib_list.sh`](lib/bash/list/README.md)
   Indexed-array helpers built on the stdlib for in-place mutation,
   membership checks, deduplication, and length results.
