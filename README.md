@@ -173,6 +173,10 @@ The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
 
+Release preparation and downstream Homebrew/Base handoffs are documented in
+[`docs/release-process.md`](docs/release-process.md). The machine-readable
+release contract lives in [`base_manifest.yaml`](base_manifest.yaml).
+
 ## License
 
 base-bash-libs is licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for

@@ -7,6 +7,10 @@ repository inherits Base's shell-library standards, including the convention
 that each sourceable shell library remains a single file at its library
 boundary.
 
+For release work, read [docs/release-process.md](docs/release-process.md). The
+repository release contract is declared in `base_manifest.yaml`; ordinary pull
+requests leave `VERSION` unchanged.
+
 ## Workflow
 
 1. Create or choose a GitHub issue before starting implementation work.
