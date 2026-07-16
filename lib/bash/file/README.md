@@ -45,6 +45,9 @@ fi
 - Returns success when the target file does not exist and there is nothing to remove.
 - Replaces or removes only the first matching marked section when markers already exist.
 - Treats markers as exact full lines; marker text embedded in longer lines is ignored.
+- Requires non-empty, distinct, single-line marker values.
+- Preserves a target symlink while atomically updating its referent.
+- Treats option-like target paths literally.
 - Appends the marked block when markers are not present.
 - `file_section_exists` returns `0` when a valid marker pair is present, `1`
   when the target file is missing or the section is absent, and `2` when marker
@@ -55,4 +58,4 @@ fi
 
 ## Tests
 
-BATS coverage lives in `tests/lib_file.bats`.
+BATS coverage lives in `lib/bash/file/tests/lib_file.bats`.

@@ -10,6 +10,57 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly __lib_file_sourced__=1
 
+__file_literal_path__() {
+    local result_name="$1" path="$2"
+
+    if [[ "$path" == -* ]]; then
+        path="./$path"
+    fi
+    printf -v "$result_name" '%s' "$path"
+}
+
+__file_resolve_target_path__() {
+    local result_name="$1" path="$2"
+    local link_target path_dir depth=0
+
+    __file_literal_path__ path "$path"
+    if [[ "$path" != /* ]]; then
+        path="$(pwd -P)/$path" || return 1
+    fi
+
+    while [[ -L "$path" ]]; do
+        ((depth += 1))
+        if ((depth > 40)); then
+            log_error "Too many symlink levels while resolving '$2'."
+            return 1
+        fi
+
+        link_target="$(readlink "$path")" || return 1
+        if [[ "$link_target" == /* ]]; then
+            path="$link_target"
+        else
+            path="$(dirname -- "$path")/$link_target"
+        fi
+        path_dir="$(cd -P -- "$(dirname -- "$path")" && pwd -P)" || return 1
+        path="$path_dir/$(basename -- "$path")"
+    done
+
+    printf -v "$result_name" '%s' "$path"
+}
+
+__file_validate_markers__() {
+    local beginning_marker="$1" end_marker="$2"
+
+    if [[ -z "$beginning_marker" || -z "$end_marker" ||
+        "$beginning_marker" == "$end_marker" ||
+        "$beginning_marker" == *$'\n'* || "$beginning_marker" == *$'\r'* ||
+        "$end_marker" == *$'\n'* || "$end_marker" == *$'\r'* ]]; then
+        log_error "Section markers must be non-empty, distinct, single-line values."
+        return 2
+    fi
+    return 0
+}
+
 __file_mode__() {
     local file_path="$1" mode
 
@@ -98,6 +149,8 @@ __file_section_marker_counts__() {
     local beginning_count_var="$4" end_count_var="$5"
     local section_beginning_marker_count section_end_marker_count
 
+    __file_validate_markers__ "$beginning_marker" "$end_marker" || return $?
+
     section_beginning_marker_count=$(grep -cxF -- "$beginning_marker" "$target_file" || true)
     section_end_marker_count=$(grep -cxF -- "$end_marker" "$target_file" || true)
 
@@ -133,6 +186,8 @@ file_section_exists() {
     local target_file="$1" beginning_marker="$2" end_marker="$3"
     local beginning_marker_count _end_marker_count
 
+    __file_literal_path__ target_file "$target_file"
+    __file_validate_markers__ "$beginning_marker" "$end_marker" || return $?
     [[ -f "$target_file" ]] || return 1
     __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
         beginning_marker_count _end_marker_count || return $?
@@ -159,6 +214,8 @@ file_section_needs_update() {
     local current_content_file="" new_content_file="" status=0
     shift 3
 
+    __file_literal_path__ target_file "$target_file"
+    __file_validate_markers__ "$beginning_marker" "$end_marker" || return $?
     [[ -f "$target_file" ]] || return 0
     __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
         beginning_marker_count _end_marker_count || return $?
@@ -284,10 +341,14 @@ update_file_section() {
         new_content_array=("$@") # Capture remaining arguments as new_lines
     fi
 
+    __file_literal_path__ target_file "$target_file"
+    __file_validate_markers__ "$beginning_marker" "$end_marker" || return 1
     if [[ ! -f "$target_file" ]]; then
         log_debug "Target file '$target_file' does not exist."
         return 0
     fi
+
+    __file_resolve_target_path__ target_file "$target_file" || return 1
 
     local __file_update_beginning_marker_count __file_update_end_marker_count
     if ! __file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
