@@ -105,6 +105,30 @@ EOF
     [ "$(cat "$target")" = $'line-one\n-n\nvalue\n-e' ]
 }
 
+@test "update_file_section preserves symlinks while updating their targets" {
+    local target="$TEST_TMPDIR/config.txt"
+    local link="$TEST_TMPDIR/config-link"
+    printf 'before\n# BEGIN\nold\n# END\nafter\n' > "$target"
+    ln -s "$(basename "$target")" "$link"
+
+    update_file_section "$link" "# BEGIN" "# END" "new"
+
+    [ -L "$link" ]
+    [ "$(readlink "$link")" = "$(basename "$target")" ]
+    [ "$(cat "$link")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
+}
+
+@test "update_file_section treats option-like target paths literally" {
+    local target="-config.txt"
+    pushd "$TEST_TMPDIR" >/dev/null
+    printf 'before' > "$target"
+
+    update_file_section "$target" "# BEGIN" "# END" "new"
+
+    [ "$(cat "./$target")" = $'before\n# BEGIN\nnew\n# END' ]
+    popd >/dev/null
+}
+
 @test "update_file_section replaces the first matching section" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -267,6 +291,21 @@ EOF
 
     capture_command file_section_exists "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END"
     [ "$status" -eq 1 ]
+}
+
+@test "file-section helpers reject invalid marker contracts" {
+    local target="$TEST_TMPDIR/config.txt"
+    printf 'plain\ncontent\n' > "$target"
+
+    capture_command file_section_exists "$target" "" "# END"
+    [ "$status" -eq 2 ]
+
+    capture_command file_section_needs_update "$target" "# BEGIN" "# BEGIN"
+    [ "$status" -eq 2 ]
+
+    capture_command update_file_section "$target" "# BEGIN" $'# END\nextra' "new"
+    [ "$status" -eq 1 ]
+    [ "$(cat "$target")" = $'plain\ncontent' ]
 }
 
 @test "file_section_exists rejects asymmetric markers" {

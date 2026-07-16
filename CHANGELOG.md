@@ -12,6 +12,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Hardened `arg_parse` option specifications against duplicate, empty, and
   unreachable tokens, and added repeatable value options with ordered,
   caller-owned indexed-array outputs.
+- Hardened file-section marker validation, preserved symlink targets during
+  atomic updates, and treated option-like target paths literally.
 
 - Made fallback timeouts terminate descendant processes when a command is
   launched in its own process group.
