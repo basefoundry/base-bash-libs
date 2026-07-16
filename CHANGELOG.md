@@ -18,7 +18,7 @@ and versions are tracked in the repo-root `VERSION` file.
   GitHub remotes, and separated submodule diagnostics from pull logs while
   unregistering eagerly removed Git temp files.
 - Added canonical `git_*` names for generic branch, worktree, default-branch,
-  and remote helpers, with temporary `gh_*` names retained for migration.
+  and remote helpers.
 
 - Made fallback timeouts terminate descendant processes when a command is
   launched in its own process group.
@@ -54,6 +54,11 @@ and versions are tracked in the repo-root `VERSION` file.
 - Kept the warning-level ShellCheck profile clean for file section marker-count
   validation.
 - Reused shared marker validation inside `update_file_section`.
+
+### Removed
+
+- Removed the temporary generic `gh_*` branch, worktree, upstream, merge,
+  default-branch, and remote helper names after Base migrated to `git_*`.
 
 ## [1.2.0] - 2026-07-04
 
