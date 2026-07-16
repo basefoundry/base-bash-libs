@@ -9,25 +9,25 @@ helpers are available.
 
 ## Public API
 
-- `str_lower`
+- `str_lower <result_var>`
   Convert a named variable's value to lowercase in place.
-- `str_upper`
+- `str_upper <result_var>`
   Convert a named variable's value to uppercase in place.
-- `str_trim`
+- `str_trim <result_var>`
   Remove leading and trailing whitespace from a named variable in place.
-- `str_ltrim`
+- `str_ltrim <result_var>`
   Remove leading whitespace from a named variable in place.
-- `str_rtrim`
+- `str_rtrim <result_var>`
   Remove trailing whitespace from a named variable in place.
-- `str_contains`
+- `str_contains <value> <substring>`
   Return success when a string contains a substring.
-- `str_starts_with`
+- `str_starts_with <value> <prefix>`
   Return success when a string starts with a prefix.
-- `str_ends_with`
+- `str_ends_with <value> <suffix>`
   Return success when a string ends with a suffix.
-- `str_split`
+- `str_split <result_array> <value> <separator>`
   Split a string by a delimiter into a caller-provided array variable.
-- `str_join`
+- `str_join <result_var> <separator> <source_array>`
   Join a caller-provided array variable into a caller-provided result variable.
 
 ## Usage

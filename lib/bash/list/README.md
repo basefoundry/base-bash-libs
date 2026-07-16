@@ -9,17 +9,17 @@ helpers are available.
 
 ## Public API
 
-- `list_append`
+- `list_append <array> [value...]`
   Append one or more values to a named indexed array.
-- `list_prepend`
+- `list_prepend <array> [value...]`
   Prepend one or more values to a named indexed array.
-- `list_remove`
+- `list_remove <value> <array>`
   Remove all exact matches from a named indexed array.
-- `list_contains`
+- `list_contains <value> <array>`
   Predicate that checks whether a named indexed array contains a value.
-- `list_unique`
+- `list_unique <result_array> <source_array>`
   Store first-seen unique values in a named result array.
-- `list_length`
+- `list_length <result_var> <source_array>`
   Store an array length in a named result variable.
 
 ## Usage
@@ -46,4 +46,4 @@ caller state.
 
 ## Tests
 
-BATS coverage lives in `tests/lib_list.bats`.
+BATS coverage lives in `lib/bash/list/tests/lib_list.bats`.

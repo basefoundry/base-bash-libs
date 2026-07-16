@@ -8,14 +8,18 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and error helper
 
 ## Public API
 
-- `file_section_exists`
+- `file_section_exists <target> <start_marker> <end_marker>`
   Inspect whether a valid marker-delimited block is present without changing
-  the file.
-- `file_section_needs_update`
+  the file; returns `0` for present, `1` for absent, and `2` for invalid
+  marker order or counts.
+- `file_section_needs_update <target> <start_marker> <end_marker> [content...]`
   Inspect whether adding or replacing a marker-delimited block would change the
-  file.
-- `update_file_section`
+  file; returns `0` when an update is needed, `1` when unchanged, and `2` for
+  invalid marker order or counts.
+- `update_file_section <target> <start_marker> <end_marker> [-r|content...]`
   Idempotently add, replace, or remove a marker-delimited block inside a file.
+  It mutates the target or symlink referent and returns nonzero on validation or
+  filesystem failure.
 
 ## Usage
 

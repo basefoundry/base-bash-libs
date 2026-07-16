@@ -587,18 +587,18 @@ EOF
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE' for logger 'custom'"* ]]
 }
 
-@test "_print_log requires a log level" {
-    ! _print_log
+@test "__print_log__ requires a log level" {
+    ! __print_log__
 }
 
-@test "_print_log formats timestamps without command substitution" {
+@test "__print_log__ formats timestamps without command substitution" {
     bats_run grep -nE 'timestamp="\$\((TZ=UTC0 )?printf' "$STDLIB_PATH"
 
     [ "$status" -eq 1 ]
     [ "$output" = "" ]
 }
 
-@test "_print_log emits structured records through one final printf" {
+@test "__print_log__ emits structured records through one final printf" {
     bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$color" "$log_line" "$COLOR_OFF"' "$STDLIB_PATH"
 
     [ "$status" -eq 0 ]
@@ -629,7 +629,7 @@ EOF
     [[ "$(cat "$stderr_file")" == *"VERBOSE"* ]]
 }
 
-@test "_print_log uses local timestamps by default" {
+@test "__print_log__ uses local timestamps by default" {
     local stderr_file="$TEST_TMPDIR/log-local-time.err"
     local expected_before expected_after output
 
@@ -642,7 +642,7 @@ EOF
     [[ "$output" == *"local timestamp"* ]]
 }
 
-@test "_print_log honors LOG_UTC for Bash timestamps" {
+@test "__print_log__ honors LOG_UTC for Bash timestamps" {
     local stderr_file="$TEST_TMPDIR/log-utc-time.err"
     local expected_before expected_after output local_before local_after
 
@@ -658,7 +658,7 @@ EOF
     [[ "$output" == *"utc timestamp"* ]]
 }
 
-@test "_print_log bounds stdlib caller stack walking" {
+@test "__print_log__ bounds stdlib caller stack walking" {
     local script="$TEST_TMPDIR/log-bounded-caller.sh"
     local caller_log="$TEST_TMPDIR/caller-count.log"
 
@@ -675,7 +675,7 @@ caller() {
     fi
     printf '%s stdlib_frame %s\n' "\$1" "\$__LIB_STD_PATH__"
 }
-_print_log INFO "bounded stack walk" >/dev/null
+__print_log__ INFO "bounded stack walk" >/dev/null
 printf 'caller_count=%s\n' "\$(( \$(wc -l < "\$caller_log") ))"
 EOF
 
@@ -699,7 +699,7 @@ EOF
     [[ "$(cat "$stderr_file")" == *"Contents of file '$target':"* ]]
     [[ "$(cat "$stderr_file")" == *"hello file"* ]]
 
-    _print_log_file INFO -l missing "$target" 2>"$stderr_file"
+    __print_log_file__ INFO -l missing "$target" 2>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"Unknown logger 'missing'"* ]]
     [[ "$(cat "$stderr_file")" != *"lib_std.sh:"* ]]
     [[ "$(cat "$stderr_file")" != *":0 "* ]]

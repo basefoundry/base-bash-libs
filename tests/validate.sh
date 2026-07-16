@@ -93,6 +93,28 @@ for file in "${required_files[@]}"; do
   }
 done
 
+readme_test_paths=(
+  "lib/bash/std/README.md|lib/bash/std/tests/lib_std.bats"
+  "lib/bash/file/README.md|lib/bash/file/tests/lib_file.bats"
+  "lib/bash/git/README.md|lib/bash/git/tests/lib_git.bats"
+  "lib/bash/gh/README.md|lib/bash/gh/tests/lib_gh.bats"
+  "lib/bash/str/README.md|lib/bash/str/tests/lib_str.bats"
+  "lib/bash/arg/README.md|lib/bash/arg/tests/lib_arg.bats"
+  "lib/bash/list/README.md|lib/bash/list/tests/lib_list.bats"
+)
+
+for mapping in "${readme_test_paths[@]}"; do
+  IFS='|' read -r readme test_path <<<"$mapping"
+  [[ -f "$test_path" ]] || {
+    printf 'Documented BATS path does not exist: %s\n' "$test_path" >&2
+    exit 1
+  }
+  grep -F "$test_path" "$readme" >/dev/null || {
+    printf 'README does not document its BATS path: %s -> %s\n' "$readme" "$test_path" >&2
+    exit 1
+  }
+done
+
 printf 'Repository baseline is present.\n'
 
 run_stage "strict-mode guard" check_no_strict_mode || exit $?

@@ -41,6 +41,108 @@ The library improves Bash-based scripting in a few practical ways:
 The goal is not to hide Bash. The goal is to make scripts fail in ways a user
 or developer can understand.
 
+## Public API Reference
+
+The functions below are the supported `lib_std.sh` API. Functions beginning
+with `__` are internal implementation details and are intentionally omitted.
+Functions that return a value through a variable name mutate that caller-owned
+variable only after validating it. Unless noted otherwise, predicates return
+zero for success and nonzero for a false or invalid condition.
+
+### Runtime and Imports
+
+- `base_bash_libs_require_version <version>`: exits with a diagnostic when the
+  loaded package version is older than the requested dotted numeric version.
+- `check_bash_version`: returns zero for Bash 4.2 or newer and reports the
+  required version otherwise.
+- `is_interactive`: returns zero when stdin and stderr are interactive TTYs.
+- `import <path>`: sources a relative path from `__SCRIPT_DIR__` or an
+  absolute path; exits when the library cannot be sourced.
+- `get_my_source_dir <result_var>`: stores the caller script directory in a
+  validated variable without printing it.
+
+### Logging and Messages
+
+- `set_log_level [-l <logger>] <level>`: changes a logger threshold and returns
+  nonzero for an unknown level or logger option error.
+- `log_fatal`, `log_error`, `log_warn`, `log_info`, `log_debug`,
+  `log_verbose <message...>`: write a structured message to stderr at the
+  named level.
+- `log_info_file`, `log_debug_file`, `log_verbose_file [-l <logger>] <file>`:
+  log a file's contents at the requested level when that level is enabled.
+- `log_info_enter`, `log_debug_enter`, `log_verbose_enter` and
+  `log_info_leave`, `log_debug_leave`, `log_verbose_leave`: log the current
+  function boundary without arguments.
+- `print_error`, `print_warn`, `print_info`, `print_success <message...>`:
+  write an unstructured user-facing message to stderr.
+- `print_bold`, `print_message <message...>`: write an unstructured message to
+  stdout; `print_bold` applies terminal formatting when enabled.
+- `print_tty <message...>`: writes only when stdout is attached to a TTY.
+- `dump_trace`: writes the current Bash call stack to stderr.
+
+### Command and Error Control
+
+- `std_run [policy options] <command> [args...]`: runs an argument-preserving
+  command, returning or exiting with its status according to the selected
+  policy. See [Running Commands Safely](#running-commands-safely).
+- `exit_if_error <status> [message...]`: returns for zero and exits with the
+  supplied status after logging a message for nonzero status.
+- `fatal_error <message...>`: logs a fatal error, prints a trace, and exits.
+- `is_dry_run`: returns zero when `DRY_RUN` or `dry_run` is truthy.
+
+### PATH and Filesystem Helpers
+
+- `add_to_path [-p] [-n] <directory...>`: prepends or appends existing PATH
+  entries, optionally allowing missing directories; returns nonzero on invalid
+  options or update failure.
+- `dedupe_path`: removes duplicate and empty PATH entries in place.
+- `print_path`: prints one PATH entry per line.
+- `safe_mkdir [-p] <directory...>`, `safe_touch <file...>`,
+  `safe_truncate <file...>`, and `safe_cd <directory>`: perform the named
+  filesystem operation with explicit diagnostics and failure statuses.
+- `safe_unalias <name...>`: removes aliases when present and ignores names that
+  are not aliases.
+
+### Cleanup and Temporary State
+
+- `std_register_cleanup_hook <function>`,
+  `std_unregister_cleanup_hook <function>`: add or remove a named cleanup
+  function from the shared exit dispatcher.
+- `std_register_cleanup_path <absolute_path...>`,
+  `std_unregister_cleanup_path <absolute_path...>`: add or remove safe paths
+  from exit cleanup; invalid paths are rejected.
+- `std_make_temp_file [--keep] [result_var] [prefix]` and
+  `std_make_temp_dir [--keep] [result_var] [prefix]`: create a temporary path,
+  store it in the caller variable, and register it for cleanup unless
+  `--keep` is used.
+
+### Introspection and Assertions
+
+- `std_command_path <result_var> <command>`: stores the resolved executable
+  path or returns nonzero when the command is unavailable.
+- `std_function_exists <name>`: returns zero when a Bash function exists.
+- `assert_function_exists <name...>`: returns nonzero and logs missing
+  functions.
+- `assert_variable_name <name...>`: validates Bash variable names.
+- `assert_indexed_array <name...>` and `assert_associative_array <name...>`:
+  validate caller-owned array declarations.
+- `assert_not_null <variable...>`: validates that named variables are set and
+  non-empty without treating values as variable names accidentally.
+- `assert_integer <value...>` and `assert_integer_range <value> <min> <max>`:
+  validate decimal integers and inclusive bounds.
+- `assert_arg_count <actual> <expected> [max]`: validates exact or ranged
+  positional argument counts.
+- `assert_command_exists <command...>`, `assert_file_exists <path...>`,
+  `assert_executable <path...>`, and `assert_dir_exists <path...>`: validate
+  required commands or filesystem objects.
+
+### Interactive Helpers
+
+- `ask_yes_no <prompt>`: prompts on a TTY and returns the user's yes/no
+  decision.
+- `wait_for_enter [prompt]`: waits for Enter on a TTY and returns nonzero when
+  no usable terminal is available.
+
 ## Loading The Library
 
 Standalone scripts can source the library directly:

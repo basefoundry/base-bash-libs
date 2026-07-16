@@ -9,8 +9,11 @@ helpers are available.
 
 ## Public API
 
-- `arg_parse`
+- `arg_parse <options_array> <positionals_array> <specs_array> -- [args...]`
   Parse exact flag, value, and repeatable options into caller-owned arrays.
+  Returns `0` on success and `2` for malformed specs, unknown options, or
+  missing values; caller-owned outputs are published only after a successful
+  parse.
 
 ## Usage
 
