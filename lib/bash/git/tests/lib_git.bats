@@ -488,6 +488,46 @@ setup() {
     [ ! -e "$git_log" ]
 }
 
+@test "_git_update_repo_finish unregisters removed temp logs" {
+    local git_log="$TEST_TMPDIR/git.log"
+    local unregister_file="$TEST_TMPDIR/unregistered-paths.txt"
+
+    printf 'pull output\n' > "$git_log"
+    eval "$(declare -f std_unregister_cleanup_path | sed '1s/std_unregister_cleanup_path/__orig_std_unregister_cleanup_path/')"
+    std_unregister_cleanup_path() {
+        printf '%s\n' "$@" >> "$unregister_file"
+        __orig_std_unregister_cleanup_path "$@"
+    }
+
+    _git_update_repo_finish "$git_log" false 0
+    unset -f std_unregister_cleanup_path __orig_std_unregister_cleanup_path
+
+    [ "$(cat "$unregister_file")" = "$git_log" ]
+    [ ! -e "$git_log" ]
+}
+
+@test "git_update_repo reports captured submodule diagnostics" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "data.txt" "base"
+    git() {
+        if [[ "${1:-}" == "submodule" ]]; then
+            printf 'submodule exploded\n' >&2
+            return 1
+        fi
+        command git "$@"
+    }
+
+    capture_command git_update_repo "$repo"
+    unset -f git
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"git submodule update failed on repo '$repo'"* ]]
+    [[ "$output" == *"submodule exploded"* ]]
+    ! compgen -G "$TEST_TMPDIR/git-submodule-log.*" >/dev/null
+}
+
 @test "_git_pull_with_retry retries once after a transient pull failure" {
     local git_log="$TEST_TMPDIR/git.log"
     local pull_count="$TEST_TMPDIR/pull-count"
