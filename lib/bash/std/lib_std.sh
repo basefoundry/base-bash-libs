@@ -274,28 +274,37 @@ __stdlib_init__() {
     #   - LOG_DEBUG=1 sets the log level to DEBUG (Bash logging has VERBOSE but Python has only DEBUG)
     #   - LOG_UTC=1   forces timestamps to use UTC
     #
-    local arg
+    local arg parse_options=1
     __color__=0
     for arg in "${__SCRIPT_ARGS__[@]}"; do
-        case "$arg" in
-            --debug-wrapper)
-                set_log_level DEBUG
-                export LOG_DEBUG=1
-                ;;
-            --verbose-wrapper)
-                set_log_level VERBOSE
-                export LOG_DEBUG=1
-                ;;
-            --utc-wrapper)
-                export LOG_UTC=1
-                ;;
-            --color)
-                __color__=1
-                ;;
-            *)
-                __new_args__+=("$arg")
-                ;;
-        esac
+        if ((parse_options)) && [[ "$arg" == "--" ]]; then
+            __new_args__+=("$arg")
+            parse_options=0
+            continue
+        fi
+        if ((parse_options)); then
+            case "$arg" in
+                --debug-wrapper)
+                    set_log_level DEBUG
+                    export LOG_DEBUG=1
+                    ;;
+                --verbose-wrapper)
+                    set_log_level VERBOSE
+                    export LOG_DEBUG=1
+                    ;;
+                --utc-wrapper)
+                    export LOG_UTC=1
+                    ;;
+                --color)
+                    __color__=1
+                    ;;
+                *)
+                    __new_args__+=("$arg")
+                    ;;
+            esac
+        else
+            __new_args__+=("$arg")
+        fi
     done
     __init_colors__
     log_debug "Command line: $0 ${__SCRIPT_ARGS__[*]}"
@@ -354,9 +363,9 @@ import() {
 #   -n : Do not check if the directory exists before adding it.
 #
 add_to_path() {
-    local dir prepend=0 opt strict=1
-    local -a path_dirs
-    OPTIND=1
+    local dir path_dir prepend=0 opt strict=1 index in_path
+    local -a path_dirs directories=()
+    local OPTIND=1
     while getopts np opt; do
         case "$opt" in
             n)  strict=0  ;;  # don't care if directory exists or not before adding it to PATH
@@ -369,21 +378,39 @@ add_to_path() {
 
     shift $((OPTIND-1))
 
-    for dir; do
-        local in_path=0
-        ((strict)) && [[ ! -d $dir ]] && continue
-        IFS=: read -ra path_dirs <<< "$PATH"
-        for path_dir in "${path_dirs[@]}"; do
-            if [[ "$path_dir" == "$dir" ]]; then
-                in_path=1
-                break
+    directories=("$@")
+    if ((prepend)); then
+        for ((index = ${#directories[@]} - 1; index >= 0; index--)); do
+            dir="${directories[index]}"
+            ((strict)) && [[ ! -d $dir ]] && continue
+            in_path=0
+            IFS=: read -ra path_dirs <<< "$PATH"
+            for path_dir in "${path_dirs[@]}"; do
+                if [[ "$path_dir" == "$dir" ]]; then
+                    in_path=1
+                    break
+                fi
+            done
+            if ((! in_path)); then
+                PATH="$dir:$PATH"
             fi
         done
-
-        if ((! in_path)); then
-            ((prepend)) && PATH="$dir:$PATH" || PATH="$PATH:$dir"
-        fi
-    done
+    else
+        for dir in "${directories[@]}"; do
+            in_path=0
+            ((strict)) && [[ ! -d $dir ]] && continue
+            IFS=: read -ra path_dirs <<< "$PATH"
+            for path_dir in "${path_dirs[@]}"; do
+                if [[ "$path_dir" == "$dir" ]]; then
+                    in_path=1
+                    break
+                fi
+            done
+            if ((! in_path)); then
+                PATH="$PATH:$dir"
+            fi
+        done
+    fi
 
     # It's good practice to de-duplicate the path after adding to it
     dedupe_path
@@ -720,7 +747,7 @@ dump_trace() {
 exit_if_error() {
     (($#)) || return
     local num_re='^[0-9]+$'
-    local rc=$1; shift
+    local rc=$1 normalized_rc; shift
     local message
     if (($#)); then
         message="$(__join_message__ "$@")"
@@ -730,6 +757,11 @@ exit_if_error() {
     if ! [[ $rc =~ $num_re ]]; then
         log_error "'$rc' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
         rc=1
+    elif ! __std_decimal_integer_value__ normalized_rc "$rc"; then
+        log_error "'$rc' is not a valid decimal exit code. Treating it as 1."
+        rc=1
+    else
+        rc="$normalized_rc"
     fi
     ((rc)) && {
         log_fatal "$message"
@@ -775,12 +807,44 @@ is_dry_run() {
     return 1
 }
 
+__std_decimal_integer_value__() {
+    local result_name="${1-}" value="${2-}" sign="" digits
+
+    [[ "$value" =~ ^[-+]?[0-9]+$ ]] || return 1
+    case "$value" in
+        -*)
+            sign="-"
+            digits="${value#-}"
+            ;;
+        +*)
+            digits="${value#+}"
+            ;;
+        *)
+            digits="$value"
+            ;;
+    esac
+
+    while [[ "${#digits}" -gt 1 && "${digits:0:1}" == "0" ]]; do
+        digits="${digits:1}"
+    done
+
+    if [[ "$sign" == "-" && "$digits" != "0" ]]; then
+        printf -v "$result_name" '%s' "-$((10#$digits))"
+    else
+        printf -v "$result_name" '%s' "$((10#$digits))"
+    fi
+}
+
 __std_is_positive_integer__() {
-    [[ "${1-}" =~ ^[1-9][0-9]*$ ]]
+    local normalized
+    __std_decimal_integer_value__ normalized "${1-}" || return 1
+    ((normalized > 0))
 }
 
 __std_is_non_negative_integer__() {
-    [[ "${1-}" =~ ^[0-9]+$ ]]
+    local normalized
+    __std_decimal_integer_value__ normalized "${1-}" || return 1
+    ((normalized >= 0))
 }
 
 __std_join_run_policy__() {
@@ -907,7 +971,7 @@ __std_run_impl__() {
                     log_error "$helper_name: timeout seconds must be a positive integer."
                     return 1
                 fi
-                timeout_seconds="$1"
+                __std_decimal_integer_value__ timeout_seconds "$1"
                 shift
                 ;;
             --max-attempts | --retry-attempts)
@@ -916,7 +980,7 @@ __std_run_impl__() {
                     log_error "$helper_name: max attempts must be a positive integer."
                     return 1
                 fi
-                max_attempts="$1"
+                __std_decimal_integer_value__ max_attempts "$1"
                 shift
                 ;;
             --retry-delay)
@@ -925,7 +989,7 @@ __std_run_impl__() {
                     log_error "$helper_name: retry delay seconds must be a non-negative integer."
                     return 1
                 fi
-                retry_delay="$1"
+                __std_decimal_integer_value__ retry_delay "$1"
                 shift
                 ;;
             --)
@@ -1032,23 +1096,52 @@ __std_sleep_interval__() {
     fi
 }
 
+__std_signal_process_tree__() {
+    local signal="$1" root_pid="$2" process_group="$3"
+    local pgrep_path ps_path child_pid child_pids=""
+
+    if ((process_group)); then
+        kill "-$signal" -- "-$root_pid" 2>/dev/null || true
+        return 0
+    fi
+
+    if std_command_path pgrep_path pgrep; then
+        child_pids="$($pgrep_path -P "$root_pid" 2>/dev/null || true)"
+    fi
+    if [[ -z "$child_pids" ]] && std_command_path ps_path ps; then
+        child_pids="$($ps_path -eo pid=,ppid= 2>/dev/null | awk -v parent="$root_pid" '$2 == parent {print $1}' || true)"
+    fi
+    while IFS= read -r child_pid; do
+        [[ -n "$child_pid" ]] || continue
+        __std_signal_process_tree__ "$signal" "$child_pid" 0
+    done <<< "$child_pids"
+
+    kill "-$signal" "$root_pid" 2>/dev/null || true
+}
+
 __std_run_with_timeout_fallback__() {
     local timeout_seconds="$1"
     shift
     local timeout_marker command_pid timer_pid command_status
+    local command_path setsid_path process_group=0
     local kill_grace_seconds=1
 
     std_make_temp_file timeout_marker base-bash-libs-timeout || return 1
 
-    "$@" &
+    if std_command_path command_path "${1-}" && [[ -n "$command_path" ]] && std_command_path setsid_path setsid; then
+        "$setsid_path" "$@" &
+        process_group=1
+    else
+        "$@" &
+    fi
     command_pid=$!
 
     (
         __std_sleep_interval__ "$timeout_seconds"
         printf '1' > "$timeout_marker"
-        kill -TERM "$command_pid" 2>/dev/null || true
+        __std_signal_process_tree__ TERM "$command_pid" "$process_group"
         __std_sleep_interval__ "$kill_grace_seconds"
-        kill -0 "$command_pid" 2>/dev/null && kill -KILL "$command_pid" 2>/dev/null || true
+        __std_signal_process_tree__ KILL "$command_pid" "$process_group"
     ) &
     timer_pid=$!
 
@@ -1079,8 +1172,8 @@ __std_run_with_timeout_fallback__() {
 #
 safe_mkdir() {
     local dir opt failed_dirs=() mkdir_args=()
+    local OPTIND=1
 
-    OPTIND=1
     while getopts ":p" opt; do
         case "$opt" in
             p) mkdir_args=(-p) ;;
@@ -1123,7 +1216,7 @@ safe_mkdir() {
 #
 safe_touch() {
     local failed_files=()
-    local file
+    local file touch_path
 
     if (($# == 0)); then
         log_warn "safe_touch: No files provided to touch."
@@ -1131,7 +1224,9 @@ safe_touch() {
     fi
 
     for file; do
-        if ! touch "$file" 2>/dev/null; then
+        touch_path="$file"
+        [[ "$touch_path" == -* ]] && touch_path="./$touch_path"
+        if ! touch "$touch_path" 2>/dev/null; then
             failed_files+=("$file")
         fi
     done
@@ -1206,8 +1301,10 @@ __std_run_cleanup_hooks__() {
     local exit_status=$? hook cleanup_path
 
     if [[ -n "${__std_original_exit_trap:-}" ]]; then
-        __std_return_status__ "$exit_status"
-        eval "$__std_original_exit_trap"
+        (
+            __std_return_status__ "$exit_status"
+            eval "$__std_original_exit_trap"
+        ) || true
     fi
 
     for hook in "${__std_cleanup_hooks[@]}"; do
@@ -1437,6 +1534,7 @@ __std_make_temp_path__() {
         log_error "$__std_temp_helper_name: result variable name must be a valid Bash variable name."
         return 1
     fi
+    __std_assert_writable_output__ "$__std_temp_helper_name" "$__std_temp_result_name" || return 1
     if [[ -z "$__std_temp_prefix" || "$__std_temp_prefix" == */* ]]; then
         log_error "$__std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
         return 1
@@ -1502,6 +1600,20 @@ std_make_temp_dir() {
 __is_valid_variable_name__() {
     local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
     [[ "$var_name" =~ $var_name_re ]]
+}
+
+__std_assert_writable_output__() {
+    local function_name="${1-}" output_name="${2-}" declaration attributes
+
+    declaration="$(declare -p "$output_name" 2>/dev/null || true)"
+    [[ -n "$declaration" ]] || return 0
+    attributes="${declaration#declare -}"
+    attributes="${attributes%% *}"
+    if [[ "$attributes" == *r* ]]; then
+        log_error "$function_name: result variable '$output_name' is readonly."
+        return 1
+    fi
+    return 0
 }
 
 #
@@ -1613,6 +1725,7 @@ std_command_path() {
         log_error "std_command_path: result variable name must be a valid Bash variable name."
         return 1
     fi
+    __std_assert_writable_output__ std_command_path "$__std_command_result_name" || return 1
 
     if [[ -n "$__std_command_name" ]]; then
         __std_command_resolved_path="$(type -P "$__std_command_name" 2>/dev/null || true)"
@@ -1740,9 +1853,13 @@ assert_integer_range() {
     if ! [[ "$max" =~ ^[-+]?[0-9]+$ ]]; then
         fatal_error "assert_integer_range maximum bound '$max' is not a valid integer."
     fi
-    local value="${!var_name-}"
+    local value="${!var_name-}" value_number min_number max_number
     assert_integer "$var_name"
-    ((value < min || value > max)) && fatal_error "Variable '$var_name' ($value) is out of range [$min, $max]."
+    __std_decimal_integer_value__ value_number "$value"
+    __std_decimal_integer_value__ min_number "$min"
+    __std_decimal_integer_value__ max_number "$max"
+    ((min_number > max_number)) && fatal_error "assert_integer_range minimum '$min' cannot exceed maximum '$max'."
+    ((value_number < min_number || value_number > max_number)) && fatal_error "Variable '$var_name' ($value) is out of range [$min, $max]."
     return 0
 }
 
@@ -1768,6 +1885,7 @@ assert_arg_count() {
 
     # Create temporary named variables for assert_integer to check
     local __assert_arg_count_val="$arg_count" __assert_count1_val="$count1"
+    local arg_count_number count1_number count2_number
     assert_integer __assert_arg_count_val __assert_count1_val
 
     if [[ -n "$count2" ]]; then
@@ -1775,14 +1893,21 @@ assert_arg_count() {
         assert_integer __assert_count2_val
     fi
 
+    __std_decimal_integer_value__ arg_count_number "$arg_count"
+    __std_decimal_integer_value__ count1_number "$count1"
+    if [[ -n "$count2" ]]; then
+        __std_decimal_integer_value__ count2_number "$count2"
+        ((count1_number > count2_number)) && fatal_error "assert_arg_count minimum '$count1' cannot exceed maximum '$count2'."
+    fi
+
     if [[ -z "$count2" ]]; then
         # Exact match case
-        if ((arg_count != count1)); then
+        if ((arg_count_number != count1_number)); then
             fatal_error "Argument count mismatch: expected $count1 but got $arg_count arguments"
         fi
     else
         # Range match case
-        if ((arg_count < count1 || arg_count > count2)); then
+        if ((arg_count_number < count1_number || arg_count_number > count2_number)); then
             fatal_error "Argument count mismatch: expected between $count1 and $count2 arguments, but got $arg_count"
         fi
     fi
@@ -1968,6 +2093,7 @@ get_my_source_dir() {
     if ! __is_valid_variable_name__ "$__std_source_result_name"; then
         fatal_error "get_my_source_dir: result variable name must be a valid Bash variable name."
     fi
+    __std_assert_writable_output__ get_my_source_dir "$__std_source_result_name" || return 1
     local __std_source_dir
     # Reference: https://stackoverflow.com/a/246128/6862601
     __std_source_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" >/dev/null 2>&1 && pwd -P)" ||

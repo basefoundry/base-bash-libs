@@ -9,6 +9,17 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Made fallback timeouts terminate descendant processes when a command is
+  launched in its own process group.
+- Isolated pre-existing EXIT trap control flow so return or exit cannot skip
+  registered cleanup hooks and paths.
+- Normalized decimal integer inputs before arithmetic validation and rejected
+  inverted argument or range bounds.
+- Stopped wrapper-option filtering at the -- argument terminator and kept
+  launcher runtime-filter state local to each script invocation.
+- Preserved caller OPTIND, maintained batch prepend order in add_to_path, and
+  treated option-like paths literally in safe_touch.
+
 - Hardened named-output helpers across std, string, arg, git, and GitHub
   libraries against caller variable names that collide with helper internals.
 - Aligned standards and stdlib documentation with the current sourceable

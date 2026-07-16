@@ -134,16 +134,19 @@ base_bash_source_stdlib() {
 }
 
 base_bash_filter_runtime_args() {
+    local parse_options=1
+
     base_bash_runtime_args=()
 
     while (($#)); do
-        case "$1" in
-            --debug-wrapper|--verbose-wrapper|--utc-wrapper|--color)
-                ;;
-            *)
-                base_bash_runtime_args+=("$1")
-                ;;
-        esac
+        if ((parse_options)) && [[ "$1" == "--" ]]; then
+            base_bash_runtime_args+=("$1")
+            parse_options=0
+        elif ((parse_options)) && [[ "$1" == --debug-wrapper || "$1" == --verbose-wrapper || "$1" == --utc-wrapper || "$1" == --color ]]; then
+            :
+        else
+            base_bash_runtime_args+=("$1")
+        fi
         shift
     done
 }
@@ -172,6 +175,7 @@ base_bash_run_script() {
     local script_path="$1"
     local package_root="$2"
     local -a runtime_args=()
+    local -a base_bash_runtime_args=()
     shift 2
 
     [[ -f "$script_path" ]] || base_bash_die "Script '$script_path' was not found."
