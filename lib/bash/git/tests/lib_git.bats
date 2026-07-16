@@ -41,6 +41,25 @@ setup() {
     [ "$branch" = "main" ]
 }
 
+@test "git_get_current_branch rejects readonly result variables" {
+    local repo="$TEST_TMPDIR/repo"
+    local branch="sentinel"
+    local stderr_file="$TEST_TMPDIR/git-readonly-output.err"
+    local rc
+
+    init_git_repo "$repo"
+    readonly branch
+    if git_get_current_branch "$repo" branch 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$branch" = "sentinel" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'branch' is readonly"* ]]
+}
+
 @test "git_get_current_branch supports shadowing-prone output variable names" {
     local repo="$TEST_TMPDIR/repo"
     local result_var_name=""

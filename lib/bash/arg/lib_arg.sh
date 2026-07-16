@@ -89,6 +89,8 @@ arg_parse() {
 
     assert_associative_array "$__arg_options_name"
     assert_indexed_array "$__arg_positionals_name" "$__arg_specs_name"
+    __std_assert_writable_output__ arg_parse "$__arg_options_name" || return 1
+    __std_assert_writable_output__ arg_parse "$__arg_positionals_name" || return 1
 
     __arg_parse_specs__ "$__arg_specs_name" __arg_token_kind __arg_token_name || return $?
 

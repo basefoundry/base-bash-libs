@@ -20,8 +20,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Preserved caller OPTIND, maintained batch prepend order in add_to_path, and
   treated option-like paths literally in safe_touch.
 
-- Hardened named-output helpers across std, string, arg, git, and GitHub
+- Hardened named-output helpers across std, string, list, arg, git, and GitHub
   libraries against caller variable names that collide with helper internals.
+- Rejected readonly caller-owned output variables before helper side effects.
 - Aligned standards and stdlib documentation with the current sourceable
   library surface and standalone checkout path.
 - Added public associative-array assertions and moved `arg_parse` caller-owned

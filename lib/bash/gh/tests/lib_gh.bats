@@ -52,6 +52,23 @@ EOF
     [ "$output" = "" ]
 }
 
+@test "GitHub pass-by-name helpers reject readonly result variables" {
+    local repo="sentinel"
+    local stderr_file="$TEST_TMPDIR/gh-readonly-output.err"
+    local rc
+
+    readonly repo
+    if gh_repo_from_remote_url "https://github.com/owner/project.git" repo 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$repo" = "sentinel" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'repo' is readonly"* ]]
+}
+
 @test "gh_require_cli reports missing gh with caller hint" {
     mkdir -p "$TEST_TMPDIR/no-gh-bin"
 

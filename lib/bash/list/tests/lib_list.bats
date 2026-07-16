@@ -101,6 +101,23 @@ create_script() {
     [ "$count" = "3" ]
 }
 
+@test "list mutators reject readonly output variables" {
+    local -a values=("alpha")
+    local stderr_file="$TEST_TMPDIR/list-readonly.err"
+    local rc
+
+    readonly values
+    if list_append values beta 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "${values[*]}" = "alpha" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'values' is readonly"* ]]
+}
+
 @test "list helpers reject invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/list-invalid-vars.sh"
 

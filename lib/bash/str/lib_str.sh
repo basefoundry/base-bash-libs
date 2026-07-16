@@ -15,6 +15,7 @@ str_lower() {
 
     assert_arg_count "$#" 1
     assert_variable_name "$__str_var_name"
+    __std_assert_writable_output__ str_lower "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
     printf -v "$__str_var_name" '%s' "${__str_value,,}"
 }
@@ -24,6 +25,7 @@ str_upper() {
 
     assert_arg_count "$#" 1
     assert_variable_name "$__str_var_name"
+    __std_assert_writable_output__ str_upper "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
     printf -v "$__str_var_name" '%s' "${__str_value^^}"
 }
@@ -33,6 +35,7 @@ str_ltrim() {
 
     assert_arg_count "$#" 1
     assert_variable_name "$__str_var_name"
+    __std_assert_writable_output__ str_ltrim "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
     __str_value="${__str_value#"${__str_value%%[![:space:]]*}"}"
     printf -v "$__str_var_name" '%s' "$__str_value"
@@ -43,6 +46,7 @@ str_rtrim() {
 
     assert_arg_count "$#" 1
     assert_variable_name "$__str_var_name"
+    __std_assert_writable_output__ str_rtrim "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
     __str_value="${__str_value%"${__str_value##*[![:space:]]}"}"
     printf -v "$__str_var_name" '%s' "$__str_value"
@@ -50,8 +54,8 @@ str_rtrim() {
 
 str_trim() {
     assert_arg_count "$#" 1
-    str_ltrim "$1"
-    str_rtrim "$1"
+    str_ltrim "$1" || return $?
+    str_rtrim "$1" || return $?
 }
 
 str_contains() {
@@ -82,6 +86,7 @@ str_split() {
 
     assert_arg_count "$#" 3
     assert_variable_name "$__str_split_result_name"
+    __std_assert_writable_output__ str_split "$__str_split_result_name" || return 1
     assert_indexed_array "$__str_split_result_name"
 
     local -a __str_split_fields=()
@@ -105,6 +110,7 @@ str_join() {
 
     assert_arg_count "$#" 3
     assert_variable_name "$__str_join_result_name" "$__str_join_array_name"
+    __std_assert_writable_output__ str_join "$__str_join_result_name" || return 1
     assert_indexed_array "$__str_join_array_name"
 
     local __str_join_joined="" __str_join_index
