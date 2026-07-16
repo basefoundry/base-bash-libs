@@ -4,6 +4,10 @@
 consistent command checks and authentication diagnostics without adopting Base's
 GitHub workflow policy.
 
+Generic Git branch, worktree, and remote helpers are owned by `lib_git.sh`.
+The historical `gh_*` names remain temporarily as forwarding compatibility
+names while callers migrate to the canonical `git_*` API.
+
 Source the stdlib before this library:
 
 ```bash

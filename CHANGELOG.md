@@ -17,6 +17,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Made GitHub API failure capture safe under `set -e`, accepted canonical SSH
   GitHub remotes, and separated submodule diagnostics from pull logs while
   unregistering eagerly removed Git temp files.
+- Added canonical `git_*` names for generic branch, worktree, default-branch,
+  and remote helpers, with temporary `gh_*` names retained for migration.
 
 - Made fallback timeouts terminate descendant processes when a command is
   launched in its own process group.

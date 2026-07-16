@@ -31,6 +31,94 @@ setup() {
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "git_detect_default_branch resolves origin HEAD and fallback branches" {
+    local repo="$TEST_TMPDIR/repo"
+    local branch=""
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" update-ref refs/remotes/origin/trunk HEAD
+    git -C "$repo" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk
+
+    git_detect_default_branch "$repo" branch
+    [ "$branch" = "trunk" ]
+
+    git -C "$repo" symbolic-ref -d refs/remotes/origin/HEAD
+    git_detect_default_branch "$repo" branch
+    [ "$branch" = "main" ]
+}
+
+@test "git worktree helpers surface producer failures" {
+    git() {
+        printf 'worktree command failed\n' >&2
+        return 7
+    }
+
+    capture_command git_worktree_path_for_branch feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unable to list Git worktrees."* ]]
+
+    capture_command git_list_worktree_branches
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unable to list Git worktrees."* ]]
+    unset -f git
+}
+
+@test "git worktree helpers parse canonical porcelain output" {
+    git() {
+        if [[ "${1:-}" == "worktree" || "${3:-}" == "worktree" ]]; then
+            cat <<'EOF'
+worktree /tmp/main
+HEAD abc123
+branch refs/heads/main
+
+worktree /tmp/feature
+HEAD def456
+branch refs/heads/feature/test
+EOF
+            return 0
+        fi
+        command git "$@"
+    }
+
+    capture_command git_worktree_path_for_branch feature/test
+    [ "$status" -eq 0 ]
+    [ "$output" = "/tmp/feature" ]
+
+    capture_command git_list_worktree_branches
+    [ "$status" -eq 0 ]
+    [[ "$output" == *$'/tmp/main\tmain'* ]]
+    [[ "$output" == *$'/tmp/feature\tfeature/test'* ]]
+    unset -f git
+}
+
+@test "git branch and remote helpers use generic names" {
+    local repo="$TEST_TMPDIR/repo"
+    local branch_output remote_output
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" branch feature
+
+    branch_output="$(git_branch_upstream "$repo" main)"
+    [ -z "$branch_output" ]
+    git_branch_merged_to_ref "$repo" feature main
+
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "ls-remote" ]]; then
+            printf 'abc123\trefs/heads/main\n'
+            printf 'def456\trefs/tags/v1\n'
+            return 0
+        fi
+        command git "$@"
+    }
+    remote_output="$(git_list_remote_branches "$repo")"
+    unset -f git
+    [ "$remote_output" = "main" ]
+}
+
 @test "git_get_current_branch returns the current branch name" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
