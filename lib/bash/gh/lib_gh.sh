@@ -70,6 +70,7 @@ gh_repo_from_remote_url() {
         return 1
     fi
     assert_variable_name "$__gh_result_name"
+    __std_assert_writable_output__ gh_repo_from_remote_url "$__gh_result_name" || return 1
 
     case "$__gh_remote_url" in
         git@github.com:*.git)
@@ -106,6 +107,7 @@ gh_infer_repo_from_origin() {
         return 1
     fi
     assert_variable_name "$__gh_infer_result_name"
+    __std_assert_writable_output__ gh_infer_repo_from_origin "$__gh_infer_result_name" || return 1
 
     if [[ "${3:-}" == "--optional" ]]; then
         __gh_infer_optional=1
@@ -134,6 +136,7 @@ gh_detect_default_branch() {
         return 1
     fi
     assert_variable_name "$__gh_detect_result_name"
+    __std_assert_writable_output__ gh_detect_default_branch "$__gh_detect_result_name" || return 1
 
     if __gh_detect_branch="$(git -C "$__gh_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
         __gh_detect_branch="${__gh_detect_branch#origin/}"
@@ -168,6 +171,7 @@ gh_repo_default_branch() {
         return 1
     fi
     assert_variable_name "$__gh_repo_result_name"
+    __std_assert_writable_output__ gh_repo_default_branch "$__gh_repo_result_name" || return 1
 
     gh_require_cli || return 1
     __gh_repo_default_branch="$(gh repo view "$__gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)" || __gh_repo_status=$?

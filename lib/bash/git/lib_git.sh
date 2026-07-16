@@ -256,6 +256,7 @@ git_get_current_branch() {
         log_error "git_get_current_branch: result variable name must be a valid Bash variable name."
         return 1
     fi
+    __std_assert_writable_output__ git_get_current_branch "$__git_branch_result_name" || return 1
 
     printf -v "$__git_branch_result_name" '%s' ""
 

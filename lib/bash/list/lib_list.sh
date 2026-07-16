@@ -20,6 +20,7 @@ list_append() {
 
     assert_variable_name "$__list_array_name"
     assert_indexed_array "$__list_array_name"
+    __std_assert_writable_output__ list_append "$__list_array_name" || return 1
     shift
     __list_values=("$@")
     eval "$__list_array_name+=(\"\${__list_values[@]}\")"
@@ -35,6 +36,7 @@ list_prepend() {
 
     assert_variable_name "$__list_array_name"
     assert_indexed_array "$__list_array_name"
+    __std_assert_writable_output__ list_prepend "$__list_array_name" || return 1
     shift
     __list_values=("$@")
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
@@ -51,6 +53,7 @@ list_remove() {
     assert_arg_count "$#" 2
     assert_variable_name "$__list_array_name"
     assert_indexed_array "$__list_array_name"
+    __std_assert_writable_output__ list_remove "$__list_array_name" || return 1
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
     for __list_item in "${__list_current[@]}"; do
@@ -84,6 +87,7 @@ list_unique() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_result_name" "$__list_array_name"
+    __std_assert_writable_output__ list_unique "$__list_result_name" || return 1
     assert_indexed_array "$__list_result_name" "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"
@@ -103,6 +107,7 @@ list_length() {
 
     assert_arg_count "$#" 2
     assert_variable_name "$__list_result_name" "$__list_array_name"
+    __std_assert_writable_output__ list_length "$__list_result_name" || return 1
     assert_indexed_array "$__list_array_name"
 
     eval "__list_current=(\"\${${__list_array_name}[@]}\")"

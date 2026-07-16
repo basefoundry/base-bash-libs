@@ -55,6 +55,25 @@ create_script() {
     [ "${positionals[2]}" = "gamma" ]
 }
 
+@test "arg_parse rejects readonly output arrays before parsing" {
+    local script="$TEST_TMPDIR/arg-readonly-output.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/arg/lib_arg.sh"
+declare -Ar options=()
+declare -a positionals=()
+declare -a specs=("verbose|flag|--verbose")
+arg_parse options positionals specs -- --verbose
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"result variable 'options' is readonly"* ]]
+}
+
 @test "arg_parse supports shadowing-prone caller array names" {
     local -a specs_name=(
         "verbose|flag|--verbose|-v"

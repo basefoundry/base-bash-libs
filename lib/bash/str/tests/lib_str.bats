@@ -68,6 +68,23 @@ create_script() {
     [ ! -s "$stdout_file" ]
 }
 
+@test "string mutators reject readonly output variables" {
+    local value="Alpha"
+    local stderr_file="$TEST_TMPDIR/string-readonly.err"
+    local rc
+
+    readonly value
+    if str_lower value 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$value" = "Alpha" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'value' is readonly"* ]]
+}
+
 @test "string transform helpers reject invalid variable names" {
     local script="$TEST_TMPDIR/string-transform-invalid.sh"
 
