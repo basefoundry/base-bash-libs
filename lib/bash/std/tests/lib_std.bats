@@ -143,6 +143,21 @@ EOF
     [[ "$output" == *"color="* ]]
 }
 
+@test "sourcing stdlib stops filtering wrapper flags after --" {
+    local script="$TEST_TMPDIR/check-init-escape.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+printf 'argv=%s\n' "\$*"
+EOF
+
+    bats_run bash "$script" --color alpha -- --color omega
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"argv=alpha -- --color omega"* ]]
+}
+
 @test "bootstrap source override controls __SCRIPT_DIR__" {
     local command_dir="$TEST_TMPDIR/commands/demo"
     local script="$TEST_TMPDIR/bootstrap-dir.sh"
@@ -488,6 +503,20 @@ EOF
 
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"add_to_path: invalid option"* ]]
+}
+
+@test "add_to_path preserves caller OPTIND and batch prepend order" {
+    local first="$TEST_TMPDIR/first"
+    local second="$TEST_TMPDIR/second"
+    local OPTIND=9
+
+    mkdir -p "$first" "$second"
+    PATH="/base"
+
+    add_to_path -p "$first" "$second"
+
+    [ "$OPTIND" -eq 9 ]
+    [ "$PATH" = "$first:$second:/base" ]
 }
 
 @test "dedupe_path removes duplicates and empty entries" {
@@ -1051,6 +1080,46 @@ EOF
     [[ "$(cat "$registration_file")" == *"base-bash-libs-timeout."* ]]
 }
 
+@test "std_run fallback timeout terminates descendants" {
+    ps -eo pid=,ppid= >/dev/null 2>&1 || skip "The process-listing command is unavailable in this environment."
+
+    local fake_bin="$TEST_TMPDIR/no-timeout-process-group-bin"
+    local child_pid_file="$TEST_TMPDIR/timeout-descendant.pid"
+    local script="$TEST_TMPDIR/timeout-descendant.sh"
+    local child_pid rc
+
+    mkdir -p "$fake_bin"
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v rm)" "$fake_bin/rm"
+    ln -s "$(command -v sleep)" "$fake_bin/sleep"
+    command -v pgrep >/dev/null 2>&1 || skip "The 'pgrep' command is required for descendant timeout coverage."
+    ln -s "$(command -v pgrep)" "$fake_bin/pgrep"
+
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+trap '' TERM
+sleep 30 &
+child_pid=$!
+printf '%s\n' "$child_pid" > "$1"
+wait "$child_pid"
+EOF
+
+    if PATH="$fake_bin" std_run --no-exit --quiet --timeout 1 /bin/bash "$script" "$child_pid_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    child_pid="$(cat "$child_pid_file")"
+    sleep 1.2
+
+    [ "$rc" -eq 124 ]
+    if kill -0 "$child_pid" 2>/dev/null; then
+        kill -KILL "$child_pid" 2>/dev/null || true
+        return 1
+    fi
+}
+
 @test "std_run --max-attempts retries until the command succeeds" {
     local counter_file="$TEST_TMPDIR/retry-count.txt"
     local script="$TEST_TMPDIR/retry-eventual-success.sh"
@@ -1242,6 +1311,16 @@ EOF
     [ -d "$second" ]
 }
 
+@test "safe_mkdir preserves caller OPTIND" {
+    local directory="$TEST_TMPDIR/optind-directory"
+    local OPTIND=11
+
+    safe_mkdir "$directory"
+
+    [ "$OPTIND" -eq 11 ]
+    [ -d "$directory" ]
+}
+
 @test "safe_mkdir warns when no directories are provided" {
     local stderr_file="$TEST_TMPDIR/safe-mkdir-empty.err"
 
@@ -1284,6 +1363,14 @@ EOF
     local target="$TEST_TMPDIR/touched.txt"
 
     safe_touch "$target"
+
+    [ -f "$target" ]
+}
+
+@test "safe_touch treats option-like paths literally" {
+    local target="$TEST_TMPDIR/-r"
+
+    (cd "$TEST_TMPDIR" && safe_touch "-r")
 
     [ -f "$target" ]
 }
@@ -1384,6 +1471,42 @@ EOF
 
     [ "$status" -eq 0 ]
     [ "$(cat "$log_file")" = $'existing-one\nexisting-two\ncleanup-one' ]
+}
+
+@test "cleanup hooks still run when the existing EXIT trap exits" {
+    local script="$TEST_TMPDIR/cleanup-exit-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-exit-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'exit 9' EXIT
+cleanup_one() { printf "cleanup-one\\n" >> "$log_file"; }
+std_register_cleanup_hook cleanup_one
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "cleanup-one" ]
+}
+
+@test "cleanup hooks still run when the existing EXIT trap returns" {
+    local script="$TEST_TMPDIR/cleanup-return-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-return-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'return 9' EXIT
+cleanup_one() { printf "cleanup-one\\n" >> "$log_file"; }
+std_register_cleanup_hook cleanup_one
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "cleanup-one" ]
 }
 
 @test "cleanup hook registration ignores duplicates and supports removal" {
@@ -1613,6 +1736,35 @@ EOF
 
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
+}
+
+@test "named output helpers reject readonly variables before side effects" {
+    local output="unchanged"
+    local temp_root="$TEST_TMPDIR/readonly-output"
+    local stderr_file="$TEST_TMPDIR/readonly-output.err"
+    local rc
+
+    mkdir -p "$temp_root"
+    readonly output
+
+    if std_command_path output bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$output" = "unchanged" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
+
+    : > "$stderr_file"
+    if TMPDIR="$temp_root" std_make_temp_file output readonly-temp 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
+    [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
 }
 
 @test "std_command_path stores executable paths and returns nonzero for missing commands" {
@@ -1943,6 +2095,41 @@ EOF
 @test "assert_arg_count accepts exact and ranged matches" {
     assert_arg_count 2 2
     assert_arg_count 2 1 3
+}
+
+@test "integer validation uses decimal semantics for leading zeroes" {
+    local script="$TEST_TMPDIR/assert-decimal-integers.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+value=08
+assert_integer_range value 0 10
+assert_arg_count 08 8
+exit_if_error 08 "decimal exit code"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 8 ]
+    [[ "$output" == *"decimal exit code"* ]]
+    [[ "$output" != *"value too great for base"* ]]
+}
+
+@test "integer ranges reject inverted bounds" {
+    local script="$TEST_TMPDIR/assert-inverted-range.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+value=5
+assert_integer_range value 10 1
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"cannot exceed maximum"* ]]
 }
 
 @test "assert_arg_count exits when the count is out of range" {

@@ -56,6 +56,24 @@ SCRIPT
     [[ "$output" == *"str-trim=function"* ]]
 }
 
+@test "base-bash preserves wrapper-like arguments after --" {
+    local script="$TEST_TMPDIR/escape-tool"
+
+    create_script "$script" <<'SCRIPT'
+#!/usr/bin/env base-bash
+# shellcheck shell=bash
+
+main() {
+    printf 'args=%s\n' "$*"
+}
+SCRIPT
+
+    bats_run "$script" --color alpha -- --color omega
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"args=alpha -- --color omega"* ]]
+}
+
 @test "base-bash reports a missing main function" {
     local script="$TEST_TMPDIR/no-main"
 
