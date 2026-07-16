@@ -10,6 +10,147 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly __lib_git_sourced__=1
 
+git_detect_default_branch() {
+    local __git_detect_repo_dir="$1"
+    local __git_detect_result_name="${2:-}"
+    local __git_detect_branch
+
+    if [[ -z "$__git_detect_repo_dir" || -z "$__git_detect_result_name" ]]; then
+        log_error "Usage: git_detect_default_branch <repo_dir> <result_variable_name>"
+        return 1
+    fi
+    assert_variable_name "$__git_detect_result_name"
+    __std_assert_writable_output__ git_detect_default_branch "$__git_detect_result_name" || return 1
+
+    if __git_detect_branch="$(git -C "$__git_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+        __git_detect_branch="${__git_detect_branch#origin/}"
+        if [[ -n "$__git_detect_branch" ]]; then
+            printf -v "$__git_detect_result_name" '%s' "$__git_detect_branch"
+            return 0
+        fi
+    fi
+
+    if git -C "$__git_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/main ||
+        git -C "$__git_detect_repo_dir" show-ref --verify --quiet refs/heads/main; then
+        printf -v "$__git_detect_result_name" '%s' main
+        return 0
+    fi
+
+    if git -C "$__git_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/master ||
+        git -C "$__git_detect_repo_dir" show-ref --verify --quiet refs/heads/master; then
+        printf -v "$__git_detect_result_name" '%s' master
+        return 0
+    fi
+
+    return 1
+}
+
+git_worktree_path_for_branch() {
+    local branch="$1"
+    local repo_dir="${2:-}"
+    local target_ref="refs/heads/$branch"
+    local line path="" ref output
+    local -a git_cmd=(git)
+
+    [[ -n "$branch" ]] || {
+        log_error "Usage: git_worktree_path_for_branch <branch> [repo_dir]"
+        return 1
+    }
+
+    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
+    if ! output="$("${git_cmd[@]}" worktree list --porcelain 2>&1)"; then
+        log_error "Unable to list Git worktrees."
+        return 1
+    fi
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*)
+                path="${line#worktree }"
+                ;;
+            "branch "*)
+                ref="${line#branch }"
+                if [[ "$ref" == "$target_ref" ]]; then
+                    printf '%s\n' "$path"
+                    return 0
+                fi
+                ;;
+        esac
+    done <<<"$output"
+
+    return 1
+}
+
+git_list_worktree_branches() {
+    local repo_dir="${1:-}"
+    local line path="" branch="" output
+    local -a git_cmd=(git)
+
+    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
+    if ! output="$("${git_cmd[@]}" worktree list --porcelain 2>&1)"; then
+        log_error "Unable to list Git worktrees."
+        return 1
+    fi
+    output+=$'\n'
+
+    while IFS= read -r line; do
+        case "$line" in
+            "")
+                if [[ -n "$path" && -n "$branch" ]]; then
+                    branch="${branch#refs/heads/}"
+                    printf '%s\t%s\n' "$path" "$branch"
+                fi
+                path=""
+                branch=""
+                ;;
+            "worktree "*)
+                path="${line#worktree }"
+                ;;
+            "branch "*)
+                branch="${line#branch }"
+                ;;
+        esac
+    done <<<"$output"
+}
+
+git_branch_upstream() {
+    local repo_dir="$1"
+    local branch="$2"
+
+    if [[ -z "$repo_dir" || -z "$branch" ]]; then
+        log_error "Usage: git_branch_upstream <repo_dir> <branch>"
+        return 1
+    fi
+
+    git -C "$repo_dir" for-each-ref --format='%(upstream:short)' "refs/heads/$branch"
+}
+
+git_branch_merged_to_ref() {
+    local repo_dir="$1"
+    local branch="$2"
+    local ref="$3"
+
+    if [[ -z "$repo_dir" || -z "$branch" || -z "$ref" ]]; then
+        log_error "Usage: git_branch_merged_to_ref <repo_dir> <branch> <ref>"
+        return 1
+    fi
+
+    git -C "$repo_dir" merge-base --is-ancestor "refs/heads/$branch" "$ref" >/dev/null 2>&1
+}
+
+git_list_remote_branches() {
+    local repo_dir="${1:-.}"
+    local output ref _sha
+
+    if ! output="$(git -C "$repo_dir" ls-remote --heads origin)"; then
+        log_error "Unable to list remote branches from origin."
+        return 1
+    fi
+    while read -r _sha ref; do
+        [[ "$ref" == refs/heads/* ]] || continue
+        printf '%s\n' "${ref#refs/heads/}"
+    done <<<"$output"
+}
+
 #
 # Returns success when tracked changes are limited to one repo-relative path.
 #

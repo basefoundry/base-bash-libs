@@ -12,6 +12,19 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
   Update a repository on its detected default branch, optionally allowing tracked changes in one specific path.
 - `git_get_current_branch`
   Return the current branch name through a caller-provided variable, or `detached head`.
+- `git_detect_default_branch`
+  Detect a repository's default branch from its remote HEAD and standard local
+  fallbacks.
+- `git_worktree_path_for_branch`
+  Print the worktree path attached to a local branch.
+- `git_list_worktree_branches`
+  Print tab-separated worktree path and branch rows.
+- `git_branch_upstream`
+  Print the configured upstream ref for a local branch.
+- `git_branch_merged_to_ref`
+  Check whether a local branch is an ancestor of a ref.
+- `git_list_remote_branches`
+  Print branch names from the `origin` remote.
 - `check_script_up_to_date`
   Check whether a tracked script appears current relative to its configured upstream.
 
@@ -54,4 +67,4 @@ log_info "Current branch: $branch"
 
 ## Tests
 
-BATS coverage lives in `tests/lib_git.bats`.
+BATS coverage lives in `lib/bash/git/tests/lib_git.bats`.
