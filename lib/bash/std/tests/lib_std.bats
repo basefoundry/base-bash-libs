@@ -629,6 +629,19 @@ EOF
     [[ "$(cat "$stderr_file")" == *"VERBOSE"* ]]
 }
 
+@test "log wrappers persist the DEBUG diagnostic stream without changing terminal verbosity" {
+    local stderr_file="$TEST_TMPDIR/log-primary.err"
+    local primary_log="$TEST_TMPDIR/primary.log"
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" log_debug "persisted debug" 2>"$stderr_file"
+    [ ! -s "$stderr_file" ]
+    [[ "$(cat "$primary_log")" == *"DEBUG"*"persisted debug"* ]]
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" log_info "terminal info" 2>>"$stderr_file"
+    [[ "$(cat "$stderr_file")" == *"INFO"*"terminal info"* ]]
+    [[ "$(cat "$primary_log")" == *"INFO"*"terminal info"* ]]
+}
+
 @test "__print_log__ uses local timestamps by default" {
     local stderr_file="$TEST_TMPDIR/log-local-time.err"
     local expected_before expected_after output

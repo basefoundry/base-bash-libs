@@ -9,6 +9,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Added an optional `BASE_CLI_PRIMARY_LOG` diagnostic sink. Bash logging keeps
+  terminal verbosity unchanged while persisting the DEBUG-level stream to the
+  shared run primary log.
 - Include the local numeric timezone offset in default structured log
   timestamps and an explicit `UTC` marker when `LOG_UTC=1`, keeping Bash log
   formatting aligned with Base's Python CLI logs.
