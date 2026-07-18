@@ -476,9 +476,9 @@ __log_timestamp__() {
     local result_name="$1"
 
     if [[ "${LOG_UTC:-}" == 1 ]]; then
-        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T UTC' -1
     else
-        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S %z)T' -1
     fi
 }
 

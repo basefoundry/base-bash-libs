@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Changed
+
+- Include the local numeric timezone offset in default structured log
+  timestamps and an explicit `UTC` marker when `LOG_UTC=1`, keeping Bash log
+  formatting aligned with Base's Python CLI logs.
+
 ## [1.3.0] - 2026-07-16
 
 ### Fixed
