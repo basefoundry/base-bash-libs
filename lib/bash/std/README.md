@@ -38,6 +38,11 @@ The library improves Bash-based scripting in a few practical ways:
 - **Base wrapper integration**: wrapper flags are recognized once and removed
   before command-specific argument parsing begins.
 
+Log timestamps use the host's local timezone and include its numeric offset by
+default, for example `2026-07-18 13:14:32 -0700`. Setting `LOG_UTC=1` switches
+the timestamp to the explicit `UTC` form. Base's `--utc-wrapper` option sets
+this variable for the complete Bash/Python runtime chain.
+
 The goal is not to hide Bash. The goal is to make scripts fail in ways a user
 or developer can understand.
 

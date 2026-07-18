@@ -629,13 +629,26 @@ EOF
     [[ "$(cat "$stderr_file")" == *"VERBOSE"* ]]
 }
 
+@test "log wrappers persist the DEBUG diagnostic stream without changing terminal verbosity" {
+    local stderr_file="$TEST_TMPDIR/log-primary.err"
+    local primary_log="$TEST_TMPDIR/primary.log"
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" log_debug "persisted debug" 2>"$stderr_file"
+    [ ! -s "$stderr_file" ]
+    [[ "$(cat "$primary_log")" == *"DEBUG"*"persisted debug"* ]]
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" log_info "terminal info" 2>>"$stderr_file"
+    [[ "$(cat "$stderr_file")" == *"INFO"*"terminal info"* ]]
+    [[ "$(cat "$primary_log")" == *"INFO"*"terminal info"* ]]
+}
+
 @test "__print_log__ uses local timestamps by default" {
     local stderr_file="$TEST_TMPDIR/log-local-time.err"
     local expected_before expected_after output
 
-    expected_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H)T' -1)"
+    expected_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     TZ=Pacific/Honolulu log_info "local timestamp" 2>"$stderr_file"
-    expected_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H)T' -1)"
+    expected_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     output="$(cat "$stderr_file")"
 
     [[ "$output" == "$expected_before"* || "$output" == "$expected_after"* ]]
@@ -646,11 +659,11 @@ EOF
     local stderr_file="$TEST_TMPDIR/log-utc-time.err"
     local expected_before expected_after output local_before local_after
 
-    expected_before="$(TZ=UTC printf '%(%Y-%m-%d %H)T' -1)"
-    local_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H)T' -1)"
+    expected_before="$(TZ=UTC printf '%(%Y-%m-%d %H:%M:%S)T UTC' -1)"
+    local_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     TZ=Pacific/Honolulu LOG_UTC=1 log_info "utc timestamp" 2>"$stderr_file"
-    expected_after="$(TZ=UTC printf '%(%Y-%m-%d %H)T' -1)"
-    local_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H)T' -1)"
+    expected_after="$(TZ=UTC printf '%(%Y-%m-%d %H:%M:%S)T UTC' -1)"
+    local_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     output="$(cat "$stderr_file")"
 
     [[ "$expected_before" != "$local_before" || "$expected_after" != "$local_after" ]]

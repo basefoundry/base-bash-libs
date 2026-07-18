@@ -476,9 +476,9 @@ __log_timestamp__() {
     local result_name="$1"
 
     if [[ "${LOG_UTC:-}" == 1 ]]; then
-        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T UTC' -1
     else
-        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T' -1
+        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S %z)T' -1
     fi
 }
 
@@ -516,13 +516,24 @@ __log_source_location__() {
 #
 __print_log_record__() {
     local color="$1" in_level="$2" source_location="$3"
-    shift 3
-    local message timestamp log_line
+    local terminal_enabled="${4:-1}" persist_enabled="${5:-0}"
+    shift 5
+    local message timestamp log_line primary_log
 
     message="$(__join_message__ "$@")"
     __log_timestamp__ timestamp
     printf -v log_line '%s %-7s %s %s' "$timestamp" "$in_level" "$source_location" "$message"
-    printf '%b%s%b\n' "$color" "$log_line" "$COLOR_OFF" >&2
+    if ((terminal_enabled)); then
+        printf '%b%s%b\n' "$color" "$log_line" "$COLOR_OFF" >&2
+    fi
+    if ((persist_enabled)); then
+        primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+        if [[ -n "$primary_log" ]]; then
+            # The launcher creates the primary log with mode 0600.  Direct
+            # library users may not, so keep the same private default here.
+            (umask 077; printf '%s\n' "$log_line" >>"$primary_log") || :
+        fi
+    fi
 }
 
 #
@@ -603,6 +614,7 @@ __print_log__() {
     [[ -n "$in_level" ]] || return 1
     shift
     local logger=default log_level_set log_level color source_location
+    local terminal_enabled persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
             printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
@@ -614,7 +626,12 @@ __print_log__() {
     log_level="${_log_levels[$in_level]}"
     log_level_set="${_loggers_level_map[$logger]:-3}"
 
-    if ((log_level_set >= log_level)); then
+    terminal_enabled=0
+    ((log_level_set >= log_level)) && terminal_enabled=1
+    persist_enabled=0
+    [[ -n "${BASE_CLI_PRIMARY_LOG:-}" ]] && ((log_level <= _log_levels[DEBUG])) && persist_enabled=1
+
+    if ((terminal_enabled || persist_enabled)); then
         # Select color based on log level
         case "$in_level" in
             FATAL|ERROR) color="$COLOR_RED";;
@@ -625,7 +642,7 @@ __print_log__() {
         esac
 
         __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
-        __print_log_record__ "$color" "$in_level" "$source_location" "$@"
+        __print_log_record__ "$color" "$in_level" "$source_location" "$terminal_enabled" "$persist_enabled" "$@"
     fi
 }
 
@@ -658,7 +675,7 @@ __print_log_file__()   {
     else
         local source_location
         __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
-        __print_log_record__ "$COLOR_YELLOW" WARN "$source_location" "Unknown logger '$logger'"
+        __print_log_record__ "$COLOR_YELLOW" WARN "$source_location" 1 1 "Unknown logger '$logger'"
     fi
 }
 
