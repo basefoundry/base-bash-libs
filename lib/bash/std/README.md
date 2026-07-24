@@ -76,12 +76,14 @@ zero for success and nonzero for a false or invalid condition.
   and at least one configured sink accept the level.
 - `log_fatal`, `log_error`, `log_warn`, `log_info`, `log_debug`,
   `log_verbose <message...>`: write a structured message to stderr at the
-  named level.
+  named level. `log_verbose` is deprecated; use `log_debug`.
 - `log_info_file`, `log_debug_file`, `log_verbose_file [-l <logger>] <file>`:
   log a file's contents at the requested level when that level is enabled.
+  `log_verbose_file` is deprecated; use `log_debug_file`.
 - `log_info_enter`, `log_debug_enter`, `log_verbose_enter` and
   `log_info_leave`, `log_debug_leave`, `log_verbose_leave`: log the current
-  function boundary without arguments.
+  function boundary without arguments. The `log_verbose_*` forms are
+  deprecated; use the DEBUG forms.
 - `print_error`, `print_warn`, `print_info`, `print_success <message...>`:
   write an unstructured user-facing message to stderr.
 - `print_bold`, `print_message <message...>`: write an unstructured message to
@@ -190,8 +192,8 @@ Sourcing `lib_std.sh` runs a small one-time initializer:
 - derives the caller's source directory in `__SCRIPT_DIR__`
 - exposes the package version in `BASE_BASH_LIBS_VERSION`
 - exposes the successful stdlib load marker in `BASE_BASH_LIBS_STDLIB_LOADED`
-- consumes Base wrapper flags such as `--debug-wrapper`, `--verbose-wrapper`,
-  `--utc-wrapper`, and `--color`
+- consumes Base wrapper flags such as `--debug-wrapper`, `--utc-wrapper`, and
+  `--color`; the compatibility flag `--verbose-wrapper` is deprecated
 - resets the caller's positional parameters to the filtered argument list
 
 Caller-visible globals:
@@ -229,7 +231,6 @@ log_info "Installing package '$name'."
 log_warn "Cache directory does not exist: $cache_dir"
 log_error "Unable to read manifest '$manifest_path'."
 log_debug "resolved_home=$resolved_home"
-log_verbose "raw_response=$response"
 ```
 
 Available levels:
@@ -239,7 +240,13 @@ Available levels:
 - `WARN`
 - `INFO`
 - `DEBUG`
-- `VERBOSE`
+- `VERBOSE` (deprecated compatibility level)
+
+`DEBUG` is the most detailed supported level for new code. `VERBOSE`,
+`log_verbose`, `log_verbose_file`, `log_verbose_enter`,
+`log_verbose_leave`, and `--verbose-wrapper` remain behaviorally compatible
+through the 1.x line, but may be removed in the next major release. They do not
+emit runtime deprecation warnings.
 
 Change terminal verbosity with:
 
@@ -265,8 +272,8 @@ Terminal verbosity and category gates answer different questions:
 - `BASE_CLI_PRIMARY_LOG`, when set, receives accepted records through DEBUG
   even when the terminal remains at INFO.
 
-Category gates are permissive by default for compatibility. Applications can
-keep their own DEBUG output while limiting a reusable component:
+The global default category gate is permissive for compatibility. Applications
+can keep their own DEBUG output while limiting a reusable component:
 
 ```bash
 set_log_level DEBUG
@@ -277,6 +284,33 @@ log_debug "application diagnostic"
 log_debug -l reusable_library "suppressed library diagnostic"
 log_debug -l reusable_library.network "enabled network diagnostic"
 ```
+
+The library's own records use these categories:
+
+- `base_bash_libs.std`
+- `base_bash_libs.arg`
+- `base_bash_libs.file`
+- `base_bash_libs.git`
+- `base_bash_libs.gh`
+
+The parent `base_bash_libs` gate defaults to INFO. Consequently, an application
+can enable its own DEBUG terminal output without also enabling reusable-library
+DEBUG records:
+
+```bash
+set_log_level DEBUG
+
+# Opt in to every base-bash-libs DEBUG category:
+set_log_category_level -l base_bash_libs DEBUG
+
+# Or keep the parent at INFO and enable one component:
+set_log_category_level -l base_bash_libs INFO
+set_log_category_level -l base_bash_libs.git DEBUG
+```
+
+`--debug-wrapper` enables both DEBUG terminal output and the
+`base_bash_libs` DEBUG gate. The deprecated `--verbose-wrapper` continues to
+enable both at VERBOSE during the compatibility window.
 
 Use `log_is_enabled` to avoid constructing an expensive diagnostic unless a
 terminal or persistent sink will consume it:

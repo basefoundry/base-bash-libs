@@ -31,7 +31,7 @@ __file_resolve_target_path__() {
     while [[ -L "$path" ]]; do
         ((depth += 1))
         if ((depth > 40)); then
-            log_error "Too many symlink levels while resolving '$2'."
+            log_error -l base_bash_libs.file "Too many symlink levels while resolving '$2'."
             return 1
         fi
 
@@ -55,7 +55,7 @@ __file_validate_markers__() {
         "$beginning_marker" == "$end_marker" ||
         "$beginning_marker" == *$'\n'* || "$beginning_marker" == *$'\r'* ||
         "$end_marker" == *$'\n'* || "$end_marker" == *$'\r'* ]]; then
-        log_error "Section markers must be non-empty, distinct, single-line values."
+        log_error -l base_bash_libs.file "Section markers must be non-empty, distinct, single-line values."
         return 2
     fi
     return 0
@@ -158,11 +158,11 @@ __file_section_marker_counts__() {
     printf -v "$end_count_var" '%s' "$section_end_marker_count"
 
     if ((section_beginning_marker_count != section_end_marker_count)); then
-        log_error "Asymmetric markers in '$target_file': $section_beginning_marker_count start, $section_end_marker_count end. Manual repair needed."
+        log_error -l base_bash_libs.file "Asymmetric markers in '$target_file': $section_beginning_marker_count start, $section_end_marker_count end. Manual repair needed."
         return 2
     fi
     if ((section_beginning_marker_count > 0)) && ! __file_section_markers_ordered__ "$target_file" "$beginning_marker" "$end_marker"; then
-        log_error "Misordered markers in '$target_file'. Manual repair needed."
+        log_error -l base_bash_libs.file "Misordered markers in '$target_file'. Manual repair needed."
         return 2
     fi
 
@@ -179,7 +179,7 @@ __file_section_marker_counts__() {
 #
 file_section_exists() {
     if [[ $# -ne 3 ]]; then
-        log_error "file_section_exists: expected <target_file> <beginning_marker> <end_marker>."
+        log_error -l base_bash_libs.file "file_section_exists: expected <target_file> <beginning_marker> <end_marker>."
         return 2
     fi
 
@@ -205,7 +205,7 @@ file_section_exists() {
 #
 file_section_needs_update() {
     if [[ $# -lt 3 ]]; then
-        log_error "file_section_needs_update: expected <target_file> <beginning_marker> <end_marker> [content_lines...]."
+        log_error -l base_bash_libs.file "file_section_needs_update: expected <target_file> <beginning_marker> <end_marker> [content_lines...]."
         return 2
     fi
 
@@ -222,23 +222,23 @@ file_section_needs_update() {
     ((beginning_marker_count > 0)) || return 0
 
     if ! std_make_temp_file new_content_file base-file-section-new; then
-        log_error "Failed to create temporary content file for '$target_file'."
+        log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
         return 2
     fi
     if (($# > 0)); then
         if ! printf '%s\n' "$@" > "$new_content_file"; then
-            log_error "Failed to write replacement content for '$target_file'."
+            log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
             __file_remove_temp_paths__ "$new_content_file"
             return 2
         fi
     elif ! : > "$new_content_file"; then
-        log_error "Failed to write replacement content for '$target_file'."
+        log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
         __file_remove_temp_paths__ "$new_content_file"
         return 2
     fi
 
     if ! std_make_temp_file current_content_file base-file-section-current; then
-        log_error "Failed to create temporary current content file for '$target_file'."
+        log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
         __file_remove_temp_paths__ "$new_content_file"
         return 2
     fi
@@ -265,7 +265,7 @@ file_section_needs_update() {
         }
     }
     ' "$target_file" > "$current_content_file"; then
-        log_error "Failed to read existing section in '$target_file'."
+        log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
         __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
         return 2
     fi
@@ -320,11 +320,11 @@ update_file_section() {
     fi
 
     if [[ $# -lt 3 ]]; then
-        log_error "Insufficient arguments."
+        log_error -l base_bash_libs.file "Insufficient arguments."
         if [[ "$remove_section" == true ]]; then
-            log_info "Usage: update_file_section -r <target_file> <beginning_marker> <end_marker>"
+            log_info -l base_bash_libs.file "Usage: update_file_section -r <target_file> <beginning_marker> <end_marker>"
         else
-            log_info "Usage: update_file_section <target_file> <beginning_marker> <end_marker> [new_lines...]"
+            log_info -l base_bash_libs.file "Usage: update_file_section <target_file> <beginning_marker> <end_marker> [new_lines...]"
         fi
         return 1
     fi
@@ -333,8 +333,8 @@ update_file_section() {
     shift 3 # consume target_file, beginning_marker, end_marker
     if [[ "$remove_section" == true ]]; then
         if [[ $# -gt 0 ]]; then
-            log_error "When -r flag is used, no content arguments should be provided."
-            log_info "Usage: update_file_section -r <target_file> <beginning_marker> <end_marker>"
+            log_error -l base_bash_libs.file "When -r flag is used, no content arguments should be provided."
+            log_info -l base_bash_libs.file "Usage: update_file_section -r <target_file> <beginning_marker> <end_marker>"
             return 1
         fi
     else
@@ -344,7 +344,7 @@ update_file_section() {
     __file_literal_path__ target_file "$target_file"
     __file_validate_markers__ "$beginning_marker" "$end_marker" || return 1
     if [[ ! -f "$target_file" ]]; then
-        log_debug "Target file '$target_file' does not exist."
+        log_debug -l base_bash_libs.file "Target file '$target_file' does not exist."
         return 0
     fi
 
@@ -371,19 +371,19 @@ update_file_section() {
     fi
 
     if [[ "$section_exists" == false && "$remove_section" == true ]]; then
-        log_debug "Section not present in '$target_file'; nothing to remove."
+        log_debug -l base_bash_libs.file "Section not present in '$target_file'; nothing to remove."
         return 0
     fi
 
     local current_content_file="" new_content_file="" temp_file
     if [[ "$remove_section" == false ]]; then
         if ! std_make_temp_file new_content_file base-file-section-new; then
-            log_error "Failed to create temporary content file for '$target_file'."
+            log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
             return 1
         fi
 
         if ! printf '%s' "$new_content_string" > "$new_content_file"; then
-            log_error "Failed to write replacement content for '$target_file'."
+            log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
             __file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
@@ -391,7 +391,7 @@ update_file_section() {
 
     if [[ "$section_exists" == true && "$remove_section" == false ]]; then
         if ! std_make_temp_file current_content_file base-file-section-current; then
-            log_error "Failed to create temporary current content file for '$target_file'."
+            log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
             __file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
@@ -413,13 +413,13 @@ update_file_section() {
             print $0
         }
         ' "$target_file" > "$current_content_file"; then
-            log_error "Failed to read existing section in '$target_file'."
+            log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
             __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 1
         fi
 
         if cmp -s "$current_content_file" "$new_content_file"; then
-            log_debug "Section already up to date in '$target_file'."
+            log_debug -l base_bash_libs.file "Section already up to date in '$target_file'."
             __file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 0
         fi
@@ -427,17 +427,17 @@ update_file_section() {
     fi
 
     if [[ "$section_exists" == true ]]; then
-        log_info "Updating '$target_file'"
+        log_info -l base_bash_libs.file "Updating '$target_file'"
     else
-        log_info "Adding section to '$target_file'"
+        log_info -l base_bash_libs.file "Adding section to '$target_file'"
     fi
     if ! __file_make_target_temp__ temp_file "$target_file"; then
-        log_error "Failed to create temporary file for '$target_file'."
+        log_error -l base_bash_libs.file "Failed to create temporary file for '$target_file'."
         __file_remove_temp_paths__ "$new_content_file"
         return 1
     fi
     if ! __preserve_file_mode__ "$target_file" "$temp_file"; then
-        log_error "Failed to preserve permissions for '$target_file'."
+        log_error -l base_bash_libs.file "Failed to preserve permissions for '$target_file'."
         __file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     fi
@@ -494,20 +494,20 @@ update_file_section() {
             fi
         fi
 
-        log_error "Failed to process sections in '$target_file'."
+        log_error -l base_bash_libs.file "Failed to process sections in '$target_file'."
         __file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     else
         # Markers not found in the file
         if ! cp "$target_file" "$temp_file"; then
-            log_error "Failed to copy '$target_file' to '$temp_file'."
+            log_error -l base_bash_libs.file "Failed to copy '$target_file' to '$temp_file'."
             __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
         if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
             if ! printf '\n' >> "$temp_file"; then
-                log_error "Failed to add trailing newline to '$temp_file'."
+                log_error -l base_bash_libs.file "Failed to add trailing newline to '$temp_file'."
                 __file_remove_temp_paths__ "$temp_file" "$new_content_file"
                 return 1
             fi
@@ -518,13 +518,13 @@ update_file_section() {
             printf '%s' "$new_content_string"
             printf '%s\n' "$end_marker"
         } >> "$temp_file"; then
-            log_error "Failed to add new section to '$target_file'."
+            log_error -l base_bash_libs.file "Failed to add new section to '$target_file'."
             __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
         if ! mv -f "$temp_file" "$target_file"; then
-            log_error "Failed to replace '$target_file' with '$temp_file'."
+            log_error -l base_bash_libs.file "Failed to replace '$target_file' with '$temp_file'."
             __file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi

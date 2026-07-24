@@ -142,6 +142,8 @@ base_bash_filter_runtime_args() {
         if ((parse_options)) && [[ "$1" == "--" ]]; then
             base_bash_runtime_args+=("$1")
             parse_options=0
+        # Keep consuming the deprecated --verbose-wrapper compatibility flag
+        # during the 1.x window so it never leaks into command argv.
         elif ((parse_options)) && [[ "$1" == --debug-wrapper || "$1" == --verbose-wrapper || "$1" == --utc-wrapper || "$1" == --color ]]; then
             :
         else

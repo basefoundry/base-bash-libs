@@ -65,6 +65,7 @@
 #
 # Notes:
 #   - Global options --debug-wrapper/--verbose-wrapper/--utc-wrapper/--color are stripped from "$@" automatically.
+#   - --verbose-wrapper is deprecated compatibility surface; prefer --debug-wrapper.
 #   - Wrappers may override the caller path seen by this library through BASE_BASH_BOOTSTRAP_SOURCE.
 #
 
@@ -271,6 +272,7 @@ check_bash_version() {
 #
 __stdlib_init__() {
     __log_init__
+    set_log_category_level -l base_bash_libs INFO
 
     #
     # Handle global arguments and strip them from the list before passing control to the main script.
@@ -290,10 +292,13 @@ __stdlib_init__() {
             case "$arg" in
                 --debug-wrapper)
                     set_log_level DEBUG
+                    set_log_category_level -l base_bash_libs DEBUG
                     export LOG_DEBUG=1
                     ;;
                 --verbose-wrapper)
+                    # Deprecated compatibility option; prefer --debug-wrapper.
                     set_log_level VERBOSE
+                    set_log_category_level -l base_bash_libs VERBOSE
                     export LOG_DEBUG=1
                     ;;
                 --utc-wrapper)
@@ -311,7 +316,7 @@ __stdlib_init__() {
         fi
     done
     __init_colors__
-    log_debug "Command line: $0 ${__SCRIPT_ARGS__[*]}"
+    log_debug -l base_bash_libs.std "Command line: $0 ${__SCRIPT_ARGS__[*]}"
     return 0
 }
 
@@ -374,7 +379,7 @@ add_to_path() {
         case "$opt" in
             n)  strict=0  ;;  # don't care if directory exists or not before adding it to PATH
             p)  prepend=1 ;;  # prepend the directory to PATH instead of appending
-            *)  log_error "add_to_path: invalid option '$opt'"
+            *)  log_error -l base_bash_libs.std "add_to_path: invalid option '$opt'"
                 return 1
                 ;;
         esac
@@ -458,6 +463,7 @@ __log_init__() {
     # Note the '-g' option passed to declare is essential for global scope.
     unset _log_levels _loggers_level_map _log_category_level_map
     declare -gA _log_levels _loggers_level_map _log_category_level_map
+    # VERBOSE is deprecated compatibility surface; new callers should use DEBUG.
     _log_levels=([FATAL]=0 [ERROR]=1 [WARN]=2 [INFO]=3 [DEBUG]=4 [VERBOSE]=5)
 
     # Terminal output defaults to INFO. Category filtering is a separate,
@@ -800,6 +806,7 @@ log_error()   { __print_log__ ERROR   "$@"; }
 log_warn()    { __print_log__ WARN    "$@"; }
 log_info()    { __print_log__ INFO    "$@"; }
 log_debug()   { __print_log__ DEBUG   "$@"; }
+# Deprecated compatibility helper; prefer log_debug.
 log_verbose() { __print_log__ VERBOSE "$@"; }
 
 #
@@ -807,6 +814,7 @@ log_verbose() { __print_log__ VERBOSE "$@"; }
 #
 log_info_file()    { __print_log_file__ INFO    "$@"; }
 log_debug_file()   { __print_log_file__ DEBUG   "$@"; }
+# Deprecated compatibility helper; prefer log_debug_file.
 log_verbose_file() { __print_log_file__ VERBOSE "$@"; }
 
 #
@@ -814,9 +822,11 @@ log_verbose_file() { __print_log_file__ VERBOSE "$@"; }
 #
 log_info_enter()    { __print_log__ INFO    "Entering function ${FUNCNAME[1]}"; }
 log_debug_enter()   { __print_log__ DEBUG   "Entering function ${FUNCNAME[1]}"; }
+# Deprecated compatibility helper; prefer log_debug_enter.
 log_verbose_enter() { __print_log__ VERBOSE "Entering function ${FUNCNAME[1]}"; }
 log_info_leave()    { __print_log__ INFO    "Leaving function ${FUNCNAME[1]}";  }
 log_debug_leave()   { __print_log__ DEBUG   "Leaving function ${FUNCNAME[1]}";  }
+# Deprecated compatibility helper; prefer log_debug_leave.
 log_verbose_leave() { __print_log__ VERBOSE "Leaving function ${FUNCNAME[1]}";  }
 
 #
@@ -884,16 +894,16 @@ exit_if_error() {
         message="No message specified"
     fi
     if ! [[ $rc =~ $num_re ]]; then
-        log_error "'$rc' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
+        log_error -l base_bash_libs.std "'$rc' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
         rc=1
     elif ! __std_decimal_integer_value__ normalized_rc "$rc"; then
-        log_error "'$rc' is not a valid decimal exit code. Treating it as 1."
+        log_error -l base_bash_libs.std "'$rc' is not a valid decimal exit code. Treating it as 1."
         rc=1
     else
         rc="$normalized_rc"
     fi
     ((rc)) && {
-        log_fatal "$message"
+        log_fatal -l base_bash_libs.std "$message"
         dump_trace
         exit "$rc"
     }
@@ -1097,7 +1107,7 @@ __std_run_impl__() {
             --timeout)
                 shift
                 if (($# == 0)) || ! __std_is_positive_integer__ "${1-}"; then
-                    log_error "$helper_name: timeout seconds must be a positive integer."
+                    log_error -l base_bash_libs.std "$helper_name: timeout seconds must be a positive integer."
                     return 1
                 fi
                 __std_decimal_integer_value__ timeout_seconds "$1"
@@ -1106,7 +1116,7 @@ __std_run_impl__() {
             --max-attempts | --retry-attempts)
                 shift
                 if (($# == 0)) || ! __std_is_positive_integer__ "${1-}"; then
-                    log_error "$helper_name: max attempts must be a positive integer."
+                    log_error -l base_bash_libs.std "$helper_name: max attempts must be a positive integer."
                     return 1
                 fi
                 __std_decimal_integer_value__ max_attempts "$1"
@@ -1115,7 +1125,7 @@ __std_run_impl__() {
             --retry-delay)
                 shift
                 if (($# == 0)) || ! __std_is_non_negative_integer__ "${1-}"; then
-                    log_error "$helper_name: retry delay seconds must be a non-negative integer."
+                    log_error -l base_bash_libs.std "$helper_name: retry delay seconds must be a non-negative integer."
                     return 1
                 fi
                 __std_decimal_integer_value__ retry_delay "$1"
@@ -1127,7 +1137,7 @@ __std_run_impl__() {
                 ;;
             *)
                 if [[ "${1-}" == --* ]]; then
-                    log_error "$helper_name: unknown option '$1'. Use -- before commands that begin with --."
+                    log_error -l base_bash_libs.std "$helper_name: unknown option '$1'. Use -- before commands that begin with --."
                     return 1
                 fi
                 break
@@ -1137,7 +1147,7 @@ __std_run_impl__() {
 
     # Check if the command is empty.
     if [[ $# -eq 0 ]]; then
-        log_error "$helper_name: No command provided."
+        log_error -l base_bash_libs.std "$helper_name: No command provided."
         return 1
     fi
 
@@ -1154,9 +1164,9 @@ __std_run_impl__() {
         # print a command and its arguments in a way that is unambiguous and
         # could be copied and pasted back into a shell.
         if [[ -n "$policy_description" ]]; then
-            log_info "[DRY-RUN] Would run with ${policy_description}: ${printable_command}"
+            log_info -l base_bash_libs.std "[DRY-RUN] Would run with ${policy_description}: ${printable_command}"
         else
-            log_info "[DRY-RUN] Would run: ${printable_command}"
+            log_info -l base_bash_libs.std "[DRY-RUN] Would run: ${printable_command}"
         fi
         return 0
     fi
@@ -1180,7 +1190,7 @@ __std_run_impl__() {
         if ((attempt < max_attempts)); then
             if ((! quiet)); then
                 __std_run_status_message__ message "$exit_code" "$timeout_seconds" "$printable_command"
-                log_warn "${message} (attempt ${attempt} of ${max_attempts}; retrying)."
+                log_warn -l base_bash_libs.std "${message} (attempt ${attempt} of ${max_attempts}; retrying)."
             fi
             if ((retry_delay > 0)); then
                 __std_sleep_interval__ "$retry_delay"
@@ -1204,7 +1214,7 @@ __std_run_impl__() {
             exit_if_error "$exit_code" "$message"
         else
             if ((! quiet)); then
-                log_warn "$message (continuing)."
+                log_warn -l base_bash_libs.std "$message (continuing)."
             fi
             return $exit_code
         fi
@@ -1307,7 +1317,7 @@ safe_mkdir() {
         case "$opt" in
             p) mkdir_args=(-p) ;;
             \?)
-                log_error "safe_mkdir: invalid option '-$OPTARG'"
+                log_error -l base_bash_libs.std "safe_mkdir: invalid option '-$OPTARG'"
                 return 1
                 ;;
         esac
@@ -1315,7 +1325,7 @@ safe_mkdir() {
     shift $((OPTIND - 1))
 
     if (($# == 0)); then
-        log_warn "safe_mkdir: No directories provided to create."
+        log_warn -l base_bash_libs.std "safe_mkdir: No directories provided to create."
         return 0
     fi
 
@@ -1348,7 +1358,7 @@ safe_touch() {
     local file touch_path
 
     if (($# == 0)); then
-        log_warn "safe_touch: No files provided to touch."
+        log_warn -l base_bash_libs.std "safe_touch: No files provided to touch."
         return 0
     fi
 
@@ -1386,7 +1396,7 @@ safe_truncate() {
     local file
 
     if (($# == 0)); then
-        log_warn "safe_truncate: No files provided to truncate."
+        log_warn -l base_bash_libs.std "safe_truncate: No files provided to truncate."
         return 0
     fi
 
@@ -1438,14 +1448,14 @@ __std_run_cleanup_hooks__() {
 
     for hook in "${__std_cleanup_hooks[@]}"; do
         if ! "$hook"; then
-            log_warn "Cleanup hook '$hook' failed."
+            log_warn -l base_bash_libs.std "Cleanup hook '$hook' failed."
         fi
     done
 
     for cleanup_path in "${__std_cleanup_paths[@]}"; do
         [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || continue
         if ! rm -rf -- "$cleanup_path"; then
-            log_warn "Cleanup path '$cleanup_path' could not be removed."
+            log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
         fi
     done
 
@@ -1477,11 +1487,11 @@ std_register_cleanup_hook() {
     local hook="${1-}" existing_hook
 
     if (($# != 1)); then
-        log_error "std_register_cleanup_hook: expected exactly one function name."
+        log_error -l base_bash_libs.std "std_register_cleanup_hook: expected exactly one function name."
         return 1
     fi
     if ! __is_valid_variable_name__ "$hook" || ! declare -F "$hook" >/dev/null; then
-        log_error "std_register_cleanup_hook: '$hook' is not a defined cleanup function."
+        log_error -l base_bash_libs.std "std_register_cleanup_hook: '$hook' is not a defined cleanup function."
         return 1
     fi
 
@@ -1505,7 +1515,7 @@ std_unregister_cleanup_hook() {
     local -a remaining_hooks=()
 
     if (($# != 1)); then
-        log_error "std_unregister_cleanup_hook: expected exactly one function name."
+        log_error -l base_bash_libs.std "std_unregister_cleanup_hook: expected exactly one function name."
         return 1
     fi
 
@@ -1550,13 +1560,13 @@ std_register_cleanup_path() {
     local already_registered had_valid_path=0 status=0
 
     if (($# == 0)); then
-        log_warn "std_register_cleanup_path: No paths provided."
+        log_warn -l base_bash_libs.std "std_register_cleanup_path: No paths provided."
         return 0
     fi
 
     for path; do
         if ! __std_is_safe_cleanup_path__ "$path"; then
-            log_error "std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
+            log_error -l base_bash_libs.std "std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
             status=1
             continue
         fi
@@ -1596,13 +1606,13 @@ std_unregister_cleanup_path() {
     local -a paths_to_remove=() remaining_paths=()
 
     if (($# == 0)); then
-        log_warn "std_unregister_cleanup_path: No paths provided."
+        log_warn -l base_bash_libs.std "std_unregister_cleanup_path: No paths provided."
         return 0
     fi
 
     for path; do
         if ! __std_is_safe_cleanup_path__ "$path"; then
-            log_error "std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '$path'."
+            log_error -l base_bash_libs.std "std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '$path'."
             status=1
             continue
         fi
@@ -1652,7 +1662,7 @@ __std_make_temp_path__() {
     done
 
     if (($# < 1 || $# > 2)); then
-        log_error "$__std_temp_helper_name: usage: $__std_temp_helper_name [--keep] <result_variable_name> [prefix]"
+        log_error -l base_bash_libs.std "$__std_temp_helper_name: usage: $__std_temp_helper_name [--keep] <result_variable_name> [prefix]"
         return 1
     fi
 
@@ -1660,31 +1670,31 @@ __std_make_temp_path__() {
     __std_temp_prefix="${2:-base-bash-libs}"
 
     if ! __is_valid_variable_name__ "$__std_temp_result_name"; then
-        log_error "$__std_temp_helper_name: result variable name must be a valid Bash variable name."
+        log_error -l base_bash_libs.std "$__std_temp_helper_name: result variable name must be a valid Bash variable name."
         return 1
     fi
     __std_assert_writable_output__ "$__std_temp_helper_name" "$__std_temp_result_name" || return 1
     if [[ -z "$__std_temp_prefix" || "$__std_temp_prefix" == */* ]]; then
-        log_error "$__std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
+        log_error -l base_bash_libs.std "$__std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
         return 1
     fi
 
     __std_temp_root="${TMPDIR:-/tmp}"
     __std_temp_root="${__std_temp_root%/}"
     if [[ -z "$__std_temp_root" || ! -d "$__std_temp_root" ]]; then
-        log_error "$__std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+        log_error -l base_bash_libs.std "$__std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
         return 1
     fi
 
     __std_temp_template="$__std_temp_root/$__std_temp_prefix.XXXXXXXXXX"
     if [[ "$__std_temp_path_kind" == "dir" ]]; then
         __std_temp_path="$(mktemp -d "$__std_temp_template" 2>/dev/null)" || {
-            log_error "$__std_temp_helper_name: failed to create temporary directory."
+            log_error -l base_bash_libs.std "$__std_temp_helper_name: failed to create temporary directory."
             return 1
         }
     else
         __std_temp_path="$(mktemp "$__std_temp_template" 2>/dev/null)" || {
-            log_error "$__std_temp_helper_name: failed to create temporary file."
+            log_error -l base_bash_libs.std "$__std_temp_helper_name: failed to create temporary file."
             return 1
         }
     fi
@@ -1739,7 +1749,7 @@ __std_assert_writable_output__() {
     attributes="${declaration#declare -}"
     attributes="${attributes%% *}"
     if [[ "$attributes" == *r* ]]; then
-        log_error "$function_name: result variable '$output_name' is readonly."
+        log_error -l base_bash_libs.std "$function_name: result variable '$output_name' is readonly."
         return 1
     fi
     return 0
@@ -1847,11 +1857,11 @@ std_command_path() {
     local __std_command_result_name="${1-}" __std_command_name="${2-}" __std_command_resolved_path=""
 
     if (($# != 2)); then
-        log_error "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
+        log_error -l base_bash_libs.std "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
         return 1
     fi
     if ! __is_valid_variable_name__ "$__std_command_result_name"; then
-        log_error "std_command_path: result variable name must be a valid Bash variable name."
+        log_error -l base_bash_libs.std "std_command_path: result variable name must be a valid Bash variable name."
         return 1
     fi
     __std_assert_writable_output__ std_command_path "$__std_command_result_name" || return 1
@@ -2061,7 +2071,7 @@ assert_command_exists() {
     local cmd
 
     if (($# == 0)); then
-        log_warn "assert_command_exists: No commands provided to check."
+        log_warn -l base_bash_libs.std "assert_command_exists: No commands provided to check."
         return 0
     fi
 
@@ -2096,7 +2106,7 @@ assert_file_exists() {
     local file
 
     if (($# == 0)); then
-        log_warn "assert_file_exists: No files provided to check."
+        log_warn -l base_bash_libs.std "assert_file_exists: No files provided to check."
         return 0
     fi
 
@@ -2135,7 +2145,7 @@ assert_executable() {
     local executable
 
     if (($# == 0)); then
-        log_warn "assert_executable: No executable paths provided to check."
+        log_warn -l base_bash_libs.std "assert_executable: No executable paths provided to check."
         return 0
     fi
 
@@ -2170,7 +2180,7 @@ assert_dir_exists() {
     local dir
 
     if (($# == 0)); then
-        log_warn "assert_dir_exists: No directories provided to check."
+        log_warn -l base_bash_libs.std "assert_dir_exists: No directories provided to check."
         return 0
     fi
 
@@ -2250,14 +2260,14 @@ get_my_source_dir() {
 #
 ask_yes_no() {
     if (("$#" != 1)); then
-        log_error "ask_yes_no: invalid arguments"
-        log_info "Usage: ask_yes_no <prompt_message>"
+        log_error -l base_bash_libs.std "ask_yes_no: invalid arguments"
+        log_info -l base_bash_libs.std "Usage: ask_yes_no <prompt_message>"
         return 1
     fi
 
     local message=$1 user_input tty_fd
     if ! exec {tty_fd}</dev/tty 2>/dev/null; then
-        log_error "ask_yes_no: /dev/tty is not available"
+        log_error -l base_bash_libs.std "ask_yes_no: /dev/tty is not available"
         return 1
     fi
 
@@ -2298,14 +2308,14 @@ ask_yes_no() {
 #
 wait_for_enter() {
     if (("$#" > 1)); then
-        log_error "wait_for_enter: invalid arguments"
-        log_info "Usage: wait_for_enter [prompt_message]"
+        log_error -l base_bash_libs.std "wait_for_enter: invalid arguments"
+        log_info -l base_bash_libs.std "Usage: wait_for_enter [prompt_message]"
         return 1
     fi
 
     local prompt=${1:-"Press Enter to continue"} tty_fd read_status
     if ! exec {tty_fd}</dev/tty 2>/dev/null; then
-        log_error "wait_for_enter: /dev/tty is not available"
+        log_error -l base_bash_libs.std "wait_for_enter: /dev/tty is not available"
         return 1
     fi
 
@@ -2314,7 +2324,7 @@ wait_for_enter() {
     exec {tty_fd}<&-
 
     if ((read_status != 0)); then
-        log_error "wait_for_enter: failed to read from /dev/tty"
+        log_error -l base_bash_libs.std "wait_for_enter: failed to read from /dev/tty"
         return "$read_status"
     fi
 

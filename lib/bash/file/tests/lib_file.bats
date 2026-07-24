@@ -261,6 +261,7 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nsame\ncontent\n# END\nafter' ]
 
     set_log_level DEBUG
+    set_log_category_level -l base_bash_libs.file DEBUG
     capture_command update_file_section "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 0 ]
