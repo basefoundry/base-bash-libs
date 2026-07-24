@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added hierarchical log-category gates and `log_is_enabled`, allowing callers
+  to control reusable-component diagnostics independently from terminal and
+  persistent-sink verbosity.
+
 ### Changed
 
 - Added an optional `BASE_CLI_PRIMARY_LOG` diagnostic sink. Bash logging keeps

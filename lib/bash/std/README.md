@@ -68,8 +68,12 @@ zero for success and nonzero for a false or invalid condition.
 
 ### Logging and Messages
 
-- `set_log_level [-l <logger>] <level>`: changes a logger threshold and returns
+- `set_log_level [-l <logger>] <level>`: changes terminal verbosity and returns
   nonzero for an unknown level or logger option error.
+- `set_log_category_level -l <category> <level>`: changes the independent gate
+  for a category and its dotted descendants.
+- `log_is_enabled [-l <category>] <level>`: returns zero when the category gate
+  and at least one configured sink accept the level.
 - `log_fatal`, `log_error`, `log_warn`, `log_info`, `log_debug`,
   `log_verbose <message...>`: write a structured message to stderr at the
   named level.
@@ -237,17 +241,50 @@ Available levels:
 - `DEBUG`
 - `VERBOSE`
 
-Change the default logger's level with:
+Change terminal verbosity with:
 
 ```bash
 set_log_level DEBUG
 ```
 
-Named loggers are also supported:
+The `-l` identifier on a log call selects both its category gate and any
+explicitly configured named terminal logger. For example:
 
 ```bash
 set_log_level -l artifact DEBUG
 log_debug -l artifact "registry key: $key"
+```
+
+Terminal verbosity and category gates answer different questions:
+
+- `set_log_level` controls what appears on the terminal. An unconfigured named
+  logger inherits the default terminal level.
+- `set_log_category_level` controls whether a component may emit a record at
+  all. Categories inherit from the nearest explicitly configured dotted parent,
+  then from `default`.
+- `BASE_CLI_PRIMARY_LOG`, when set, receives accepted records through DEBUG
+  even when the terminal remains at INFO.
+
+Category gates are permissive by default for compatibility. Applications can
+keep their own DEBUG output while limiting a reusable component:
+
+```bash
+set_log_level DEBUG
+set_log_category_level -l reusable_library INFO
+set_log_category_level -l reusable_library.network DEBUG
+
+log_debug "application diagnostic"
+log_debug -l reusable_library "suppressed library diagnostic"
+log_debug -l reusable_library.network "enabled network diagnostic"
+```
+
+Use `log_is_enabled` to avoid constructing an expensive diagnostic unless a
+terminal or persistent sink will consume it:
+
+```bash
+if log_is_enabled -l reusable_library.network DEBUG; then
+    log_debug -l reusable_library.network "response=$(render_large_response)"
+fi
 ```
 
 For user-facing messages that should not include timestamps or source
