@@ -20,6 +20,7 @@ run_stage() {
 
 lint_files=(
   bin/base-bash
+  tests/bash-42-logging-smoke.sh
   tests/validate.sh
   tests/lint-warnings.sh
   examples/std-usage.sh
