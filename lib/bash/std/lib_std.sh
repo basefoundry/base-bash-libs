@@ -45,7 +45,11 @@
 #   base_bash_libs_require_version min_version
 #                                # Exit clearly if the loaded library is too old.
 #   add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
-#   set_log_level [LEVEL]        # Adjust default logger (FATAL..VERBOSE).
+#   set_log_level [LEVEL]        # Adjust terminal verbosity (FATAL..VERBOSE).
+#   set_log_category_level -l category LEVEL
+#                                # Gate a category independently of its sinks.
+#   log_is_enabled [-l category] LEVEL
+#                                # Test whether any configured sink accepts a level.
 #   log_info/debug/... msgs      # Structured logging (color in interactive shells).
 #   safe_touch file [...]        # touch wrapper that exits on failure (same for safe_truncate).
 #   assert_* utilities           # Validation helpers (assert_not_null / assert_integer / ...).
@@ -452,13 +456,14 @@ print_path() {
 __log_init__() {
     # Map log level strings (FATAL, ERROR, etc.) to numeric values.
     # Note the '-g' option passed to declare is essential for global scope.
-    unset _log_levels _loggers_level_map
-    declare -gA _log_levels _loggers_level_map
+    unset _log_levels _loggers_level_map _log_category_level_map
+    declare -gA _log_levels _loggers_level_map _log_category_level_map
     _log_levels=([FATAL]=0 [ERROR]=1 [WARN]=2 [INFO]=3 [DEBUG]=4 [VERBOSE]=5)
 
-    # Hash to map loggers to their log levels.
-    # The default logger "default" has INFO as its default log level.
+    # Terminal output defaults to INFO. Category filtering is a separate,
+    # permissive gate so existing callers retain their current sink behavior.
     _loggers_level_map["default"]=3
+    _log_category_level_map["default"]=5
 }
 
 #
@@ -603,6 +608,114 @@ set_log_level() {
 }
 
 #
+# set_log_category_level - Sets the gate for a hierarchical log category.
+#
+# Usage:
+#   set_log_category_level -l [category] [level]
+#
+# Categories inherit by dotted parent name. For example, base.git.fetch first
+# checks base.git.fetch, then base.git, then base, and finally default.
+# Invalid arguments return 1 without changing the existing category level.
+#
+set_log_category_level() {
+    local category in_level l
+
+    if [[ "$#" -ne 3 || "${1-}" != "-l" || -z "${2-}" || -z "${3-}" ]]; then
+        printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Usage: set_log_category_level -l <category> <level>" >&2
+        return 1
+    fi
+
+    category=$2
+    in_level=$3
+    if [[ -n "${_log_levels[$in_level]+set}" ]]; then
+        l="${_log_levels[$in_level]}"
+        _log_category_level_map[$category]=$l
+        return 0
+    fi
+
+    printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+        "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for category '$category'" >&2
+    return 1
+}
+
+#
+# __resolve_log_category_level__ - Resolve a category through its dotted parents.
+#
+__resolve_log_category_level__() {
+    local result_name="$1" category="${2:-default}" candidate
+
+    candidate=$category
+    while [[ -n "$candidate" ]]; do
+        if [[ -n "${_log_category_level_map[$candidate]+set}" ]]; then
+            printf -v "$result_name" '%s' "${_log_category_level_map[$candidate]}"
+            return 0
+        fi
+        [[ "$candidate" == *.* ]] || break
+        candidate="${candidate%.*}"
+    done
+
+    printf -v "$result_name" '%s' "${_log_category_level_map[default]}"
+}
+
+#
+# __log_sink_state__ - Store terminal and persistent-sink decisions.
+#
+__log_sink_state__() {
+    local category="$1" in_level="$2" terminal_result="$3" persist_result="$4"
+    local event_level category_level terminal_level terminal_state=0 persist_state=0
+
+    [[ -n "${_log_levels[$in_level]+set}" ]] || return 1
+    event_level="${_log_levels[$in_level]}"
+    __resolve_log_category_level__ category_level "$category"
+
+    if ((category_level >= event_level)); then
+        terminal_level="${_loggers_level_map[$category]:-${_loggers_level_map[default]}}"
+        ((terminal_level >= event_level)) && terminal_state=1
+        if [[ -n "${BASE_CLI_PRIMARY_LOG:-}" ]] && ((event_level <= _log_levels[DEBUG])); then
+            persist_state=1
+        fi
+    fi
+
+    printf -v "$terminal_result" '%s' "$terminal_state"
+    printf -v "$persist_result" '%s' "$persist_state"
+}
+
+#
+# log_is_enabled - Return success when any configured sink accepts a level.
+#
+# Usage:
+#   log_is_enabled [-l category] level
+#
+log_is_enabled() {
+    local category=default in_level terminal_enabled persist_enabled
+
+    if [[ "${1-}" == "-l" ]]; then
+        if [[ -z "${2-}" ]]; then
+            printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+                "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+            return 1
+        fi
+        category=$2
+        shift 2
+    fi
+    if [[ "$#" -ne 1 || -z "${1-}" ]]; then
+        printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Usage: log_is_enabled [-l <category>] <level>" >&2
+        return 1
+    fi
+    in_level=$1
+    if [[ -z "${_log_levels[$in_level]+set}" ]]; then
+        printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
+            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for category '$category'" >&2
+        return 1
+    fi
+
+    __log_sink_state__ "$category" "$in_level" terminal_enabled persist_enabled || return 1
+    ((terminal_enabled || persist_enabled))
+}
+
+#
 # __print_log__ - Core and private log printing logic.
 #
 # This is the internal engine for the logging functions. It formats the log
@@ -613,7 +726,7 @@ __print_log__() {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
-    local logger=default log_level_set log_level color source_location
+    local logger=default color source_location
     local terminal_enabled persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
@@ -623,13 +736,7 @@ __print_log__() {
         logger=$2
         shift 2
     fi
-    log_level="${_log_levels[$in_level]}"
-    log_level_set="${_loggers_level_map[$logger]:-3}"
-
-    terminal_enabled=0
-    ((log_level_set >= log_level)) && terminal_enabled=1
-    persist_enabled=0
-    [[ -n "${BASE_CLI_PRIMARY_LOG:-}" ]] && ((log_level <= _log_levels[DEBUG])) && persist_enabled=1
+    __log_sink_state__ "$logger" "$in_level" terminal_enabled persist_enabled || return 1
 
     if ((terminal_enabled || persist_enabled)); then
         # Select color based on log level
@@ -655,7 +762,8 @@ __print_log_file__()   {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
-    local logger=default log_level_set log_level file
+    local logger=default file primary_log
+    local terminal_enabled persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
             printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
@@ -665,17 +773,21 @@ __print_log_file__()   {
         shift 2
     fi
     file="${1-}"
-    log_level="${_log_levels[$in_level]}"
-    log_level_set="${_loggers_level_map[$logger]}"
-    if [[ $log_level_set ]]; then
-        if ((log_level_set >= log_level)) && [[ -f $file ]]; then
-            __print_log__ "$in_level" -l "$logger" "Contents of file '$file':"
+    __log_sink_state__ "$logger" "$in_level" terminal_enabled persist_enabled || return 1
+    if ((terminal_enabled || persist_enabled)) && [[ -f "$file" ]]; then
+        __print_log__ "$in_level" -l "$logger" "Contents of file '$file':"
+        if ((terminal_enabled)); then
             cat -- "$file" >&2
+            # Keep the next structured record separate even when the file does
+            # not end in a newline. A blank separator is harmless otherwise.
+            printf '\n' >&2
         fi
-    else
-        local source_location
-        __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
-        __print_log_record__ "$COLOR_YELLOW" WARN "$source_location" 1 1 "Unknown logger '$logger'"
+        if ((persist_enabled)); then
+            primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+            if [[ -n "$primary_log" ]]; then
+                (umask 077; { cat -- "$file"; printf '\n'; } >>"$primary_log") || :
+            fi
+        fi
     fi
 }
 

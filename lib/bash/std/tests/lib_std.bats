@@ -548,6 +548,7 @@ EOF
     [ "${_log_levels[ERROR]}" -eq 1 ]
     [ "${_log_levels[VERBOSE]}" -eq 5 ]
     [ "${_loggers_level_map[default]}" -eq 3 ]
+    [ "${_log_category_level_map[default]}" -eq 5 ]
     [ -z "${COLOR_RED:-}" ]
 }
 
@@ -585,6 +586,120 @@ EOF
     [ "$rc" -eq 1 ]
     [ "${_loggers_level_map[custom]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE' for logger 'custom'"* ]]
+}
+
+@test "set_log_category_level updates categories and rejects invalid input without changing levels" {
+    local stderr_file="$TEST_TMPDIR/set-log-category-level.err"
+    local rc
+
+    set_log_category_level -l base.library DEBUG
+    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+
+    if set_log_category_level -l base.library 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [ -s "$stderr_file" ]
+
+    if set_log_category_level -l base.library NOPE 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE'"* ]]
+}
+
+@test "log category resolution prefers exact then nearest parent then default" {
+    local stderr_file="$TEST_TMPDIR/log-category-hierarchy.err"
+
+    set_log_level DEBUG
+    set_log_category_level -l product INFO
+    set_log_category_level -l product.library DEBUG
+    set_log_category_level -l product.library.exact INFO
+
+    {
+        log_debug -l product.library.worker "nearest parent enabled"
+        log_debug -l product.library.exact "exact override hidden"
+        log_debug -l product.library.sibling "sibling remains enabled"
+        log_debug -l product.other "broader parent hidden"
+        log_debug -l unrelated "default category enabled"
+    } 2>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *"nearest parent enabled"* ]]
+    [[ "$(cat "$stderr_file")" != *"exact override hidden"* ]]
+    [[ "$(cat "$stderr_file")" == *"sibling remains enabled"* ]]
+    [[ "$(cat "$stderr_file")" != *"broader parent hidden"* ]]
+    [[ "$(cat "$stderr_file")" == *"default category enabled"* ]]
+}
+
+@test "unconfigured named terminal loggers inherit default and explicit overrides win" {
+    local stderr_file="$TEST_TMPDIR/log-terminal-inheritance.err"
+
+    set_log_level DEBUG
+    set_log_level -l explicit INFO
+
+    {
+        log_debug -l inherited "inherited terminal debug"
+        log_debug -l explicit "explicit terminal override"
+    } 2>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *"inherited terminal debug"* ]]
+    [[ "$(cat "$stderr_file")" != *"explicit terminal override"* ]]
+}
+
+@test "log_is_enabled requires both category acceptance and an accepting sink" {
+    local primary_log="$TEST_TMPDIR/log-is-enabled-primary.log"
+
+    log_is_enabled INFO
+    ! log_is_enabled DEBUG
+
+    BASE_CLI_PRIMARY_LOG="$primary_log"
+    log_is_enabled DEBUG
+    ! log_is_enabled VERBOSE
+
+    set_log_category_level -l base.library INFO
+    ! log_is_enabled -l base.library DEBUG
+
+    set_log_category_level -l base.library DEBUG
+    log_is_enabled -l base.library DEBUG
+
+    unset BASE_CLI_PRIMARY_LOG
+    ! log_is_enabled -l base.library DEBUG
+    set_log_level DEBUG
+    log_is_enabled -l base.library DEBUG
+}
+
+@test "log_is_enabled rejects malformed and invalid input without changing logging state" {
+    local stderr_file="$TEST_TMPDIR/log-is-enabled-invalid.err"
+    local rc
+
+    set_log_category_level -l base.library DEBUG
+    set_log_level DEBUG
+
+    if log_is_enabled -l 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [ "${_loggers_level_map[default]}" -eq 4 ]
+    [ -s "$stderr_file" ]
+
+    if log_is_enabled -l base.library NOPE 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [ "${_loggers_level_map[default]}" -eq 4 ]
+    [[ "$(cat "$stderr_file")" == *"NOPE"* ]]
 }
 
 @test "__print_log__ requires a log level" {
@@ -640,6 +755,26 @@ EOF
     BASE_CLI_PRIMARY_LOG="$primary_log" log_info "terminal info" 2>>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"INFO"*"terminal info"* ]]
     [[ "$(cat "$primary_log")" == *"INFO"*"terminal info"* ]]
+}
+
+@test "category gates apply before terminal and persistent sink decisions" {
+    local stderr_file="$TEST_TMPDIR/log-category-sinks.err"
+    local primary_log="$TEST_TMPDIR/log-category-sinks.log"
+
+    set_log_category_level -l base.library INFO
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug -l base.library "blocked library debug" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ ! -s "$primary_log" ]
+
+    set_log_category_level -l base.library DEBUG
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug -l base.library "persisted library debug" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [[ "$(cat "$primary_log")" == *"DEBUG"*"persisted library debug"* ]]
+    [[ "$(cat "$primary_log")" != *"blocked library debug"* ]]
 }
 
 @test "__print_log__ uses local timestamps by default" {
@@ -698,7 +833,7 @@ EOF
     [[ "$output" == *"caller_count=20"* ]]
 }
 
-@test "file logging helpers print contents and warn on unknown loggers" {
+@test "file logging helpers inherit default terminal levels for named categories" {
     local target="$TEST_TMPDIR/log-target.txt"
     local stderr_file="$TEST_TMPDIR/log-file.err"
 
@@ -713,9 +848,49 @@ EOF
     [[ "$(cat "$stderr_file")" == *"hello file"* ]]
 
     __print_log_file__ INFO -l missing "$target" 2>"$stderr_file"
-    [[ "$(cat "$stderr_file")" == *"Unknown logger 'missing'"* ]]
-    [[ "$(cat "$stderr_file")" != *"lib_std.sh:"* ]]
-    [[ "$(cat "$stderr_file")" != *":0 "* ]]
+    [[ "$(cat "$stderr_file")" == *"Contents of file '$target':"* ]]
+    [[ "$(cat "$stderr_file")" == *"hello file"* ]]
+    [[ "$(cat "$stderr_file")" != *"Unknown logger"* ]]
+}
+
+@test "file logging helpers apply category gates and sink decisions" {
+    local target="$TEST_TMPDIR/log-category-target.txt"
+    local stderr_file="$TEST_TMPDIR/log-category-file.err"
+    local primary_log="$TEST_TMPDIR/log-category-file.log"
+
+    printf 'category file contents\n' > "$target"
+    set_log_category_level -l base.files INFO
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug_file -l base.files "$target" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ ! -s "$primary_log" ]
+
+    set_log_category_level -l base.files DEBUG
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug_file -l base.files "$target" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [[ "$(cat "$primary_log")" == *"DEBUG"*"Contents of file '$target':"* ]]
+    [[ "$(cat "$primary_log")" == *"category file contents"* ]]
+}
+
+@test "file logging helpers separate unterminated contents from later records" {
+    local target="$TEST_TMPDIR/log-unterminated-target.txt"
+    local stderr_file="$TEST_TMPDIR/log-unterminated.err"
+    local primary_log="$TEST_TMPDIR/log-unterminated.log"
+
+    printf 'unterminated contents' > "$target"
+    set_log_level DEBUG
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug_file "$target" 2>"$stderr_file"
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_info "next structured record" 2>>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *$'unterminated contents\n'*"next structured record"* ]]
+    [[ "$(cat "$primary_log")" == *$'unterminated contents\n'*"next structured record"* ]]
 }
 
 @test "enter and leave logging helpers include the caller name" {
