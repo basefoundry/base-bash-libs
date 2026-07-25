@@ -15,6 +15,22 @@ smoke_assert_contains() {
     return 0
 }
 
+smoke_capture_stderr() {
+    local stdout_path="$1" stderr_path="$2" label="$3"
+    shift 3
+
+    if ! "$@" >"$stdout_path" 2>"$stderr_path"; then
+        smoke_fail "$label returned a failure status."
+        return 1
+    fi
+    if [[ -s "$stdout_path" ]]; then
+        smoke_fail "$label wrote to stdout instead of reserving it for program output."
+        return 1
+    fi
+    SMOKE_CAPTURED_STDERR="$(<"$stderr_path")"
+    return 0
+}
+
 smoke_file_mode() {
     local file_path="$1" mode
 
@@ -28,6 +44,7 @@ smoke_file_mode() {
 main() {
     local expected_major="${1-}" expected_minor="${2-}" expected_patch="${3-}"
     local script_dir repo_root smoke_dir primary_log payload_file
+    local terminal_stdout terminal_stderr
     local info_output debug_output terminal_output primary_content mode
     local utc_output verbose_output
 
@@ -65,11 +82,24 @@ main() {
         return 1
     fi
 
-    info_output="$(log_info -l base_bash_libs.smoke "default info" 2>&1)"
+    std_make_temp_dir smoke_dir bash42-logging-smoke || {
+        smoke_fail "unable to create the smoke workspace."
+        return 1
+    }
+    terminal_stdout="$smoke_dir/terminal.stdout"
+    terminal_stderr="$smoke_dir/terminal.stderr"
+    primary_log="$smoke_dir/primary.log"
+    payload_file="$smoke_dir/payload.txt"
+
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "default INFO" \
+        log_info -l base_bash_libs.smoke "default info" || return 1
+    info_output="$SMOKE_CAPTURED_STDERR"
     smoke_assert_contains "$info_output" "INFO" "default INFO record" || return 1
     smoke_assert_contains "$info_output" "default info" "default INFO message" || return 1
 
-    debug_output="$(log_debug -l base_bash_libs.smoke "hidden library debug" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "default DEBUG" \
+        log_debug -l base_bash_libs.smoke "hidden library debug" || return 1
+    debug_output="$SMOKE_CAPTURED_STDERR"
     if [[ -n "$debug_output" ]]; then
         smoke_fail "library DEBUG was visible at the default thresholds."
         return 1
@@ -96,7 +126,9 @@ main() {
         smoke_fail "a child category did not inherit its parent DEBUG gate."
         return 1
     fi
-    debug_output="$(log_debug -l base_bash_libs.smoke.child "visible category debug" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "enabled DEBUG" \
+        log_debug -l base_bash_libs.smoke.child "visible category debug" || return 1
+    debug_output="$SMOKE_CAPTURED_STDERR"
     smoke_assert_contains "$debug_output" "DEBUG" "enabled DEBUG record" || return 1
     smoke_assert_contains "$debug_output" "visible category debug" "enabled DEBUG message" || return 1
 
@@ -104,12 +136,6 @@ main() {
         smoke_fail "unable to restore terminal INFO."
         return 1
     }
-    std_make_temp_dir smoke_dir bash42-logging-smoke || {
-        smoke_fail "unable to create the smoke workspace."
-        return 1
-    }
-    primary_log="$smoke_dir/primary.log"
-    payload_file="$smoke_dir/payload.txt"
     export BASE_CLI_PRIMARY_LOG="$primary_log"
 
     if ! log_is_enabled -l base_bash_libs.smoke.child DEBUG; then
@@ -121,7 +147,9 @@ main() {
         return 1
     fi
 
-    terminal_output="$(log_debug -l base_bash_libs.smoke.child "persisted debug" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "persistent DEBUG" \
+        log_debug -l base_bash_libs.smoke.child "persisted debug" || return 1
+    terminal_output="$SMOKE_CAPTURED_STDERR"
     if [[ -n "$terminal_output" ]]; then
         smoke_fail "persistent DEBUG leaked to the INFO terminal."
         return 1
@@ -146,7 +174,12 @@ main() {
         smoke_fail "the INFO category gate did not suppress persistent DEBUG."
         return 1
     fi
-    log_debug -l base_bash_libs.smoke.child "blocked persistent debug" 2>&1
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "blocked persistent DEBUG" \
+        log_debug -l base_bash_libs.smoke.child "blocked persistent debug" || return 1
+    if [[ -n "$SMOKE_CAPTURED_STDERR" ]]; then
+        smoke_fail "the INFO category gate allowed terminal DEBUG."
+        return 1
+    fi
     primary_content="$(<"$primary_log")"
     if [[ "$primary_content" == *"blocked persistent debug"* ]]; then
         smoke_fail "the INFO category gate allowed a persistent DEBUG record."
@@ -161,7 +194,9 @@ main() {
         smoke_fail "unable to create the file-logging payload."
         return 1
     }
-    terminal_output="$(log_debug_file -l base_bash_libs.smoke.child "$payload_file" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "persistent DEBUG file" \
+        log_debug_file -l base_bash_libs.smoke.child "$payload_file" || return 1
+    terminal_output="$SMOKE_CAPTURED_STDERR"
     if [[ -n "$terminal_output" ]]; then
         smoke_fail "persistent DEBUG file contents leaked to the INFO terminal."
         return 1
@@ -173,7 +208,9 @@ main() {
         "persistent file payload" || return 1
 
     export LOG_UTC=1
-    utc_output="$(log_info -l base_bash_libs.smoke "utc info" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "UTC INFO" \
+        log_info -l base_bash_libs.smoke "utc info" || return 1
+    utc_output="$SMOKE_CAPTURED_STDERR"
     smoke_assert_contains "$utc_output" " UTC INFO" "UTC log timestamp" || return 1
 
     set_log_level VERBOSE || {
@@ -184,7 +221,9 @@ main() {
         smoke_fail "unable to enable the VERBOSE compatibility category."
         return 1
     }
-    verbose_output="$(log_verbose -l base_bash_libs.smoke "compat verbose" 2>&1)"
+    smoke_capture_stderr "$terminal_stdout" "$terminal_stderr" "VERBOSE compatibility" \
+        log_verbose -l base_bash_libs.smoke "compat verbose" || return 1
+    verbose_output="$SMOKE_CAPTURED_STDERR"
     smoke_assert_contains "$verbose_output" "VERBOSE" "VERBOSE compatibility record" || return 1
     if [[ "$verbose_output" == *"deprecated"* ]]; then
         smoke_fail "VERBOSE compatibility emitted a runtime deprecation warning."
