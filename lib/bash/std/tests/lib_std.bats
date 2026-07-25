@@ -801,8 +801,9 @@ EOF
 @test "primary sink creates and hardens regular files to mode 0600" {
     local new_log="$TEST_TMPDIR/new-private-primary.log"
     local existing_log="$TEST_TMPDIR/existing-primary.log"
+    local option_log="$TEST_TMPDIR/-option-primary.log"
     local stderr_file="$TEST_TMPDIR/private-primary.err"
-    local original_umask
+    local original_dir original_umask
 
     original_umask="$(umask)"
     umask 000
@@ -822,6 +823,16 @@ EOF
     [ "$(file_mode "$existing_log")" = "600" ]
     [[ "$(cat "$existing_log")" == "existing sentinel"* ]]
     [[ "$(cat "$existing_log")" == *"existing private record"* ]]
+
+    original_dir="$PWD"
+    cd "$TEST_TMPDIR" || return 1
+    BASE_CLI_PRIMARY_LOG="-option-primary.log" \
+        log_debug "option-like private record" 2>"$stderr_file"
+    cd "$original_dir" || return 1
+
+    [ ! -s "$stderr_file" ]
+    [ "$(file_mode "$option_log")" = "600" ]
+    [[ "$(cat "$option_log")" == *"option-like private record"* ]]
 }
 
 @test "unusable primary sinks stay silent without disabling the terminal" {
@@ -852,7 +863,10 @@ EOF
 
     __log_primary_sink_is_usable__ "$first_log"
     __log_primary_sink_is_usable__ "$second_log"
-    mkdir "$first_log" "$second_log"
+    __log_primary_sink_prepare__() {
+        printf 'synthetic primary sink setup failure\n' >&2
+        return 1
+    }
 
     BASE_CLI_PRIMARY_LOG="$first_log" \
         __log_primary_sink_write__ record "first must not persist" 2>"$stderr_file"
@@ -863,7 +877,8 @@ EOF
     [ "${_log_primary_sink_failed_paths[$first_log]}" = "1" ]
     [ "${_log_primary_sink_failed_paths[$second_log]}" = "1" ]
 
-    rmdir "$first_log" "$second_log"
+    [ ! -e "$first_log" ]
+    [ ! -e "$second_log" ]
     ! __log_primary_sink_is_usable__ "$first_log"
     ! __log_primary_sink_is_usable__ "$second_log"
 }
