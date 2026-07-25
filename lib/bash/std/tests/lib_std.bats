@@ -176,10 +176,10 @@ EOF
     local script="$TEST_TMPDIR/check-argv-logging.sh"
     local primary_log="$TEST_TMPDIR/check-argv-logging.log"
     local primary_content secret
-    local spaced_secret="spaced secret 191"
-    local inline_secret="--token=inline-secret-191"
+    local separate_secret="separate-secret-191"
+    local inline_secret="inline-secret-191"
     local positional_secret="positional-secret-191"
-    local url_secret="https://user:url-secret-191@example.invalid/path"
+    local url_secret="url-secret-191"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
@@ -191,10 +191,10 @@ EOF
 
     bats_run bash "$script" \
         --debug-wrapper \
-        --api-token "$spaced_secret" \
-        "$inline_secret" \
+        --api-token "$separate_secret" \
+        "--token=$inline_secret" \
         "$positional_secret" \
-        "$url_secret"
+        "https://user:$url_secret@example.invalid/path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"safe explicit diagnostic"* ]]
@@ -206,7 +206,7 @@ EOF
     [[ "$primary_content" != *"Command line:"* ]]
 
     for secret in \
-        "$spaced_secret" \
+        "$separate_secret" \
         "$inline_secret" \
         "$positional_secret" \
         "$url_secret"; do
