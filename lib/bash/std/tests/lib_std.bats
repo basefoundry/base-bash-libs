@@ -146,6 +146,7 @@ EOF
     [[ "$output" == *"terminal-level=5"* ]]
     [[ "$output" == *"library-level=5"* ]]
     [[ "$output" != *"deprecated"* ]]
+    [[ "$output" != *"Command line:"* ]]
 }
 
 @test "--debug-wrapper enables caller and reusable-library DEBUG" {
@@ -169,6 +170,49 @@ EOF
     [[ "$output" == *"debug=1"* ]]
     [[ "$output" == *"terminal-level=4"* ]]
     [[ "$output" == *"library-level=4"* ]]
+}
+
+@test "stdlib never logs process arguments automatically" {
+    local script="$TEST_TMPDIR/check-argv-logging.sh"
+    local primary_log="$TEST_TMPDIR/check-argv-logging.log"
+    local primary_content secret
+    local spaced_secret="spaced secret 191"
+    local inline_secret="--token=inline-secret-191"
+    local positional_secret="positional-secret-191"
+    local url_secret="https://user:url-secret-191@example.invalid/path"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+export BASE_CLI_PRIMARY_LOG="$primary_log"
+source "$STDLIB_PATH"
+log_debug -l base_bash_libs.std "safe explicit diagnostic"
+printf 'argv-count=%s\n' "\$#"
+EOF
+
+    bats_run bash "$script" \
+        --debug-wrapper \
+        --api-token "$spaced_secret" \
+        "$inline_secret" \
+        "$positional_secret" \
+        "$url_secret"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"safe explicit diagnostic"* ]]
+    [[ "$output" == *"argv-count=5"* ]]
+    [[ "$output" != *"Command line:"* ]]
+
+    primary_content="$(cat "$primary_log")"
+    [[ "$primary_content" == *"safe explicit diagnostic"* ]]
+    [[ "$primary_content" != *"Command line:"* ]]
+
+    for secret in \
+        "$spaced_secret" \
+        "$inline_secret" \
+        "$positional_secret" \
+        "$url_secret"; do
+        [[ "$output" != *"$secret"* ]]
+        [[ "$primary_content" != *"$secret"* ]]
+    done
 }
 
 @test "sourcing stdlib stops filtering wrapper flags after --" {

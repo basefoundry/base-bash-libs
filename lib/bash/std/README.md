@@ -312,6 +312,11 @@ set_log_category_level -l base_bash_libs.git DEBUG
 `base_bash_libs` DEBUG gate. The deprecated `--verbose-wrapper` continues to
 enable both at VERBOSE during the compatibility window.
 
+`lib_std.sh` does not log the process argument vector automatically. Arguments
+may contain credentials or other sensitive data; applications that need
+invocation diagnostics should apply schema-aware redaction before calling
+`log_debug`.
+
 Use `log_is_enabled` to avoid constructing an expensive diagnostic unless a
 terminal or persistent sink will consume it:
 
