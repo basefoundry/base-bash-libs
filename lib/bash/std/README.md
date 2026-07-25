@@ -269,8 +269,16 @@ Terminal verbosity and category gates answer different questions:
 - `set_log_category_level` controls whether a component may emit a record at
   all. Categories inherit from the nearest explicitly configured dotted parent,
   then from `default`.
-- `BASE_CLI_PRIMARY_LOG`, when set, receives accepted records through DEBUG
-  even when the terminal remains at INFO.
+- `BASE_CLI_PRIMARY_LOG`, when it names an eligible path, receives accepted
+  records through DEBUG even when the terminal remains at INFO.
+
+The primary sink is best-effort and never changes application status. An
+existing target must be an owned, writable, regular non-symlink file; a missing
+target needs an existing writable and searchable parent directory. The library
+does not create parent directories. `log_is_enabled` checks this eligibility
+without creating or changing the target. Before appending, the library creates
+or normalizes the primary log to mode `0600`; setup and write failures are
+suppressed and disable that path for the remainder of the process.
 
 The global default category gate is permissive for compatibility. Applications
 can keep their own DEBUG output while limiting a reusable component:

@@ -460,8 +460,9 @@ print_path() {
 __log_init__() {
     # Map log level strings (FATAL, ERROR, etc.) to numeric values.
     # Note the '-g' option passed to declare is essential for global scope.
-    unset _log_levels _loggers_level_map _log_category_level_map
+    unset _log_levels _loggers_level_map _log_category_level_map _log_primary_sink_failed_path
     declare -gA _log_levels _loggers_level_map _log_category_level_map
+    declare -g _log_primary_sink_failed_path=""
     # VERBOSE is deprecated compatibility surface; new callers should use DEBUG.
     _log_levels=([FATAL]=0 [ERROR]=1 [WARN]=2 [INFO]=3 [DEBUG]=4 [VERBOSE]=5)
 
@@ -522,13 +523,109 @@ __log_source_location__() {
 }
 
 #
+# __log_primary_sink_is_usable__ - Check the primary sink without modifying it.
+#
+__log_primary_sink_is_usable__() {
+    local primary_log="${1-}" parent_dir
+
+    [[ -n "$primary_log" && "$primary_log" != */ ]] || return 1
+    [[ "$primary_log" != "$_log_primary_sink_failed_path" ]] || return 1
+    [[ ! -L "$primary_log" ]] || return 1
+
+    if [[ -e "$primary_log" ]]; then
+        if [[ -f "$primary_log" && -O "$primary_log" && -w "$primary_log" ]]; then
+            return 0
+        fi
+        return 1
+    fi
+
+    if [[ "$primary_log" == */* ]]; then
+        parent_dir="${primary_log%/*}"
+        [[ -n "$parent_dir" ]] || parent_dir=/
+    else
+        parent_dir=.
+    fi
+
+    [[ -d "$parent_dir" && -w "$parent_dir" && -x "$parent_dir" ]]
+}
+
+#
+# __log_primary_sink_prepare__ - Create or privately harden a usable sink.
+#
+__log_primary_sink_prepare__() {
+    local primary_log="$1" chmod_path
+
+    __log_primary_sink_is_usable__ "$primary_log" || return 1
+
+    if [[ ! -e "$primary_log" ]]; then
+        # noclobber avoids truncating a target that appears after the
+        # non-mutating eligibility check.
+        if ! (umask 077; set -o noclobber; : >"$primary_log") 2>/dev/null; then
+            [[ -e "$primary_log" && ! -L "$primary_log" ]] || return 1
+        fi
+    fi
+
+    [[ -f "$primary_log" && ! -L "$primary_log" &&
+        -O "$primary_log" && -w "$primary_log" ]] || return 1
+
+    # macOS chmod does not accept "--"; prefix a bare option-like path instead.
+    chmod_path="$primary_log"
+    [[ "$chmod_path" == -* ]] && chmod_path="./$chmod_path"
+    command chmod 600 "$chmod_path" 2>/dev/null || return 1
+
+    [[ -f "$primary_log" && ! -L "$primary_log" &&
+        -O "$primary_log" && -w "$primary_log" ]]
+}
+
+#
+# __log_primary_sink_append__ - Append one record or file payload.
+#
+__log_primary_sink_append__() {
+    local payload_kind="${1-}" payload="${2-}"
+    local primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+
+    __log_primary_sink_is_usable__ "$primary_log" || return 1
+
+    (
+        umask 077
+        __log_primary_sink_prepare__ "$primary_log" || exit 1
+
+        case "$payload_kind" in
+            record)
+                printf '%s\n' "$payload"
+                ;;
+            file)
+                command cat -- "$payload" || exit 1
+                printf '\n'
+                ;;
+            *)
+                exit 1
+                ;;
+        esac >>"$primary_log"
+    ) 2>/dev/null
+}
+
+#
+# __log_primary_sink_write__ - Keep sink failures best-effort and disable them.
+#
+__log_primary_sink_write__() {
+    local payload_kind="$1" payload="$2"
+    local primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+
+    if ! __log_primary_sink_append__ "$payload_kind" "$payload"; then
+        _log_primary_sink_failed_path="$primary_log"
+    fi
+    return 0
+}
+
+#
 # __print_log_record__ - Compose and write a structured log record.
 #
 __print_log_record__() {
     local color="$1" in_level="$2" source_location="$3"
     local terminal_enabled="${4:-1}" persist_enabled="${5:-0}"
     shift 5
-    local message timestamp log_line primary_log
+    local message timestamp log_line
 
     message="$(__join_message__ "$@")"
     __log_timestamp__ timestamp
@@ -537,12 +634,7 @@ __print_log_record__() {
         printf '%b%s%b\n' "$color" "$log_line" "$COLOR_OFF" >&2
     fi
     if ((persist_enabled)); then
-        primary_log="${BASE_CLI_PRIMARY_LOG:-}"
-        if [[ -n "$primary_log" ]]; then
-            # The launcher creates the primary log with mode 0600.  Direct
-            # library users may not, so keep the same private default here.
-            (umask 077; printf '%s\n' "$log_line" >>"$primary_log") || :
-        fi
+        __log_primary_sink_write__ record "$log_line"
     fi
 }
 
@@ -677,7 +769,8 @@ __log_sink_state__() {
     if ((category_level >= event_level)); then
         terminal_level="${_loggers_level_map[$category]:-${_loggers_level_map[default]}}"
         ((terminal_level >= event_level)) && terminal_state=1
-        if [[ -n "${BASE_CLI_PRIMARY_LOG:-}" ]] && ((event_level <= _log_levels[DEBUG])); then
+        if ((event_level <= _log_levels[DEBUG])) &&
+            __log_primary_sink_is_usable__ "${BASE_CLI_PRIMARY_LOG:-}"; then
             persist_state=1
         fi
     fi
@@ -767,7 +860,7 @@ __print_log_file__()   {
     local in_level="${1-}"
     [[ -n "$in_level" ]] || return 1
     shift
-    local logger=default file primary_log
+    local logger=default file
     local terminal_enabled persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
@@ -788,10 +881,7 @@ __print_log_file__()   {
             printf '\n' >&2
         fi
         if ((persist_enabled)); then
-            primary_log="${BASE_CLI_PRIMARY_LOG:-}"
-            if [[ -n "$primary_log" ]]; then
-                (umask 077; { cat -- "$file"; printf '\n'; } >>"$primary_log") || :
-            fi
+            __log_primary_sink_write__ file "$file"
         fi
     fi
 }

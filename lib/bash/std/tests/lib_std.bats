@@ -10,6 +10,14 @@ create_script() {
     chmod +x "$script_path"
 }
 
+file_mode() {
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
+}
+
 normalize_tty_output() {
     local text="$1"
     text="${text//$'\r'/}"
@@ -112,7 +120,7 @@ PY
 setup() {
     setup_test_tmpdir
     PATH="$BASE_TEST_ORIG_PATH"
-    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE
+    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE BASE_CLI_PRIMARY_LOG
     source "$STDLIB_PATH"
 }
 
@@ -747,6 +755,130 @@ EOF
     log_is_enabled -l base.library DEBUG
 }
 
+@test "log_is_enabled validates primary sink paths without modifying them" {
+    local primary_log="$TEST_TMPDIR/eligible-primary.log"
+    local existing_log="$TEST_TMPDIR/existing-eligible-primary.log"
+    local missing_parent_log="$TEST_TMPDIR/missing/primary.log"
+    local directory_log="$TEST_TMPDIR/directory-primary"
+    local symlink_target="$TEST_TMPDIR/symlink-target.log"
+    local symlink_log="$TEST_TMPDIR/symlink-primary.log"
+    local fifo_log="$TEST_TMPDIR/fifo-primary.log"
+    local stderr_file="$TEST_TMPDIR/unusable-primary.err"
+
+    BASE_CLI_PRIMARY_LOG="$primary_log"
+    log_is_enabled DEBUG
+    [ ! -e "$primary_log" ]
+
+    printf 'existing eligible content\n' >"$existing_log"
+    chmod 644 "$existing_log"
+    BASE_CLI_PRIMARY_LOG="$existing_log"
+    log_is_enabled DEBUG
+    [ "$(file_mode "$existing_log")" = "644" ]
+
+    mkdir "$directory_log"
+    BASE_CLI_PRIMARY_LOG="$directory_log"
+    ! log_is_enabled DEBUG
+
+    printf 'symlink target\n' >"$symlink_target"
+    ln -s "$symlink_target" "$symlink_log"
+    BASE_CLI_PRIMARY_LOG="$symlink_log"
+    ! log_is_enabled DEBUG
+
+    mkfifo "$fifo_log"
+    BASE_CLI_PRIMARY_LOG="$fifo_log"
+    ! log_is_enabled DEBUG
+    log_debug "fifo must not block" 2>"$stderr_file"
+    [ ! -s "$stderr_file" ]
+
+    BASE_CLI_PRIMARY_LOG="$missing_parent_log"
+    ! log_is_enabled DEBUG
+    log_debug "missing parent must stay silent" 2>"$stderr_file"
+    [ ! -e "$missing_parent_log" ]
+    [ ! -s "$stderr_file" ]
+    [ "$(cat "$symlink_target")" = "symlink target" ]
+}
+
+@test "primary sink creates and hardens regular files to mode 0600" {
+    local new_log="$TEST_TMPDIR/new-private-primary.log"
+    local existing_log="$TEST_TMPDIR/existing-primary.log"
+    local stderr_file="$TEST_TMPDIR/private-primary.err"
+    local original_umask
+
+    original_umask="$(umask)"
+    umask 000
+    BASE_CLI_PRIMARY_LOG="$new_log" log_debug "new private record" 2>"$stderr_file"
+    umask "$original_umask"
+
+    [ ! -s "$stderr_file" ]
+    [ "$(file_mode "$new_log")" = "600" ]
+    [[ "$(cat "$new_log")" == *"new private record"* ]]
+
+    printf 'existing sentinel\n' >"$existing_log"
+    chmod 666 "$existing_log"
+    BASE_CLI_PRIMARY_LOG="$existing_log" \
+        log_debug "existing private record" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ "$(file_mode "$existing_log")" = "600" ]
+    [[ "$(cat "$existing_log")" == "existing sentinel"* ]]
+    [[ "$(cat "$existing_log")" == *"existing private record"* ]]
+}
+
+@test "unusable primary sinks stay silent without disabling the terminal" {
+    local directory_log="$TEST_TMPDIR/unusable-primary"
+    local stderr_file="$TEST_TMPDIR/unusable-terminal.err"
+
+    mkdir "$directory_log"
+
+    BASE_CLI_PRIMARY_LOG="$directory_log" \
+        log_debug "hidden unusable record" 2>"$stderr_file"
+    [ ! -s "$stderr_file" ]
+
+    BASE_CLI_PRIMARY_LOG="$directory_log"
+    ! log_is_enabled DEBUG
+    set_log_level DEBUG
+    log_is_enabled DEBUG
+    log_debug "terminal-only debug" 2>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *"DEBUG"*"terminal-only debug"* ]]
+    [[ "$(cat "$stderr_file")" != *"Is a directory"* ]]
+    [[ "$(cat "$stderr_file")" != *"No such file or directory"* ]]
+}
+
+@test "primary sink setup failure disables the same path for the process" {
+    local primary_log="$TEST_TMPDIR/raced-primary.log"
+    local stderr_file="$TEST_TMPDIR/raced-primary.err"
+
+    __log_primary_sink_is_usable__ "$primary_log"
+    mkdir "$primary_log"
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        __log_primary_sink_write__ record "must not persist" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ "$_log_primary_sink_failed_path" = "$primary_log" ]
+
+    rmdir "$primary_log"
+    ! __log_primary_sink_is_usable__ "$primary_log"
+}
+
+@test "read-only primary sink is ignored when the test identity cannot write it" {
+    local primary_log="$TEST_TMPDIR/read-only-primary.log"
+    local stderr_file="$TEST_TMPDIR/read-only-primary.err"
+
+    printf 'read-only sentinel\n' >"$primary_log"
+    chmod 400 "$primary_log"
+    [[ ! -w "$primary_log" ]] || skip "The test identity can write mode-0400 files."
+
+    BASE_CLI_PRIMARY_LOG="$primary_log"
+    ! log_is_enabled DEBUG
+    log_debug "must not persist" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ "$(file_mode "$primary_log")" = "400" ]
+    [ "$(cat "$primary_log")" = "read-only sentinel" ]
+}
+
 @test "log_is_enabled rejects malformed and invalid input without changing logging state" {
     local stderr_file="$TEST_TMPDIR/log-is-enabled-invalid.err"
     local rc
@@ -977,6 +1109,26 @@ EOF
 
     [[ "$(cat "$stderr_file")" == *$'unterminated contents\n'*"next structured record"* ]]
     [[ "$(cat "$primary_log")" == *$'unterminated contents\n'*"next structured record"* ]]
+}
+
+@test "file logging hardens an existing primary sink before appending" {
+    local target="$TEST_TMPDIR/log-private-target.txt"
+    local stderr_file="$TEST_TMPDIR/log-private-file.err"
+    local primary_log="$TEST_TMPDIR/log-private-file.log"
+
+    printf 'existing sink content\n' >"$primary_log"
+    chmod 644 "$primary_log"
+    printf 'private file contents\n' >"$target"
+    set_log_category_level -l base.files DEBUG
+
+    BASE_CLI_PRIMARY_LOG="$primary_log" \
+        log_debug_file -l base.files "$target" 2>"$stderr_file"
+
+    [ ! -s "$stderr_file" ]
+    [ "$(file_mode "$primary_log")" = "600" ]
+    [[ "$(cat "$primary_log")" == "existing sink content"* ]]
+    [[ "$(cat "$primary_log")" == *"Contents of file '$target':"* ]]
+    [[ "$(cat "$primary_log")" == *"private file contents"* ]]
 }
 
 @test "enter and leave logging helpers include the caller name" {

@@ -30,6 +30,10 @@ and versions are tracked in the repo-root `VERSION` file.
 - Stopped emitting the caller's unredacted argument vector when wrapper
   diagnostics are enabled, preventing sensitive option and positional values
   from entering terminal or persistent logs.
+- Hardened the primary diagnostic sink to reject unusable and non-regular
+  targets, normalize new and existing log files to mode `0600`, suppress
+  best-effort write errors, and report only eligible sinks through
+  `log_is_enabled`.
 
 ### Deprecated
 
