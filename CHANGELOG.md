@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-25
+
 ### Added
 
 - Added hierarchical log-category gates and `log_is_enabled`, allowing callers
