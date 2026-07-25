@@ -251,6 +251,7 @@ EOF
     commit_all "$repo" "Initial commit"
     printf 'local change\n' > "$repo/data.txt"
     set_log_level DEBUG
+    set_log_category_level -l base_bash_libs.git DEBUG
 
     capture_command git_update_repo "$repo"
 
@@ -258,13 +259,43 @@ EOF
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
 }
 
-@test "git_update_repo treats branch mismatch as a skip" {
+@test "caller DEBUG does not enable reusable Git DEBUG by default" {
     local repo="$TEST_TMPDIR/repo"
 
     init_git_repo "$repo"
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
     set_log_level DEBUG
+
+    capture_command git_update_repo "$repo" "" release
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"not 'release'. Skipping update"* ]]
+}
+
+@test "Git child category DEBUG opt-in enables reusable Git diagnostics" {
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    set_log_level DEBUG
+    set_log_category_level -l base_bash_libs.git DEBUG
+
+    capture_command git_update_repo "$repo" "" release
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"not 'release'. Skipping update"* ]]
+}
+
+@test "base_bash_libs parent DEBUG opt-in enables reusable Git diagnostics" {
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    set_log_level DEBUG
+    set_log_category_level -l base_bash_libs DEBUG
 
     capture_command git_update_repo "$repo" "" release
 
@@ -369,6 +400,7 @@ EOF
     commit_all "$repo" "Initial commit"
     printf 'local change\n' > "$repo/data.txt"
     set_log_level DEBUG
+    set_log_category_level -l base_bash_libs.git DEBUG
 
     capture_command git_update_repo "$repo"
 
@@ -775,6 +807,7 @@ EOF
 
     create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
     set_log_level DEBUG
+    set_log_category_level -l base_bash_libs.git DEBUG
 
     bats_run check_script_up_to_date "$script_path"
 

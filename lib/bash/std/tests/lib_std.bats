@@ -120,7 +120,7 @@ teardown() {
     PATH="$BASE_TEST_ORIG_PATH"
 }
 
-@test "sourcing stdlib preserves original args and strips wrapper flags" {
+@test "deprecated --verbose-wrapper preserves original args and enables VERBOSE compatibility" {
     local script="$TEST_TMPDIR/check-init.sh"
 
     create_script "$script" <<EOF
@@ -131,6 +131,8 @@ printf 'argv=%s\n' "\$*"
 printf 'debug=%s\n' "\${LOG_DEBUG:-}"
 printf 'utc=%s\n' "\${LOG_UTC:-}"
 printf 'color=%s\n' "\${COLOR_RED:-}"
+printf 'terminal-level=%s\n' "\${_loggers_level_map[default]}"
+printf 'library-level=%s\n' "\${_log_category_level_map[base_bash_libs]}"
 EOF
 
     bats_run bash "$script" --verbose-wrapper --utc-wrapper --color alpha beta
@@ -141,6 +143,32 @@ EOF
     [[ "$output" == *"debug=1"* ]]
     [[ "$output" == *"utc=1"* ]]
     [[ "$output" == *"color="* ]]
+    [[ "$output" == *"terminal-level=5"* ]]
+    [[ "$output" == *"library-level=5"* ]]
+    [[ "$output" != *"deprecated"* ]]
+}
+
+@test "--debug-wrapper enables caller and reusable-library DEBUG" {
+    local script="$TEST_TMPDIR/check-debug-init.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+printf 'orig=%s\n' "\${__SCRIPT_ARGS__[*]}"
+printf 'argv=%s\n' "\$*"
+printf 'debug=%s\n' "\${LOG_DEBUG:-}"
+printf 'terminal-level=%s\n' "\${_loggers_level_map[default]}"
+printf 'library-level=%s\n' "\${_log_category_level_map[base_bash_libs]}"
+EOF
+
+    bats_run bash "$script" --debug-wrapper alpha beta
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"orig=--debug-wrapper alpha beta"* ]]
+    [[ "$output" == *"argv=alpha beta"* ]]
+    [[ "$output" == *"debug=1"* ]]
+    [[ "$output" == *"terminal-level=4"* ]]
+    [[ "$output" == *"library-level=4"* ]]
 }
 
 @test "sourcing stdlib stops filtering wrapper flags after --" {
@@ -544,11 +572,12 @@ EOF
     [ "$joined" = "alpha beta gamma delta" ]
 }
 
-@test "log initialization sets the default logger map" {
+@test "log initialization defaults reusable-library categories to INFO" {
     [ "${_log_levels[ERROR]}" -eq 1 ]
     [ "${_log_levels[VERBOSE]}" -eq 5 ]
     [ "${_loggers_level_map[default]}" -eq 3 ]
     [ "${_log_category_level_map[default]}" -eq 5 ]
+    [ "${_log_category_level_map[base_bash_libs]}" -eq 3 ]
     [ -z "${COLOR_RED:-}" ]
 }
 
@@ -853,6 +882,19 @@ EOF
     [[ "$(cat "$stderr_file")" != *"Unknown logger"* ]]
 }
 
+@test "deprecated VERBOSE file logging remains behaviorally compatible" {
+    local target="$TEST_TMPDIR/log-verbose-target.txt"
+    local stderr_file="$TEST_TMPDIR/log-verbose-file.err"
+
+    printf 'verbose file contents\n' > "$target"
+    set_log_level VERBOSE
+
+    log_verbose_file "$target" 2>"$stderr_file"
+
+    [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Contents of file '$target':"* ]]
+    [[ "$(cat "$stderr_file")" == *"verbose file contents"* ]]
+}
+
 @test "file logging helpers apply category gates and sink decisions" {
     local target="$TEST_TMPDIR/log-category-target.txt"
     local stderr_file="$TEST_TMPDIR/log-category-file.err"
@@ -908,8 +950,8 @@ EOF
     set_log_level VERBOSE
     trace_me 2>"$stderr_file"
 
-    [[ "$(cat "$stderr_file")" == *"Entering function trace_me"* ]]
-    [[ "$(cat "$stderr_file")" == *"Leaving function trace_me"* ]]
+    [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Entering function trace_me"* ]]
+    [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Leaving function trace_me"* ]]
 }
 
 @test "print helpers emit expected text" {

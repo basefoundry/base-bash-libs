@@ -14,8 +14,8 @@ gh_require_cli() {
     local install_hint="${1:-}"
 
     command -v gh >/dev/null 2>&1 || {
-        log_error "Required command 'gh' was not found on PATH."
-        [[ -z "$install_hint" ]] || log_error "$install_hint"
+        log_error -l base_bash_libs.gh "Required command 'gh' was not found on PATH."
+        [[ -z "$install_hint" ]] || log_error -l base_bash_libs.gh "$install_hint"
         return 1
     }
 }
@@ -28,9 +28,9 @@ gh_auth_status_diagnostics() {
 
     auth_output="$(gh auth status -h github.com 2>&1)" || {
         while IFS= read -r line || [[ -n "$line" ]]; do
-            [[ -n "$line" ]] && log_error "gh auth status: $line"
+            [[ -n "$line" ]] && log_error -l base_bash_libs.gh "gh auth status: $line"
         done <<<"$auth_output"
-        [[ -z "$login_hint" ]] || log_error "$login_hint"
+        [[ -z "$login_hint" ]] || log_error -l base_bash_libs.gh "$login_hint"
         return 1
     }
 }
@@ -43,9 +43,9 @@ gh_report_command_failure() {
     if (($#)); then
         printf -v printable_args '%q ' "$@"
         printable_args="${printable_args% }"
-        log_error "GitHub command failed: gh $printable_args"
+        log_error -l base_bash_libs.gh "GitHub command failed: gh $printable_args"
     else
-        log_error "GitHub command failed: gh"
+        log_error -l base_bash_libs.gh "GitHub command failed: gh"
     fi
     gh_auth_status_diagnostics || true
     return "$status"
@@ -66,7 +66,7 @@ gh_repo_from_remote_url() {
     local __gh_parsed_repo
 
     if [[ -z "$__gh_remote_url" || -z "$__gh_result_name" ]]; then
-        log_error "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
+        log_error -l base_bash_libs.gh "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
         return 1
     fi
     assert_variable_name "$__gh_result_name"
@@ -99,7 +99,7 @@ gh_infer_repo_from_origin() {
     local __gh_infer_repo __gh_infer_remote_url
 
     if [[ -z "$__gh_infer_repo_dir" || -z "$__gh_infer_result_name" ]]; then
-        log_error "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
+        log_error -l base_bash_libs.gh "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 1
     fi
     assert_variable_name "$__gh_infer_result_name"
@@ -115,7 +115,7 @@ gh_infer_repo_from_origin() {
             printf -v "$__gh_infer_result_name" '%s' ""
             return 0
         fi
-        log_error "Could not infer GitHub repository from '$__gh_infer_repo_dir' origin remote."
+        log_error -l base_bash_libs.gh "Could not infer GitHub repository from '$__gh_infer_repo_dir' origin remote."
         return 1
     fi
 
@@ -128,7 +128,7 @@ gh_repo_default_branch() {
     local __gh_repo_default_branch __gh_repo_status=0
 
     if [[ -z "$__gh_repo" || -z "$__gh_repo_result_name" ]]; then
-        log_error "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
+        log_error -l base_bash_libs.gh "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 1
     fi
     assert_variable_name "$__gh_repo_result_name"
@@ -141,7 +141,7 @@ gh_repo_default_branch() {
         return $?
     fi
     if [[ -z "$__gh_repo_default_branch" ]]; then
-        log_error "GitHub repository '$__gh_repo' does not report a default branch."
+        log_error -l base_bash_libs.gh "GitHub repository '$__gh_repo' does not report a default branch."
         return 1
     fi
 
@@ -187,7 +187,7 @@ gh_api_with_retry() {
 
     gh_require_cli || return 1
     if [[ ! "$max_attempts" =~ ^[0-9]+$ ]] || ((max_attempts < 1)); then
-        log_warn "BASE_GH_API_MAX_ATTEMPTS must be a positive integer; using 2."
+        log_warn -l base_bash_libs.gh "BASE_GH_API_MAX_ATTEMPTS must be a positive integer; using 2."
         max_attempts=2
     fi
 
@@ -208,9 +208,9 @@ gh_api_with_retry() {
         fi
 
         if ((max_attempts == 2)); then
-            log_warn "GitHub API call failed on attempt $attempt; retrying once."
+            log_warn -l base_bash_libs.gh "GitHub API call failed on attempt $attempt; retrying once."
         else
-            log_warn "GitHub API call failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
+            log_warn -l base_bash_libs.gh "GitHub API call failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
         fi
         delay="$(__gh_api_retry_delay_seconds "$output")"
         __std_sleep_interval__ "$delay"

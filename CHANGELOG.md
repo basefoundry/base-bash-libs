@@ -15,12 +15,22 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Assigned reusable-library records to `base_bash_libs.<module>` categories and
+  defaulted the parent library gate to INFO, allowing application DEBUG output
+  without implicitly enabling library DEBUG diagnostics.
 - Added an optional `BASE_CLI_PRIMARY_LOG` diagnostic sink. Bash logging keeps
   terminal verbosity unchanged while persisting the DEBUG-level stream to the
   shared run primary log.
 - Include the local numeric timezone offset in default structured log
   timestamps and an explicit `UTC` marker when `LOG_UTC=1`, keeping Bash log
   formatting aligned with Base's Python CLI logs.
+
+### Deprecated
+
+- Deprecated the Bash-only `VERBOSE` level, `log_verbose*` helpers, and
+  `--verbose-wrapper`. Their 1.x behavior remains unchanged, with removal no
+  earlier than the next major release; DEBUG is the most detailed level for
+  new code.
 
 ## [1.3.0] - 2026-07-16
 
