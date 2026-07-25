@@ -845,21 +845,27 @@ EOF
     [[ "$(cat "$stderr_file")" != *"No such file or directory"* ]]
 }
 
-@test "primary sink setup failure disables the same path for the process" {
-    local primary_log="$TEST_TMPDIR/raced-primary.log"
+@test "primary sink setup failures keep every failed path disabled" {
+    local first_log="$TEST_TMPDIR/first-raced-primary.log"
+    local second_log="$TEST_TMPDIR/second-raced-primary.log"
     local stderr_file="$TEST_TMPDIR/raced-primary.err"
 
-    __log_primary_sink_is_usable__ "$primary_log"
-    mkdir "$primary_log"
+    __log_primary_sink_is_usable__ "$first_log"
+    __log_primary_sink_is_usable__ "$second_log"
+    mkdir "$first_log" "$second_log"
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        __log_primary_sink_write__ record "must not persist" 2>"$stderr_file"
+    BASE_CLI_PRIMARY_LOG="$first_log" \
+        __log_primary_sink_write__ record "first must not persist" 2>"$stderr_file"
+    BASE_CLI_PRIMARY_LOG="$second_log" \
+        __log_primary_sink_write__ record "second must not persist" 2>>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
-    [ "$_log_primary_sink_failed_path" = "$primary_log" ]
+    [ "${_log_primary_sink_failed_paths[$first_log]}" = "1" ]
+    [ "${_log_primary_sink_failed_paths[$second_log]}" = "1" ]
 
-    rmdir "$primary_log"
-    ! __log_primary_sink_is_usable__ "$primary_log"
+    rmdir "$first_log" "$second_log"
+    ! __log_primary_sink_is_usable__ "$first_log"
+    ! __log_primary_sink_is_usable__ "$second_log"
 }
 
 @test "read-only primary sink is ignored when the test identity cannot write it" {

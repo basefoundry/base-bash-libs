@@ -460,9 +460,9 @@ print_path() {
 __log_init__() {
     # Map log level strings (FATAL, ERROR, etc.) to numeric values.
     # Note the '-g' option passed to declare is essential for global scope.
-    unset _log_levels _loggers_level_map _log_category_level_map _log_primary_sink_failed_path
-    declare -gA _log_levels _loggers_level_map _log_category_level_map
-    declare -g _log_primary_sink_failed_path=""
+    unset _log_levels _loggers_level_map _log_category_level_map _log_primary_sink_failed_paths
+    declare -gA _log_levels _loggers_level_map _log_category_level_map _log_primary_sink_failed_paths
+    _log_primary_sink_failed_paths=()
     # VERBOSE is deprecated compatibility surface; new callers should use DEBUG.
     _log_levels=([FATAL]=0 [ERROR]=1 [WARN]=2 [INFO]=3 [DEBUG]=4 [VERBOSE]=5)
 
@@ -529,7 +529,7 @@ __log_primary_sink_is_usable__() {
     local primary_log="${1-}" parent_dir
 
     [[ -n "$primary_log" && "$primary_log" != */ ]] || return 1
-    [[ "$primary_log" != "$_log_primary_sink_failed_path" ]] || return 1
+    [[ -z "${_log_primary_sink_failed_paths[$primary_log]+set}" ]] || return 1
     [[ ! -L "$primary_log" ]] || return 1
 
     if [[ -e "$primary_log" ]]; then
@@ -613,7 +613,7 @@ __log_primary_sink_write__() {
     local primary_log="${BASE_CLI_PRIMARY_LOG:-}"
 
     if ! __log_primary_sink_append__ "$payload_kind" "$payload"; then
-        _log_primary_sink_failed_path="$primary_log"
+        _log_primary_sink_failed_paths["$primary_log"]=1
     fi
     return 0
 }
