@@ -196,6 +196,10 @@ The suite expects `bats` and `shellcheck` to be installed. On macOS:
 brew install bats-core shellcheck
 ```
 
+Local validation runs the logging compatibility smoke on the installed
+supported Bash. CI runs the same script on the exact minimum runtime, Bash
+4.2.53, using a digest-pinned Docker Official Image.
+
 ## Base
 
 This repository is managed by [Base](https://github.com/basefoundry/base).

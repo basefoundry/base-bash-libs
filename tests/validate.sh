@@ -15,6 +15,7 @@ required_files=(
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   bin/base-bash
+  tests/bash-42-logging-smoke.sh
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
   examples/cookbook-args-lists-strings.sh
@@ -63,6 +64,7 @@ check_no_strict_mode() {
   local file matches status
   local strict_mode_files=(
     bin/base-bash
+    tests/bash-42-logging-smoke.sh
     tests/validate.sh
     tests/lint-warnings.sh
     examples/*.sh
@@ -191,6 +193,7 @@ done
 
 run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
+  tests/bash-42-logging-smoke.sh \
   tests/validate.sh \
   tests/lint-warnings.sh \
   examples/std-usage.sh \
@@ -220,6 +223,7 @@ bats_files=(
 run_stage "BATS test suites" bats \
   "${bats_files[@]}" || exit $?
 
+run_stage "Bash logging smoke" tests/bash-42-logging-smoke.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
 run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?

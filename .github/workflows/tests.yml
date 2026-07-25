@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate (${{ matrix.os }})
@@ -17,7 +20,9 @@ jobs:
           - macos-latest
           - ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install validation tools (macOS)
         if: runner.os == 'macOS'
@@ -39,9 +44,9 @@ jobs:
             check_bash_version
           ' bash "$PWD/lib/bash/std/lib_std.sh"
 
-      # Hosted runners do not provide Bash 4.2 directly. The BATS suite covers
-      # the lower-bound comparison logic; this macOS smoke exercises the known
-      # unsupported system Bash 3.2 path when it is available.
+      # The exact supported lower bound runs in the bash-42-logging job. This
+      # macOS smoke exercises the known unsupported system Bash 3.2 path when
+      # it is available.
       - name: Smoke unsupported macOS system Bash
         if: runner.os == 'macOS'
         run: |
@@ -58,3 +63,30 @@ jobs:
           test "$status" -ne 0
           grep -F "requires Bash 4.2 or higher" <<<"$output"
           ! grep -F "syntax error" <<<"$output"
+
+  bash-42-logging:
+    name: Logging smoke (Bash 4.2.53)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run Bash 4.2 logging smoke
+        run: |
+          docker run --rm \
+            --platform linux/amd64 \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            --pids-limit 64 \
+            --user 65534:65534 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 \
+            --env HOME=/tmp \
+            --env TMPDIR=/tmp \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --workdir /workspace \
+            docker.io/library/bash@sha256:0931edd3941d0603cb3d5da1cb298cf3eb6a579e09e094c3e34e2d5e9df8cddc \
+            bash tests/bash-42-logging-smoke.sh 4 2 53
