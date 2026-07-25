@@ -316,7 +316,6 @@ __stdlib_init__() {
         fi
     done
     __init_colors__
-    log_debug -l base_bash_libs.std "Command line: $0 ${__SCRIPT_ARGS__[*]}"
     return 0
 }
 

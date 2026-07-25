@@ -25,6 +25,12 @@ and versions are tracked in the repo-root `VERSION` file.
   timestamps and an explicit `UTC` marker when `LOG_UTC=1`, keeping Bash log
   formatting aligned with Base's Python CLI logs.
 
+### Security
+
+- Stopped emitting the caller's unredacted argument vector when wrapper
+  diagnostics are enabled, preventing sensitive option and positional values
+  from entering terminal or persistent logs.
+
 ### Deprecated
 
 - Deprecated the Bash-only `VERBOSE` level, `log_verbose*` helpers, and
