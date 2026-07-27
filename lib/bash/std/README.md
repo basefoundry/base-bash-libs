@@ -54,13 +54,19 @@ Functions that return a value through a variable name mutate that caller-owned
 variable only after validating it. Unless noted otherwise, predicates return
 zero for success and nonzero for a false or invalid condition.
 
+Required arguments are shown with angle brackets, optional arguments with square
+brackets, and variadic arguments with `...`. Callers should pass only the
+documented arguments. Public helpers that write through caller-supplied
+variable or array names reserve the `__` prefix for library-internal state;
+such output names are rejected before caller state is changed.
+
 ### Runtime and Imports
 
 - `base_bash_libs_require_version <version>`: exits with a diagnostic when the
   loaded package version is older than the requested dotted numeric version.
 - `check_bash_version`: returns zero for Bash 4.2 or newer and reports the
   required version otherwise.
-- `is_interactive`: returns zero when stdin and stderr are interactive TTYs.
+- `is_interactive`: returns zero when stdin is attached to an interactive TTY.
 - `import <path>`: sources a relative path from `__SCRIPT_DIR__` or an
   absolute path; exits when the library cannot be sourced.
 - `get_my_source_dir <result_var>`: stores the caller script directory in a
@@ -122,8 +128,8 @@ zero for success and nonzero for a false or invalid condition.
 - `std_register_cleanup_path <absolute_path...>`,
   `std_unregister_cleanup_path <absolute_path...>`: add or remove safe paths
   from exit cleanup; invalid paths are rejected.
-- `std_make_temp_file [--keep] [result_var] [prefix]` and
-  `std_make_temp_dir [--keep] [result_var] [prefix]`: create a temporary path,
+- `std_make_temp_file [--keep] <result_var> [prefix]` and
+  `std_make_temp_dir [--keep] <result_var> [prefix]`: create a temporary path,
   store it in the caller variable, and register it for cleanup unless
   `--keep` is used.
 
@@ -132,15 +138,17 @@ zero for success and nonzero for a false or invalid condition.
 - `std_command_path <result_var> <command>`: stores the resolved executable
   path or returns nonzero when the command is unavailable.
 - `std_function_exists <name>`: returns zero when a Bash function exists.
-- `assert_function_exists <name...>`: returns nonzero and logs missing
-  functions.
+- `assert_function_exists <name...>`: exits through `fatal_error` when one or
+  more required functions are missing or invalid. Use `std_function_exists` for
+  a non-fatal predicate.
 - `assert_variable_name <name...>`: validates Bash variable names.
 - `assert_indexed_array <name...>` and `assert_associative_array <name...>`:
   validate caller-owned array declarations.
 - `assert_not_null <variable...>`: validates that named variables are set and
   non-empty without treating values as variable names accidentally.
-- `assert_integer <value...>` and `assert_integer_range <value> <min> <max>`:
-  validate decimal integers and inclusive bounds.
+- `assert_integer <variable...>` and
+  `assert_integer_range <variable> <min> <max>`: validate the values of named
+  variables as decimal integers and enforce inclusive bounds.
 - `assert_arg_count <actual> <expected> [max]`: validates exact or ranged
   positional argument counts.
 - `assert_command_exists <command...>`, `assert_file_exists <path...>`,
