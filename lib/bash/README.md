@@ -25,3 +25,10 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
 The Base runtime shell files and Base version helpers remain in
 `basefoundry/base`. This repository carries only sourceable reusable library
 modules.
+
+## Naming Contract
+
+Public helpers that write through caller-supplied variable or array names
+reserve the `__` prefix for library-internal state. Passing an output name that
+begins with `__` fails before the helper changes caller state. Use a regular
+Bash variable name for public output values and arrays.

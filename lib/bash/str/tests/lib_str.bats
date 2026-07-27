@@ -216,6 +216,22 @@ EOF
     [ "$joined" = "left|right" ]
 }
 
+@test "str_lower rejects reserved internal output names" {
+    local __str_var_name="Mixed Case"
+    local stderr_file="$TEST_TMPDIR/str-reserved-output.err"
+    local rc
+
+    if str_lower __str_var_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$__str_var_name" = "Mixed Case" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+}
+
 @test "str_join rejects invalid variable names" {
     local script="$TEST_TMPDIR/str-join-invalid-array.sh"
 

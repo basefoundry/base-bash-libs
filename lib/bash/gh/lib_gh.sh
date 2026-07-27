@@ -96,7 +96,7 @@ gh_infer_repo_from_origin() {
     local __gh_infer_repo_dir="$1"
     local __gh_infer_result_name="${2:-}"
     local __gh_infer_optional=0
-    local __gh_infer_repo __gh_infer_remote_url
+    local gh_infer_parsed_repo __gh_infer_remote_url
 
     if [[ -z "$__gh_infer_repo_dir" || -z "$__gh_infer_result_name" ]]; then
         log_error -l base_bash_libs.gh "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
@@ -110,7 +110,8 @@ gh_infer_repo_from_origin() {
     fi
 
     __gh_infer_remote_url="$(git -C "$__gh_infer_repo_dir" remote get-url origin 2>/dev/null || true)"
-    if [[ -z "$__gh_infer_remote_url" ]] || ! gh_repo_from_remote_url "$__gh_infer_remote_url" __gh_infer_repo; then
+    if [[ -z "$__gh_infer_remote_url" ]] ||
+        ! gh_repo_from_remote_url "$__gh_infer_remote_url" gh_infer_parsed_repo; then
         if ((__gh_infer_optional)); then
             printf -v "$__gh_infer_result_name" '%s' ""
             return 0
@@ -119,7 +120,7 @@ gh_infer_repo_from_origin() {
         return 1
     fi
 
-    printf -v "$__gh_infer_result_name" '%s' "$__gh_infer_repo"
+    printf -v "$__gh_infer_result_name" '%s' "$gh_infer_parsed_repo"
 }
 
 gh_repo_default_branch() {

@@ -90,6 +90,25 @@ EOF
     [ "${positionals_name[0]}" = "item" ]
 }
 
+@test "arg_parse rejects reserved internal output names" {
+    local -A __arg_options=([sentinel]="keep")
+    local -a __arg_positionals=(sentinel)
+    local -a specs_name=("verbose|flag|--verbose|-v")
+    local stderr_file="$TEST_TMPDIR/arg-reserved-output.err"
+    local rc
+
+    if arg_parse __arg_options __arg_positionals specs_name -- -v 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "${__arg_options[sentinel]}" = "keep" ]
+    [ "${__arg_positionals[0]}" = "sentinel" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+}
+
 @test "arg_parse accepts long option equals values and repeated options" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
