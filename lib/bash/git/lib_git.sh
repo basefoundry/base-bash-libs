@@ -164,28 +164,42 @@ __git_path_matches_allowed_path__() {
 
 __git_only_path_dirty__() {
     local allowed_path="$1"
-    local status_output line path source_path destination_path
+    local status_file status_record status_code path related_path
 
-    status_output="$(git status --porcelain --untracked-files=no --ignore-submodules=none)"
-    [[ -z "$status_output" ]] && return 1
+    std_make_temp_file status_file base-git-status || return 1
+    if ! git status --porcelain=v1 --untracked-files=no --ignore-submodules=none -z > "$status_file"; then
+        std_unregister_cleanup_path "$status_file"
+        rm -f -- "$status_file"
+        return 1
+    fi
+    if [[ ! -s "$status_file" ]]; then
+        std_unregister_cleanup_path "$status_file"
+        rm -f -- "$status_file"
+        return 1
+    fi
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        path="${line:3}"
-        if [[ "$path" == *" -> "* ]]; then
-            source_path="${path%% -> *}"
-            destination_path="${path#* -> }"
-            if ! __git_path_matches_allowed_path__ "$source_path" "$allowed_path" ||
-                ! __git_path_matches_allowed_path__ "$destination_path" "$allowed_path"; then
-                return 1
-            fi
-            continue
-        fi
+    while IFS= read -r -d '' status_record; do
+        [[ -n "$status_record" ]] || continue
+        status_code="${status_record:0:2}"
+        path="${status_record:3}"
         if ! __git_path_matches_allowed_path__ "$path" "$allowed_path"; then
+            std_unregister_cleanup_path "$status_file"
+            rm -f -- "$status_file"
             return 1
         fi
-    done <<< "$status_output"
 
+        if [[ "$status_code" == *R* || "$status_code" == *C* ]]; then
+            if ! IFS= read -r -d '' related_path ||
+                ! __git_path_matches_allowed_path__ "$related_path" "$allowed_path"; then
+                std_unregister_cleanup_path "$status_file"
+                rm -f -- "$status_file"
+                return 1
+            fi
+        fi
+    done < "$status_file"
+
+    std_unregister_cleanup_path "$status_file"
+    rm -f -- "$status_file"
     return 0
 }
 

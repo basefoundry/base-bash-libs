@@ -478,6 +478,24 @@ EOF
     [ "$rc" -eq 0 ]
 }
 
+@test "__git_only_path_dirty__ accepts tracked paths containing spaces" {
+    local repo="$TEST_TMPDIR/repo"
+    local rc
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/shared"
+    printf 'one\n' > "$repo/shared/hello world.txt"
+    commit_all "$repo" "Initial commit"
+    printf 'local change\n' >> "$repo/shared/hello world.txt"
+
+    pushd "$repo" >/dev/null
+    __git_only_path_dirty__ "shared"
+    rc=$?
+    popd >/dev/null
+
+    [ "$rc" -eq 0 ]
+}
+
 @test "__git_only_path_dirty__ does not treat sibling path prefixes as allowed" {
     local repo="$TEST_TMPDIR/repo"
     local rc
