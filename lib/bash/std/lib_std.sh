@@ -1833,6 +1833,11 @@ __is_valid_variable_name__() {
 __std_assert_writable_output__() {
     local function_name="${1-}" output_name="${2-}" declaration attributes
 
+    if [[ "$output_name" == __* ]]; then
+        log_error -l base_bash_libs.std "$function_name: result variable '$output_name' uses the reserved '__' internal namespace."
+        return 1
+    fi
+
     declaration="$(declare -p "$output_name" 2>/dev/null || true)"
     [[ -n "$declaration" ]] || return 0
     attributes="${declaration#declare -}"
