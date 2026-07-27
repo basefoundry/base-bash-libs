@@ -91,6 +91,19 @@ SCRIPT
     [[ "$output" == *"did not define main()"* ]]
 }
 
+@test "base-bash bounds symlink resolution" {
+    local first_link="$TEST_TMPDIR/cycle-a"
+    local second_link="$TEST_TMPDIR/cycle-b"
+
+    ln -s "$(basename "$second_link")" "$first_link"
+    ln -s "$(basename "$first_link")" "$second_link"
+
+    bats_run base-bash "$first_link"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Symlink resolution exceeded 40 links"* ]]
+}
+
 @test "base-bash resolves Homebrew-style libexec layout" {
     local prefix="$TEST_TMPDIR/homebrew-prefix"
     local script="$TEST_TMPDIR/brew-tool"
