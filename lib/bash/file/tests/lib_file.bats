@@ -105,6 +105,19 @@ EOF
     [ "$(cat "$target")" = $'line-one\n-n\nvalue\n-e' ]
 }
 
+@test "update_file_section preserves literal backslashes in markers and content" {
+    local target="$TEST_TMPDIR/config.txt"
+    local beginning='\t'
+    local ending='\e'
+    local replacement='replacement\t'
+    printf '%s\nold\n%s\nafter\n' "$beginning" "$ending" > "$target"
+
+    update_file_section "$target" "$beginning" "$ending" "$replacement"
+
+    printf -v expected '%s\n%s\n%s\nafter' "$beginning" "$replacement" "$ending"
+    [ "$(cat "$target")" = "$expected" ]
+}
+
 @test "update_file_section preserves symlinks while updating their targets" {
     local target="$TEST_TMPDIR/config.txt"
     local link="$TEST_TMPDIR/config-link"
