@@ -13,7 +13,7 @@ helpers are available.
   Append one or more values to a named indexed array.
 - `list_prepend <array> [value...]`
   Prepend one or more values to a named indexed array.
-- `list_remove <value> <array>`
+- `list_remove <array> <value>`
   Remove all exact matches from a named indexed array.
 - `list_contains <value> <array>`
   Predicate that checks whether a named indexed array contains a value.

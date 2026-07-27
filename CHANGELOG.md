@@ -7,6 +7,18 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Hardened file-section processing, allowed-dirty-path checks, temporary
+  directory normalization, launcher symlink resolution, and pass-by-name output
+  handling for the v1.5.0 hardening train.
+
+### Documentation
+
+- Aligned the public Bash API documentation with implementation behavior,
+  including list removal argument order, TTY detection, assertion semantics,
+  temporary output arguments, and fatal function assertions.
+
 ## [1.4.0] - 2026-07-25
 
 ### Added
