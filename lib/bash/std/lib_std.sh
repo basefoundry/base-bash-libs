@@ -1769,13 +1769,25 @@ __std_make_temp_path__() {
     fi
 
     __std_temp_root="${TMPDIR:-/tmp}"
-    __std_temp_root="${__std_temp_root%/}"
+    if [[ "$__std_temp_root" != /* ]]; then
+        if ! __std_temp_root="$(cd -- "$__std_temp_root" 2>/dev/null && pwd -P)"; then
+            log_error -l base_bash_libs.std "$__std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+            return 1
+        fi
+    fi
+    while [[ "$__std_temp_root" != "/" && "$__std_temp_root" == */ ]]; do
+        __std_temp_root="${__std_temp_root%/}"
+    done
     if [[ -z "$__std_temp_root" || ! -d "$__std_temp_root" ]]; then
         log_error -l base_bash_libs.std "$__std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
         return 1
     fi
 
-    __std_temp_template="$__std_temp_root/$__std_temp_prefix.XXXXXXXXXX"
+    if [[ "$__std_temp_root" == "/" ]]; then
+        __std_temp_template="/$__std_temp_prefix.XXXXXXXXXX"
+    else
+        __std_temp_template="$__std_temp_root/$__std_temp_prefix.XXXXXXXXXX"
+    fi
     if [[ "$__std_temp_path_kind" == "dir" ]]; then
         __std_temp_path="$(mktemp -d "$__std_temp_template" 2>/dev/null)" || {
             log_error -l base_bash_libs.std "$__std_temp_helper_name: failed to create temporary directory."
