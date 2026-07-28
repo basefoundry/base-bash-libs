@@ -2100,6 +2100,59 @@ EOF
     [ ! -e "$created_path" ]
 }
 
+@test "std_make_temp_file accepts TMPDIR=/" {
+    local script="$TEST_TMPDIR/temp-file-root.sh"
+    local path_file="$TEST_TMPDIR/temp-file-root.path"
+    local created_path
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+TMPDIR=/
+mktemp() {
+    [[ "\$1" == "/root-temp.XXXXXXXXXX" ]] || return 44
+    : > "$TEST_TMPDIR/root-temp-file"
+    printf '%s\n' "$TEST_TMPDIR/root-temp-file"
+}
+std_make_temp_file temp_file root-temp
+[[ -f "\$temp_file" ]] || exit 44
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    [ "$created_path" = "$TEST_TMPDIR/root-temp-file" ]
+    [ ! -e "$created_path" ]
+}
+
+@test "std_make_temp_file resolves relative and trailing-slash TMPDIR values" {
+    local script="$TEST_TMPDIR/temp-file-relative.sh"
+    local temp_root="$TEST_TMPDIR/temp-relative-root"
+    local path_file="$TEST_TMPDIR/temp-file-relative.path"
+    local created_path expected_root
+
+    mkdir -p "$temp_root"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+cd "$TEST_TMPDIR"
+TMPDIR="$(basename "$temp_root")///"
+std_make_temp_file temp_file relative-temp
+[[ -f "\$temp_file" ]] || exit 44
+printf '%s\n' "\$temp_file" > "$path_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    created_path="$(cat "$path_file")"
+    expected_root="$(cd "$temp_root" && pwd -P)"
+    [[ "$created_path" == "$expected_root"/relative-temp.* ]]
+    [ ! -e "$created_path" ]
+}
+
 @test "std_make_temp_dir creates a directory under TMPDIR and cleans it up" {
     local script="$TEST_TMPDIR/temp-dir.sh"
     local temp_root="$TEST_TMPDIR/temp-dir-root"
