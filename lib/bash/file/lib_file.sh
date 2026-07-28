@@ -114,8 +114,12 @@ __file_make_target_temp__() {
 __file_section_markers_ordered__() {
     local target_file="$1" beginning_marker="$2" end_marker="$3"
 
-    awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
+    BASE_BASH_FILE_START_MARKER="$beginning_marker" \
+    BASE_BASH_FILE_END_MARKER="$end_marker" \
+    awk '
     BEGIN {
+        START_M = ENVIRON["BASE_BASH_FILE_START_MARKER"]
+        END_M = ENVIRON["BASE_BASH_FILE_END_MARKER"]
         in_section = 0
         invalid = 0
     }
@@ -243,8 +247,12 @@ file_section_needs_update() {
         return 2
     fi
 
-    if ! awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
+    if ! BASE_BASH_FILE_START_MARKER="$beginning_marker" \
+        BASE_BASH_FILE_END_MARKER="$end_marker" \
+        awk '
     BEGIN {
+        START_M = ENVIRON["BASE_BASH_FILE_START_MARKER"]
+        END_M = ENVIRON["BASE_BASH_FILE_END_MARKER"]
         in_section = 0
         processed = 0
     }
@@ -444,8 +452,12 @@ update_file_section() {
 
     if [[ "$section_exists" == true ]]; then
         if [[ "$remove_section" == true ]]; then
-            if awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
+            if BASE_BASH_FILE_START_MARKER="$beginning_marker" \
+                BASE_BASH_FILE_END_MARKER="$end_marker" \
+                awk '
             BEGIN {
+                START_M = ENVIRON["BASE_BASH_FILE_START_MARKER"]
+                END_M = ENVIRON["BASE_BASH_FILE_END_MARKER"]
                 in_section = 0
                 processed = 0
             }
@@ -466,8 +478,14 @@ update_file_section() {
                 return 0
             fi
         else
-            if awk -v START_M="$beginning_marker" -v END_M="$end_marker" -v NEW_TEXT_FILE="$new_content_file" '
+            if BASE_BASH_FILE_START_MARKER="$beginning_marker" \
+                BASE_BASH_FILE_END_MARKER="$end_marker" \
+                BASE_BASH_FILE_NEW_CONTENT_FILE="$new_content_file" \
+                awk '
             BEGIN {
+                START_M = ENVIRON["BASE_BASH_FILE_START_MARKER"]
+                END_M = ENVIRON["BASE_BASH_FILE_END_MARKER"]
+                NEW_TEXT_FILE = ENVIRON["BASE_BASH_FILE_NEW_CONTENT_FILE"]
                 processed = 0 # 0 = not yet processed, 1 = processing, 2 = done
             }
             $0 == START_M && processed == 0 {
