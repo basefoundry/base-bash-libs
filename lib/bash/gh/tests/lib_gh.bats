@@ -40,6 +40,116 @@ create_fake_git() {
     [[ "$output" != *"command not found"* ]]
 }
 
+@test "GitHub required-argument APIs return usage errors under every caller option combination" {
+    local function_name mode
+
+    for mode in off e u p eu ep up eup; do
+        for function_name in \
+            gh_report_command_failure \
+            gh_repo_from_remote_url \
+            gh_infer_repo_from_origin \
+            gh_repo_default_branch; do
+            bats_run "$BASH" -c '
+                mode="$1"
+                case "$mode" in *e*) set -e ;; esac
+                case "$mode" in *u*) set -u ;; esac
+                case "$mode" in *p*) set -o pipefail ;; esac
+                source "$2"
+                source "$3"
+                "$4"
+                rc=$?
+                exit "$rc"
+            ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" "$function_name"
+
+            [ "$status" -eq 1 ]
+            [[ "$output" == *"Usage:"* ]]
+            [[ "$output" != *"unbound variable"* ]]
+        done
+    done
+}
+
+@test "GitHub optional forms reject excess arguments and invalid values" {
+    capture_command gh_require_cli one two
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_require_cli [install_hint]"* ]]
+
+    capture_command gh_auth_status_diagnostics one two
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_auth_status_diagnostics [login_hint]"* ]]
+
+    capture_command gh_infer_repo_from_origin repo result --required
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"* ]]
+
+    capture_command gh_report_command_failure invalid issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_report_command_failure <status> [gh args...]"* ]]
+
+    capture_command gh_report_command_failure 0 issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_report_command_failure <status> [gh args...]"* ]]
+
+    capture_command gh_report_command_failure 256 issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_report_command_failure <status> [gh args...]"* ]]
+}
+
+@test "GitHub diagnostics are independent of and preserve caller IFS" {
+    local output_file="$TEST_TMPDIR/auth-diagnostics.out"
+    local rc
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+printf 'first diagnostic\nsecond diagnostic\n' >&2
+exit 4
+EOF
+
+    IFS=:
+    if gh_auth_status_diagnostics >"$output_file" 2>&1; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$IFS" = ":" ]
+    [[ "$(cat "$output_file")" == *"gh auth status: first diagnostic"* ]]
+    [[ "$(cat "$output_file")" == *"gh auth status: second diagnostic"* ]]
+}
+
+@test "gh_run preserves command status under every caller option combination" {
+    local mode
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "auth" && "${2:-}" == "status" ]]; then
+    printf 'not logged in\n' >&2
+    exit 1
+fi
+printf 'command failed\n' >&2
+exit 7
+EOF
+
+    for mode in off e u p eu ep up eup; do
+        bats_run "$BASH" -c '
+            mode="$1"
+            case "$mode" in *e*) set -e ;; esac
+            case "$mode" in *u*) set -u ;; esac
+            case "$mode" in *p*) set -o pipefail ;; esac
+            source "$2"
+            source "$3"
+            PATH="$4:$PATH"
+            gh_run issue list
+            rc=$?
+            exit "$rc"
+        ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" "$TEST_TMPDIR/bin"
+
+        [ "$status" -eq 7 ]
+        [[ "$output" == *"GitHub command failed: gh issue list"* ]]
+        [[ "$output" != *"unbound variable"* ]]
+    done
+}
+
 @test "gh_require_cli succeeds when gh is on PATH" {
     create_fake_gh <<'EOF'
 #!/usr/bin/env bash
@@ -67,6 +177,41 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$repo" = "sentinel" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'repo' is readonly"* ]]
+}
+
+@test "GitHub result helpers reject exact internal holder names before locals or mutation" {
+    local -r __gh_result_name=parsed
+    local -r __gh_infer_result_name=inferred
+    local -r __gh_repo_result_name=defaulted
+    local parsed="keep-parsed" inferred="keep-inferred" defaulted="keep-defaulted"
+    local stderr_file="$TEST_TMPDIR/gh-internal-holder.err"
+    local rc
+
+    if gh_repo_from_remote_url "https://github.com/owner/project.git" __gh_result_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$parsed" = "keep-parsed" ]
+
+    if gh_infer_repo_from_origin . __gh_infer_result_name --optional 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$inferred" = "keep-inferred" ]
+
+    if gh_repo_default_branch owner/project __gh_repo_result_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$defaulted" = "keep-defaulted" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
 @test "gh_require_cli reports missing gh with caller hint" {
@@ -289,6 +434,18 @@ EOF
     gh_infer_repo_from_origin "$repo_dir" remote_url
 
     [ "$remote_url" = "owner/repo" ]
+}
+
+@test "gh_infer_repo_from_origin supports its former internal parsed name as the result variable" {
+    local repo_dir="$TEST_TMPDIR/repo"
+    local gh_infer_parsed_repo=""
+
+    init_git_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "git@github.com:owner/repo.git"
+
+    gh_infer_repo_from_origin "$repo_dir" gh_infer_parsed_repo
+
+    [ "$gh_infer_parsed_repo" = "owner/repo" ]
 }
 
 @test "gh_infer_repo_from_origin returns empty success for non-GitHub remotes when optional" {

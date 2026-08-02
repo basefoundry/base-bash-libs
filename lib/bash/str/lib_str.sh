@@ -11,9 +11,10 @@ fi
 readonly __lib_str_sourced__=1
 
 str_lower() {
-    local __str_var_name="${1-}" __str_value
-
     assert_arg_count "$#" 1
+    __std_assert_public_variable_names__ str_lower "${1-}" || return 1
+    local __str_var_name="$1" __str_value
+
     assert_variable_name "$__str_var_name"
     __std_assert_writable_output__ str_lower "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
@@ -21,9 +22,10 @@ str_lower() {
 }
 
 str_upper() {
-    local __str_var_name="${1-}" __str_value
-
     assert_arg_count "$#" 1
+    __std_assert_public_variable_names__ str_upper "${1-}" || return 1
+    local __str_var_name="$1" __str_value
+
     assert_variable_name "$__str_var_name"
     __std_assert_writable_output__ str_upper "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
@@ -31,9 +33,10 @@ str_upper() {
 }
 
 str_ltrim() {
-    local __str_var_name="${1-}" __str_value
-
     assert_arg_count "$#" 1
+    __std_assert_public_variable_names__ str_ltrim "${1-}" || return 1
+    local __str_var_name="$1" __str_value
+
     assert_variable_name "$__str_var_name"
     __std_assert_writable_output__ str_ltrim "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
@@ -42,9 +45,10 @@ str_ltrim() {
 }
 
 str_rtrim() {
-    local __str_var_name="${1-}" __str_value
-
     assert_arg_count "$#" 1
+    __std_assert_public_variable_names__ str_rtrim "${1-}" || return 1
+    local __str_var_name="$1" __str_value
+
     assert_variable_name "$__str_var_name"
     __std_assert_writable_output__ str_rtrim "$__str_var_name" || return 1
     __str_value="${!__str_var_name-}"
@@ -54,6 +58,7 @@ str_rtrim() {
 
 str_trim() {
     assert_arg_count "$#" 1
+    __std_assert_public_variable_names__ str_trim "${1-}" || return 1
     str_ltrim "$1" || return $?
     str_rtrim "$1" || return $?
 }
@@ -82,9 +87,10 @@ str_ends_with() {
 # Splits a value into a caller-owned indexed array. Empty fields are preserved,
 # including the final empty field produced by a trailing separator.
 str_split() {
-    local __str_split_result_name="${1-}" __str_split_value="${2-}" __str_split_separator="${3-}"
-
     assert_arg_count "$#" 3
+    __std_assert_public_variable_names__ str_split "${1-}" || return 1
+    local __str_split_result_name="$1" __str_split_value="$2" __str_split_separator="$3"
+
     assert_variable_name "$__str_split_result_name"
     __std_assert_writable_output__ str_split "$__str_split_result_name" || return 1
     assert_indexed_array "$__str_split_result_name"
@@ -106,22 +112,29 @@ str_split() {
 }
 
 str_join() {
-    local __str_join_result_name="${1-}" __str_join_separator="${2-}" __str_join_array_name="${3-}"
-
     assert_arg_count "$#" 3
+    __std_assert_public_variable_names__ str_join "${1-}" "${3-}" || return 1
+    local __str_join_result_name="$1" __str_join_separator="$2" __str_join_array_name="$3"
+
     assert_variable_name "$__str_join_result_name" "$__str_join_array_name"
+    if [[ "$__str_join_result_name" == "$__str_join_array_name" ]]; then
+        log_error -l base_bash_libs.str \
+            "str_join: result and source variables must be distinct; '$__str_join_result_name' was provided for both."
+        return 1
+    fi
     __std_assert_writable_output__ str_join "$__str_join_result_name" || return 1
     assert_indexed_array "$__str_join_array_name"
 
-    local __str_join_joined="" __str_join_index
+    local __str_join_joined="" __str_join_value __str_join_has_value=0
     local -a __str_join_values=()
-    eval "__str_join_values=(\"\${${__str_join_array_name}[@]}\")"
+    eval "if [[ -n \"\${${__str_join_array_name}[@]+set}\" ]]; then __str_join_values=(\"\${${__str_join_array_name}[@]}\"); fi"
 
-    for __str_join_index in "${!__str_join_values[@]}"; do
-        if ((__str_join_index == 0)); then
-            __str_join_joined="${__str_join_values[$__str_join_index]}"
+    for __str_join_value in "${__str_join_values[@]+"${__str_join_values[@]}"}"; do
+        if ((__str_join_has_value == 0)); then
+            __str_join_joined="$__str_join_value"
+            __str_join_has_value=1
         else
-            __str_join_joined+="$__str_join_separator${__str_join_values[$__str_join_index]}"
+            __str_join_joined+="$__str_join_separator$__str_join_value"
         fi
     done
 

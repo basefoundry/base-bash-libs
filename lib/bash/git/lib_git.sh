@@ -11,15 +11,21 @@ fi
 readonly __lib_git_sourced__=1
 
 git_detect_default_branch() {
+    if (($# != 2)); then
+        log_error -l base_bash_libs.git "Usage: git_detect_default_branch <repo_dir> <result_variable_name>"
+        return 1
+    fi
+    __std_assert_public_variable_names__ git_detect_default_branch "${2-}" || return 1
+
     local __git_detect_repo_dir="$1"
-    local __git_detect_result_name="${2:-}"
+    local __git_detect_result_name="$2"
     local __git_detect_branch
 
     if [[ -z "$__git_detect_repo_dir" || -z "$__git_detect_result_name" ]]; then
         log_error -l base_bash_libs.git "Usage: git_detect_default_branch <repo_dir> <result_variable_name>"
         return 1
     fi
-    assert_variable_name "$__git_detect_result_name"
+    assert_variable_name "$__git_detect_result_name" || return 1
     __std_assert_writable_output__ git_detect_default_branch "$__git_detect_result_name" || return 1
 
     if __git_detect_branch="$(git -C "$__git_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
@@ -46,6 +52,11 @@ git_detect_default_branch() {
 }
 
 git_worktree_path_for_branch() {
+    if (($# < 1 || $# > 2)); then
+        log_error -l base_bash_libs.git "Usage: git_worktree_path_for_branch <branch> [repo_dir]"
+        return 1
+    fi
+
     local branch="$1"
     local repo_dir="${2:-}"
     local target_ref="refs/heads/$branch"
@@ -58,7 +69,7 @@ git_worktree_path_for_branch() {
     }
 
     [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
-    if ! output="$("${git_cmd[@]}" worktree list --porcelain 2>&1)"; then
+    if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
         log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
@@ -81,12 +92,17 @@ git_worktree_path_for_branch() {
 }
 
 git_list_worktree_branches() {
+    if (($# > 1)); then
+        log_error -l base_bash_libs.git "Usage: git_list_worktree_branches [repo_dir]"
+        return 1
+    fi
+
     local repo_dir="${1:-}"
     local line path="" branch="" output
     local -a git_cmd=(git)
 
     [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
-    if ! output="$("${git_cmd[@]}" worktree list --porcelain 2>&1)"; then
+    if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
         log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
@@ -113,6 +129,11 @@ git_list_worktree_branches() {
 }
 
 git_branch_upstream() {
+    if (($# != 2)); then
+        log_error -l base_bash_libs.git "Usage: git_branch_upstream <repo_dir> <branch>"
+        return 1
+    fi
+
     local repo_dir="$1"
     local branch="$2"
 
@@ -125,6 +146,11 @@ git_branch_upstream() {
 }
 
 git_branch_merged_to_ref() {
+    if (($# != 3)); then
+        log_error -l base_bash_libs.git "Usage: git_branch_merged_to_ref <repo_dir> <branch> <ref>"
+        return 1
+    fi
+
     local repo_dir="$1"
     local branch="$2"
     local ref="$3"
@@ -138,6 +164,11 @@ git_branch_merged_to_ref() {
 }
 
 git_list_remote_branches() {
+    if (($# > 1)); then
+        log_error -l base_bash_libs.git "Usage: git_list_remote_branches [repo_dir]"
+        return 1
+    fi
+
     local repo_dir="${1:-.}"
     local output ref _sha
 
@@ -145,7 +176,7 @@ git_list_remote_branches() {
         log_error -l base_bash_libs.git "Unable to list remote branches from origin."
         return 1
     fi
-    while read -r _sha ref; do
+    while IFS=$' \t' read -r _sha ref; do
         [[ "$ref" == refs/heads/* ]] || continue
         printf '%s\n' "${ref#refs/heads/}"
     done <<<"$output"
@@ -157,12 +188,16 @@ git_list_remote_branches() {
 # @param $1 allowed_path Path in repository root that may be dirty (for example "shared").
 #
 __git_path_matches_allowed_path__() {
+    (($# == 2)) || return 1
+
     local path="$1" allowed_path="$2"
 
     [[ "$path" == "$allowed_path" || "$path" == "$allowed_path/"* ]]
 }
 
 __git_only_path_dirty__() {
+    (($# == 1)) || return 1
+
     local allowed_path="$1"
     local status_file status_record status_code path related_path
 
@@ -204,6 +239,8 @@ __git_only_path_dirty__() {
 }
 
 __git_expected_update_branch__() {
+    (($# <= 1)) || return 1
+
     local configured_branch="${1:-}"
     local default_branch
 
@@ -265,6 +302,8 @@ __git_update_repo_finish__() {
 }
 
 __git_pull_with_retry__() {
+    (($# == 1)) || return 1
+
     local git_log="$1"
     local max_attempts="${BASE_GIT_PULL_MAX_ATTEMPTS:-2}"
     local attempt=1
@@ -308,6 +347,11 @@ __git_pull_with_retry__() {
 #   BASE_GIT_PULL_MAX_ATTEMPTS Positive integer retry count for `git pull --ff-only`; defaults to 2.
 #
 git_update_repo() {
+    if (($# < 1 || $# > 3)); then
+        log_info -l base_bash_libs.git "Usage: git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
+        return 1
+    fi
+
     local git_repo="$1"
     local allowed_dirty_path="${2:-}"
     local expected_branch="${3:-}"
@@ -412,8 +456,14 @@ git_update_repo() {
 #   - The function itself returns an exit code of 0 on success, 1 on invalid usage.
 #
 git_get_current_branch() {
+    if (($# != 2)); then
+        log_error -l base_bash_libs.git "Usage: git_get_current_branch <directory> <result_variable_name>"
+        return 1
+    fi
+    __std_assert_public_variable_names__ git_get_current_branch "${2-}" || return 1
+
     local __git_branch_target_dir="$1"
-    local __git_branch_result_name="${2:-}"
+    local __git_branch_result_name="$2"
 
     # --- Argument Validation ---
     if [[ -z "$__git_branch_target_dir" || -z "$__git_branch_result_name" ]]; then
@@ -468,12 +518,14 @@ git_get_current_branch() {
 check_script_up_to_date() {
     local fetch_before_check=false script_path
 
-    if [[ "${1:-}" == "--fetch" ]]; then
+    if (($# == 2)); then
+        if [[ "$1" != "--fetch" ]]; then
+            log_error -l base_bash_libs.git "Usage: check_script_up_to_date [--fetch] <script_path>"
+            return 1
+        fi
         fetch_before_check=true
         shift
-    fi
-
-    if (($# != 1)); then
+    elif (($# != 1)) || [[ "$1" == "--fetch" ]]; then
         log_error -l base_bash_libs.git "Usage: check_script_up_to_date [--fetch] <script_path>"
         return 1
     fi

@@ -44,7 +44,7 @@ jobs:
             check_bash_version
           ' bash "$PWD/lib/bash/std/lib_std.sh"
 
-      # The exact supported lower bound runs in the bash-42-logging job. This
+      # The exact supported lower bound runs in the compatibility job. This
       # macOS smoke exercises the known unsupported system Bash 3.2 path when
       # it is available.
       - name: Smoke unsupported macOS system Bash
@@ -93,4 +93,5 @@ jobs:
               set -e
               bash tests/bash-42-logging-smoke.sh 4 2 53
               bash tests/bash-42-release-smoke.sh 4 2 53
+              bash tests/bash-option-contract.sh 4 2 53
             '

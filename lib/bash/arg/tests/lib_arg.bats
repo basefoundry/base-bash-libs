@@ -37,6 +37,27 @@ create_script() {
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "arg_parse returns usage without nounset aborts under every caller option combination" {
+    local mode
+
+    for mode in off e u p eu ep up eup; do
+        bats_run "$BASH" -c '
+            mode="$1"
+            case "$mode" in *e*) set -e ;; esac
+            case "$mode" in *u*) set -u ;; esac
+            case "$mode" in *p*) set -o pipefail ;; esac
+            source "$2"
+            source "$3"
+            arg_parse
+            exit $?
+        ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/arg/lib_arg.sh"
+
+        [ "$status" -eq 2 ]
+        [[ "$output" == *"arg_parse: usage:"* ]]
+        [[ "$output" != *"unbound variable"* ]]
+    done
+}
+
 @test "arg_parse stores flags values and positionals" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
@@ -109,6 +130,102 @@ EOF
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
 }
 
+@test "arg_parse rejects exact internal holder and repeatable names before locals or mutation" {
+    local -r __arg_options_name=actual_options
+    local -A actual_options=([sentinel]="keep")
+    local -a positionals=(old)
+    local -a specs=("verbose|flag|--verbose")
+    local -ar __arg_repeatable_name=(saved)
+    local -a repeatable_specs=("__arg_repeatable_name|repeatable|--include")
+    local stderr_file="$TEST_TMPDIR/arg-internal-holder.err"
+    local rc
+
+    if arg_parse __arg_options_name positionals specs -- --verbose 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${actual_options[sentinel]}" = "keep" ]
+    [ "${positionals[0]}" = "old" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+
+    if arg_parse actual_options positionals repeatable_specs -- --include new 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${actual_options[sentinel]}" = "keep" ]
+    [ "${positionals[0]}" = "old" ]
+    [ "${__arg_repeatable_name[0]}" = "saved" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+}
+
+@test "arg_parse rejects aliases among its primary caller-owned arrays before mutation" {
+    local -A options=([existing]="keep")
+    local -a positionals=(old)
+    local -a specs=("verbose|flag|--verbose|-v")
+    local rc
+
+    if arg_parse options options specs -- --verbose 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${options[existing]}" = "keep" ]
+
+    if arg_parse options positionals options -- --verbose 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${options[existing]}" = "keep" ]
+    [ "${positionals[0]}" = "old" ]
+
+    if arg_parse options positionals positionals -- --verbose 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${options[existing]}" = "keep" ]
+    [ "${positionals[0]}" = "old" ]
+    [ "${specs[0]}" = "verbose|flag|--verbose|-v" ]
+}
+
+@test "arg_parse rejects repeatable-output aliases before mutation" {
+    local -A options=([existing]="keep")
+    local -a positionals=(old)
+    local -a specs=("include|repeatable|--include")
+    local -a include=(saved)
+    local rc
+
+    if arg_parse options include specs -- --include new 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${options[existing]}" = "keep" ]
+    [ "${include[0]}" = "saved" ]
+
+    include=("include|repeatable|--include")
+    if arg_parse options positionals include -- --include new 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${options[existing]}" = "keep" ]
+    [ "${positionals[0]}" = "old" ]
+    [ "${include[0]}" = "include|repeatable|--include" ]
+}
+
 @test "arg_parse accepts long option equals values and repeated options" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
@@ -163,6 +280,27 @@ EOF
 
     [ "${#include[@]}" -eq 0 ]
     [ -z "${options[include]+set}" ]
+}
+
+@test "arg_parse handles declared-empty arrays under nounset" {
+    local script="$TEST_TMPDIR/arg-empty-nounset.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+set -u
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/arg/lib_arg.sh"
+declare -A options=()
+declare -a positionals=()
+declare -a specs=()
+arg_parse options positionals specs --
+[[ -z "\${options[*]-}" ]]
+[[ -z "\${positionals[*]-}" ]]
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
 }
 
 @test "arg_parse returns usage status for unknown options" {

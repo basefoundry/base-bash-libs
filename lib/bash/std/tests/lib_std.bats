@@ -260,6 +260,52 @@ EOF
     [[ "$output" == *"script_dir=$expected_dir"* ]]
 }
 
+@test "stdlib supports a top-level strict shell without an outer BASH_SOURCE frame" {
+    local expected_dir
+
+    expected_dir="$(cd "$TEST_TMPDIR" && pwd -P)"
+    bats_run bash -c '
+        set -euo pipefail
+        cd -- "$2"
+        source "$1"
+        source_dir=""
+        get_my_source_dir source_dir
+        [[ "$-" == *e* && "$-" == *u* ]]
+        shopt -qo pipefail
+        printf "script_dir=%s\nsource_dir=%s\nstrict=preserved\n" "$__SCRIPT_DIR__" "$source_dir"
+    ' bash "$STDLIB_PATH" "$TEST_TMPDIR"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"script_dir=$expected_dir"* ]]
+    [[ "$output" == *"source_dir=$expected_dir"* ]]
+    [[ "$output" == *"strict=preserved"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "stdlib handles empty arrays in a strict child with no positional arguments" {
+    local script="$TEST_TMPDIR/strict-empty-arrays.sh"
+    local directory="$TEST_TMPDIR/strict-directory"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$STDLIB_PATH"
+safe_mkdir "$directory"
+temp_path=""
+TMPDIR="$TEST_TMPDIR" std_make_temp_file temp_path strict-empty
+std_unregister_cleanup_path "\$temp_path"
+rm -f -- "\$temp_path"
+printf 'args=%s strict=preserved\n' "\$#"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ -d "$directory" ]
+    [[ "$output" == *"args=0 strict=preserved"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
 @test "stdlib exposes readonly package version from root VERSION" {
     local expected_version
 
@@ -940,7 +986,7 @@ EOF
 }
 
 @test "__print_log__ emits structured records through one final printf" {
-    bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$color" "$log_line" "$COLOR_OFF"' "$STDLIB_PATH"
+    bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$__std_log_record_color" "$__std_log_record_line" "$COLOR_OFF"' "$STDLIB_PATH"
 
     [ "$status" -eq 0 ]
 }
@@ -1171,6 +1217,36 @@ EOF
     [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Leaving function trace_me"* ]]
 }
 
+@test "top-level logging stack helpers are nounset-safe" {
+    bats_run bash -c '
+        set -euo pipefail
+        source "$1"
+        log_info_enter
+        log_info_leave
+        printf "after-log\n"
+    ' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Entering function main"* ]]
+    [[ "$output" == *"Leaving function main"* ]]
+    [[ "$output" == *"after-log"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "top-level logging usage errors remain diagnostic under strict options" {
+    bats_run bash -c '
+        set -euo pipefail
+        source "$1"
+        set_log_level NOT_A_LEVEL
+        printf "after-log-error\n"
+    ' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unknown log level 'NOT_A_LEVEL'"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+    [[ "$output" != *"after-log-error"* ]]
+}
+
 @test "print helpers emit expected text" {
     local stderr_file="$TEST_TMPDIR/print.err"
     local stdout_file="$TEST_TMPDIR/print.out"
@@ -1242,6 +1318,29 @@ EOF
     [[ "$output" == *"outer_trace"* ]]
 }
 
+@test "logging stack parsing is independent of and preserves caller IFS" {
+    local script="$TEST_TMPDIR/log-stack-ifs.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+stack_with_custom_ifs() {
+    IFS=:
+    log_info "custom IFS log"
+    dump_trace
+    printf 'ifs=<%s>\n' "\$IFS"
+}
+stack_with_custom_ifs
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"log-stack-ifs.sh:"*"custom IFS log"* ]]
+    [[ "$output" == *"stack_with_custom_ifs"* ]]
+    [[ "$output" == *"ifs=<:>"* ]]
+}
+
 @test "exit_if_error returns success for zero and empty input" {
     local rc
 
@@ -1270,6 +1369,25 @@ EOF
 
     [ "$status" -eq 7 ]
     [[ "$output" == *"boom"* ]]
+    [[ "$output" != *"after"* ]]
+}
+
+@test "exit_if_error preserves its requested status with errexit and pipefail" {
+    local script="$TEST_TMPDIR/exit-if-error-strict.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$STDLIB_PATH"
+exit_if_error 7 "strict boom"
+printf 'after\n'
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 7 ]
+    [[ "$output" == *"strict boom"* ]]
+    [[ "$output" == *"Encountered a fatal error"* ]]
     [[ "$output" != *"after"* ]]
 }
 
@@ -1977,6 +2095,53 @@ EOF
     [ "$(cat "$log_file")" = "keep" ]
 }
 
+@test "removing the final cleanup registration restores the caller EXIT trap" {
+    local script="$TEST_TMPDIR/cleanup-restore-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-restore-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "caller\n" >> "$log_file"' EXIT
+before_trap="\$(trap -p EXIT)"
+cleanup_transient() { printf 'unexpected\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_transient
+dispatcher_trap="\$(trap -p EXIT)"
+[[ "\$dispatcher_trap" != "\$before_trap" ]]
+std_unregister_cleanup_hook cleanup_transient
+after_trap="\$(trap -p EXIT)"
+[[ "\$after_trap" == "\$before_trap" ]]
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "caller" ]
+}
+
+@test "cleanup unregistration does not overwrite a caller-replaced EXIT trap" {
+    local script="$TEST_TMPDIR/cleanup-caller-replaced-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-caller-replaced-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "original\n" >> "$log_file"' EXIT
+cleanup_transient() { printf 'unexpected\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_transient
+trap 'printf "replacement\n" >> "$log_file"' EXIT
+replacement_trap="\$(trap -p EXIT)"
+std_unregister_cleanup_hook cleanup_transient
+after_trap="\$(trap -p EXIT)"
+[[ "\$after_trap" == "\$replacement_trap" ]]
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "replacement" ]
+}
+
 @test "cleanup path registration removes files and directories on exit" {
     local script="$TEST_TMPDIR/cleanup-paths.sh"
     local target_file="$TEST_TMPDIR/cleanup-file.txt"
@@ -2267,6 +2432,95 @@ EOF
     [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
 }
 
+@test "readonly caller locals do not collide with logging diagnostics" {
+    local output="unchanged"
+    local stderr_file="$TEST_TMPDIR/readonly-logging-locals.err"
+    local rc
+    local -r logger="caller-logger" color="caller-color" message="caller-message"
+    local -r source_path="caller-source"
+
+    readonly output
+    if std_command_path output bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "$output" = "unchanged" ]
+    [ "$logger" = "caller-logger" ]
+    [ "$color" = "caller-color" ]
+    [ "$message" = "caller-message" ]
+    [ "$source_path" = "caller-source" ]
+    [[ "$(cat "$stderr_file")" == *"std_command_path: result variable 'output' is readonly."* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+    [[ "$(cat "$stderr_file")" != *"local:"* ]]
+}
+
+@test "named std helpers reject exact internal holder names before locals or side effects" {
+    local -r __std_command_result_name=command_target
+    local -r __std_temp_result_name=temp_target
+    local -r __std_source_result_name=source_target
+    local command_target="keep-command" temp_target="keep-temp" source_target="keep-source"
+    local temp_root="$TEST_TMPDIR/std-internal-holder"
+    local stderr_file="$TEST_TMPDIR/std-internal-holder.err"
+    local rc
+
+    mkdir -p "$temp_root"
+    if std_command_path __std_command_result_name bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$command_target" = "keep-command" ]
+
+    if TMPDIR="$temp_root" std_make_temp_file --keep __std_temp_result_name reserved 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$temp_target" = "keep-temp" ]
+    [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
+
+    if get_my_source_dir __std_source_result_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$source_target" = "keep-source" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+    [[ "$(cat "$stderr_file")" != *"local:"* ]]
+}
+
+@test "readonly result names cannot collide with validation or diagnostic locals" {
+    local candidate
+
+    for candidate in var_name var_name_re function_name output_name declaration attributes logger color message source_path; do
+        bats_run "$BASH" -c '
+            source "$1"
+            printf -v "$2" %s unchanged
+            readonly "$2"
+            std_command_path "$2" bash
+            case $? in
+                1) ;;
+                *) exit 99 ;;
+            esac
+            printf "value=%s\n" "${!2}"
+            exit 1
+        ' bash "$STDLIB_PATH" "$candidate"
+
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"result variable '$candidate' is readonly"* ]]
+        [[ "$output" == *"value=unchanged"* ]]
+        [[ "$output" != *"readonly variable"* ]]
+        [[ "$output" != *"local:"* ]]
+    done
+}
+
 @test "std_command_path stores executable paths and returns nonzero for missing commands" {
     local command_path=""
 
@@ -2358,7 +2612,48 @@ EOF
 }
 
 @test "assert_variable_name accepts valid Bash variable names" {
-    assert_variable_name value_name _value_name VALUE_NAME value_name_2
+    assert_variable_name value_name _value_name VALUE_NAME value_name_2 __internal_syntax_name
+}
+
+@test "named assertions reject reserved caller sources before local declarations" {
+    local -ar __std_assert_indexed_name=(alpha)
+    local -Ar __std_assert_associative_name=([alpha]=one)
+    local -r __std_assert_not_null_name=present
+    local -r __std_assert_integer_name=7
+    local -r __std_range_name=5
+    local stderr_file="$TEST_TMPDIR/assert-reserved-names.err"
+    assert_reserved_name_rejected() {
+        local assertion_status
+        if "$@" 2>"$stderr_file"; then
+            assertion_status=0
+        else
+            assertion_status=$?
+        fi
+        [ "$assertion_status" -eq 1 ]
+        [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+        [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+        [[ "$(cat "$stderr_file")" != *"local:"* ]]
+    }
+
+    assert_reserved_name_rejected assert_indexed_array __std_assert_indexed_name
+    assert_reserved_name_rejected assert_associative_array __std_assert_associative_name
+    assert_reserved_name_rejected assert_not_null __std_assert_not_null_name
+    assert_reserved_name_rejected assert_integer __std_assert_integer_name
+    assert_reserved_name_rejected assert_integer_range __std_range_name 1 10
+}
+
+@test "named assertions support historically shadowing-prone caller names" {
+    local -a var_name=(alpha)
+    local unset_vars=present
+    local value=7
+
+    assert_indexed_array var_name
+    unset var_name
+    local -A var_name=([alpha]=one)
+    assert_associative_array var_name
+    assert_not_null unset_vars
+    assert_integer value
+    assert_integer_range value 1 10
 }
 
 @test "assert_variable_name exits for invalid variable names without echoing values" {

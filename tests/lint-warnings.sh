@@ -24,6 +24,7 @@ lint_files=(
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
+  tests/bash-option-contract.sh
   tests/validate.sh
   tests/lint-warnings.sh
   examples/std-usage.sh

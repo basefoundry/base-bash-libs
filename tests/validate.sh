@@ -20,6 +20,7 @@ required_files=(
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
+  tests/bash-option-contract.sh
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
   examples/cookbook-args-lists-strings.sh
@@ -73,6 +74,7 @@ check_no_strict_mode() {
     tests/fixtures/basectl-release-stub
     tests/bash-42-release-smoke.sh
     tests/bash-42-logging-smoke.sh
+    tests/bash-option-contract.sh
     tests/validate.sh
     tests/lint-warnings.sh
     examples/*.sh
@@ -205,6 +207,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   tests/fixtures/basectl-release-stub \
   tests/bash-42-release-smoke.sh \
   tests/bash-42-logging-smoke.sh \
+  tests/bash-option-contract.sh \
   tests/validate.sh \
   tests/lint-warnings.sh \
   examples/std-usage.sh \
@@ -238,6 +241,7 @@ run_stage "BATS test suites" bats \
 
 run_stage "Bash logging smoke" tests/bash-42-logging-smoke.sh || exit $?
 run_stage "Bash release guard smoke" tests/bash-42-release-smoke.sh || exit $?
+run_stage "Bash caller-option contract" tests/bash-option-contract.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
 run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?
