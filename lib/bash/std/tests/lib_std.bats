@@ -1443,6 +1443,48 @@ EOF
     [[ "$output" != *"std_run_with_timeout=function"* ]]
 }
 
+@test "command display helpers validate labels and keep protected argv opaque" {
+    local rendered
+    local unsafe_display
+
+    __std_is_safe_display__ "upload release asset"
+    for unsafe_display in \
+        "" \
+        "-option-like" \
+        $'line\nbreak' \
+        $'carriage\rreturn' \
+        $'tab\tlabel' \
+        $'delete\177label' \
+        $'next-line-\302\205' \
+        $'line-separator-\342\200\250' \
+        $'paragraph-separator-\342\200\251' \
+        $'bidi-override-\342\200\256'; do
+        if __std_is_safe_display__ "$unsafe_display"; then
+            return 1
+        fi
+    done
+
+    __std_render_command_display__ rendered 1 "upload release asset" \
+        '[sensitive command; arguments hidden]' \
+        "CANARY spaced value" "--token=CANARY-inline"
+    [ "$rendered" = "upload release asset [sensitive command; arguments hidden]" ]
+    [[ "$rendered" != *"CANARY"* ]]
+
+    __std_render_command_display__ rendered 1 "" \
+        '[sensitive command; arguments hidden]' "CANARY-default"
+    [ "$rendered" = "[sensitive command; arguments hidden]" ]
+
+    __std_render_command_display__ rendered 0 "" \
+        '[sensitive command; arguments hidden]' printf '%s\n' "value with spaces"
+    [ "$rendered" = 'printf %s\\n value\ with\ spaces' ]
+
+    local LC_ALL=C
+    readonly LC_ALL
+    __std_is_safe_display__ "readonly locale remains supported" \
+        2>"$TEST_TMPDIR/safe-display-readonly-locale.err"
+    [ ! -s "$TEST_TMPDIR/safe-display-readonly-locale.err" ]
+}
+
 @test "std_run returns an error when no command is provided" {
     local stderr_file="$TEST_TMPDIR/run-empty.err"
     local rc
@@ -1468,7 +1510,8 @@ EOF
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: unknown option '--typo'."* ]]
+    [[ "$(cat "$stderr_file")" == *"std_run: unknown runner option."* ]]
+    [[ "$(cat "$stderr_file")" != *"--typo"* ]]
     [[ "$(cat "$stderr_file")" == *"Use -- before commands that begin with --."* ]]
 }
 
@@ -1487,6 +1530,88 @@ EOF
     [ "$(cat "$output_file")" = "ran" ]
 }
 
+@test "std_run rejects malformed sensitive controls without executing or exposing arguments" {
+    local marker="$TEST_TMPDIR/sensitive-invalid.marker"
+    local script="$TEST_TMPDIR/sensitive-invalid.sh"
+    local stderr_file="$TEST_TMPDIR/sensitive-invalid.err"
+    local canary="CANARY-malformed-control-secret"
+    local rc
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+printf 'executed\n' > "$marker"
+EOF
+
+    if std_run --safe-display "operation" -- "$script" "$canary" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display "" -- "$script" "$canary" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display "unicode-$canary"$'\342\200\250' -- "$script" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display $'unsafe\nlabel' -- "$script" "$canary" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive "$script" "--token=$canary" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive "--token=$canary" "$script" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display "-H$canary" -- "$script" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display "--token=$canary" -- "$script" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if std_run --sensitive --safe-display -- "$script" "$canary" 2>>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    [ ! -e "$marker" ]
+    [[ "$(cat "$stderr_file")" != *"$canary"* ]]
+    [[ "$(cat "$stderr_file")" == *"--safe-display is valid only with --sensitive"* ]]
+    [[ "$(cat "$stderr_file")" == *"--sensitive requires -- before the command"* ]]
+    [[ "$(cat "$stderr_file")" == *"unknown runner option"* ]]
+}
+
 @test "std_run honors dry-run mode without executing the command" {
     local target="$TEST_TMPDIR/dry-run.txt"
     DRY_RUN=true
@@ -1495,6 +1620,60 @@ EOF
 
     [ "$?" -eq 0 ]
     [ ! -e "$target" ]
+}
+
+@test "std_run sensitive dry-run hides varied canaries from terminal and persistent diagnostics" {
+    local marker="$TEST_TMPDIR/sensitive-dry-run.marker"
+    local script="$TEST_TMPDIR/sensitive-dry-run.sh"
+    local stderr_file="$TEST_TMPDIR/sensitive-dry-run.err"
+    local primary_log="$TEST_TMPDIR/sensitive-dry-run.log"
+    local diagnostic_file canary
+    local -a canaries=(
+        "CANARY spaced value"
+        "CANARY-inline-value"
+        "CANARY-header-value"
+        "CANARY-url-userinfo"
+        "CANARY-form-field"
+    )
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+printf 'executed\n' > "$marker"
+EOF
+
+    DRY_RUN=1
+    BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+        --sensitive --safe-display "upload release asset" \
+        --timeout 30 --max-attempts 3 --retry-delay 2 -- \
+        "$script" \
+        "${canaries[0]}" \
+        "--token=${canaries[1]}" \
+        --header "Authorization: Bearer ${canaries[2]}" \
+        "https://user:${canaries[3]}@example.test/path" \
+        --field "password=${canaries[4]}" 2>"$stderr_file"
+    unset DRY_RUN
+
+    [ ! -e "$marker" ]
+    [ -s "$stderr_file" ]
+    [ -s "$primary_log" ]
+    for diagnostic_file in "$stderr_file" "$primary_log"; do
+        grep -Fq "upload release asset [sensitive command; arguments hidden]" "$diagnostic_file"
+        grep -Fq "30s timeout, 3 attempts, 2s retry delay" "$diagnostic_file"
+        for canary in "${canaries[@]}"; do
+            ! grep -Fq -- "$canary" "$diagnostic_file"
+        done
+    done
+}
+
+@test "std_run ordinary dry-run retains copy-pastable argument rendering" {
+    local stderr_file="$TEST_TMPDIR/ordinary-dry-run.err"
+
+    DRY_RUN=1
+    std_run printf '%s\n' "value with spaces" "--option=ordinary value" 2>"$stderr_file"
+    unset DRY_RUN
+
+    [[ "$(cat "$stderr_file")" == *'printf %s\\n value\ with\ spaces --option=ordinary\ value'* ]]
+    [[ "$(cat "$stderr_file")" != *"arguments hidden"* ]]
 }
 
 @test "std_run treats common truthy dry-run values as dry-run mode" {
@@ -1702,6 +1881,158 @@ EOF
 
     [ "$?" -eq 0 ]
     [ "$(cat "$counter_file")" = "3" ]
+}
+
+@test "std_run sensitive retries and final failure keep terminal and persistent diagnostics secret-safe" {
+    local counter_file="$TEST_TMPDIR/sensitive-retry-count.txt"
+    local script="$TEST_TMPDIR/sensitive-retry.sh"
+    local stderr_file="$TEST_TMPDIR/sensitive-retry.err"
+    local primary_log="$TEST_TMPDIR/sensitive-retry.log"
+    local canary="CANARY-retry-final-secret"
+    local diagnostic_file rc
+
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$1" ]] && read -r count < "$1"
+count=$((count + 1))
+printf '%s\n' "$count" > "$1"
+exit 73
+EOF
+
+    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+        --no-exit --max-attempts 2 \
+        --sensitive --safe-display "publish release metadata" -- \
+        "$script" "$counter_file" "value with $canary" "--token=$canary" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 73 ]
+    [ "$(cat "$counter_file")" = "2" ]
+    for diagnostic_file in "$stderr_file" "$primary_log"; do
+        grep -Fq "publish release metadata [sensitive command; arguments hidden]" "$diagnostic_file"
+        grep -Fq "attempt 1 of 2; retrying" "$diagnostic_file"
+        grep -Fq "failed after 2 attempts (exit 73)" "$diagnostic_file"
+        ! grep -Fq -- "$canary" "$diagnostic_file"
+    done
+}
+
+@test "std_run immutable display survives hostile shell-function variable collisions" {
+    local stderr_file="$TEST_TMPDIR/sensitive-function-collision.err"
+    local primary_log="$TEST_TMPDIR/sensitive-function-collision.log"
+    local canary="CANARY-dynamic-scope-display-secret"
+    local collision_invocations=0 diagnostic_file rc
+
+    hostile_display_command() {
+        collision_invocations=$((collision_invocations + 1))
+        printable_command="$canary"
+        command_display="$canary"
+        __std_run_command_display="$canary"
+        timeout_seconds="$canary"
+        timeout_path="$canary"
+        max_attempts=99
+        retry_delay=99
+        quiet=1
+        exit_on_failure=1
+        __std_run_immutable_command_display="$canary"
+        __std_run_policy_exit_on_failure=1
+        __std_run_policy_quiet=1
+        __std_run_policy_timeout_seconds="$canary"
+        __std_run_policy_timeout_path="$canary"
+        __std_run_policy_max_attempts=99
+        __std_run_policy_retry_delay=99
+        __std_run_attempt_number=99
+        __std_run_exit_code="$canary"
+        __std_run_message="$canary"
+        return 124
+    }
+
+    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+        --no-exit --max-attempts 2 \
+        --sensitive --safe-display "run protected shell function" -- \
+        hostile_display_command "--token=$canary" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    unset -f hostile_display_command
+
+    [ "$rc" -eq 124 ]
+    [ "$collision_invocations" -eq 2 ]
+    for diagnostic_file in "$stderr_file" "$primary_log"; do
+        grep -Fq "Command failed (exit 124)" "$diagnostic_file"
+        grep -Fq "attempt 1 of 2; retrying" "$diagnostic_file"
+        grep -Fq "failed after 2 attempts (exit 124)" "$diagnostic_file"
+        grep -Fq "run protected shell function [sensitive command; arguments hidden]" "$diagnostic_file"
+        ! grep -Fq -- "$canary" "$diagnostic_file"
+    done
+}
+
+@test "std_run protected default fatal path preserves status and hides argv" {
+    local command_script="$TEST_TMPDIR/sensitive-fatal-command.sh"
+    local runner_script="$TEST_TMPDIR/sensitive-fatal-runner.sh"
+    local primary_log="$TEST_TMPDIR/sensitive-fatal.log"
+    local canary="CANARY-default-fatal-secret"
+
+    create_script "$command_script" <<'EOF'
+#!/usr/bin/env bash
+exit 255
+EOF
+    create_script "$runner_script" <<'EOF'
+#!/usr/bin/env bash
+source "$1"
+primary_log="$2"
+command_script="$3"
+canary="$4"
+BASE_CLI_PRIMARY_LOG="$primary_log"
+export BASE_CLI_PRIMARY_LOG
+std_run --sensitive --safe-display "publish protected release" -- \
+    "$command_script" "value with $canary" "--token=$canary"
+printf 'after\n'
+EOF
+
+    bats_run bash "$runner_script" "$STDLIB_PATH" "$primary_log" "$command_script" "$canary"
+
+    [ "$status" -eq 255 ]
+    [[ "$output" == *"Command failed (exit 255)"* ]]
+    [[ "$output" == *"publish protected release [sensitive command; arguments hidden]"* ]]
+    [[ "$output" == *"Encountered a fatal error"* ]]
+    [[ "$output" != *"$canary"* ]]
+    [[ "$output" != *"after"* ]]
+    grep -Fq "Command failed (exit 255)" "$primary_log"
+    grep -Fq "publish protected release [sensitive command; arguments hidden]" "$primary_log"
+    ! grep -Fq -- "$canary" "$primary_log"
+}
+
+@test "std_run sensitive timeout retains status and timing without exposing arguments" {
+    local script="$TEST_TMPDIR/sensitive-timeout.sh"
+    local stderr_file="$TEST_TMPDIR/sensitive-timeout.err"
+    local primary_log="$TEST_TMPDIR/sensitive-timeout.log"
+    local canary="CANARY-timeout-secret"
+    local diagnostic_file rc
+
+    create_script "$script" <<'EOF'
+#!/usr/bin/env bash
+sleep 3
+EOF
+
+    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+        --no-exit --timeout 1 \
+        --sensitive --safe-display "wait for protected service" -- \
+        "$script" "value with $canary" "https://user:$canary@example.test" 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 124 ]
+    for diagnostic_file in "$stderr_file" "$primary_log"; do
+        grep -Fq "Command timed out after 1s" "$diagnostic_file"
+        grep -Fq "wait for protected service [sensitive command; arguments hidden]" "$diagnostic_file"
+        ! grep -Fq -- "$canary" "$diagnostic_file"
+    done
 }
 
 @test "std_run combines per-attempt timeout with retry" {

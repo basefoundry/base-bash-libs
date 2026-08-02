@@ -214,6 +214,7 @@ contract_std_api_smoke() {
     local contract_log_file="$contract_tmp/log-input"
     local contract_created_dir="$contract_tmp/created/child"
     local contract_created_file="$contract_tmp/created/file"
+    local contract_output="" contract_status=0
 
     check_bash_version
     base_bash_libs_require_version 0.0.0
@@ -253,7 +254,48 @@ contract_std_api_smoke() {
     DRY_RUN=1
     contract_quiet_success "std_run dry run" \
         std_run --no-exit --quiet command-that-must-not-run
+    contract_output="$(
+        std_run --no-exit --sensitive --safe-display "option contract upload" -- \
+            command-that-must-not-run \
+            "CONTRACT_CANARY spaced value" \
+            "--token=CONTRACT_CANARY_EQUALS" \
+            "Authorization: Bearer CONTRACT_CANARY_HEADER" 2>&1
+    )"
+    [[ "$contract_output" == *"option contract upload"* ]] ||
+        contract_fail "sensitive std_run omitted its safe display label"
+    [[ "$contract_output" != *"CONTRACT_CANARY"* ]] ||
+        contract_fail "sensitive std_run exposed a protected argument"
     unset DRY_RUN
+
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision canaries.
+    contract_sensitive_std_failure() {
+        printable_command="CONTRACT_CANARY_DYNAMIC_DISPLAY"
+        timeout_seconds="CONTRACT_CANARY_DYNAMIC_TIMEOUT"
+        attempt="CONTRACT_CANARY_DYNAMIC_ATTEMPT"
+        __std_run_immutable_command_display="CONTRACT_CANARY_INTERNAL_DISPLAY"
+        __std_run_attempt_number="CONTRACT_CANARY_INTERNAL_ATTEMPT"
+        return 73
+    }
+    if contract_output="$(
+        std_run --no-exit --max-attempts 2 \
+            --sensitive --safe-display "option contract protected failure" -- \
+            contract_sensitive_std_failure \
+            "CONTRACT_CANARY spaced value" \
+            "--token=CONTRACT_CANARY_EQUALS" 2>&1
+    )"; then
+        contract_status=0
+    else
+        contract_status=$?
+    fi
+    unset -f contract_sensitive_std_failure
+    contract_assert_equal "sensitive std_run failure status" 73 "$contract_status"
+    [[ "$contract_output" == *"option contract protected failure"* ]] ||
+        contract_fail "sensitive std_run failure omitted its safe display label"
+    [[ "$contract_output" == *"failed after 2 attempts (exit 73)"* ]] ||
+        contract_fail "sensitive std_run failure omitted final attempt context"
+    [[ "$contract_output" != *"CONTRACT_CANARY"* ]] ||
+        contract_fail "sensitive std_run failure exposed a protected value"
+
     contract_expect_status "is_dry_run false predicate" 1 is_dry_run
     # shellcheck disable=SC2034 # is_dry_run reads the compatibility global by name.
     dry_run=yes
@@ -485,7 +527,7 @@ contract_gh_stub() {
 }
 
 contract_git_gh_api_smoke() {
-    local contract_result="" contract_output=""
+    local contract_result="" contract_output="" contract_status=0
 
     git() { contract_git_stub "$@"; }
     gh() { contract_gh_stub "$@"; }
@@ -533,6 +575,21 @@ contract_git_gh_api_smoke() {
         gh_report_command_failure 7 api contract
     CONTRACT_GH_STATUS=255
     contract_expect_status "gh_run failure status" 255 contract_quiet_call gh_run api contract
+    if contract_output="$(
+        gh_run --sensitive --safe-display "option contract GitHub call" -- \
+            api repos/basefoundry/base-bash-libs \
+            -H "Authorization: Bearer CONTRACT_CANARY_HEADER" \
+            -f "secret=CONTRACT_CANARY_FIELD" 2>&1
+    )"; then
+        contract_status=0
+    else
+        contract_status=$?
+    fi
+    contract_assert_equal "sensitive gh_run failure status" 255 "$contract_status"
+    [[ "$contract_output" == *"option contract GitHub call"* ]] ||
+        contract_fail "sensitive gh_run omitted its safe display label"
+    [[ "$contract_output" != *"CONTRACT_CANARY"* ]] ||
+        contract_fail "sensitive gh_run exposed a protected argument"
     unset CONTRACT_GH_STATUS
 
     contract_expect_status "gh_require_cli usage" 1 contract_quiet_call gh_require_cli one two

@@ -337,10 +337,12 @@ set_log_category_level -l base_bash_libs.git DEBUG
 `base_bash_libs` DEBUG gate. The deprecated `--verbose-wrapper` continues to
 enable both at VERBOSE during the compatibility window.
 
-`lib_std.sh` does not log the process argument vector automatically. Arguments
-may contain credentials or other sensitive data; applications that need
-invocation diagnostics should apply schema-aware redaction before calling
-`log_debug`.
+Merely sourcing `lib_std.sh` does not log the caller process argument vector.
+Explicit command execution is different: ordinary `std_run` dry-run and
+failure diagnostics intentionally render the command arguments with Bash
+`%q`. Arguments may contain credentials or other sensitive data, so use
+`std_run --sensitive` for a protected command and apply schema-aware redaction
+before writing any caller-owned invocation diagnostic.
 
 Use `log_is_enabled` to avoid constructing an expensive diagnostic unless a
 terminal or persistent sink will consume it:
@@ -403,7 +405,8 @@ It improves on ad hoc command strings because it:
 
 - executes commands as argument arrays, not through `eval`
 - preserves spaces and special characters
-- logs a copy-pastable command in dry-run mode
+- logs a copy-pastable command in ordinary dry-run and failure diagnostics
+- can replace sensitive command text with a protected marker and safe label
 - can bound each attempt with `--timeout`
 - can retry transient failures with `--max-attempts` and `--retry-delay`
 - exits through `exit_if_error` by default when a command fails
@@ -418,6 +421,51 @@ std_run brew install jq
 `DRY_RUN` and `dry_run` both accept `true`, `1`, `yes`, and `on`. Use
 `is_dry_run` when a script needs to branch on the same normalized dry-run state
 without executing a command through `std_run`.
+
+Protect framework-generated diagnostics for a command whose arguments contain
+credentials or other sensitive values with `--sensitive`. Protected calls must
+use `--` to separate runner options from the command:
+
+```bash
+std_run \
+    --sensitive \
+    --safe-display "upload release asset" \
+    -- \
+    curl \
+        --header "Authorization: Bearer $token" \
+        --form "asset=@$archive" \
+        "$upload_url"
+```
+
+The rendered operation is:
+
+```text
+upload release asset [sensitive command; arguments hidden]
+```
+
+Without `--safe-display`, diagnostics contain only
+`[sensitive command; arguments hidden]`. A safe display must be non-empty,
+contain only printable ASCII bytes, and not begin with `-`. The byte-oriented
+rule rejects line separators, bidirectional text controls, and other
+locale-dependent non-printing characters. Rejecting a leading hyphen prevents
+a missing label from consuming an option-like command argument. The label is
+copied into terminal and persistent diagnostics exactly as the caller supplies
+it, so the caller is responsible for ensuring that the label itself contains
+no secret.
+
+`--sensitive` changes diagnostics only. It does not alter argument boundaries,
+execution, status propagation, timeout, retry, dry-run, or `--quiet` behavior,
+and it does not attempt heuristic redaction. In particular, it cannot protect:
+
+- output emitted by the executed command, including shell functions, builtins,
+  and subprocesses
+- shell tracing such as `set -x`
+- command arguments visible through the operating system process list
+- secrets placed in the caller-supplied safe display or other explicit logs
+
+Configure or redirect an executed command that may echo secrets, and disable
+tracing around sensitive invocations. Ordinary commands continue to use `%q`
+so their diagnostics retain exact, copy-pastable argument boundaries.
 
 Handle a failing command yourself with `--no-exit`:
 
@@ -480,6 +528,12 @@ first:
 ```bash
 std_run -- --command-name arg
 ```
+
+The separator is optional for ordinary commands whose name does not begin with
+`--`, but mandatory whenever `--sensitive` is selected. `--safe-display` is
+valid only with `--sensitive`. Invalid protected controls return `1` without
+executing the command, and their diagnostics do not repeat an offending token
+after sensitive mode has been selected.
 
 Timeout execution prefers `timeout` or `gtimeout` when available and otherwise
 uses a Bash fallback so scripts work on macOS and Linux.

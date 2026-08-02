@@ -13,6 +13,13 @@ and versions are tracked in the repo-root `VERSION` file.
   alpha, beta, release-candidate, and GA identifiers while locking publication
   until the verified-artifact and pre-GA release-candidate gates are complete.
 
+### Security
+
+- Added explicit sensitive-command diagnostics for the standard command runner
+  and GitHub helpers, allowing callers to publish a safe operation label while
+  keeping protected argument values out of dry-run, retry, timeout, and final
+  failure records.
+
 ### Fixed
 
 - Hardened file-section processing, allowed-dirty-path checks, temporary
