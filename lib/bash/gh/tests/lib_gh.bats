@@ -94,6 +94,62 @@ create_fake_git() {
     [[ "$output" == *"Usage: gh_report_command_failure <status> [gh args...]"* ]]
 }
 
+@test "GitHub sensitive controls fail closed before executing or echoing malformed arguments" {
+    local secret="parser-canary with spaces"
+    local unicode_label=$'unicode-label-canary\xe2\x80\xa8\xe2\x80\xae'
+    local invocation_file="$TEST_TMPDIR/parser-invoked"
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+printf 'invoked\n' > "${TEST_TMPDIR:?}/parser-invoked"
+exit 0
+EOF
+
+    capture_command gh_run --sensitive "--opaque=$secret" -- issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"protected diagnostic controls must end with --"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    capture_command gh_api_with_retry --safe-display "safe API operation" -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--safe-display is valid only with --sensitive"* ]]
+
+    capture_command gh_run --sensitive --safe-display "--token=$secret" -- issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one non-empty printable ASCII label"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    capture_command gh_run --sensitive --safe-display "-H$secret" -- issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one non-empty printable ASCII label"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    capture_command gh_api_with_retry --sensitive --safe-display "-fsecret=$secret" -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one non-empty printable ASCII label"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    capture_command gh_run --sensitive --safe-display "$unicode_label" -- issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one non-empty printable ASCII label"* ]]
+    [[ "$output" != *"unicode-label-canary"* ]]
+
+    capture_command gh_report_command_failure --sensitive 77 issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"protected diagnostic controls must end with --"* ]]
+
+    capture_command gh_report_command_failure --sensitive -- "status=$secret" issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: gh_report_command_failure"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    capture_command gh_run --sensitive --safe-display $'unsafe\nparser-secret' -- issue list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one non-empty printable ASCII label"* ]]
+    [[ "$output" != *"parser-secret"* ]]
+    [ ! -e "$invocation_file" ]
+}
+
 @test "GitHub diagnostics are independent of and preserve caller IFS" {
     local output_file="$TEST_TMPDIR/auth-diagnostics.out"
     local rc
@@ -146,6 +202,25 @@ EOF
 
         [ "$status" -eq 7 ]
         [[ "$output" == *"GitHub command failed: gh issue list"* ]]
+        [[ "$output" != *"unbound variable"* ]]
+
+        bats_run "$BASH" -c '
+            mode="$1"
+            case "$mode" in *e*) set -e ;; esac
+            case "$mode" in *u*) set -u ;; esac
+            case "$mode" in *p*) set -o pipefail ;; esac
+            source "$2"
+            source "$3"
+            PATH="$4:$PATH"
+            gh_run --sensitive --safe-display "strict protected operation" -- issue list
+            rc=$?
+            exit "$rc"
+        ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" "$TEST_TMPDIR/bin"
+
+        [ "$status" -eq 7 ]
+        [[ "$output" == *"strict protected operation [sensitive GitHub operation; arguments hidden]"* ]]
+        [[ "$output" == *"(exit 7)"* ]]
+        [[ "$output" != *"gh auth status: not logged in"* ]]
         [[ "$output" != *"unbound variable"* ]]
     done
 }
@@ -282,6 +357,97 @@ EOF
     [[ "$output" == *"Run 'gh auth login -h github.com' and retry."* ]]
 }
 
+@test "gh_run sensitive diagnostics hide every argv form and nested auth output from all log sinks" {
+    local secret="gh-run-canary with spaces"
+    local primary_log="$TEST_TMPDIR/gh-run-sensitive.log"
+    local received_args="$TEST_TMPDIR/gh-run-sensitive.args"
+    local primary_content
+
+    export GH_TEST_SECRET="$secret"
+    BASE_CLI_PRIMARY_LOG="$primary_log"
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1-}" == "auth" && "${2-}" == "status" ]]; then
+    printf 'auth diagnostic exposed %s\n' "${GH_TEST_SECRET:?}" >&2
+    exit 4
+fi
+printf '<%s>\n' "$@" > "${TEST_TMPDIR:?}/gh-run-sensitive.args"
+exit 73
+EOF
+
+    capture_command gh_run --sensitive --safe-display "create protected issue" -- \
+        api graphql \
+        "spaced value $secret" \
+        "--option=$secret" \
+        --header "Authorization: Bearer $secret" \
+        "https://user:$secret@github.example.test/resource" \
+        --field "token=$secret"
+
+    [ "$status" -eq 73 ]
+    [[ "$output" == *"create protected issue [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"GitHub command failed:"* ]]
+    [[ "$output" == *"(exit 73)"* ]]
+    [[ "$output" == *"raw auth diagnostics hidden"* ]]
+    [[ "$output" == *"Run 'gh auth login -h github.com' and retry."* ]]
+    [[ "$output" != *"$secret"* ]]
+    [[ "$(cat "$received_args")" == *"$secret"* ]]
+
+    primary_content="$(cat "$primary_log")"
+    [[ "$primary_content" == *"create protected issue"* ]]
+    [[ "$primary_content" == *"(exit 73)"* ]]
+    [[ "$primary_content" == *"raw auth diagnostics hidden"* ]]
+    [[ "$primary_content" != *"$secret"* ]]
+}
+
+@test "gh_run locks sensitive diagnostics against a dynamically scoped gh function" {
+    local secret="dynamic-scope-gh-canary"
+
+    gh() {
+        if [[ "${1-}" == "auth" && "${2-}" == "status" ]]; then
+            printf 'auth diagnostic exposed %s\n' "$secret" >&2
+            return 4
+        fi
+        __gh_run_sensitive=0
+        __gh_run_safe_display=""
+        return 67
+    }
+
+    capture_command gh_run --sensitive --safe-display "protected function call" -- \
+        api graphql --header "Authorization: Bearer $secret"
+    unset -f gh
+
+    [ "$status" -eq 67 ]
+    [[ "$output" == *"protected function call [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"(exit 67)"* ]]
+    [[ "$output" == *"raw auth diagnostics hidden"* ]]
+    [[ "$output" != *"$secret"* ]]
+}
+
+@test "gh_report_command_failure accepts control-first sensitive reporting through status 255" {
+    local secret="public-reporter-canary"
+
+    export GH_TEST_SECRET="$secret"
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1-}" == "auth" && "${2-}" == "status" ]]; then
+    printf 'auth diagnostic exposed %s\n' "${GH_TEST_SECRET:?}" >&2
+    exit 4
+fi
+exit 99
+EOF
+
+    capture_command gh_report_command_failure \
+        --sensitive --safe-display "publish protected release" -- \
+        255 api repos/owner/repo --header "Authorization: Bearer $secret"
+
+    [ "$status" -eq 255 ]
+    [[ "$output" == *"publish protected release [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"(exit 255)"* ]]
+    [[ "$output" == *"raw auth diagnostics hidden"* ]]
+    [[ "$output" != *"$secret"* ]]
+    [[ "$output" != *"--header"* ]]
+}
+
 @test "gh_run reports command failure under set -e" {
     local script="$TEST_TMPDIR/gh-run-set-e.sh"
 
@@ -327,6 +493,7 @@ EOF
 
     [ "$status" -eq 7 ]
     [[ "$output" == *"GitHub command failed: gh issue create --title Example\\ Title --body body\\ value"* ]]
+    [[ "$output" == *"(exit 7)"* ]]
     [[ "$output" != *"GitHub command failed: gh issue create --title Example Title --body body value"* ]]
 }
 
@@ -563,6 +730,65 @@ EOF
     [[ "$output" == *"GitHub API call failed on attempt 1; retrying once."* ]]
     [[ "$output" == *"ok"* ]]
     [ "$(cat "$TEST_TMPDIR/gh-api-count")" = "2" ]
+}
+
+@test "gh_api_with_retry sensitive retries and final failures never replay captured secrets" {
+    local secret="gh-api-canary with spaces"
+    local primary_log="$TEST_TMPDIR/gh-api-sensitive.log"
+    local primary_content
+
+    export GH_TEST_SECRET="$secret"
+    export BASE_CLI_PRIMARY_LOG="$primary_log"
+    export BASE_GH_API_MAX_ATTEMPTS=2
+    export BASE_GH_API_RETRY_DELAY_SECONDS=0
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+state_file="${TEST_TMPDIR:?}/gh-api-sensitive-count"
+count=0
+[[ -f "$state_file" ]] && read -r count < "$state_file"
+count=$((count + 1))
+printf '%s\n' "$count" > "$state_file"
+printf 'secondary rate limit; retry-after: 0; captured=%s\n' "${GH_TEST_SECRET:?}" >&2
+exit 29
+EOF
+
+    capture_command gh_api_with_retry --sensitive --safe-display "rotate deployment key" -- \
+        repos/owner/repo \
+        "spaced value $secret" \
+        "--option=$secret" \
+        --header "Authorization: Bearer $secret" \
+        "https://user:$secret@github.example.test/resource" \
+        --raw-field "token=$secret"
+
+    [ "$status" -eq 29 ]
+    [ "$(cat "$TEST_TMPDIR/gh-api-sensitive-count")" = "2" ]
+    [[ "$output" == *"rotate deployment key [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"retrying once"* ]]
+    [[ "$output" == *"attempt 2 of 2"* ]]
+    [[ "$output" == *"exit 29"* ]]
+    [[ "$output" == *"captured output hidden"* ]]
+    [[ "$output" != *"$secret"* ]]
+
+    primary_content="$(cat "$primary_log")"
+    [[ "$primary_content" == *"rotate deployment key"* ]]
+    [[ "$primary_content" == *"retrying once"* ]]
+    [[ "$primary_content" == *"exit 29"* ]]
+    [[ "$primary_content" != *"$secret"* ]]
+}
+
+@test "gh_api_with_retry sensitive success preserves functional stdout" {
+    local secret="successful-api-argv-canary"
+
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+printf '{"ok":true}\n'
+EOF
+
+    capture_command gh_api_with_retry --sensitive --safe-display "read protected API data" -- \
+        repos/owner/repo --header "Authorization: Bearer $secret"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = '{"ok":true}' ]
 }
 
 @test "gh_api_with_retry avoids shadowed sleep functions between retries" {

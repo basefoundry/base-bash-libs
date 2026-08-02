@@ -1149,6 +1149,61 @@ __std_is_non_negative_integer__() {
     ((__std_non_negative_normalized >= 0))
 }
 
+__std_is_safe_display__() {
+    (($# == 1)) || return 1
+
+    local __std_safe_display_value="${1-}"
+    local __std_safe_display_allowed_ascii
+    local __std_safe_display_character __std_safe_display_index
+
+    # Spell out the printable ASCII set instead of changing LC_ALL. Bash
+    # variables use dynamic scope, so even a function-local locale binding can
+    # collide with a caller's readonly LC_ALL. Quoted substring membership is
+    # independent of character classes and locale collation.
+    __std_safe_display_allowed_ascii=$' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+
+    [[ -n "$__std_safe_display_value" && "$__std_safe_display_value" != -* ]] || return 1
+    for ((__std_safe_display_index = 0;
+        __std_safe_display_index < ${#__std_safe_display_value};
+        __std_safe_display_index++)); do
+        __std_safe_display_character="${__std_safe_display_value:__std_safe_display_index:1}"
+        [[ "$__std_safe_display_allowed_ascii" == *"$__std_safe_display_character"* ]] || return 1
+    done
+}
+
+__std_render_command_display__() {
+    (($# >= 4)) || return 1
+
+    local __std_render_display_result_name="${1-}"
+    local __std_render_display_sensitive="${2-}"
+    local __std_render_display_safe_value="${3-}"
+    local __std_render_display_protected_description="${4-}"
+    local __std_render_display_value=""
+    shift 4
+
+    case "$__std_render_display_sensitive" in
+        1)
+            if [[ -n "$__std_render_display_safe_value" ]]; then
+                __std_is_safe_display__ "$__std_render_display_safe_value" || return 1
+                __std_render_display_value="$__std_render_display_safe_value $__std_render_display_protected_description"
+            else
+                __std_render_display_value="$__std_render_display_protected_description"
+            fi
+            ;;
+        0)
+            if (($#)); then
+                printf -v __std_render_display_value '%q ' "$@"
+                __std_render_display_value="${__std_render_display_value% }"
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    printf -v "$__std_render_display_result_name" '%s' "$__std_render_display_value"
+}
+
 __std_join_run_policy__() {
     local result_name="$1" timeout_seconds="$2" max_attempts="$3" retry_delay="$4"
     local policies=()
@@ -1169,14 +1224,28 @@ __std_join_run_policy__() {
 }
 
 __std_run_once__() {
-    local timeout_seconds="$1" timeout_path="$2"
-    shift 2
+    local __std_run_once_timeout_seconds="$1" __std_run_once_timeout_path="$2"
+    # These mutable locals shadow the caller's authoritative state while a
+    # shell-function command runs in Bash's dynamic scope. Assignments made by
+    # the command are absorbed here and discarded when this helper returns.
+    local __std_run_attempt_number="$3"
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
+    local __std_run_immutable_command_display
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
+    local __std_run_policy_exit_on_failure __std_run_policy_quiet
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
+    local __std_run_policy_timeout_seconds __std_run_policy_timeout_path
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
+    local __std_run_policy_max_attempts __std_run_policy_retry_delay
+    # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
+    local __std_run_exit_code __std_run_message
+    shift 3
 
-    if [[ -n "$timeout_seconds" ]]; then
-        if [[ -n "$timeout_path" ]]; then
-            "$timeout_path" "$timeout_seconds" "$@"
+    if [[ -n "$__std_run_once_timeout_seconds" ]]; then
+        if [[ -n "$__std_run_once_timeout_path" ]]; then
+            "$__std_run_once_timeout_path" "$__std_run_once_timeout_seconds" "$@"
         else
-            __std_run_with_timeout_fallback__ "$timeout_seconds" "$@"
+            __std_run_with_timeout_fallback__ "$__std_run_once_timeout_seconds" "$@"
         fi
     else
         "$@"
@@ -1215,9 +1284,13 @@ __std_run_status_message__() {
 #   - Optional Quiet Probe: If an initial argument is `--quiet`, handled
 #     failures do not log warnings. This is intended for expected probe
 #     failures and is most useful with `--no-exit`.
+#   - Protected Diagnostics: `--sensitive` prevents framework-generated
+#     diagnostics from rendering the command arguments. `--safe-display`
+#     supplies an optional caller-vetted, single-line operation label.
 #
 # Usage:
 #   std_run [options] command [arg1] [arg2] ...
+#   std_run --sensitive [--safe-display label] [options] -- command [arg1] ...
 #
 # Options:
 #   --no-exit   If provided as an initial argument, the script will not
@@ -1233,6 +1306,12 @@ __std_run_status_message__() {
 #               Alias for --max-attempts.
 #   --retry-delay N
 #               Sleep N seconds between failed attempts. Defaults to 0.
+#   --sensitive  Hide the command and all arguments from framework-generated
+#               dry-run, retry, timeout, and final-failure diagnostics. A
+#               literal `--` must separate runner options from the command.
+#   --safe-display LABEL
+#               Add a printable ASCII operation label that is non-empty and
+#               does not begin with `-`. Valid only with `--sensitive`.
 #
 # Examples:
 #   # Run a simple command. Exits if `ls` fails.
@@ -1250,11 +1329,16 @@ __std_run_status_message__() {
 #   DRY_RUN=true
 #   std_run rm -rf /some/important/path
 #
+#   # Protect credentials in framework-generated diagnostics.
+#   std_run --sensitive --safe-display "upload release asset" -- \
+#       curl -H "Authorization: Bearer $token" "$upload_url"
+#
 ################################################################################
 __std_run_impl__() {
     local helper_name="$1"
     shift
     local exit_on_failure=1 quiet=0 timeout_seconds="" timeout_path="" max_attempts=1 retry_delay=0
+    local sensitive=0 safe_display="" safe_display_set=0 option_terminator_seen=0
 
     # Parse optional run flags before the command.
     while (($#)); do
@@ -1294,13 +1378,30 @@ __std_run_impl__() {
                 __std_decimal_integer_value__ retry_delay "$1"
                 shift
                 ;;
+            --sensitive)
+                sensitive=1
+                shift
+                ;;
+            --safe-display)
+                safe_display_set=1
+                shift
+                if (($# == 0)) || [[ "${1-}" == -* ]]; then
+                    log_error -l base_bash_libs.std \
+                        "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
+                    return 1
+                fi
+                safe_display="$1"
+                shift
+                ;;
             --)
+                option_terminator_seen=1
                 shift
                 break
                 ;;
             *)
                 if [[ "${1-}" == --* ]]; then
-                    log_error -l base_bash_libs.std "$helper_name: unknown option '$1'. Use -- before commands that begin with --."
+                    log_error -l base_bash_libs.std \
+                        "$helper_name: unknown runner option. Use -- before commands that begin with --."
                     return 1
                 fi
                 break
@@ -1308,28 +1409,62 @@ __std_run_impl__() {
         esac
     done
 
+    if ((safe_display_set && ! sensitive)); then
+        log_error -l base_bash_libs.std "$helper_name: --safe-display is valid only with --sensitive."
+        return 1
+    fi
+    if ((safe_display_set)) && ! __std_is_safe_display__ "$safe_display"; then
+        log_error -l base_bash_libs.std \
+            "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
+        return 1
+    fi
+    if ((sensitive && ! option_terminator_seen)); then
+        log_error -l base_bash_libs.std \
+            "$helper_name: --sensitive requires -- before the command."
+        return 1
+    fi
+
     # Check if the command is empty.
     if [[ $# -eq 0 ]]; then
         log_error -l base_bash_libs.std "$helper_name: No command provided."
         return 1
     fi
 
-    local printable_command
-    printf -v printable_command "%q " "$@"
-    printable_command="${printable_command% }"
+    local __std_run_immutable_command_display
+    __std_render_command_display__ __std_run_immutable_command_display "$sensitive" "$safe_display" \
+        '[sensitive command; arguments hidden]' "$@" || {
+        log_error -l base_bash_libs.std "$helper_name: could not render a safe command diagnostic."
+        return 1
+    }
+    readonly __std_run_immutable_command_display
+
+    # Bash functions execute in the caller's dynamic scope. Freeze every
+    # parsed value that remains authoritative after command execution, and use
+    # only these uniquely prefixed copies below. A command may happen to assign
+    # generic names such as `timeout_seconds` or `quiet`; those assignments
+    # must not alter retry behavior or become framework-generated diagnostics.
+    local -r __std_run_policy_exit_on_failure="$exit_on_failure"
+    local -r __std_run_policy_quiet="$quiet"
+    local -r __std_run_policy_timeout_seconds="$timeout_seconds"
+    local -r __std_run_policy_max_attempts="$max_attempts"
+    local -r __std_run_policy_retry_delay="$retry_delay"
 
     # --- Dry-Run Handling ---
     if is_dry_run; then
         local policy_description
-        __std_join_run_policy__ policy_description "$timeout_seconds" "$max_attempts" "$retry_delay"
+        __std_join_run_policy__ policy_description \
+            "$__std_run_policy_timeout_seconds" \
+            "$__std_run_policy_max_attempts" \
+            "$__std_run_policy_retry_delay"
 
-        # Use printf with the %q format specifier. This is the safest way to
-        # print a command and its arguments in a way that is unambiguous and
-        # could be copied and pasted back into a shell.
+        # Ordinary commands use a copy-pastable %q rendering. Sensitive
+        # commands use only the caller-vetted label or the protected marker;
+        # the renderer does not inspect or format their command arguments.
         if [[ -n "$policy_description" ]]; then
-            log_info -l base_bash_libs.std "[DRY-RUN] Would run with ${policy_description}: ${printable_command}"
+            log_info -l base_bash_libs.std \
+                "[DRY-RUN] Would run with ${policy_description}: ${__std_run_immutable_command_display}"
         else
-            log_info -l base_bash_libs.std "[DRY-RUN] Would run: ${printable_command}"
+            log_info -l base_bash_libs.std "[DRY-RUN] Would run: ${__std_run_immutable_command_display}"
         fi
         return 0
     fi
@@ -1338,48 +1473,58 @@ __std_run_impl__() {
     # Execute the command. Using "$@" is the key. It expands each argument
     # as a separate, quoted string, preserving spaces and special characters.
     # This is the safe, modern alternative to using `eval`.
-    if [[ -n "$timeout_seconds" ]]; then
+    if [[ -n "$__std_run_policy_timeout_seconds" ]]; then
         std_command_path timeout_path timeout || std_command_path timeout_path gtimeout || timeout_path=""
     fi
+    local -r __std_run_policy_timeout_path="$timeout_path"
 
-    local attempt=1 exit_code=0 message
-    while ((attempt <= max_attempts)); do
-        if __std_run_once__ "$timeout_seconds" "$timeout_path" "$@"; then
+    local __std_run_attempt_number=1 __std_run_exit_code=0 __std_run_message
+    while ((__std_run_attempt_number <= __std_run_policy_max_attempts)); do
+        if __std_run_once__ \
+            "$__std_run_policy_timeout_seconds" \
+            "$__std_run_policy_timeout_path" \
+            "$__std_run_attempt_number" \
+            "$@"; then
             return 0
         else
-            exit_code=$?
+            __std_run_exit_code=$?
         fi
 
-        if ((attempt < max_attempts)); then
-            if ((! quiet)); then
-                __std_run_status_message__ message "$exit_code" "$timeout_seconds" "$printable_command"
-                log_warn -l base_bash_libs.std "${message} (attempt ${attempt} of ${max_attempts}; retrying)."
+        if ((__std_run_attempt_number < __std_run_policy_max_attempts)); then
+            if ((! __std_run_policy_quiet)); then
+                __std_run_status_message__ __std_run_message \
+                    "$__std_run_exit_code" "$__std_run_policy_timeout_seconds" \
+                    "$__std_run_immutable_command_display"
+                log_warn -l base_bash_libs.std \
+                    "${__std_run_message} (attempt ${__std_run_attempt_number} of ${__std_run_policy_max_attempts}; retrying)."
             fi
-            if ((retry_delay > 0)); then
-                __std_sleep_interval__ "$retry_delay"
+            if ((__std_run_policy_retry_delay > 0)); then
+                __std_sleep_interval__ "$__std_run_policy_retry_delay"
             fi
         fi
 
-        attempt=$((attempt + 1))
+        __std_run_attempt_number=$((__std_run_attempt_number + 1))
     done
 
-    if ((exit_code)); then
-        if ((max_attempts > 1)); then
-            if ((exit_code == 124)) && [[ -n "$timeout_seconds" ]]; then
-                message="Command timed out after ${timeout_seconds}s on final attempt (${max_attempts} attempts): ${printable_command}"
+    if ((__std_run_exit_code)); then
+        if ((__std_run_policy_max_attempts > 1)); then
+            if ((__std_run_exit_code == 124)) && [[ -n "$__std_run_policy_timeout_seconds" ]]; then
+                __std_run_message="Command timed out after ${__std_run_policy_timeout_seconds}s on final attempt (${__std_run_policy_max_attempts} attempts): ${__std_run_immutable_command_display}"
             else
-                message="Command failed after ${max_attempts} attempts (exit ${exit_code}): ${printable_command}"
+                __std_run_message="Command failed after ${__std_run_policy_max_attempts} attempts (exit ${__std_run_exit_code}): ${__std_run_immutable_command_display}"
             fi
         else
-            __std_run_status_message__ message "$exit_code" "$timeout_seconds" "$printable_command"
+            __std_run_status_message__ __std_run_message \
+                "$__std_run_exit_code" "$__std_run_policy_timeout_seconds" \
+                "$__std_run_immutable_command_display"
         fi
-        if ((exit_on_failure)); then
-            exit_if_error "$exit_code" "$message"
+        if ((__std_run_policy_exit_on_failure)); then
+            exit_if_error "$__std_run_exit_code" "$__std_run_message"
         else
-            if ((! quiet)); then
-                log_warn -l base_bash_libs.std "$message (continuing)."
+            if ((! __std_run_policy_quiet)); then
+                log_warn -l base_bash_libs.std "$__std_run_message (continuing)."
             fi
-            return $exit_code
+            return "$__std_run_exit_code"
         fi
     fi
 
