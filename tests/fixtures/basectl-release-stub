@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# Parser-aware test double for the subset of `basectl release` used by the
+# repository release guard.
+
+if [[ -z "${BASE_BASH_RELEASE_TEST_CAPTURE:-}" ]]; then
+    printf 'BASE_BASH_RELEASE_TEST_CAPTURE is required.\n' >&2
+    exit 2
+fi
+
+printf 'cwd=<%s>\n' "$PWD" > "$BASE_BASH_RELEASE_TEST_CAPTURE"
+for argument in "$@"; do
+    printf 'arg=<%s>\n' "$argument" >> "$BASE_BASH_RELEASE_TEST_CAPTURE"
+done
+
+if [[ "${1-}" == "release" && "${2-}" == "publish" ]]; then
+    shift 2
+    dry_run=0
+    while (($#)); do
+        case "$1" in
+            --version|--manifest)
+                shift 2
+                ;;
+            --dry-run)
+                dry_run=1
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    if ((dry_run == 0)) && [[ -n "${BASE_BASH_RELEASE_TEST_PUBLISH_MARKER:-}" ]]; then
+        : > "$BASE_BASH_RELEASE_TEST_PUBLISH_MARKER"
+    fi
+fi
+
+exit "${BASE_BASH_RELEASE_TEST_STATUS:-0}"

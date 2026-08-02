@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+
+# Repository-owned release policy guard for the Base Bash v2 release line.
+
+release_usage() {
+    cat >&2 <<'EOF'
+Usage:
+  scripts/release <check|plan|notes|publish> --version <version> [options]
+
+Allowed release identifiers:
+  2.0.0-alpha.N
+  2.0.0-beta.N
+  2.0.0-rc.N
+  2.0.0
+
+N must be a positive integer without leading zeroes. Real publication remains
+locked until the verified-artifact and pre-GA release-candidate gates are
+complete.
+EOF
+}
+
+release_error() {
+    printf 'ERROR: %s\n' "$*" >&2
+}
+
+release_version_kind() {
+    local version="${1-}"
+    local prerelease_re='^2[.]0[.]0-(alpha|beta|rc)[.]([1-9][0-9]*)$'
+
+    if [[ "$version" == "2.0.0" ]]; then
+        printf 'ga\n'
+        return 0
+    fi
+    if [[ "$version" =~ $prerelease_re ]]; then
+        printf 'prerelease\n'
+        return 0
+    fi
+    return 1
+}
+
+main() {
+    local canonical_manifest
+    local command="${1-}"
+    local manifest_value=""
+    local version=""
+    local version_kind=""
+    local dry_run=0
+    local index
+    local release_driver="${BASE_BASH_RELEASE_BASECTL:-basectl}"
+    local script_dir repo_root
+    local -a arguments=("$@")
+    local -a delegated_arguments=()
+    local seen_dry_run=0
+    local seen_format=0
+    local seen_manifest=0
+    local seen_version=0
+    local seen_yes=0
+
+    case "$command" in
+        check|plan|notes|publish)
+            ;;
+        ""|-h|--help|help)
+            release_usage
+            return 2
+            ;;
+        *)
+            release_error "Unknown release command '$command'."
+            release_usage
+            return 2
+            ;;
+    esac
+
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || return 1
+    repo_root="$(cd -- "$script_dir/.." && pwd -P)" || return 1
+    canonical_manifest="$repo_root/base_manifest.yaml"
+    if [[ ! -f "$canonical_manifest" ]]; then
+        release_error "Canonical release manifest was not found at '$canonical_manifest'."
+        return 1
+    fi
+
+    index=1
+    while ((index < ${#arguments[@]})); do
+        case "${arguments[$index]}" in
+            --version)
+                if ((seen_version)); then
+                    release_error "Option '--version' may be provided only once."
+                    return 2
+                fi
+                seen_version=1
+                index=$((index + 1))
+                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                    release_error "Option '--version' requires an argument."
+                    return 2
+                fi
+                version="${arguments[$index]}"
+                ;;
+            --manifest)
+                if ((seen_manifest)); then
+                    release_error "Option '--manifest' may be provided only once."
+                    return 2
+                fi
+                seen_manifest=1
+                index=$((index + 1))
+                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                    release_error "Option '--manifest' requires an argument."
+                    return 2
+                fi
+                manifest_value="${arguments[$index]}"
+                if [[ "$manifest_value" != "base_manifest.yaml" &&
+                    "$manifest_value" != "./base_manifest.yaml" &&
+                    "$manifest_value" != "$canonical_manifest" ]]; then
+                    release_error "Release operations must use the canonical manifest at '$canonical_manifest'."
+                    return 1
+                fi
+                ;;
+            --format)
+                if [[ "$command" != "check" ]]; then
+                    release_error "Option '--format' is only supported by release check."
+                    return 2
+                fi
+                if ((seen_format)); then
+                    release_error "Option '--format' may be provided only once."
+                    return 2
+                fi
+                seen_format=1
+                index=$((index + 1))
+                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                    release_error "Option '--format' requires an argument."
+                    return 2
+                fi
+                ;;
+            --dry-run)
+                if [[ "$command" != "publish" ]]; then
+                    release_error "Option '--dry-run' is only supported by release publish."
+                    return 2
+                fi
+                if ((seen_dry_run)); then
+                    release_error "Option '--dry-run' may be provided only once."
+                    return 2
+                fi
+                seen_dry_run=1
+                dry_run=1
+                ;;
+            --yes)
+                if [[ "$command" != "publish" ]]; then
+                    release_error "Option '--yes' is only supported by release publish."
+                    return 2
+                fi
+                if ((seen_yes)); then
+                    release_error "Option '--yes' may be provided only once."
+                    return 2
+                fi
+                seen_yes=1
+                ;;
+            -h|--help)
+                release_usage
+                return 0
+                ;;
+            *)
+                release_error "Unknown release $command option '${arguments[$index]}'."
+                return 2
+                ;;
+        esac
+        index=$((index + 1))
+    done
+
+    if [[ -z "$version" ]]; then
+        release_error "Release commands require --version."
+        return 2
+    fi
+
+    version_kind="$(release_version_kind "$version")" || {
+        release_error "Version '$version' is outside the Base Bash v2.0.0 release line."
+        release_error "Use 2.0.0-alpha.N, 2.0.0-beta.N, 2.0.0-rc.N, or 2.0.0."
+        return 1
+    }
+
+    if [[ "$command" == "publish" && "$dry_run" -eq 0 ]]; then
+        if [[ "$version_kind" == "prerelease" ]]; then
+            release_error "Publishing $version is locked until verified release artifacts and provenance land in #233."
+        else
+            release_error "Publishing v2.0.0 GA is locked until the #214 pre-GA gates and #240 RC rehearsal are complete."
+        fi
+        release_error "Use 'publish --dry-run' to inspect the guarded plan without changing GitHub state."
+        return 1
+    fi
+
+    delegated_arguments=("$@")
+    if ((seen_manifest == 0)); then
+        delegated_arguments+=(--manifest "$canonical_manifest")
+    fi
+
+    (
+        cd -- "$repo_root" || exit 1
+        "$release_driver" release "${delegated_arguments[@]}"
+    )
+}
+
+main "$@"

@@ -5,6 +5,12 @@ This repository declares its release contract in
 release commands and is the source of truth for the version file, changelog,
 GitHub Release, and Homebrew handoff.
 
+The repository release line and its temporary publication gates are defined in
+the [versioning policy](versioning-policy.md). Always enter the release workflow
+through [`scripts/release`](../scripts/release); do not invoke
+`basectl release` directly. The repository guard validates the candidate before
+delegating safe operations to Base's generic release machinery.
+
 ## Standard Sequence
 
 1. Create or choose a release issue and set its repository Project metadata.
@@ -24,17 +30,17 @@ GitHub Release, and Homebrew handoff.
 6. Sync local `main`, then inspect the release from the repository root:
 
    ```bash
-   basectl release check --version X.Y.Z --manifest base_manifest.yaml
-   basectl release plan --version X.Y.Z --manifest base_manifest.yaml
-   basectl release notes --version X.Y.Z --manifest base_manifest.yaml
-   basectl release publish --version X.Y.Z --manifest base_manifest.yaml --dry-run
+   scripts/release check --version X.Y.Z --manifest base_manifest.yaml
+   scripts/release plan --version X.Y.Z --manifest base_manifest.yaml
+   scripts/release notes --version X.Y.Z --manifest base_manifest.yaml
+   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml --dry-run
    ```
 
 7. Publish only after the readiness checks pass. Use `--yes` only from a
    trusted non-interactive release shell:
 
    ```bash
-   basectl release publish --version X.Y.Z --manifest base_manifest.yaml --yes
+   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml --yes
    ```
 
 8. Verify the annotated `vX.Y.Z` tag and the GitHub Release for
@@ -45,10 +51,12 @@ GitHub Release, and Homebrew handoff.
 The release contract requires the tap-owned formula
 `basefoundry/base/base-bash-libs` in `basefoundry/homebrew-base`.
 
-After the GitHub Release exists:
+After the GitHub Release and its verified canonical source asset exist:
 
 1. Create a tap release branch and update `Formula/base-bash-libs.rb` to the
-   new archive URL, version, SHA256, and version assertions in the formula test.
+   canonical release-asset URL, version, SHA256, and version assertions in the
+   formula test. Do not use GitHub's automatic `archive/refs/tags/...` URL for
+   v2.
 2. Validate the formula from the tap checkout:
 
    ```bash
@@ -71,8 +79,9 @@ Base changelog when it is user-visible or release-relevant.
 
 ## Finish
 
-Record the library release URL, Homebrew tap pull request, and Base dependency
-pull request on the release issue. Remove the release worktree and merged
-branches when safe. Do not publish a release while the worktree is dirty, the
-version metadata disagrees, the changelog section is missing, or a declared
+Record the library release URL, asset checksums and provenance, Homebrew tap
+pull request, and Base dependency pull request on the release issue. Remove the
+release worktree and merged branches when safe. Do not publish a release while
+the worktree is dirty, the version metadata disagrees, the changelog section is
+missing, the repository release guard blocks the candidate, or a declared
 downstream handoff has not been completed or explicitly deferred.

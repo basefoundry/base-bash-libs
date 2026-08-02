@@ -20,6 +20,9 @@ run_stage() {
 
 lint_files=(
   bin/base-bash
+  scripts/release
+  tests/fixtures/basectl-release-stub
+  tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
   tests/validate.sh
   tests/lint-warnings.sh
@@ -35,6 +38,7 @@ lint_files=(
   lib/bash/list/lib_list.sh
   lib/bash/tests/test_helper.sh
   tests/launcher.bats
+  tests/release.bats
 )
 
 run_stage "ShellCheck warning profile" shellcheck --severity=warning "${lint_files[@]}" || exit $?
