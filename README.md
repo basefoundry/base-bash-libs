@@ -99,8 +99,15 @@ You can use a git checkout, tarball extract, or copied source tree without
 Homebrew. Keep the repository layout intact so `lib_std.sh` can find the root
 `VERSION` file:
 
+Pin the checkout to the full current release commit instead of consuming the
+moving default branch:
+
 ```bash
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
+git -C vendor/base-bash-libs checkout --detach \
+  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
+  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
 ```
 
 Source the stdlib from that checkout:
@@ -172,6 +179,12 @@ base_bash_libs_require_version 1.4.0
 The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
+
+`v1.4.0` remains stable during the clean-break v2 development train. The sole
+next stable target is `v2.0.0`; there will be no stable v1.5.0 or version reset
+to 0.x. See the [versioning and release-line policy](docs/versioning-policy.md)
+for prerelease identifiers, publication gates, the withdrawn July 2026 v2
+event, immutable consumption, and the post-GA support contract.
 
 Release preparation and downstream Homebrew/Base handoffs are documented in
 [`docs/release-process.md`](docs/release-process.md). The machine-readable

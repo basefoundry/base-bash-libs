@@ -10,10 +10,12 @@ Read [docs/release-process.md](docs/release-process.md) before doing release
 work. Ordinary pull requests must leave `VERSION` unchanged; a release-prep
 pull request owns the version, README release row, and changelog transition.
 
-The repository release contract is declared in `base_manifest.yaml`. Use the
-guarded `basectl release check|plan|notes|publish` commands after the release
-preparation pull request is merged, and complete the Homebrew and Base
-downstream handoffs documented in the release process.
+The repository release contract is declared in `base_manifest.yaml`, and the
+active release-line policy is documented in `docs/versioning-policy.md`. Use
+the repository-owned `scripts/release check|plan|notes|publish` guard after the
+release preparation pull request is merged. Do not bypass it with direct
+`basectl release` calls. Complete the Homebrew and Base downstream handoffs
+documented in the release process.
 
 ## Shell Changes
 

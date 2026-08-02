@@ -12,9 +12,13 @@ required_files=(
   LICENSE
   NOTICE
   base_manifest.yaml
+  docs/versioning-policy.md
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   bin/base-bash
+  scripts/release
+  tests/fixtures/basectl-release-stub
+  tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
@@ -40,6 +44,7 @@ required_files=(
   lib/bash/list/tests/lib_list.bats
   lib/bash/tests/test_helper.sh
   tests/launcher.bats
+  tests/release.bats
   tests/lint-warnings.sh
 )
 
@@ -64,6 +69,9 @@ check_no_strict_mode() {
   local file matches status
   local strict_mode_files=(
     bin/base-bash
+    scripts/release
+    tests/fixtures/basectl-release-stub
+    tests/bash-42-release-smoke.sh
     tests/bash-42-logging-smoke.sh
     tests/validate.sh
     tests/lint-warnings.sh
@@ -193,6 +201,9 @@ done
 
 run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
+  scripts/release \
+  tests/fixtures/basectl-release-stub \
+  tests/bash-42-release-smoke.sh \
   tests/bash-42-logging-smoke.sh \
   tests/validate.sh \
   tests/lint-warnings.sh \
@@ -207,10 +218,12 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   lib/bash/arg/lib_arg.sh \
   lib/bash/list/lib_list.sh \
   lib/bash/tests/test_helper.sh \
-  tests/launcher.bats
+  tests/launcher.bats \
+  tests/release.bats
 
 bats_files=(
   tests/launcher.bats
+  tests/release.bats
   lib/bash/std/tests/lib_std.bats
   lib/bash/file/tests/lib_file.bats
   lib/bash/git/tests/lib_git.bats
@@ -224,6 +237,7 @@ run_stage "BATS test suites" bats \
   "${bats_files[@]}" || exit $?
 
 run_stage "Bash logging smoke" tests/bash-42-logging-smoke.sh || exit $?
+run_stage "Bash release guard smoke" tests/bash-42-release-smoke.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
 run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?

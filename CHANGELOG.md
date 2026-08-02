@@ -7,17 +7,26 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added a repository-owned v2 release guard that permits only the planned
+  alpha, beta, release-candidate, and GA identifiers while locking publication
+  until the verified-artifact and pre-GA release-candidate gates are complete.
+
 ### Fixed
 
 - Hardened file-section processing, allowed-dirty-path checks, temporary
   directory normalization, launcher symlink resolution, and pass-by-name output
-  handling for the v1.5.0 hardening train.
+  handling in post-v1.4.0 development.
 
 ### Documentation
 
 - Aligned the public Bash API documentation with implementation behavior,
   including list removal argument order, TTY detection, assertion semantics,
   temporary output arguments, and fatal function assertions.
+- Documented the clean-break v2 release line, the withdrawn July 2026 v2 event,
+  immutable source pins, publication gates, and the canonical release-asset
+  requirement for Homebrew.
 
 ## [1.4.0] - 2026-07-25
 

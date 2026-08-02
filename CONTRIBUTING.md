@@ -9,7 +9,9 @@ boundary.
 
 For release work, read [docs/release-process.md](docs/release-process.md). The
 repository release contract is declared in `base_manifest.yaml`; ordinary pull
-requests leave `VERSION` unchanged.
+requests leave `VERSION` unchanged. The active release line is documented in
+[docs/versioning-policy.md](docs/versioning-policy.md), and every release
+operation must enter through the repository-owned `scripts/release` guard.
 
 ## Workflow
 
