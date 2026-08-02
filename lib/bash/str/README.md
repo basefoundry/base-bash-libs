@@ -63,6 +63,8 @@ str_join joined "|" parts
 - `str_split` preserves a trailing empty field when the input ends with the
   separator.
 - `str_join` preserves empty array elements, including trailing empty elements.
+- `str_join` requires distinct result and source variable names and rejects an
+  alias before changing caller state.
 - Use `list_contains` from `lib/bash/list/lib_list.sh` for indexed-array
   membership checks.
 - Named string, result, and array arguments must be valid Bash variable names.

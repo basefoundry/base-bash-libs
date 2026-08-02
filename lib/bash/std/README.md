@@ -217,6 +217,15 @@ When a Base wrapper preloads the stdlib for another command, it can set
 `BASE_BASH_BOOTSTRAP_SOURCE` so `__SCRIPT_DIR__` still points at the command
 script rather than the wrapper.
 
+The library preserves caller-selected `errexit`, `nounset`, and `pipefail`
+settings and supports every combination on Bash 4.2 or newer. It does not
+enable or disable those options for the caller. A top-level interactive or
+`bash -c` source has no outer `BASH_SOURCE` frame; without a bootstrap override,
+`__SCRIPT_DIR__` and `get_my_source_dir` use the current working directory in
+that case. Predicate helpers can intentionally return nonzero, so callers using
+`errexit` should invoke them in `if`, `while`, `&&`, or another normal Bash
+conditional context.
+
 ## Version Requirements
 
 Use `base_bash_libs_require_version` when a downstream script depends on APIs
@@ -575,7 +584,11 @@ std_unregister_cleanup_hook cleanup_workspace
 
 Hooks run in registration order and duplicate registrations are ignored. If an
 `EXIT` trap already exists when the first cleanup hook or path is registered,
-that existing trap is preserved and runs before the stdlib cleanup hooks.
+that existing trap is preserved and runs before the stdlib cleanup hooks. The
+shared dispatcher remains installed only while at least one hook or path is
+registered. Removing the final registration restores the prior `EXIT` trap if
+the dispatcher still owns it; a trap installed later by the caller is never
+overwritten during unregistration.
 
 ## Temporary Path Helpers
 

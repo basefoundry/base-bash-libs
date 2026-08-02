@@ -200,14 +200,30 @@ base_bash_libs_require_version() {
 #
 readonly __SCRIPT_ARGS__=("$@")
 __new_args__=()
-__SCRIPT_DIR__=$(
-    cd -- "$(dirname -- "${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]}}" )" &>/dev/null && pwd -P
-)
+__script_source__="${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}"
+if [[ -n "$__script_source__" ]]; then
+    __SCRIPT_DIR__=$(
+        cd -- "$(dirname -- "$__script_source__")" &>/dev/null && pwd -P
+    ) || {
+        printf '%s\n' "Error: Unable to resolve caller directory from '$__script_source__'." >&2
+        return 1 2>/dev/null || exit 1
+    }
+else
+    # An interactive shell or a top-level `bash -c` source has no outer
+    # BASH_SOURCE frame. In that case relative imports are anchored to the
+    # directory in which the caller sourced the library.
+    __SCRIPT_DIR__="$(pwd -P)" || {
+        printf '%s\n' "Error: Unable to resolve the current caller directory." >&2
+        return 1 2>/dev/null || exit 1
+    }
+fi
 readonly __SCRIPT_DIR__
 declare -ga __std_cleanup_hooks=()
 declare -ga __std_cleanup_paths=()
 declare -g __std_cleanup_dispatcher_installed=0
 declare -g __std_original_exit_trap=""
+declare -g __std_original_exit_trap_spec=""
+declare -g __std_cleanup_dispatcher_trap_spec=""
 
 ############################################ BASH VERSION CHECKER #######################################################
 
@@ -282,7 +298,7 @@ __stdlib_init__() {
     #
     local arg parse_options=1
     __color__=0
-    for arg in "${__SCRIPT_ARGS__[@]}"; do
+    for arg in "${__SCRIPT_ARGS__[@]+"${__SCRIPT_ARGS__[@]}"}"; do
         if ((parse_options)) && [[ "$arg" == "--" ]]; then
             __new_args__+=("$arg")
             parse_options=0
@@ -371,7 +387,7 @@ import() {
 #   -n : Do not check if the directory exists before adding it.
 #
 add_to_path() {
-    local dir path_dir prepend=0 opt strict=1 index in_path
+    local dir path_dir prepend=0 opt strict=1 index in_path directory_count
     local -a path_dirs directories=()
     local OPTIND=1
     while getopts np opt; do
@@ -387,13 +403,14 @@ add_to_path() {
     shift $((OPTIND-1))
 
     directories=("$@")
+    directory_count=$#
     if ((prepend)); then
-        for ((index = ${#directories[@]} - 1; index >= 0; index--)); do
+        for ((index = directory_count - 1; index >= 0; index--)); do
             dir="${directories[index]}"
             ((strict)) && [[ ! -d $dir ]] && continue
             in_path=0
             IFS=: read -ra path_dirs <<< "$PATH"
-            for path_dir in "${path_dirs[@]}"; do
+            for path_dir in "${path_dirs[@]+"${path_dirs[@]}"}"; do
                 if [[ "$path_dir" == "$dir" ]]; then
                     in_path=1
                     break
@@ -404,11 +421,11 @@ add_to_path() {
             fi
         done
     else
-        for dir in "${directories[@]}"; do
+        for dir in "${directories[@]+"${directories[@]}"}"; do
             in_path=0
             ((strict)) && [[ ! -d $dir ]] && continue
             IFS=: read -ra path_dirs <<< "$PATH"
-            for path_dir in "${path_dirs[@]}"; do
+            for path_dir in "${path_dirs[@]+"${path_dirs[@]}"}"; do
                 if [[ "$path_dir" == "$dir" ]]; then
                     in_path=1
                     break
@@ -432,7 +449,7 @@ dedupe_path() {
     local -A seen
     local IFS=':' new_path dir
     for dir in $PATH; do
-        if [[ -n "$dir" && -z "${seen[$dir]}" ]]; then
+        if [[ -n "$dir" && -z "${seen[$dir]-}" ]]; then
             new_path="${new_path:+$new_path:}$dir"
             seen["$dir"]=1
         fi
@@ -446,7 +463,7 @@ dedupe_path() {
 print_path() {
     local IFS=':' dirs dir
     IFS=: read -ra dirs <<< "$PATH"
-    for dir in "${dirs[@]}"; do printf '%s\n' "$dir"; done
+    for dir in "${dirs[@]+"${dirs[@]}"}"; do printf '%s\n' "$dir"; done
 }
 
 #################################################### LOGGING ###########################################################
@@ -476,20 +493,25 @@ __log_init__() {
 # __join_message__ - Join message fragments with a stable single-space separator.
 #
 __join_message__() {
-    local IFS=' '
-    printf '%s' "$*"
+    local __std_join_message_result="" __std_join_message_fragment __std_join_message_separator=""
+
+    for __std_join_message_fragment in "$@"; do
+        __std_join_message_result+="${__std_join_message_separator}${__std_join_message_fragment}"
+        __std_join_message_separator=" "
+    done
+    printf '%s' "$__std_join_message_result"
 }
 
 #
 # __log_timestamp__ - Store the current log timestamp in a named variable.
 #
 __log_timestamp__() {
-    local result_name="$1"
+    local __std_log_timestamp_result_name="$1"
 
     if [[ "${LOG_UTC:-}" == 1 ]]; then
-        TZ=UTC0 printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S)T UTC' -1
+        TZ=UTC0 printf -v "$__std_log_timestamp_result_name" '%(%Y-%m-%d %H:%M:%S)T UTC' -1
     else
-        printf -v "$result_name" '%(%Y-%m-%d %H:%M:%S %z)T' -1
+        printf -v "$__std_log_timestamp_result_name" '%(%Y-%m-%d %H:%M:%S %z)T' -1
     fi
 }
 
@@ -497,111 +519,120 @@ __log_timestamp__() {
 # __log_source_location__ - Store the first non-stdlib caller location.
 #
 __log_source_location__() {
-    local result_name="$1"
-    local fallback_path="${2:-}" fallback_line="${3:-0}"
-    local source_path="" source_line=""
-    local frame=1 max_caller_frames=20 caller_info caller_line _caller_func caller_file
+    local __std_log_source_result_name="$1"
+    local __std_log_source_fallback_path="${2:-}" __std_log_source_fallback_line="${3:-0}"
+    local __std_log_source_path="" __std_log_source_line=""
+    local __std_log_source_frame=1 __std_log_source_max_frames=20
+    local __std_log_source_caller_info __std_log_source_caller_rest
+    local __std_log_source_caller_line __std_log_source_caller_file
 
-    while ((frame <= max_caller_frames)) && caller_info=$(caller "$frame"); do
-        read -r caller_line _caller_func caller_file <<<"$caller_info"
-        if [[ -n "$caller_file" && "$caller_file" != "$__LIB_STD_PATH__" ]]; then
-            source_path="$caller_file"
-            source_line="$caller_line"
+    while ((__std_log_source_frame <= __std_log_source_max_frames)) &&
+        __std_log_source_caller_info=$(caller "$__std_log_source_frame"); do
+        __std_log_source_caller_line="${__std_log_source_caller_info%% *}"
+        __std_log_source_caller_rest="${__std_log_source_caller_info#* }"
+        __std_log_source_caller_file="${__std_log_source_caller_rest#* }"
+        if [[ -n "$__std_log_source_caller_file" &&
+            "$__std_log_source_caller_file" != "$__LIB_STD_PATH__" ]]; then
+            __std_log_source_path="$__std_log_source_caller_file"
+            __std_log_source_line="$__std_log_source_caller_line"
             break
         fi
-        ((frame++))
+        ((__std_log_source_frame++))
     done
 
-    if [[ -z "$source_path" ]]; then
-        source_path="${fallback_path:-${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]:-unknown}}}}"
-        source_line="${fallback_line:-${BASH_LINENO[1]:-${BASH_LINENO[0]:-0}}}"
+    if [[ -z "$__std_log_source_path" ]]; then
+        __std_log_source_path="${__std_log_source_fallback_path:-${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]:-unknown}}}}"
+        __std_log_source_line="${__std_log_source_fallback_line:-${BASH_LINENO[1]:-${BASH_LINENO[0]:-0}}}"
     fi
 
-    source_path="${source_path#"$__SCRIPT_DIR__"/}"
-    source_path="${source_path#./}"
-    printf -v "$result_name" '%s:%s' "$source_path" "$source_line"
+    __std_log_source_path="${__std_log_source_path#"$__SCRIPT_DIR__"/}"
+    __std_log_source_path="${__std_log_source_path#./}"
+    printf -v "$__std_log_source_result_name" '%s:%s' "$__std_log_source_path" "$__std_log_source_line"
 }
 
 #
 # __log_primary_sink_is_usable__ - Check the primary sink without modifying it.
 #
 __log_primary_sink_is_usable__() {
-    local primary_log="${1-}" parent_dir
+    local __std_log_primary_usable_path="${1-}" __std_log_primary_usable_parent_dir
 
-    [[ -n "$primary_log" && "$primary_log" != */ ]] || return 1
-    [[ -z "${_log_primary_sink_failed_paths[$primary_log]+set}" ]] || return 1
-    [[ ! -L "$primary_log" ]] || return 1
+    [[ -n "$__std_log_primary_usable_path" && "$__std_log_primary_usable_path" != */ ]] || return 1
+    [[ -z "${_log_primary_sink_failed_paths[$__std_log_primary_usable_path]+set}" ]] || return 1
+    [[ ! -L "$__std_log_primary_usable_path" ]] || return 1
 
-    if [[ -e "$primary_log" ]]; then
-        if [[ -f "$primary_log" && -O "$primary_log" && -w "$primary_log" ]]; then
+    if [[ -e "$__std_log_primary_usable_path" ]]; then
+        if [[ -f "$__std_log_primary_usable_path" && -O "$__std_log_primary_usable_path" &&
+            -w "$__std_log_primary_usable_path" ]]; then
             return 0
         fi
         return 1
     fi
 
-    if [[ "$primary_log" == */* ]]; then
-        parent_dir="${primary_log%/*}"
-        [[ -n "$parent_dir" ]] || parent_dir=/
+    if [[ "$__std_log_primary_usable_path" == */* ]]; then
+        __std_log_primary_usable_parent_dir="${__std_log_primary_usable_path%/*}"
+        [[ -n "$__std_log_primary_usable_parent_dir" ]] || __std_log_primary_usable_parent_dir=/
     else
-        parent_dir=.
+        __std_log_primary_usable_parent_dir=.
     fi
 
-    [[ -d "$parent_dir" && -w "$parent_dir" && -x "$parent_dir" ]]
+    [[ -d "$__std_log_primary_usable_parent_dir" && -w "$__std_log_primary_usable_parent_dir" &&
+        -x "$__std_log_primary_usable_parent_dir" ]]
 }
 
 #
 # __log_primary_sink_prepare__ - Create or privately harden a usable sink.
 #
 __log_primary_sink_prepare__() {
-    local primary_log="$1" chmod_path
+    local __std_log_primary_prepare_path="$1" __std_log_primary_prepare_chmod_path
 
-    __log_primary_sink_is_usable__ "$primary_log" || return 1
+    __log_primary_sink_is_usable__ "$__std_log_primary_prepare_path" || return 1
 
-    if [[ ! -e "$primary_log" ]]; then
+    if [[ ! -e "$__std_log_primary_prepare_path" ]]; then
         # noclobber avoids truncating a target that appears after the
         # non-mutating eligibility check.
-        if ! (umask 077; set -o noclobber; : >"$primary_log") 2>/dev/null; then
-            [[ -e "$primary_log" && ! -L "$primary_log" ]] || return 1
+        if ! (umask 077; set -o noclobber; : >"$__std_log_primary_prepare_path") 2>/dev/null; then
+            [[ -e "$__std_log_primary_prepare_path" && ! -L "$__std_log_primary_prepare_path" ]] || return 1
         fi
     fi
 
-    [[ -f "$primary_log" && ! -L "$primary_log" &&
-        -O "$primary_log" && -w "$primary_log" ]] || return 1
+    [[ -f "$__std_log_primary_prepare_path" && ! -L "$__std_log_primary_prepare_path" &&
+        -O "$__std_log_primary_prepare_path" && -w "$__std_log_primary_prepare_path" ]] || return 1
 
     # macOS chmod does not accept "--"; prefix a bare option-like path instead.
-    chmod_path="$primary_log"
-    [[ "$chmod_path" == -* ]] && chmod_path="./$chmod_path"
-    command chmod 600 "$chmod_path" 2>/dev/null || return 1
+    __std_log_primary_prepare_chmod_path="$__std_log_primary_prepare_path"
+    [[ "$__std_log_primary_prepare_chmod_path" == -* ]] &&
+        __std_log_primary_prepare_chmod_path="./$__std_log_primary_prepare_chmod_path"
+    command chmod 600 "$__std_log_primary_prepare_chmod_path" 2>/dev/null || return 1
 
-    [[ -f "$primary_log" && ! -L "$primary_log" &&
-        -O "$primary_log" && -w "$primary_log" ]]
+    [[ -f "$__std_log_primary_prepare_path" && ! -L "$__std_log_primary_prepare_path" &&
+        -O "$__std_log_primary_prepare_path" && -w "$__std_log_primary_prepare_path" ]]
 }
 
 #
 # __log_primary_sink_append__ - Append one record or file payload.
 #
 __log_primary_sink_append__() {
-    local payload_kind="${1-}" payload="${2-}"
-    local primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+    local __std_log_primary_append_kind="${1-}" __std_log_primary_append_payload="${2-}"
+    local __std_log_primary_append_path="${BASE_CLI_PRIMARY_LOG:-}"
 
-    __log_primary_sink_is_usable__ "$primary_log" || return 1
+    __log_primary_sink_is_usable__ "$__std_log_primary_append_path" || return 1
 
     (
         umask 077
-        __log_primary_sink_prepare__ "$primary_log" || exit 1
+        __log_primary_sink_prepare__ "$__std_log_primary_append_path" || exit 1
 
-        case "$payload_kind" in
+        case "$__std_log_primary_append_kind" in
             record)
-                printf '%s\n' "$payload"
+                printf '%s\n' "$__std_log_primary_append_payload"
                 ;;
             file)
-                command cat -- "$payload" || exit 1
+                command cat -- "$__std_log_primary_append_payload" || exit 1
                 printf '\n'
                 ;;
             *)
                 exit 1
                 ;;
-        esac >>"$primary_log"
+        esac >>"$__std_log_primary_append_path"
     ) 2>/dev/null
 }
 
@@ -609,11 +640,11 @@ __log_primary_sink_append__() {
 # __log_primary_sink_write__ - Keep sink failures best-effort and disable them.
 #
 __log_primary_sink_write__() {
-    local payload_kind="$1" payload="$2"
-    local primary_log="${BASE_CLI_PRIMARY_LOG:-}"
+    local __std_log_primary_write_kind="$1" __std_log_primary_write_payload="$2"
+    local __std_log_primary_write_path="${BASE_CLI_PRIMARY_LOG:-}"
 
-    if ! __log_primary_sink_append__ "$payload_kind" "$payload"; then
-        _log_primary_sink_failed_paths["$primary_log"]=1
+    if ! __log_primary_sink_append__ "$__std_log_primary_write_kind" "$__std_log_primary_write_payload"; then
+        _log_primary_sink_failed_paths["$__std_log_primary_write_path"]=1
     fi
     return 0
 }
@@ -622,19 +653,21 @@ __log_primary_sink_write__() {
 # __print_log_record__ - Compose and write a structured log record.
 #
 __print_log_record__() {
-    local color="$1" in_level="$2" source_location="$3"
-    local terminal_enabled="${4:-1}" persist_enabled="${5:-0}"
+    local __std_log_record_color="$1" __std_log_record_level="$2" __std_log_record_source="$3"
+    local __std_log_record_terminal_enabled="${4:-1}" __std_log_record_persist_enabled="${5:-0}"
     shift 5
-    local message timestamp log_line
+    local __std_log_record_message __std_log_record_timestamp __std_log_record_line
 
-    message="$(__join_message__ "$@")"
-    __log_timestamp__ timestamp
-    printf -v log_line '%s %-7s %s %s' "$timestamp" "$in_level" "$source_location" "$message"
-    if ((terminal_enabled)); then
-        printf '%b%s%b\n' "$color" "$log_line" "$COLOR_OFF" >&2
+    __std_log_record_message="$(__join_message__ "$@")"
+    __log_timestamp__ __std_log_record_timestamp
+    printf -v __std_log_record_line '%s %-7s %s %s' \
+        "$__std_log_record_timestamp" "$__std_log_record_level" "$__std_log_record_source" \
+        "$__std_log_record_message"
+    if ((__std_log_record_terminal_enabled)); then
+        printf '%b%s%b\n' "$__std_log_record_color" "$__std_log_record_line" "$COLOR_OFF" >&2
     fi
-    if ((persist_enabled)); then
-        __log_primary_sink_write__ record "$log_line"
+    if ((__std_log_record_persist_enabled)); then
+        __log_primary_sink_write__ record "$__std_log_record_line"
     fi
 }
 
@@ -676,31 +709,38 @@ __init_colors__() {
 # Invalid levels return 1 and leave the existing logger level unchanged.
 #
 set_log_level() {
-    local logger=default in_level l
+    local __std_set_log_logger=default __std_set_log_level __std_set_log_level_value
+    local __std_set_log_source_location
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
+            __log_source_location__ __std_set_log_source_location \
+                "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
             printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-                "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+                "$__std_set_log_source_location Option '-l' needs an argument" >&2
             return 1
         fi
-        logger=$2
+        __std_set_log_logger=$2
         shift 2 2>/dev/null
     fi
-    in_level="${1:-INFO}"
-    if [[ -z "$logger" ]]; then
+    __std_set_log_level="${1:-INFO}"
+    if [[ -z "$__std_set_log_logger" ]]; then
+        __log_source_location__ __std_set_log_source_location \
+            "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+            "$__std_set_log_source_location Option '-l' needs an argument" >&2
         return 1
     fi
 
-    if [[ -n "${_log_levels[$in_level]+set}" ]]; then
-        l="${_log_levels[$in_level]}"
-        _loggers_level_map[$logger]=$l
+    if [[ -n "${_log_levels[$__std_set_log_level]+set}" ]]; then
+        __std_set_log_level_value="${_log_levels[$__std_set_log_level]}"
+        _loggers_level_map[$__std_set_log_logger]=$__std_set_log_level_value
         return 0
     fi
 
+    __log_source_location__ __std_set_log_source_location \
+        "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
     printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-        "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for logger '$logger'" >&2
+        "$__std_set_log_source_location Unknown log level '$__std_set_log_level' for logger '$__std_set_log_logger'" >&2
     return 1
 }
 
@@ -715,24 +755,29 @@ set_log_level() {
 # Invalid arguments return 1 without changing the existing category level.
 #
 set_log_category_level() {
-    local category in_level l
+    local __std_set_category_name __std_set_category_level __std_set_category_level_value
+    local __std_set_category_source_location
 
     if [[ "$#" -ne 3 || "${1-}" != "-l" || -z "${2-}" || -z "${3-}" ]]; then
+        __log_source_location__ __std_set_category_source_location \
+            "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Usage: set_log_category_level -l <category> <level>" >&2
+            "$__std_set_category_source_location Usage: set_log_category_level -l <category> <level>" >&2
         return 1
     fi
 
-    category=$2
-    in_level=$3
-    if [[ -n "${_log_levels[$in_level]+set}" ]]; then
-        l="${_log_levels[$in_level]}"
-        _log_category_level_map[$category]=$l
+    __std_set_category_name=$2
+    __std_set_category_level=$3
+    if [[ -n "${_log_levels[$__std_set_category_level]+set}" ]]; then
+        __std_set_category_level_value="${_log_levels[$__std_set_category_level]}"
+        _log_category_level_map[$__std_set_category_name]=$__std_set_category_level_value
         return 0
     fi
 
+    __log_source_location__ __std_set_category_source_location \
+        "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
     printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-        "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for category '$category'" >&2
+        "$__std_set_category_source_location Unknown log level '$__std_set_category_level' for category '$__std_set_category_name'" >&2
     return 1
 }
 
@@ -740,43 +785,47 @@ set_log_category_level() {
 # __resolve_log_category_level__ - Resolve a category through its dotted parents.
 #
 __resolve_log_category_level__() {
-    local result_name="$1" category="${2:-default}" candidate
+    local __std_log_category_result_name="$1" __std_log_category_name="${2:-default}"
+    local __std_log_category_candidate
 
-    candidate=$category
-    while [[ -n "$candidate" ]]; do
-        if [[ -n "${_log_category_level_map[$candidate]+set}" ]]; then
-            printf -v "$result_name" '%s' "${_log_category_level_map[$candidate]}"
+    __std_log_category_candidate=$__std_log_category_name
+    while [[ -n "$__std_log_category_candidate" ]]; do
+        if [[ -n "${_log_category_level_map[$__std_log_category_candidate]+set}" ]]; then
+            printf -v "$__std_log_category_result_name" '%s' \
+                "${_log_category_level_map[$__std_log_category_candidate]}"
             return 0
         fi
-        [[ "$candidate" == *.* ]] || break
-        candidate="${candidate%.*}"
+        [[ "$__std_log_category_candidate" == *.* ]] || break
+        __std_log_category_candidate="${__std_log_category_candidate%.*}"
     done
 
-    printf -v "$result_name" '%s' "${_log_category_level_map[default]}"
+    printf -v "$__std_log_category_result_name" '%s' "${_log_category_level_map[default]}"
 }
 
 #
 # __log_sink_state__ - Store terminal and persistent-sink decisions.
 #
 __log_sink_state__() {
-    local category="$1" in_level="$2" terminal_result="$3" persist_result="$4"
-    local event_level category_level terminal_level terminal_state=0 persist_state=0
+    local __std_log_sink_category="$1" __std_log_sink_level="$2"
+    local __std_log_sink_terminal_result="$3" __std_log_sink_persist_result="$4"
+    local __std_log_sink_event_level __std_log_sink_category_level __std_log_sink_terminal_level
+    local __std_log_sink_terminal_state=0 __std_log_sink_persist_state=0
 
-    [[ -n "${_log_levels[$in_level]+set}" ]] || return 1
-    event_level="${_log_levels[$in_level]}"
-    __resolve_log_category_level__ category_level "$category"
+    [[ -n "${_log_levels[$__std_log_sink_level]+set}" ]] || return 1
+    __std_log_sink_event_level="${_log_levels[$__std_log_sink_level]}"
+    __resolve_log_category_level__ __std_log_sink_category_level "$__std_log_sink_category"
 
-    if ((category_level >= event_level)); then
-        terminal_level="${_loggers_level_map[$category]:-${_loggers_level_map[default]}}"
-        ((terminal_level >= event_level)) && terminal_state=1
-        if ((event_level <= _log_levels[DEBUG])) &&
+    if ((__std_log_sink_category_level >= __std_log_sink_event_level)); then
+        __std_log_sink_terminal_level="${_loggers_level_map[$__std_log_sink_category]:-${_loggers_level_map[default]}}"
+        ((__std_log_sink_terminal_level >= __std_log_sink_event_level)) && __std_log_sink_terminal_state=1
+        if ((__std_log_sink_event_level <= _log_levels[DEBUG])) &&
             __log_primary_sink_is_usable__ "${BASE_CLI_PRIMARY_LOG:-}"; then
-            persist_state=1
+            __std_log_sink_persist_state=1
         fi
     fi
 
-    printf -v "$terminal_result" '%s' "$terminal_state"
-    printf -v "$persist_result" '%s' "$persist_state"
+    printf -v "$__std_log_sink_terminal_result" '%s' "$__std_log_sink_terminal_state"
+    printf -v "$__std_log_sink_persist_result" '%s' "$__std_log_sink_persist_state"
 }
 
 #
@@ -786,31 +835,39 @@ __log_sink_state__() {
 #   log_is_enabled [-l category] level
 #
 log_is_enabled() {
-    local category=default in_level terminal_enabled persist_enabled
+    local __std_log_enabled_category=default __std_log_enabled_level
+    local __std_log_enabled_terminal __std_log_enabled_persist __std_log_enabled_source_location
 
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
+            __log_source_location__ __std_log_enabled_source_location \
+                "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
             printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-                "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+                "$__std_log_enabled_source_location Option '-l' needs an argument" >&2
             return 1
         fi
-        category=$2
+        __std_log_enabled_category=$2
         shift 2
     fi
     if [[ "$#" -ne 1 || -z "${1-}" ]]; then
+        __log_source_location__ __std_log_enabled_source_location \
+            "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Usage: log_is_enabled [-l <category>] <level>" >&2
+            "$__std_log_enabled_source_location Usage: log_is_enabled [-l <category>] <level>" >&2
         return 1
     fi
-    in_level=$1
-    if [[ -z "${_log_levels[$in_level]+set}" ]]; then
+    __std_log_enabled_level=$1
+    if [[ -z "${_log_levels[$__std_log_enabled_level]+set}" ]]; then
+        __log_source_location__ __std_log_enabled_source_location \
+            "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "${BASH_SOURCE[1]}:${BASH_LINENO[0]} Unknown log level '$in_level' for category '$category'" >&2
+            "$__std_log_enabled_source_location Unknown log level '$__std_log_enabled_level' for category '$__std_log_enabled_category'" >&2
         return 1
     fi
 
-    __log_sink_state__ "$category" "$in_level" terminal_enabled persist_enabled || return 1
-    ((terminal_enabled || persist_enabled))
+    __log_sink_state__ "$__std_log_enabled_category" "$__std_log_enabled_level" \
+        __std_log_enabled_terminal __std_log_enabled_persist || return 1
+    ((__std_log_enabled_terminal || __std_log_enabled_persist))
 }
 
 #
@@ -821,33 +878,40 @@ log_is_enabled() {
 # be called directly; use the `log_*` helper functions instead.
 #
 __print_log__() {
-    local in_level="${1-}"
-    [[ -n "$in_level" ]] || return 1
+    local __std_print_log_level="${1-}"
+    [[ -n "$__std_print_log_level" ]] || return 1
     shift
-    local logger=default color source_location
-    local terminal_enabled persist_enabled
+    local __std_print_log_logger=default __std_print_log_color __std_print_log_source_location
+    local __std_print_log_terminal_enabled __std_print_log_persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
-            printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+            __log_source_location__ __std_print_log_source_location \
+                "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
+            printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 \
+                "WARN $__std_print_log_source_location Option '-l' needs an argument" >&2
             return 1
         fi
-        logger=$2
+        __std_print_log_logger=$2
         shift 2
     fi
-    __log_sink_state__ "$logger" "$in_level" terminal_enabled persist_enabled || return 1
+    __log_sink_state__ "$__std_print_log_logger" "$__std_print_log_level" \
+        __std_print_log_terminal_enabled __std_print_log_persist_enabled || return 1
 
-    if ((terminal_enabled || persist_enabled)); then
+    if ((__std_print_log_terminal_enabled || __std_print_log_persist_enabled)); then
         # Select color based on log level
-        case "$in_level" in
-            FATAL|ERROR) color="$COLOR_RED";;
-            WARN)        color="$COLOR_YELLOW";;
-            INFO)        color="$COLOR_GREEN";;
-            DEBUG)       color="$COLOR_BLUE";;
-            *)           color="";; # No color for VERBOSE or others
+        case "$__std_print_log_level" in
+            FATAL|ERROR) __std_print_log_color="$COLOR_RED";;
+            WARN)        __std_print_log_color="$COLOR_YELLOW";;
+            INFO)        __std_print_log_color="$COLOR_GREEN";;
+            DEBUG)       __std_print_log_color="$COLOR_BLUE";;
+            *)           __std_print_log_color="";; # No color for VERBOSE or others
         esac
 
-        __log_source_location__ source_location "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
-        __print_log_record__ "$color" "$in_level" "$source_location" "$terminal_enabled" "$persist_enabled" "$@"
+        __log_source_location__ __std_print_log_source_location \
+            "${BASH_SOURCE[2]:-}" "${BASH_LINENO[1]:-0}"
+        __print_log_record__ "$__std_print_log_color" "$__std_print_log_level" \
+            "$__std_print_log_source_location" "$__std_print_log_terminal_enabled" \
+            "$__std_print_log_persist_enabled" "$@"
     fi
 }
 
@@ -857,31 +921,37 @@ __print_log__() {
 # Internal helper to be called by `log_info_file`, etc.
 #
 __print_log_file__()   {
-    local in_level="${1-}"
-    [[ -n "$in_level" ]] || return 1
+    local __std_print_file_level="${1-}"
+    [[ -n "$__std_print_file_level" ]] || return 1
     shift
-    local logger=default file
-    local terminal_enabled persist_enabled
+    local __std_print_file_logger=default __std_print_file_path __std_print_file_source_location
+    local __std_print_file_terminal_enabled __std_print_file_persist_enabled
     if [[ "${1-}" == "-l" ]]; then
         if [[ -z "${2-}" ]]; then
-            printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 "WARN ${BASH_SOURCE[1]}:${BASH_LINENO[0]} Option '-l' needs an argument" >&2
+            __log_source_location__ __std_print_file_source_location \
+                "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
+            printf '%(%Y-%m-%d %H:%M:%S)T %s\n' -1 \
+                "WARN $__std_print_file_source_location Option '-l' needs an argument" >&2
             return 1
         fi
-        logger=$2
+        __std_print_file_logger=$2
         shift 2
     fi
-    file="${1-}"
-    __log_sink_state__ "$logger" "$in_level" terminal_enabled persist_enabled || return 1
-    if ((terminal_enabled || persist_enabled)) && [[ -f "$file" ]]; then
-        __print_log__ "$in_level" -l "$logger" "Contents of file '$file':"
-        if ((terminal_enabled)); then
-            cat -- "$file" >&2
+    __std_print_file_path="${1-}"
+    __log_sink_state__ "$__std_print_file_logger" "$__std_print_file_level" \
+        __std_print_file_terminal_enabled __std_print_file_persist_enabled || return 1
+    if ((__std_print_file_terminal_enabled || __std_print_file_persist_enabled)) &&
+        [[ -f "$__std_print_file_path" ]]; then
+        __print_log__ "$__std_print_file_level" -l "$__std_print_file_logger" \
+            "Contents of file '$__std_print_file_path':"
+        if ((__std_print_file_terminal_enabled)); then
+            cat -- "$__std_print_file_path" >&2
             # Keep the next structured record separate even when the file does
             # not end in a newline. A blank separator is harmless otherwise.
             printf '\n' >&2
         fi
-        if ((persist_enabled)); then
-            __log_primary_sink_write__ file "$file"
+        if ((__std_print_file_persist_enabled)); then
+            __log_primary_sink_write__ file "$__std_print_file_path"
         fi
     fi
 }
@@ -909,23 +979,23 @@ log_verbose_file() { __print_log_file__ VERBOSE "$@"; }
 #
 # Public functions for logging function entry and exit points.
 #
-log_info_enter()    { __print_log__ INFO    "Entering function ${FUNCNAME[1]}"; }
-log_debug_enter()   { __print_log__ DEBUG   "Entering function ${FUNCNAME[1]}"; }
+log_info_enter()    { __print_log__ INFO    "Entering function ${FUNCNAME[1]:-main}"; }
+log_debug_enter()   { __print_log__ DEBUG   "Entering function ${FUNCNAME[1]:-main}"; }
 # Deprecated compatibility helper; prefer log_debug_enter.
-log_verbose_enter() { __print_log__ VERBOSE "Entering function ${FUNCNAME[1]}"; }
-log_info_leave()    { __print_log__ INFO    "Leaving function ${FUNCNAME[1]}";  }
-log_debug_leave()   { __print_log__ DEBUG   "Leaving function ${FUNCNAME[1]}";  }
+log_verbose_enter() { __print_log__ VERBOSE "Entering function ${FUNCNAME[1]:-main}"; }
+log_info_leave()    { __print_log__ INFO    "Leaving function ${FUNCNAME[1]:-main}";  }
+log_debug_leave()   { __print_log__ DEBUG   "Leaving function ${FUNCNAME[1]:-main}";  }
 # Deprecated compatibility helper; prefer log_debug_leave.
-log_verbose_leave() { __print_log__ VERBOSE "Leaving function ${FUNCNAME[1]}";  }
+log_verbose_leave() { __print_log__ VERBOSE "Leaving function ${FUNCNAME[1]:-main}";  }
 
 #
 # Simple print routines that do not prefix messages with timestamps or levels.
 #
-print_error()   { local message; message="$(__join_message__ "$@")"; { printf '%bERROR: %s%b\n' "$COLOR_RED" "$message" "$COLOR_OFF"; } >&2; }
-print_warn()    { local message; message="$(__join_message__ "$@")"; { printf '%bWARN: %s%b\n' "$COLOR_YELLOW" "$message" "$COLOR_OFF"; } >&2; }
-print_info()    { local message; message="$(__join_message__ "$@")"; { printf '%b%s%b\n' "$COLOR_GREEN" "$message" "$COLOR_OFF"; } >&2; }
-print_success() { local message; message="$(__join_message__ "$@")"; { printf '%bSUCCESS: %s%b\n' "$COLOR_GREEN" "$message" "$COLOR_OFF"; } >&2; }
-print_bold()    { local message; message="$(__join_message__ "$@")"; printf '%b%s%b\n' "$COLOR_BOLD" "$message" "$COLOR_OFF"; }
+print_error()   { local __std_print_error_message; __std_print_error_message="$(__join_message__ "$@")"; { printf '%bERROR: %s%b\n' "$COLOR_RED" "$__std_print_error_message" "$COLOR_OFF"; } >&2; }
+print_warn()    { local __std_print_warn_message; __std_print_warn_message="$(__join_message__ "$@")"; { printf '%bWARN: %s%b\n' "$COLOR_YELLOW" "$__std_print_warn_message" "$COLOR_OFF"; } >&2; }
+print_info()    { local __std_print_info_message; __std_print_info_message="$(__join_message__ "$@")"; { printf '%b%s%b\n' "$COLOR_GREEN" "$__std_print_info_message" "$COLOR_OFF"; } >&2; }
+print_success() { local __std_print_success_message; __std_print_success_message="$(__join_message__ "$@")"; { printf '%bSUCCESS: %s%b\n' "$COLOR_GREEN" "$__std_print_success_message" "$COLOR_OFF"; } >&2; }
+print_bold()    { local __std_print_bold_message; __std_print_bold_message="$(__join_message__ "$@")"; printf '%b%s%b\n' "$COLOR_BOLD" "$__std_print_bold_message" "$COLOR_OFF"; }
 print_message() { printf '%s\n' "$@"; }
 
 #
@@ -946,15 +1016,16 @@ print_tty() {
 # that led to an error.
 #
 dump_trace() {
-    local frame=0 line func source n=0
-    while caller "$frame"; do
-        ((frame++))
-    done | while read -r line func source; do
-        ((n++ == 0)) && {
+    local __std_trace_frame=0 __std_trace_line __std_trace_func __std_trace_source __std_trace_caller_info
+    while __std_trace_caller_info="$(caller "$__std_trace_frame")"; do
+        IFS=' ' read -r __std_trace_line __std_trace_func __std_trace_source <<<"$__std_trace_caller_info"
+        if ((__std_trace_frame == 0)); then
             printf 'Encountered a fatal error\n'
-        }
-        printf '%4s at %s\n' " " "$func ($source:$line)"
+        fi
+        printf '%4s at %s\n' " " "$__std_trace_func ($__std_trace_source:$__std_trace_line)"
+        ((__std_trace_frame += 1))
     done >&2
+    return 0
 }
 
 #
@@ -974,27 +1045,29 @@ dump_trace() {
 #
 exit_if_error() {
     (($#)) || return
-    local num_re='^[0-9]+$'
-    local rc=$1 normalized_rc; shift
-    local message
+    local __std_exit_number_re='^[0-9]+$'
+    local __std_exit_status=$1 __std_exit_normalized_status
+    shift
+    local __std_exit_message
     if (($#)); then
-        message="$(__join_message__ "$@")"
+        __std_exit_message="$(__join_message__ "$@")"
     else
-        message="No message specified"
+        __std_exit_message="No message specified"
     fi
-    if ! [[ $rc =~ $num_re ]]; then
-        log_error -l base_bash_libs.std "'$rc' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
-        rc=1
-    elif ! __std_decimal_integer_value__ normalized_rc "$rc"; then
-        log_error -l base_bash_libs.std "'$rc' is not a valid decimal exit code. Treating it as 1."
-        rc=1
+    if ! [[ $__std_exit_status =~ $__std_exit_number_re ]]; then
+        log_error -l base_bash_libs.std \
+            "'$__std_exit_status' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
+        __std_exit_status=1
+    elif ! __std_decimal_integer_value__ __std_exit_normalized_status "$__std_exit_status"; then
+        log_error -l base_bash_libs.std "'$__std_exit_status' is not a valid decimal exit code. Treating it as 1."
+        __std_exit_status=1
     else
-        rc="$normalized_rc"
+        __std_exit_status="$__std_exit_normalized_status"
     fi
-    ((rc)) && {
-        log_fatal -l base_bash_libs.std "$message"
+    ((__std_exit_status)) && {
+        log_fatal -l base_bash_libs.std "$__std_exit_message"
         dump_trace
-        exit "$rc"
+        exit "$__std_exit_status"
     }
     return 0
 }
@@ -1009,9 +1082,9 @@ exit_if_error() {
 #   [[ -f "$my_file" ]] || fatal_error "Required file '$my_file' not found."
 #
 fatal_error() {
-    local ec=$?                # grab the current exit code
-    ((ec == 0)) && ec=1        # if it is zero, set exit code to 1
-    exit_if_error "$ec" "$@"
+    local __std_fatal_status=$?                         # grab the current exit code
+    ((__std_fatal_status == 0)) && __std_fatal_status=1 # if it is zero, set exit code to 1
+    exit_if_error "$__std_fatal_status" "$@"
 }
 
 #################################################### COMMAND EXECUTION #################################################
@@ -1023,10 +1096,10 @@ fatal_error() {
 # accept common truthy values so callers do not need to duplicate normalization.
 #
 is_dry_run() {
-    local value
+    local __std_dry_run_value
 
-    for value in "${DRY_RUN-}" "${dry_run-}"; do
-        case "${value,,}" in
+    for __std_dry_run_value in "${DRY_RUN-}" "${dry_run-}"; do
+        case "${__std_dry_run_value,,}" in
             true | 1 | yes | on)
                 return 0
                 ;;
@@ -1036,43 +1109,44 @@ is_dry_run() {
 }
 
 __std_decimal_integer_value__() {
-    local result_name="${1-}" value="${2-}" sign="" digits
+    local __std_decimal_result_name="${1-}" __std_decimal_value="${2-}" __std_decimal_sign=""
+    local __std_decimal_digits
 
-    [[ "$value" =~ ^[-+]?[0-9]+$ ]] || return 1
-    case "$value" in
+    [[ "$__std_decimal_value" =~ ^[-+]?[0-9]+$ ]] || return 1
+    case "$__std_decimal_value" in
         -*)
-            sign="-"
-            digits="${value#-}"
+            __std_decimal_sign="-"
+            __std_decimal_digits="${__std_decimal_value#-}"
             ;;
         +*)
-            digits="${value#+}"
+            __std_decimal_digits="${__std_decimal_value#+}"
             ;;
         *)
-            digits="$value"
+            __std_decimal_digits="$__std_decimal_value"
             ;;
     esac
 
-    while [[ "${#digits}" -gt 1 && "${digits:0:1}" == "0" ]]; do
-        digits="${digits:1}"
+    while [[ "${#__std_decimal_digits}" -gt 1 && "${__std_decimal_digits:0:1}" == "0" ]]; do
+        __std_decimal_digits="${__std_decimal_digits:1}"
     done
 
-    if [[ "$sign" == "-" && "$digits" != "0" ]]; then
-        printf -v "$result_name" '%s' "-$((10#$digits))"
+    if [[ "$__std_decimal_sign" == "-" && "$__std_decimal_digits" != "0" ]]; then
+        printf -v "$__std_decimal_result_name" '%s' "-$((10#$__std_decimal_digits))"
     else
-        printf -v "$result_name" '%s' "$((10#$digits))"
+        printf -v "$__std_decimal_result_name" '%s' "$((10#$__std_decimal_digits))"
     fi
 }
 
 __std_is_positive_integer__() {
-    local normalized
-    __std_decimal_integer_value__ normalized "${1-}" || return 1
-    ((normalized > 0))
+    local __std_positive_normalized
+    __std_decimal_integer_value__ __std_positive_normalized "${1-}" || return 1
+    ((__std_positive_normalized > 0))
 }
 
 __std_is_non_negative_integer__() {
-    local normalized
-    __std_decimal_integer_value__ normalized "${1-}" || return 1
-    ((normalized >= 0))
+    local __std_non_negative_normalized
+    __std_decimal_integer_value__ __std_non_negative_normalized "${1-}" || return 1
+    ((__std_non_negative_normalized >= 0))
 }
 
 __std_join_run_policy__() {
@@ -1084,7 +1158,7 @@ __std_join_run_policy__() {
     ((max_attempts > 1)) && policies+=("${max_attempts} attempts")
     ((retry_delay > 0)) && policies+=("${retry_delay}s retry delay")
 
-    for policy in "${policies[@]}"; do
+    for policy in "${policies[@]+"${policies[@]}"}"; do
         if [[ -n "$joined_policy" ]]; then
             joined_policy+=", "
         fi
@@ -1373,8 +1447,11 @@ __std_run_with_timeout_fallback__() {
     ) &
     timer_pid=$!
 
-    wait "$command_pid" 2>/dev/null
-    command_status=$?
+    if wait "$command_pid" 2>/dev/null; then
+        command_status=0
+    else
+        command_status=$?
+    fi
 
     if kill -0 "$timer_pid" 2>/dev/null; then
         kill -KILL "$timer_pid" 2>/dev/null || true
@@ -1420,11 +1497,11 @@ safe_mkdir() {
 
     for dir; do
         [[ -d "$dir" ]] && continue
-        if ! mkdir "${mkdir_args[@]}" -- "$dir"; then
+        if ! mkdir "${mkdir_args[@]+"${mkdir_args[@]}"}" -- "$dir"; then
             failed_dirs+=("$dir")
         fi
     done
-    ((${#failed_dirs[@]} > 0)) && exit_if_error 1 "Failed to create directories: ${failed_dirs[*]}"
+    [[ -z "${failed_dirs[0]+set}" ]] || exit_if_error 1 "Failed to create directories: ${failed_dirs[*]}"
     return 0
 }
 
@@ -1459,7 +1536,7 @@ safe_touch() {
         fi
     done
 
-    if ((${#failed_files[@]} > 0)); then
+    if [[ -n "${failed_files[0]+set}" ]]; then
         fatal_error "Failed to touch the following files: ${failed_files[*]}"
     fi
 
@@ -1498,7 +1575,7 @@ safe_truncate() {
         fi
     done
 
-    if ((${#failed_files[@]} > 0)); then
+    if [[ -n "${failed_files[0]+set}" ]]; then
         fatal_error "Failed to truncate the following files: ${failed_files[*]}"
     fi
 
@@ -1535,13 +1612,13 @@ __std_run_cleanup_hooks__() {
         ) || true
     fi
 
-    for hook in "${__std_cleanup_hooks[@]}"; do
+    for hook in "${__std_cleanup_hooks[@]+"${__std_cleanup_hooks[@]}"}"; do
         if ! "$hook"; then
             log_warn -l base_bash_libs.std "Cleanup hook '$hook' failed."
         fi
     done
 
-    for cleanup_path in "${__std_cleanup_paths[@]}"; do
+    for cleanup_path in "${__std_cleanup_paths[@]+"${__std_cleanup_paths[@]}"}"; do
         [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || continue
         if ! rm -rf -- "$cleanup_path"; then
             log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
@@ -1556,9 +1633,34 @@ __std_install_cleanup_dispatcher__() {
         return 0
     fi
 
+    __std_original_exit_trap_spec="$(trap -p EXIT || true)"
     __std_get_exit_trap_command__ __std_original_exit_trap
     trap '__std_run_cleanup_hooks__' EXIT
+    __std_cleanup_dispatcher_trap_spec="$(trap -p EXIT || true)"
     __std_cleanup_dispatcher_installed=1
+    return 0
+}
+
+__std_maybe_uninstall_cleanup_dispatcher__() {
+    local current_exit_trap_spec
+
+    ((__std_cleanup_dispatcher_installed)) || return 0
+    if [[ -n "${__std_cleanup_hooks[0]+set}" || -n "${__std_cleanup_paths[0]+set}" ]]; then
+        return 0
+    fi
+
+    current_exit_trap_spec="$(trap -p EXIT || true)"
+    if [[ "$current_exit_trap_spec" == "$__std_cleanup_dispatcher_trap_spec" ]]; then
+        trap - EXIT
+        if [[ -n "$__std_original_exit_trap_spec" ]]; then
+            eval "$__std_original_exit_trap_spec"
+        fi
+    fi
+
+    __std_cleanup_dispatcher_installed=0
+    __std_original_exit_trap=""
+    __std_original_exit_trap_spec=""
+    __std_cleanup_dispatcher_trap_spec=""
     return 0
 }
 
@@ -1584,7 +1686,7 @@ std_register_cleanup_hook() {
         return 1
     fi
 
-    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+    for existing_hook in "${__std_cleanup_hooks[@]+"${__std_cleanup_hooks[@]}"}"; do
         [[ "$existing_hook" == "$hook" ]] && return 0
     done
 
@@ -1608,11 +1710,12 @@ std_unregister_cleanup_hook() {
         return 1
     fi
 
-    for existing_hook in "${__std_cleanup_hooks[@]}"; do
+    for existing_hook in "${__std_cleanup_hooks[@]+"${__std_cleanup_hooks[@]}"}"; do
         [[ "$existing_hook" == "$hook" ]] && continue
         remaining_hooks+=("$existing_hook")
     done
-    __std_cleanup_hooks=("${remaining_hooks[@]}")
+    __std_cleanup_hooks=("${remaining_hooks[@]+"${remaining_hooks[@]}"}")
+    __std_maybe_uninstall_cleanup_dispatcher__
     return 0
 }
 
@@ -1662,7 +1765,7 @@ std_register_cleanup_path() {
 
         had_valid_path=1
         already_registered=0
-        for existing_path in "${__std_cleanup_paths[@]}"; do
+        for existing_path in "${__std_cleanup_paths[@]+"${__std_cleanup_paths[@]}"}"; do
             if [[ "$existing_path" == "$path" ]]; then
                 already_registered=1
                 break
@@ -1711,9 +1814,9 @@ std_unregister_cleanup_path() {
     done
 
     if ((had_valid_path)); then
-        for existing_path in "${__std_cleanup_paths[@]}"; do
+        for existing_path in "${__std_cleanup_paths[@]+"${__std_cleanup_paths[@]}"}"; do
             should_remove=0
-            for path in "${paths_to_remove[@]}"; do
+            for path in "${paths_to_remove[@]+"${paths_to_remove[@]}"}"; do
                 if [[ "$existing_path" == "$path" ]]; then
                     should_remove=1
                     break
@@ -1721,9 +1824,10 @@ std_unregister_cleanup_path() {
             done
             ((should_remove)) || remaining_paths+=("$existing_path")
         done
-        __std_cleanup_paths=("${remaining_paths[@]}")
+        __std_cleanup_paths=("${remaining_paths[@]+"${remaining_paths[@]}"}")
     fi
 
+    __std_maybe_uninstall_cleanup_dispatcher__
     return "$status"
 }
 
@@ -1820,6 +1924,7 @@ __std_make_temp_path__() {
 #   std_make_temp_file [--keep] <result_variable_name> [prefix]
 #
 std_make_temp_file() {
+    __std_preflight_temp_result_name__ std_make_temp_file "$@" || return 1
     __std_make_temp_path__ std_make_temp_file file "$@"
 }
 
@@ -1832,33 +1937,74 @@ std_make_temp_file() {
 #   std_make_temp_dir [--keep] <result_variable_name> [prefix]
 #
 std_make_temp_dir() {
+    __std_preflight_temp_result_name__ std_make_temp_dir "$@" || return 1
     __std_make_temp_path__ std_make_temp_dir dir "$@"
 }
 
 ####################################################### ASSERTIONS ####################################################
 
 __is_valid_variable_name__() {
-    local var_name="${1-}" var_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
-    [[ "$var_name" =~ $var_name_re ]]
+    local __std_variable_name="${1-}"
+    local __std_variable_name_re='^[A-Za-z_][A-Za-z0-9_]*$'
+    [[ "$__std_variable_name" =~ $__std_variable_name_re ]]
 }
 
 __std_assert_writable_output__() {
-    local function_name="${1-}" output_name="${2-}" declaration attributes
+    local __std_output_function_name="${1-}" __std_output_name="${2-}"
+    local __std_output_declaration __std_output_attributes
 
-    if [[ "$output_name" == __* ]]; then
-        log_error -l base_bash_libs.std "$function_name: result variable '$output_name' uses the reserved '__' internal namespace."
+    if [[ "$__std_output_name" == __* ]]; then
+        log_error -l base_bash_libs.std \
+            "$__std_output_function_name: result variable '$__std_output_name' uses the reserved '__' internal namespace."
         return 1
     fi
 
-    declaration="$(declare -p "$output_name" 2>/dev/null || true)"
-    [[ -n "$declaration" ]] || return 0
-    attributes="${declaration#declare -}"
-    attributes="${attributes%% *}"
-    if [[ "$attributes" == *r* ]]; then
-        log_error -l base_bash_libs.std "$function_name: result variable '$output_name' is readonly."
+    __std_output_declaration="$(declare -p "$__std_output_name" 2>/dev/null || true)"
+    [[ -n "$__std_output_declaration" ]] || return 0
+    __std_output_attributes="${__std_output_declaration#declare -}"
+    __std_output_attributes="${__std_output_attributes%% *}"
+    if [[ "$__std_output_attributes" == *r* ]]; then
+        log_error -l base_bash_libs.std \
+            "$__std_output_function_name: result variable '$__std_output_name' is readonly."
         return 1
     fi
     return 0
+}
+
+__std_assert_public_variable_names__() {
+    (($# >= 1)) || return 1
+    set -- "${@:2}" "$1"
+
+    while (($# > 1)); do
+        if [[ "${1-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${1-}" == __* ]]; then
+            log_error -l base_bash_libs.std \
+                "${!#}: variable '${1-}' uses the reserved '__' internal namespace."
+            return 1
+        fi
+        shift
+    done
+    return 0
+}
+
+__std_preflight_temp_result_name__() {
+    (($# >= 1)) || return 1
+    shift
+    while (($#)); do
+        case "${1-}" in
+            --keep)
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    (($# >= 1)) || return 0
+    __std_assert_public_variable_names__ "${FUNCNAME[1]}" "${1-}"
 }
 
 #
@@ -1871,14 +2017,14 @@ __std_assert_writable_output__() {
 #   assert_variable_name result_name array_name
 #
 assert_variable_name() {
-    local var_name
+    local __std_assert_variable_name
 
     if (($# == 0)); then
         fatal_error "assert_variable_name: No variable names provided for validation."
     fi
 
-    for var_name in "$@"; do
-        if ! __is_valid_variable_name__ "$var_name"; then
+    for __std_assert_variable_name in "$@"; do
+        if ! __is_valid_variable_name__ "$__std_assert_variable_name"; then
             fatal_error "assert_variable_name expects valid Bash variable names; one or more arguments are invalid."
         fi
     done
@@ -1887,12 +2033,13 @@ assert_variable_name() {
 }
 
 __std_declares_array_kind__() {
-    local variable_name="${1-}" array_kind="${2-}" declaration attributes
+    local __std_array_variable_name="${1-}" __std_array_kind="${2-}"
+    local __std_array_declaration __std_array_attributes
 
-    declaration="$(declare -p "$variable_name" 2>/dev/null)" || return 1
-    attributes="${declaration#declare -}"
-    attributes="${attributes%% *}"
-    [[ "$attributes" == *"$array_kind"* ]]
+    __std_array_declaration="$(declare -p "$__std_array_variable_name" 2>/dev/null)" || return 1
+    __std_array_attributes="${__std_array_declaration#declare -}"
+    __std_array_attributes="${__std_array_attributes%% *}"
+    [[ "$__std_array_attributes" == *"$__std_array_kind"* ]]
 }
 
 #
@@ -1906,16 +2053,16 @@ __std_declares_array_kind__() {
 #   assert_indexed_array values
 #
 assert_indexed_array() {
-    local var_name
-
     if (($# == 0)); then
         fatal_error "assert_indexed_array: No variable names provided for validation."
     fi
+    __std_assert_public_variable_names__ assert_indexed_array "$@" || return 1
+    local __std_assert_indexed_name
 
-    for var_name in "$@"; do
-        assert_variable_name "$var_name"
-        if ! __std_declares_array_kind__ "$var_name" "a"; then
-            fatal_error "Variable '$var_name' must be an indexed array declared by the caller."
+    for __std_assert_indexed_name in "$@"; do
+        assert_variable_name "$__std_assert_indexed_name"
+        if ! __std_declares_array_kind__ "$__std_assert_indexed_name" "a"; then
+            fatal_error "Variable '$__std_assert_indexed_name' must be an indexed array declared by the caller."
         fi
     done
 
@@ -1933,16 +2080,16 @@ assert_indexed_array() {
 #   assert_associative_array options
 #
 assert_associative_array() {
-    local var_name
-
     if (($# == 0)); then
         fatal_error "assert_associative_array: No variable names provided for validation."
     fi
+    __std_assert_public_variable_names__ assert_associative_array "$@" || return 1
+    local __std_assert_associative_name
 
-    for var_name in "$@"; do
-        assert_variable_name "$var_name"
-        if ! __std_declares_array_kind__ "$var_name" "A"; then
-            fatal_error "Variable '$var_name' must be an associative array declared by the caller."
+    for __std_assert_associative_name in "$@"; do
+        assert_variable_name "$__std_assert_associative_name"
+        if ! __std_declares_array_kind__ "$__std_assert_associative_name" "A"; then
+            fatal_error "Variable '$__std_assert_associative_name' must be an associative array declared by the caller."
         fi
     done
 
@@ -1960,12 +2107,13 @@ assert_associative_array() {
 #   fi
 #
 std_command_path() {
-    local __std_command_result_name="${1-}" __std_command_name="${2-}" __std_command_resolved_path=""
-
     if (($# != 2)); then
         log_error -l base_bash_libs.std "std_command_path: usage: std_command_path <result_variable_name> <command_name>"
         return 1
     fi
+    __std_assert_public_variable_names__ std_command_path "${1-}" || return 1
+    local __std_command_result_name="$1" __std_command_name="$2" __std_command_resolved_path=""
+
     if ! __is_valid_variable_name__ "$__std_command_result_name"; then
         log_error -l base_bash_libs.std "std_command_path: result variable name must be a valid Bash variable name."
         return 1
@@ -2012,7 +2160,7 @@ assert_function_exists() {
         fi
     done
 
-    if ((${#missing_functions[@]} > 0)); then
+    if [[ -n "${missing_functions[0]+set}" ]]; then
         fatal_error "Required functions are not defined: ${missing_functions[*]}"
     fi
 
@@ -2038,25 +2186,27 @@ assert_function_exists() {
 #   $@: One or more variable names to check.
 #
 assert_not_null() {
-    local unset_vars=() var_name
     if (($# == 0)); then
         fatal_error "assert_not_null: No variable names provided for validation."
     fi
+    __std_assert_public_variable_names__ assert_not_null "$@" || return 1
+    local -a __std_assert_not_null_unset_names=()
+    local __std_assert_not_null_name
 
-    for var_name in "$@"; do
-        if ! __is_valid_variable_name__ "$var_name"; then
+    for __std_assert_not_null_name in "$@"; do
+        if ! __is_valid_variable_name__ "$__std_assert_not_null_name"; then
             fatal_error "assert_not_null expects variable names, not values; one or more arguments are not valid Bash variable names."
         fi
         # Use indirection to get the value of the variable whose name is stored in var_name.
         # The -v check is for unset variables, -z is for empty strings.
         # We check for empty string as per the request.
-        if [[ ! -v $var_name || -z "${!var_name-}" ]]; then
-            unset_vars+=("$var_name")
+        if [[ ! -v $__std_assert_not_null_name || -z "${!__std_assert_not_null_name-}" ]]; then
+            __std_assert_not_null_unset_names+=("$__std_assert_not_null_name")
         fi
     done
 
-    if ((${#unset_vars[@]} > 0)); then
-        fatal_error "These required variables are not set or are empty: ${unset_vars[*]}"
+    if [[ -n "${__std_assert_not_null_unset_names[0]+set}" ]]; then
+        fatal_error "These required variables are not set or are empty: ${__std_assert_not_null_unset_names[*]}"
     fi
 
     return 0
@@ -2065,17 +2215,24 @@ assert_not_null() {
 #
 # assert_integer - Checks if the values of one or more variables are valid integers.
 #
-assert_integer() {
-    local var_name int_re='^[-+]?[0-9]+$'
-    (($# == 0)) && fatal_error "assert_integer: No variable names provided."
-    for var_name in "$@"; do
-        if ! __is_valid_variable_name__ "$var_name"; then
+__std_assert_integer_names__() {
+    local __std_assert_integer_name __std_assert_integer_value
+    local __std_assert_integer_re='^[-+]?[0-9]+$'
+    for __std_assert_integer_name in "$@"; do
+        if ! __is_valid_variable_name__ "$__std_assert_integer_name"; then
             fatal_error "assert_integer expects variable names, not values; one or more arguments are not valid Bash variable names."
         fi
-        local value="${!var_name-}"
-        ! [[ "$value" =~ $int_re ]] && fatal_error "Variable '$var_name' with value '$value' is not a valid integer."
+        __std_assert_integer_value="${!__std_assert_integer_name-}"
+        ! [[ "$__std_assert_integer_value" =~ $__std_assert_integer_re ]] &&
+            fatal_error "Variable '$__std_assert_integer_name' with value '$__std_assert_integer_value' is not a valid integer."
     done
     return 0
+}
+
+assert_integer() {
+    (($# == 0)) && fatal_error "assert_integer: No variable names provided."
+    __std_assert_public_variable_names__ assert_integer "$@" || return 1
+    __std_assert_integer_names__ "$@"
 }
 
 #
@@ -2087,24 +2244,28 @@ assert_integer() {
 #   $3: The maximum value.
 #
 assert_integer_range() {
-    local var_name="${1-}" min="${2-}" max="${3-}"
     (($# != 3)) && fatal_error "assert_integer_range: Expected 3 arguments, got $#."
-    if ! __is_valid_variable_name__ "$var_name"; then
+    __std_assert_public_variable_names__ assert_integer_range "${1-}" || return 1
+    local __std_range_name="$1" __std_range_min="$2" __std_range_max="$3"
+    local __std_range_value __std_range_value_number __std_range_min_number __std_range_max_number
+    if ! __is_valid_variable_name__ "$__std_range_name"; then
         fatal_error "assert_integer_range expects a variable name as its first argument."
     fi
-    if ! [[ "$min" =~ ^[-+]?[0-9]+$ ]]; then
-        fatal_error "assert_integer_range minimum bound '$min' is not a valid integer."
+    if ! [[ "$__std_range_min" =~ ^[-+]?[0-9]+$ ]]; then
+        fatal_error "assert_integer_range minimum bound '$__std_range_min' is not a valid integer."
     fi
-    if ! [[ "$max" =~ ^[-+]?[0-9]+$ ]]; then
-        fatal_error "assert_integer_range maximum bound '$max' is not a valid integer."
+    if ! [[ "$__std_range_max" =~ ^[-+]?[0-9]+$ ]]; then
+        fatal_error "assert_integer_range maximum bound '$__std_range_max' is not a valid integer."
     fi
-    local value="${!var_name-}" value_number min_number max_number
-    assert_integer "$var_name"
-    __std_decimal_integer_value__ value_number "$value"
-    __std_decimal_integer_value__ min_number "$min"
-    __std_decimal_integer_value__ max_number "$max"
-    ((min_number > max_number)) && fatal_error "assert_integer_range minimum '$min' cannot exceed maximum '$max'."
-    ((value_number < min_number || value_number > max_number)) && fatal_error "Variable '$var_name' ($value) is out of range [$min, $max]."
+    __std_range_value="${!__std_range_name-}"
+    __std_assert_integer_names__ "$__std_range_name"
+    __std_decimal_integer_value__ __std_range_value_number "$__std_range_value"
+    __std_decimal_integer_value__ __std_range_min_number "$__std_range_min"
+    __std_decimal_integer_value__ __std_range_max_number "$__std_range_max"
+    ((__std_range_min_number > __std_range_max_number)) &&
+        fatal_error "assert_integer_range minimum '$__std_range_min' cannot exceed maximum '$__std_range_max'."
+    ((__std_range_value_number < __std_range_min_number || __std_range_value_number > __std_range_max_number)) &&
+        fatal_error "Variable '$__std_range_name' ($__std_range_value) is out of range [$__std_range_min, $__std_range_max]."
     return 0
 }
 
@@ -2121,39 +2282,42 @@ assert_integer_range() {
 #   $3: (Optional) The maximum count for a range.
 #
 assert_arg_count() {
-    local arg_count="${1-}" count1="${2-}" count2="${3-}" argc=$#
+    local __std_arg_count_actual="${1-}" __std_arg_count_first="${2-}" __std_arg_count_second="${3-}"
+    local __std_arg_count_arity=$#
 
     # Check the number of arguments passed to this function itself.
-    if ((argc < 2 || argc > 3)); then
-        fatal_error "assert_arg_count: Incorrect usage. Expected 2 or 3 arguments, but got $argc."
+    if ((__std_arg_count_arity < 2 || __std_arg_count_arity > 3)); then
+        fatal_error "assert_arg_count: Incorrect usage. Expected 2 or 3 arguments, but got $__std_arg_count_arity."
     fi
 
     # Create temporary named variables for assert_integer to check
-    local __assert_arg_count_val="$arg_count" __assert_count1_val="$count1"
-    local arg_count_number count1_number count2_number
-    assert_integer __assert_arg_count_val __assert_count1_val
+    local __std_arg_count_actual_value="$__std_arg_count_actual" __std_arg_count_first_value="$__std_arg_count_first"
+    local __std_arg_count_actual_number __std_arg_count_first_number __std_arg_count_second_number
+    __std_assert_integer_names__ __std_arg_count_actual_value __std_arg_count_first_value
 
-    if [[ -n "$count2" ]]; then
-        local __assert_count2_val="$count2"
-        assert_integer __assert_count2_val
+    if [[ -n "$__std_arg_count_second" ]]; then
+        local __std_arg_count_second_value="$__std_arg_count_second"
+        __std_assert_integer_names__ __std_arg_count_second_value
     fi
 
-    __std_decimal_integer_value__ arg_count_number "$arg_count"
-    __std_decimal_integer_value__ count1_number "$count1"
-    if [[ -n "$count2" ]]; then
-        __std_decimal_integer_value__ count2_number "$count2"
-        ((count1_number > count2_number)) && fatal_error "assert_arg_count minimum '$count1' cannot exceed maximum '$count2'."
+    __std_decimal_integer_value__ __std_arg_count_actual_number "$__std_arg_count_actual"
+    __std_decimal_integer_value__ __std_arg_count_first_number "$__std_arg_count_first"
+    if [[ -n "$__std_arg_count_second" ]]; then
+        __std_decimal_integer_value__ __std_arg_count_second_number "$__std_arg_count_second"
+        ((__std_arg_count_first_number > __std_arg_count_second_number)) &&
+            fatal_error "assert_arg_count minimum '$__std_arg_count_first' cannot exceed maximum '$__std_arg_count_second'."
     fi
 
-    if [[ -z "$count2" ]]; then
+    if [[ -z "$__std_arg_count_second" ]]; then
         # Exact match case
-        if ((arg_count_number != count1_number)); then
-            fatal_error "Argument count mismatch: expected $count1 but got $arg_count arguments"
+        if ((__std_arg_count_actual_number != __std_arg_count_first_number)); then
+            fatal_error "Argument count mismatch: expected $__std_arg_count_first but got $__std_arg_count_actual arguments"
         fi
     else
         # Range match case
-        if ((arg_count_number < count1_number || arg_count_number > count2_number)); then
-            fatal_error "Argument count mismatch: expected between $count1 and $count2 arguments, but got $arg_count"
+        if ((__std_arg_count_actual_number < __std_arg_count_first_number ||
+            __std_arg_count_actual_number > __std_arg_count_second_number)); then
+            fatal_error "Argument count mismatch: expected between $__std_arg_count_first and $__std_arg_count_second arguments, but got $__std_arg_count_actual"
         fi
     fi
     return 0
@@ -2187,7 +2351,7 @@ assert_command_exists() {
         fi
     done
 
-    if ((${#missing_commands[@]} > 0)); then
+    if [[ -n "${missing_commands[0]+set}" ]]; then
         fatal_error "These required commands were not found in your PATH: ${missing_commands[*]}"
     fi
 
@@ -2222,7 +2386,7 @@ assert_file_exists() {
         fi
     done
 
-    if ((${#missing_files[@]} > 0)); then
+    if [[ -n "${missing_files[0]+set}" ]]; then
         fatal_error "These required files do not exist or are not regular files: ${missing_files[*]}"
     fi
 
@@ -2261,7 +2425,7 @@ assert_executable() {
         fi
     done
 
-    if ((${#missing_executables[@]} > 0)); then
+    if [[ -n "${missing_executables[0]+set}" ]]; then
         fatal_error "These required executable paths do not exist, are not regular files, or are not executable: ${missing_executables[*]}"
     fi
 
@@ -2296,7 +2460,7 @@ assert_dir_exists() {
         fi
     done
 
-    if ((${#missing_dirs[@]} > 0)); then
+    if [[ -n "${missing_dirs[0]+set}" ]]; then
         fatal_error "These required directories do not exist: ${missing_dirs[*]}"
     fi
 
@@ -2333,16 +2497,22 @@ safe_unalias() {
 #   get_my_source_dir var_name
 #
 get_my_source_dir() {
-    local __std_source_result_name="${1-}"
-    [[ -n "$__std_source_result_name" ]] || fatal_error "get_my_source_dir: No result variable name provided."
+    [[ -n "${1-}" ]] || fatal_error "get_my_source_dir: No result variable name provided."
+    __std_assert_public_variable_names__ get_my_source_dir "${1-}" || return 1
+    local __std_source_result_name="$1"
+
     if ! __is_valid_variable_name__ "$__std_source_result_name"; then
         fatal_error "get_my_source_dir: result variable name must be a valid Bash variable name."
     fi
     __std_assert_writable_output__ get_my_source_dir "$__std_source_result_name" || return 1
-    local __std_source_dir
+    local __std_source_dir __std_source_path="${BASH_SOURCE[1]-}"
     # Reference: https://stackoverflow.com/a/246128/6862601
-    __std_source_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" >/dev/null 2>&1 && pwd -P)" ||
-        fatal_error "get_my_source_dir: Unable to resolve source directory."
+    if [[ -n "$__std_source_path" ]]; then
+        __std_source_dir="$(cd "$(dirname -- "$__std_source_path")" >/dev/null 2>&1 && pwd -P)" ||
+            fatal_error "get_my_source_dir: Unable to resolve source directory."
+    else
+        __std_source_dir="$(pwd -P)" || fatal_error "get_my_source_dir: Unable to resolve source directory."
+    fi
     printf -v "$__std_source_result_name" '%s' "$__std_source_dir"
 }
 
@@ -2425,8 +2595,11 @@ wait_for_enter() {
         return 1
     fi
 
-    read -r -s -p "$prompt" <&"$tty_fd"
-    read_status=$?
+    if read -r -s -p "$prompt" <&"$tty_fd"; then
+        read_status=0
+    else
+        read_status=$?
+    fi
     exec {tty_fd}<&-
 
     if ((read_status != 0)); then
@@ -2449,5 +2622,5 @@ readonly BASE_BASH_LIBS_STDLIB_LOADED=1
 
 # This is the crucial step: it resets the positional parameters ($@, $1, etc.)
 # of the *calling script* to the new, filtered list of arguments.
-set -- "${__new_args__[@]}"
-unset __new_args__ __stdlib_init__ __log_init__ __init_colors__
+set -- "${__new_args__[@]+"${__new_args__[@]}"}"
+unset __new_args__ __script_source__ __stdlib_init__ __log_init__ __init_colors__

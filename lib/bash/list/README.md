@@ -9,9 +9,9 @@ helpers are available.
 
 ## Public API
 
-- `list_append <array> [value...]`
+- `list_append <array> <value> [value...]`
   Append one or more values to a named indexed array.
-- `list_prepend <array> [value...]`
+- `list_prepend <array> <value> [value...]`
   Prepend one or more values to a named indexed array.
 - `list_remove <array> <value>`
   Remove all exact matches from a named indexed array.
@@ -43,6 +43,9 @@ array result variables must already be declared as indexed arrays, for example
 with `declare -a values=()`. Scalar result helpers accept the name of the output
 variable, validate it with `assert_variable_name`, and avoid stdout capture for
 caller state.
+
+For `list_unique` and `list_length`, the result and source variable names must
+be distinct. An alias is rejected before the source is changed.
 
 ## Tests
 

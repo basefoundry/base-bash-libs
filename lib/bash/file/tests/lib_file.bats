@@ -96,6 +96,51 @@ EOF
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "update_file_section reports zero-argument usage under strict options" {
+    local script="$TEST_TMPDIR/update-file-section-usage-strict.sh"
+
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/file/lib_file.sh"
+update_file_section
+printf 'after\n'
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Insufficient arguments."* ]]
+    [[ "$output" == *"Usage: update_file_section"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+    [[ "$output" != *"after"* ]]
+}
+
+@test "update_file_section accepts empty content under strict options" {
+    local script="$TEST_TMPDIR/update-file-section-empty-strict.sh"
+    local target="$TEST_TMPDIR/strict-config.txt"
+
+    printf 'before\n' > "$target"
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/file/lib_file.sh"
+update_file_section "\$1" "# BEGIN" "# END"
+printf 'strict=preserved\n'
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script" "$target"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"strict=preserved"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+    [ "$(cat "$target")" = $'before\n# BEGIN\n# END' ]
+}
+
 @test "update_file_section writes option-like markers literally" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
@@ -243,7 +288,7 @@ EOF
 
     update_file_section "$target" "# BEGIN" "# END" "new"
 
-    for cleanup_path in "${__std_cleanup_paths[@]}"; do
+    for cleanup_path in "${__std_cleanup_paths[@]+"${__std_cleanup_paths[@]}"}"; do
         if [[ "$cleanup_path" == *"base-file-section-new."* ||
             "$cleanup_path" == *"base-file-section-current."* ||
             "$cleanup_path" == *"config.txt."* ]]; then
@@ -251,6 +296,31 @@ EOF
             return 1
         fi
     done
+}
+
+@test "update_file_section restores a preexisting EXIT trap after transient cleanup" {
+    local script="$TEST_TMPDIR/update-file-section-exit-trap.sh"
+    local target="$TEST_TMPDIR/update-file-section-exit-trap.txt"
+    local log_file="$TEST_TMPDIR/update-file-section-exit-trap.log"
+
+    printf 'before\n' > "$target"
+    cat > "$script" <<EOF
+#!/usr/bin/env bash
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/file/lib_file.sh"
+trap 'printf "caller\n" >> "$log_file"' EXIT
+before_trap="\$(trap -p EXIT)"
+update_file_section "$target" '# BEGIN' '# END' 'managed'
+after_trap="\$(trap -p EXIT)"
+[[ "\$after_trap" == "\$before_trap" ]]
+EOF
+    chmod +x "$script"
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = "caller" ]
+    [ "$(cat "$target")" = $'before\n# BEGIN\nmanaged\n# END' ]
 }
 
 @test "update_file_section skips unchanged existing section" {

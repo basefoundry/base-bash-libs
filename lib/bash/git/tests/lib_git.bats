@@ -31,6 +31,115 @@ setup() {
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "git required-argument APIs return usage errors under every caller option combination" {
+    local function_name mode
+
+    for mode in off e u p eu ep up eup; do
+        for function_name in \
+            git_detect_default_branch \
+            git_worktree_path_for_branch \
+            git_branch_upstream \
+            git_branch_merged_to_ref \
+            git_update_repo \
+            git_get_current_branch \
+            check_script_up_to_date; do
+            bats_run "$BASH" -c '
+                mode="$1"
+                case "$mode" in *e*) set -e ;; esac
+                case "$mode" in *u*) set -u ;; esac
+                case "$mode" in *p*) set -o pipefail ;; esac
+                source "$2"
+                source "$3"
+                "$4"
+                rc=$?
+                exit "$rc"
+            ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$function_name"
+
+            [ "$status" -eq 1 ]
+            [[ "$output" == *"Usage:"* ]]
+            [[ "$output" != *"unbound variable"* ]]
+        done
+    done
+}
+
+@test "git optional forms reject excess arguments and unsupported option placement" {
+    capture_command git_list_worktree_branches one two
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: git_list_worktree_branches [repo_dir]"* ]]
+
+    capture_command git_list_remote_branches one two
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: git_list_remote_branches [repo_dir]"* ]]
+
+    capture_command git_worktree_path_for_branch branch repo extra
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: git_worktree_path_for_branch <branch> [repo_dir]"* ]]
+
+    capture_command check_script_up_to_date --refresh script.sh
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: check_script_up_to_date [--fetch] <script_path>"* ]]
+
+    capture_command check_script_up_to_date --fetch
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage: check_script_up_to_date [--fetch] <script_path>"* ]]
+}
+
+@test "git remote parsing is independent of and preserves caller IFS" {
+    local output_file="$TEST_TMPDIR/remote-branches.out"
+    local rc
+
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "ls-remote" ]]; then
+            printf 'abc123\trefs/heads/main\n'
+            printf 'def456\trefs/heads/feature/topic\n'
+            return 0
+        fi
+        command git "$@"
+    }
+
+    IFS=:
+    if git_list_remote_branches "$TEST_TMPDIR" >"$output_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    unset -f git
+
+    [ "$rc" -eq 0 ]
+    [ "$IFS" = ":" ]
+    [ "$(cat "$output_file")" = $'main\nfeature/topic' ]
+}
+
+@test "git predicate status survives every caller option combination" {
+    local mode
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" checkout -b feature >/dev/null 2>&1
+    printf 'feature\n' > "$repo/feature.txt"
+    commit_all "$repo" "Feature commit"
+    git -C "$repo" checkout main >/dev/null 2>&1
+
+    for mode in off e u p eu ep up eup; do
+        bats_run "$BASH" -c '
+            mode="$1"
+            case "$mode" in *e*) set -e ;; esac
+            case "$mode" in *u*) set -u ;; esac
+            case "$mode" in *p*) set -o pipefail ;; esac
+            source "$2"
+            source "$3"
+            git_branch_merged_to_ref "$4" feature main
+            rc=$?
+            exit "$rc"
+        ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$repo"
+
+        [ "$status" -eq 1 ]
+        [[ "$output" != *"unbound variable"* ]]
+    done
+}
+
 @test "git_detect_default_branch resolves origin HEAD and fallback branches" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
@@ -93,6 +202,32 @@ EOF
     unset -f git
 }
 
+@test "git worktree command arrays are Bash 4.2 nounset-safe" {
+    bats_run "$BASH" -c '
+        set -u
+        source "$1"
+        source "$2"
+        git() {
+            printf "%s\n" \
+                "worktree /tmp/main" \
+                "HEAD abc123" \
+                "branch refs/heads/main" \
+                "" \
+                "worktree /tmp/feature" \
+                "HEAD def456" \
+                "branch refs/heads/feature/test"
+        }
+        git_worktree_path_for_branch feature/test
+        git_list_worktree_branches /tmp/repo
+    ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/tmp/feature"* ]]
+    [[ "$output" == *$'/tmp/main\tmain'* ]]
+    [[ "$output" == *$'/tmp/feature\tfeature/test'* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
 @test "git branch and remote helpers use generic names" {
     local repo="$TEST_TMPDIR/repo"
     local branch_output remote_output
@@ -146,6 +281,33 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$branch" = "sentinel" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'branch' is readonly"* ]]
+}
+
+@test "Git result helpers reject exact internal holder names before locals or mutation" {
+    local -r __git_detect_result_name=detected
+    local -r __git_branch_result_name=current
+    local detected="keep-detected"
+    local current="keep-current"
+    local stderr_file="$TEST_TMPDIR/git-internal-holder.err"
+    local rc
+
+    if git_detect_default_branch . __git_detect_result_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$detected" = "keep-detected" ]
+
+    if git_get_current_branch . __git_branch_result_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$current" = "keep-current" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
 @test "git_get_current_branch supports shadowing-prone output variable names" {

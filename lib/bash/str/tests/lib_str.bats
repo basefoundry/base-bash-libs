@@ -37,6 +37,38 @@ create_script() {
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "string APIs reject missing arguments under every caller option combination" {
+    local function_name mode
+
+    for mode in off e u p eu ep up eup; do
+        for function_name in \
+            str_lower \
+            str_upper \
+            str_ltrim \
+            str_rtrim \
+            str_trim \
+            str_contains \
+            str_starts_with \
+            str_ends_with \
+            str_split \
+            str_join; do
+            bats_run "$BASH" -c '
+                mode="$1"
+                case "$mode" in *e*) set -e ;; esac
+                case "$mode" in *u*) set -u ;; esac
+                case "$mode" in *p*) set -o pipefail ;; esac
+                source "$2"
+                source "$3"
+                "$4"
+                exit $?
+            ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/str/lib_str.sh" "$function_name"
+
+            [ "$status" -eq 1 ]
+            [[ "$output" != *"unbound variable"* ]]
+        done
+    done
+}
+
 @test "string case helpers transform text without changing other characters" {
     local value="Alpha BETA 123!?"
     local stdout_file="$TEST_TMPDIR/case.stdout"
@@ -83,6 +115,32 @@ create_script() {
     [ "$rc" -eq 1 ]
     [ "$value" = "Alpha" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'value' is readonly"* ]]
+}
+
+@test "readonly string outputs cannot collide with argument-count decimal locals" {
+    local candidate
+
+    for candidate in result_name value sign digits normalized; do
+        bats_run "$BASH" -c '
+            source "$1"
+            source "$2"
+            printf -v "$3" %s MiXeD
+            readonly "$3"
+            str_lower "$3"
+            case $? in
+                1) ;;
+                *) exit 99 ;;
+            esac
+            printf "value=%s\n" "${!3}"
+            exit 1
+        ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/str/lib_str.sh" "$candidate"
+
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"result variable '$candidate' is readonly"* ]]
+        [[ "$output" == *"value=MiXeD"* ]]
+        [[ "$output" != *"readonly variable"* ]]
+        [[ "$output" != *"local:"* ]]
+    done
 }
 
 @test "string transform helpers reject invalid variable names" {
@@ -216,6 +274,41 @@ EOF
     [ "$joined" = "left|right" ]
 }
 
+@test "str_join rejects a source alias before mutation" {
+    local -a values=("alpha" "beta")
+    local rc
+
+    if str_join values "," values 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 1 ]
+    [ "${#values[@]}" -eq 2 ]
+    [ "${values[0]}" = "alpha" ]
+    [ "${values[1]}" = "beta" ]
+}
+
+@test "str_join handles a declared-empty array under nounset" {
+    local script="$TEST_TMPDIR/str-join-empty-nounset.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+set -u
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/str/lib_str.sh"
+declare -a values=()
+joined=invalid
+str_join joined "," values
+[[ -z "\$joined" ]]
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+}
+
 @test "str_lower rejects reserved internal output names" {
     local __str_var_name="Mixed Case"
     local stderr_file="$TEST_TMPDIR/str-reserved-output.err"
@@ -230,6 +323,44 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$__str_var_name" = "Mixed Case" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+}
+
+@test "string helpers reject exact internal holder names before locals or mutation" {
+    local -r __str_var_name=actual
+    local actual="Mixed Case"
+    local -r __str_join_result_name=joined
+    local joined="keep"
+    local -a values=(alpha beta)
+    local -ar __str_join_values=(alpha beta)
+    local stderr_file="$TEST_TMPDIR/str-internal-holder.err"
+    local rc
+
+    if str_lower __str_var_name 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$actual" = "Mixed Case" ]
+
+    if str_join __str_join_result_name , values 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$joined" = "keep" ]
+
+    if str_join joined , __str_join_values 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$joined" = "keep" ]
+    [ "${__str_join_values[*]}" = "alpha beta" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
 @test "str_join rejects invalid variable names" {

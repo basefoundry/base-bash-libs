@@ -37,6 +37,34 @@ create_script() {
     [[ "$output" == *"source-rc=1"* ]]
 }
 
+@test "list APIs reject missing arguments under every caller option combination" {
+    local function_name mode
+
+    for mode in off e u p eu ep up eup; do
+        for function_name in \
+            list_append \
+            list_prepend \
+            list_remove \
+            list_contains \
+            list_unique \
+            list_length; do
+            bats_run "$BASH" -c '
+                mode="$1"
+                case "$mode" in *e*) set -e ;; esac
+                case "$mode" in *u*) set -u ;; esac
+                case "$mode" in *p*) set -o pipefail ;; esac
+                source "$2"
+                source "$3"
+                "$4"
+                exit $?
+            ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/list/lib_list.sh" "$function_name"
+
+            [ "$status" -eq 1 ]
+            [[ "$output" != *"unbound variable"* ]]
+        done
+    done
+}
+
 @test "list_append and list_prepend mutate caller arrays in place" {
     local -a values=("middle")
 
@@ -92,6 +120,77 @@ create_script() {
     [ "${unique[2]}" = "" ]
 }
 
+@test "list result helpers reject source aliases before mutation" {
+    local -a values=("alpha" "alpha" "beta")
+    local rc
+
+    if list_unique values values 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${#values[@]}" -eq 3 ]
+    [ "${values[0]}" = "alpha" ]
+    [ "${values[1]}" = "alpha" ]
+    [ "${values[2]}" = "beta" ]
+
+    if list_length values values 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${#values[@]}" -eq 3 ]
+    [ "${values[0]}" = "alpha" ]
+    [ "${values[1]}" = "alpha" ]
+    [ "${values[2]}" = "beta" ]
+}
+
+@test "list helpers reject exact internal holder names before locals or mutation" {
+    local -r __list_array_name=actual
+    local -a actual=(keep)
+    local -ar __list_current=(alpha beta)
+    local -a result=(saved)
+    local count=saved
+    local stderr_file="$TEST_TMPDIR/list-internal-holder.err"
+    local rc
+
+    if list_append __list_array_name new 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${actual[*]}" = "keep" ]
+
+    if list_contains alpha __list_current 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+
+    if list_unique result __list_current 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "${result[*]}" = "saved" ]
+
+    if list_length count __list_current 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 1 ]
+    [ "$count" = "saved" ]
+    [ "${__list_current[*]}" = "alpha beta" ]
+    [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
+    [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
+}
+
 @test "list_length stores the array length in a named variable" {
     local -a values=("alpha" "beta gamma" "")
     local count=""
@@ -99,6 +198,32 @@ create_script() {
     list_length count values
 
     [ "$count" = "3" ]
+}
+
+@test "list helpers handle declared-empty arrays under nounset" {
+    local script="$TEST_TMPDIR/list-empty-nounset.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+set -u
+source "$BASE_BASH_DIR/std/lib_std.sh"
+source "$BASE_BASH_DIR/list/lib_list.sh"
+declare -a values=()
+declare -a unique=(old)
+list_prepend values head
+list_remove values head
+list_contains missing values && exit 10
+list_unique unique values
+count=invalid
+list_length count values
+[[ -z "\${values[*]-}" ]]
+[[ -z "\${unique[*]-}" ]]
+[[ "\$count" == 0 ]]
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
 }
 
 @test "list mutators reject readonly output variables" {

@@ -322,7 +322,7 @@ update_file_section() {
     local remove_section=false
     local new_content_array=()
 
-    if [[ "$1" == "-r" ]]; then
+    if [[ "${1-}" == "-r" ]]; then
         remove_section=true
         shift # consume -r
     fi
@@ -371,10 +371,10 @@ update_file_section() {
 
     local new_content_string=""
     if [[ "$remove_section" == false ]]; then
-        if [[ ${#new_content_array[@]} -gt 0 ]]; then
+        if [[ -n "${new_content_array[0]+set}" ]]; then
             # Use printf to join array elements with newlines, adding a final newline.
             # This ensures proper multi-line insertion.
-            printf -v new_content_string '%s\n' "${new_content_array[@]}"
+            printf -v new_content_string '%s\n' "${new_content_array[@]+"${new_content_array[@]}"}"
         fi
     fi
 

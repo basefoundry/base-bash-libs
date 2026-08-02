@@ -48,6 +48,14 @@ log_info "Current branch: $branch"
 
 ## Behavior Notes
 
+- Public functions validate the documented argument count before expanding
+  required positional parameters. Invalid calls return `1`, including when the
+  caller has enabled `nounset`; extra arguments are rejected unless the
+  signature explicitly accepts them.
+- The library does not change the caller's `errexit`, `nounset`, `pipefail`,
+  `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters.
+  Parsing that requires field splitting uses a command-scoped `IFS`, so a
+  caller-defined value is preserved.
 - `git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
 - `git_update_repo` retries `git pull --ff-only` twice by default. Set
   `BASE_GIT_PULL_MAX_ATTEMPTS` to a positive integer to change the retry count.

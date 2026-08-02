@@ -48,6 +48,18 @@ All GitHub helper failures return a nonzero status and preserve the underlying
 `gh` status where applicable. The remote parser and origin inference helpers
 leave caller-owned result variables unchanged on failure; use `--optional` with
 `gh_infer_repo_from_origin` when a missing or non-GitHub origin is expected.
+
+Public functions validate the documented argument count before expanding
+required positional parameters. Invalid calls return `1`, including when the
+caller has enabled `nounset`; optional flags such as `--optional` are rejected
+when misspelled. The variadic `gh_run` and `gh_api_with_retry` helpers continue
+to pass all arguments through to `gh` unchanged.
+
+The library does not change the caller's `errexit`, `nounset`, `pipefail`,
+`shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters. Its
+diagnostic parsing uses a command-scoped empty `IFS`, and failed `gh` commands
+retain their original status from `1` through `255`.
+
 ## Boundary
 
 This library is intentionally generic. It does not know about Base branch

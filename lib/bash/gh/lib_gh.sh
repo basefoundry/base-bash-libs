@@ -10,7 +10,15 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly __lib_gh_sourced__=1
 
+# Public callers may provide the optional install hint even though internal
+# callers use the default.
+# shellcheck disable=SC2120
 gh_require_cli() {
+    if (($# > 1)); then
+        log_error -l base_bash_libs.gh "Usage: gh_require_cli [install_hint]"
+        return 1
+    fi
+
     local install_hint="${1:-}"
 
     command -v gh >/dev/null 2>&1 || {
@@ -20,7 +28,15 @@ gh_require_cli() {
     }
 }
 
+# Public callers may provide the optional login hint even though the internal
+# failure reporter uses the default.
+# shellcheck disable=SC2120
 gh_auth_status_diagnostics() {
+    if (($# > 1)); then
+        log_error -l base_bash_libs.gh "Usage: gh_auth_status_diagnostics [login_hint]"
+        return 1
+    fi
+
     local login_hint="${1:-Run 'gh auth login -h github.com' and retry.}"
     local auth_output line
 
@@ -36,9 +52,24 @@ gh_auth_status_diagnostics() {
 }
 
 gh_report_command_failure() {
+    if (($# < 1)); then
+        log_error -l base_bash_libs.gh "Usage: gh_report_command_failure <status> [gh args...]"
+        return 1
+    fi
+
     local status="$1"
     shift
     local printable_args=""
+
+    if [[ ! "$status" =~ ^[0-9]{1,3}$ ]]; then
+        log_error -l base_bash_libs.gh "Usage: gh_report_command_failure <status> [gh args...]"
+        return 1
+    fi
+    status=$((10#$status))
+    if ((status < 1 || status > 255)); then
+        log_error -l base_bash_libs.gh "Usage: gh_report_command_failure <status> [gh args...]"
+        return 1
+    fi
 
     if (($#)); then
         printf -v printable_args '%q ' "$@"
@@ -60,49 +91,69 @@ gh_run() {
     gh_report_command_failure "$status" "$@"
 }
 
-gh_repo_from_remote_url() {
-    local __gh_remote_url="$1"
-    local __gh_result_name="${2:-}"
-    local __gh_parsed_repo
+__gh_parse_repo_from_remote_url__() {
+    local __gh_parse_remote_url="${1-}" __gh_parse_result_name="${2-}"
+    local __gh_parse_repo
 
-    if [[ -z "$__gh_remote_url" || -z "$__gh_result_name" ]]; then
-        log_error -l base_bash_libs.gh "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
-        return 1
-    fi
-    assert_variable_name "$__gh_result_name"
-    __std_assert_writable_output__ gh_repo_from_remote_url "$__gh_result_name" || return 1
-
-    case "$__gh_remote_url" in
+    case "$__gh_parse_remote_url" in
         git@github.com:*)
-            __gh_parsed_repo="${__gh_remote_url#git@github.com:}"
+            __gh_parse_repo="${__gh_parse_remote_url#git@github.com:}"
             ;;
         ssh://git@github.com/*)
-            __gh_parsed_repo="${__gh_remote_url#ssh://git@github.com/}"
+            __gh_parse_repo="${__gh_parse_remote_url#ssh://git@github.com/}"
             ;;
         https://github.com/*)
-            __gh_parsed_repo="${__gh_remote_url#https://github.com/}"
+            __gh_parse_repo="${__gh_parse_remote_url#https://github.com/}"
             ;;
         *)
             return 1
             ;;
     esac
 
-    __gh_parsed_repo="${__gh_parsed_repo%.git}"
-    [[ "$__gh_parsed_repo" =~ ^[^/[:space:]?#]+/[^/[:space:]?#]+$ ]] || return 1
+    __gh_parse_repo="${__gh_parse_repo%.git}"
+    [[ "$__gh_parse_repo" =~ ^[^/[:space:]?#]+/[^/[:space:]?#]+$ ]] || return 1
+    printf -v "$__gh_parse_result_name" '%s' "$__gh_parse_repo"
+}
+
+gh_repo_from_remote_url() {
+    if (($# != 2)); then
+        log_error -l base_bash_libs.gh "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
+        return 1
+    fi
+    __std_assert_public_variable_names__ gh_repo_from_remote_url "${2-}" || return 1
+
+    local __gh_remote_url="$1"
+    local __gh_result_name="$2"
+    local __gh_parsed_repo
+
+    if [[ -z "$__gh_remote_url" || -z "$__gh_result_name" ]]; then
+        log_error -l base_bash_libs.gh "Usage: gh_repo_from_remote_url <remote_url> <result_variable_name>"
+        return 1
+    fi
+    assert_variable_name "$__gh_result_name" || return 1
+    __std_assert_writable_output__ gh_repo_from_remote_url "$__gh_result_name" || return 1
+
+    __gh_parse_repo_from_remote_url__ "$__gh_remote_url" __gh_parsed_repo || return 1
     printf -v "$__gh_result_name" '%s' "$__gh_parsed_repo"
 }
 
 gh_infer_repo_from_origin() {
+    if (($# < 2 || $# > 3)) || { (($# == 3)) && [[ "$3" != "--optional" ]]; }; then
+        log_error -l base_bash_libs.gh "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
+        return 1
+    fi
+    __std_assert_public_variable_names__ gh_infer_repo_from_origin "${2-}" || return 1
+
     local __gh_infer_repo_dir="$1"
-    local __gh_infer_result_name="${2:-}"
+    local __gh_infer_result_name="$2"
     local __gh_infer_optional=0
-    local gh_infer_parsed_repo __gh_infer_remote_url
+    local __gh_infer_parsed_repo __gh_infer_remote_url
 
     if [[ -z "$__gh_infer_repo_dir" || -z "$__gh_infer_result_name" ]]; then
         log_error -l base_bash_libs.gh "Usage: gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 1
     fi
-    assert_variable_name "$__gh_infer_result_name"
+    assert_variable_name "$__gh_infer_result_name" || return 1
     __std_assert_writable_output__ gh_infer_repo_from_origin "$__gh_infer_result_name" || return 1
 
     if [[ "${3:-}" == "--optional" ]]; then
@@ -111,7 +162,7 @@ gh_infer_repo_from_origin() {
 
     __gh_infer_remote_url="$(git -C "$__gh_infer_repo_dir" remote get-url origin 2>/dev/null || true)"
     if [[ -z "$__gh_infer_remote_url" ]] ||
-        ! gh_repo_from_remote_url "$__gh_infer_remote_url" gh_infer_parsed_repo; then
+        ! __gh_parse_repo_from_remote_url__ "$__gh_infer_remote_url" __gh_infer_parsed_repo; then
         if ((__gh_infer_optional)); then
             printf -v "$__gh_infer_result_name" '%s' ""
             return 0
@@ -120,19 +171,25 @@ gh_infer_repo_from_origin() {
         return 1
     fi
 
-    printf -v "$__gh_infer_result_name" '%s' "$gh_infer_parsed_repo"
+    printf -v "$__gh_infer_result_name" '%s' "$__gh_infer_parsed_repo"
 }
 
 gh_repo_default_branch() {
+    if (($# != 2)); then
+        log_error -l base_bash_libs.gh "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
+        return 1
+    fi
+    __std_assert_public_variable_names__ gh_repo_default_branch "${2-}" || return 1
+
     local __gh_repo="$1"
-    local __gh_repo_result_name="${2:-}"
+    local __gh_repo_result_name="$2"
     local __gh_repo_default_branch __gh_repo_status=0
 
     if [[ -z "$__gh_repo" || -z "$__gh_repo_result_name" ]]; then
         log_error -l base_bash_libs.gh "Usage: gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 1
     fi
-    assert_variable_name "$__gh_repo_result_name"
+    assert_variable_name "$__gh_repo_result_name" || return 1
     __std_assert_writable_output__ gh_repo_default_branch "$__gh_repo_result_name" || return 1
 
     gh_require_cli || return 1
@@ -150,6 +207,8 @@ gh_repo_default_branch() {
 }
 
 __gh_api_failure_retryable() {
+    (($# == 1)) || return 1
+
     local output="${1,,}"
 
     [[ "$output" == *"secondary rate limit"* ||
@@ -165,6 +224,8 @@ __gh_api_failure_retryable() {
 }
 
 __gh_api_retry_delay_seconds() {
+    (($# == 1)) || return 1
+
     local output="${1,,}"
     local configured_delay="${BASE_GH_API_RETRY_DELAY_SECONDS:-2}"
 

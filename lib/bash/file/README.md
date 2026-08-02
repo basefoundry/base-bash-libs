@@ -5,6 +5,8 @@ File-oriented Bash helpers shared by CLI commands.
 ## Dependency
 
 Source `lib/bash/std/lib_std.sh` before this library so logging and error helpers are available.
+Both libraries preserve caller-selected `errexit`, `nounset`, and `pipefail`
+settings; they do not impose a strict-mode policy on the calling script.
 
 ## Public API
 
@@ -16,7 +18,7 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and error helper
   Inspect whether adding or replacing a marker-delimited block would change the
   file; returns `0` when an update is needed, `1` when unchanged, and `2` for
   invalid marker order or counts.
-- `update_file_section <target> <start_marker> <end_marker> [-r|content...]`
+- `update_file_section [-r] <target> <start_marker> <end_marker> [content...]`
   Idempotently add, replace, or remove a marker-delimited block inside a file.
   It mutates the target or symlink referent and returns nonzero on validation or
   filesystem failure.
@@ -59,6 +61,9 @@ fi
 - `file_section_needs_update` returns `0` when an add/update would change the
   target file, `1` when the first existing marked section already matches, and
   `2` when marker pairs are asymmetric or misordered.
+- Invalid or incomplete arguments produce a usage diagnostic and return
+  nonzero without relying on unset positional parameters. Under `errexit`, use
+  a conditional context when a nonzero inspection result is expected.
 
 ## Tests
 
