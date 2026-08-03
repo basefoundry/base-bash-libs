@@ -2013,6 +2013,15 @@ __std_run_with_timeout_supervisor__() {
                         __std_timeout_final_status=124
                         __std_timeout_outcome=timeout
                         ;;
+                    125)
+                        # A command that has already published a terminal
+                        # status completed before the deadline clock was
+                        # canceled.  Preserve that command result even when
+                        # an older Bash/coreutils combination reports the
+                        # canceled clock as an infrastructure failure.
+                        __std_timeout_final_status="$__std_timeout_run_status"
+                        __std_timeout_outcome=command
+                        ;;
                     *)
                         __std_timeout_final_status=125
                         __std_timeout_outcome=infrastructure
