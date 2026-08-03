@@ -2086,7 +2086,7 @@ __std_run_with_timeout_supervisor__() {
                             __std_timeout_outcome=infrastructure
                         else
                             __std_timeout_final_status="$__std_timeout_run_status"
-                            __std_timeout_outcome=command
+                            __std_timeout_outcome="command"
                         fi
                         ;;
                     *)
