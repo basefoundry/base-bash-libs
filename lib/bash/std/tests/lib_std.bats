@@ -1769,6 +1769,24 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
+@test "std_run fallback preserves Bash function resolution over same-named executables" {
+    local rc
+
+    timeout_function_collision() { return 73; }
+    std_command_path() {
+        printf -v "$1" '%s' /bin/false
+        return 0
+    }
+
+    if __std_run_with_timeout_fallback__ 5 timeout_function_collision; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 73 ]
+}
+
 @test "std_run fallback timeout kills commands that ignore TERM" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local marker_file="$TEST_TMPDIR/term-ignored.marker"
@@ -2671,6 +2689,21 @@ EOF
     created_path="$(cat "$path_file")"
     [[ "$created_path" == "$temp_root"/workspace.* ]]
     [ ! -e "$created_path" ]
+}
+
+@test "private temp dir helper supports reserved output without public-name collision" {
+    local temp_root="$TEST_TMPDIR/private-temp-dir-root"
+    local -r gh_api_capture_workspace="caller-owned-readonly"
+    local __gh_api_capture_workspace=""
+
+    mkdir -p "$temp_root"
+    TMPDIR="$temp_root" __std_make_internal_temp_dir__ --keep \
+        __gh_api_capture_workspace private-workspace
+
+    [ "$gh_api_capture_workspace" = "caller-owned-readonly" ]
+    [[ "$__gh_api_capture_workspace" == "$temp_root"/private-workspace.* ]]
+    [ -d "$__gh_api_capture_workspace" ]
+    rmdir -- "$__gh_api_capture_workspace"
 }
 
 @test "std_make_temp_file --keep leaves the created file in place" {

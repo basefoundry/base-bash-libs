@@ -514,20 +514,45 @@ contract_git_stub() {
 }
 
 contract_gh_stub() {
-    local status="${CONTRACT_GH_STATUS:-0}"
+    local status="${CONTRACT_GH_STATUS:-0}" call_count=0
+    local fails_before_success="${CONTRACT_GH_FAILS_BEFORE_SUCCESS:-0}"
+    local contract_gh_arg contract_gh_include=0
+
+    if [[ "${1-}" == "api" ]]; then
+        for contract_gh_arg in "$@"; do
+            [[ "$contract_gh_arg" == "--include" ]] && contract_gh_include=1
+        done
+    fi
+
+    if [[ "${1-}" == "api" && -n "${CONTRACT_GH_COUNT_FILE:-}" ]]; then
+        if [[ -s "$CONTRACT_GH_COUNT_FILE" ]]; then
+            IFS= read -r call_count < "$CONTRACT_GH_COUNT_FILE" || return 1
+        fi
+        call_count=$((call_count + 1))
+        printf '%s\n' "$call_count" > "$CONTRACT_GH_COUNT_FILE"
+    fi
 
     if ((status != 0)); then
         return "$status"
     fi
+    if [[ "${1-}" == "api" ]] &&
+        ((fails_before_success > 0 && call_count <= fails_before_success)); then
+        printf '%s\n' 'Get "https://api.github.test/repos/owner/repo": read tcp 127.0.0.1:443->127.0.0.2:1234: read: connection reset by peer' >&2
+        return 1
+    fi
     case "${1-}:${2-}" in
         repo:view) printf 'main\n' ;;
-        api:*) printf '{"contract":true}\n' ;;
+        api:*)
+            ((contract_gh_include == 0)) || printf 'HTTP/2.0 200 OK\r\n\r\n'
+            printf '{"contract":true}\n'
+            ;;
     esac
     return 0
 }
 
 contract_git_gh_api_smoke() {
     local contract_result="" contract_output="" contract_status=0
+    local contract_gh_count_file="$contract_tmp/gh-api-count"
 
     git() { contract_git_stub "$@"; }
     gh() { contract_gh_stub "$@"; }
@@ -571,6 +596,65 @@ contract_git_gh_api_smoke() {
     contract_assert_equal "gh_repo_default_branch" main "$contract_result"
     contract_output="$(gh_api_with_retry repos/basefoundry/base-bash-libs)"
     contract_assert_equal "gh_api_with_retry" '{"contract":true}' "$contract_output"
+    CONTRACT_GH_COUNT_FILE="$contract_gh_count_file"
+    CONTRACT_GH_FAILS_BEFORE_SUCCESS=1
+    export CONTRACT_GH_COUNT_FILE CONTRACT_GH_FAILS_BEFORE_SUCCESS
+    : > "$contract_gh_count_file"
+    contract_output="$(
+        gh_api_with_retry \
+            --max-attempts 2 \
+            --max-elapsed-seconds 10 \
+            --attempt-timeout-seconds 2 \
+            --base-delay-seconds 0 \
+            --max-delay-seconds 1 \
+            -- \
+            repos/basefoundry/base-bash-libs
+    )"
+    contract_assert_equal "gh_api_with_retry read retry output" \
+        '{"contract":true}' "$contract_output"
+    IFS= read -r contract_result < "$contract_gh_count_file" ||
+        contract_fail "could not read gh_api_with_retry read retry count"
+    contract_assert_equal "gh_api_with_retry read retry count" 2 "$contract_result"
+
+    : > "$contract_gh_count_file"
+    CONTRACT_GH_FAILS_BEFORE_SUCCESS=2
+    contract_expect_status "gh_api_with_retry mutation retry withheld" 1 contract_quiet_call \
+        gh_api_with_retry \
+        --max-attempts 3 \
+        --max-elapsed-seconds 10 \
+        --attempt-timeout-seconds 2 \
+        --base-delay-seconds 0 \
+        --max-delay-seconds 1 \
+        -- \
+        repos/basefoundry/base-bash-libs \
+        --method POST
+    IFS= read -r contract_result < "$contract_gh_count_file" ||
+        contract_fail "could not read gh_api_with_retry mutation count"
+    contract_assert_equal "gh_api_with_retry mutation retry withheld count" 1 "$contract_result"
+
+    : > "$contract_gh_count_file"
+    CONTRACT_GH_FAILS_BEFORE_SUCCESS=1
+    contract_output="$(
+        gh_api_with_retry \
+            --retry-policy replay-safe \
+            --max-attempts 2 \
+            --max-elapsed-seconds 10 \
+            --attempt-timeout-seconds 2 \
+            --base-delay-seconds 0 \
+            --max-delay-seconds 1 \
+            -- \
+            repos/basefoundry/base-bash-libs \
+            -XPOST
+    )"
+    contract_assert_equal "gh_api_with_retry replay-safe mutation output" \
+        '{"contract":true}' "$contract_output"
+    IFS= read -r contract_result < "$contract_gh_count_file" ||
+        contract_fail "could not read gh_api_with_retry replay-safe mutation count"
+    contract_assert_equal "gh_api_with_retry replay-safe mutation count" 2 "$contract_result"
+    unset CONTRACT_GH_COUNT_FILE CONTRACT_GH_FAILS_BEFORE_SUCCESS
+
+    contract_expect_status "gh_api_with_retry invalid retry policy" 1 contract_quiet_call \
+        gh_api_with_retry --retry-policy unsafe -- repos/basefoundry/base-bash-libs
     contract_expect_status "gh_report_command_failure status" 7 contract_quiet_call \
         gh_report_command_failure 7 api contract
     CONTRACT_GH_STATUS=255

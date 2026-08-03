@@ -38,13 +38,12 @@ import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
   store an empty string and return success.
 - `gh_repo_default_branch <owner/repo> <result_var>`
   Uses `gh repo view` to read the GitHub repository default branch.
-- `gh_api_with_retry [gh api args...]`
-  Runs `gh api "$@"` with bounded retries for API pressure and transient server
-  errors such as secondary rate limits, `Retry-After`, abuse detection, and
-  502/503/504-style failures. `BASE_GH_API_MAX_ATTEMPTS` defaults to `2`.
-  `BASE_GH_API_RETRY_DELAY_SECONDS` defaults to `2` when the error output does
-  not include a `Retry-After` value. Protected calls use the sensitive form
-  documented below.
+- `gh_api_with_retry [retry controls --] <endpoint> [gh api args...]`
+  Runs `gh api "$@"` with idempotency-aware, elapsed-time-bounded retries.
+  Reads may retry by default; mutations, GraphQL, file-backed payloads, and
+  requests the parser cannot classify do not retry unless the caller explicitly
+  attests that replay is safe. Stdin-backed payloads never retry. See
+  [Idempotency-aware API retries](#idempotency-aware-api-retries).
 
 All GitHub helper failures return a nonzero status and preserve the underlying
 `gh` status where applicable. The remote parser and origin inference helpers
@@ -54,14 +53,167 @@ leave caller-owned result variables unchanged on failure; use `--optional` with
 Public functions validate the documented argument count before expanding
 required positional parameters. Invalid calls return `1`, including when the
 caller has enabled `nounset`; optional flags such as `--optional` are rejected
-when misspelled. The variadic `gh_run` and `gh_api_with_retry` helpers continue
-to pass GitHub arguments after any protected-diagnostic control prefix through
-to `gh` unchanged.
+when misspelled. `gh_run` passes every GitHub argument after its optional
+protected-diagnostic control prefix through unchanged. `gh_api_with_retry`
+preserves those caller arguments except for the documented internal
+response-metadata instrumentation on compatible retry-authorized calls.
 
 The library does not change the caller's `errexit`, `nounset`, `pipefail`,
-`shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters. Its
-diagnostic parsing uses a command-scoped empty `IFS`, and failed `gh` commands
-retain their original status from `1` through `255`.
+`noclobber`, `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional
+parameters. Its diagnostic parsing uses a command-scoped empty `IFS`, and
+failed `gh` commands retain their original status from `1` through `255`.
+During a retry call, an explicitly ignored HUP, INT, QUIT, or TERM remains
+ignored. Other dispositions are temporarily supervised so captures and child
+processes can be cleaned; the exact caller disposition is then restored and
+the signal is re-delivered, preserving default termination and custom trap
+handlers.
+
+## Idempotency-aware API retries
+
+The legacy form remains valid and uses the conservative defaults:
+
+```bash
+gh_api_with_retry repos/basefoundry/base-bash-libs --jq .name
+```
+
+When any framework retry or sensitive-diagnostic control is present, put every
+control in one leading prefix and terminate it with `--`:
+
+```bash
+gh_api_with_retry \
+    --retry-policy replay-safe \
+    --max-attempts 4 \
+    --max-elapsed-seconds 180 \
+    --attempt-timeout-seconds 45 \
+    --base-delay-seconds 2 \
+    --max-delay-seconds 90 \
+    -- \
+    repos/owner/repo/branches/main/protection --method PUT --input "$stable_payload"
+```
+
+This example is suitable only when `stable_payload` is immutable for the call
+and describes the complete desired branch-protection state. Repeating that PUT
+converges on the same known final state; an event-creating POST such as a
+repository dispatch would not have that property.
+
+The controls and defaults are:
+
+| Control | Default | Allowed values |
+| --- | ---: | --- |
+| `--retry-policy` | `read-only` | `read-only`, `never`, `replay-safe` |
+| `--max-attempts` | `3` | `1` through `10` |
+| `--max-elapsed-seconds` | `300` | `1` through `3600` |
+| `--attempt-timeout-seconds` | `60` | `1` through `600` |
+| `--base-delay-seconds` | `2` | `0` through `60` |
+| `--max-delay-seconds` | `120` | `1` through `300` |
+
+Duplicate, missing, out-of-range, or conflicting controls fail before `gh`
+runs. `--base-delay-seconds` cannot exceed `--max-delay-seconds`. Control
+values are not repeated in validation diagnostics. The retired
+`BASE_GH_API_MAX_ATTEMPTS` and `BASE_GH_API_RETRY_DELAY_SECONDS` environment
+variables have no effect; migrate each call to the explicit controls above.
+
+### Replay policy
+
+`read-only` retries only confidently classified `GET`, `HEAD`, and `OPTIONS`
+requests. An explicit method may use any GitHub CLI form, including
+`--method GET`, `--method=GET`, `-X GET`, `-XGET`, or `-X=GET`. Without an
+explicit method, any `--field`/`-F`, `--raw-field`/`-f`, or `--input` implies
+`POST`; otherwise the method is `GET`. The parser understands interspersed
+options, pflag short-option clusters, attached values, option-looking flag
+values, and the `--` terminator. Duplicate method flags and unfamiliar syntax
+are deliberately classified as unknown.
+
+GraphQL is never classified as a read, even when the query text happens to be
+read-only. File-backed `--input` and `--field key=@file` requests also require
+`replay-safe`, because their data could change between attempts.
+
+`replay-safe` is an explicit caller attestation that repeating the operation is
+semantically safe and that every file or other data source will remain stable
+for the whole call. It is not a generic GitHub idempotency-key mechanism. Use it
+for a mutation only when duplicate execution and an unknown first-attempt
+outcome are acceptable. `never` performs exactly one attempt.
+
+`--input -` and typed `--field key=@-`/`-Fkey=@-` consume stdin and therefore
+never retry, including under `replay-safe`. The same prohibition applies to
+`/dev/stdin`, `/dev/fd/*`, `/proc/*/fd/*`, and named-pipe paths supplied through
+`--input` or typed fields. A raw field such as `--raw-field key=@-` sends the
+literal string `@-`; it is not stdin-backed. Typed fields split at their first
+`=`, so `--field payload=literal=@-` is also a stable literal value rather than
+a stdin reference.
+
+### Retry evidence and scheduling
+
+For a retry-authorized ordinary request, the helper internally adds
+`--include`, examines the bounded leading response-header block, and removes
+that exact byte prefix before returning stdout. This lets default reads retry
+structured HTTP `408`, `425`, `429`, `500`, `502`, `503`, and `504` responses
+without changing their public output. HTTP `403` retries only when the same
+header block establishes rate limiting. A caller's own `--include`/`-i` is
+preserved and its headers remain in stdout.
+
+Internal header injection is disabled for pagination, slurp, verbose output,
+an explicit include setting, ambiguous syntax, and forced-TTY/color rendering.
+Those modes retain their original output. A caller-supplied include can still
+provide structured HTTP evidence; otherwise retries are limited to the
+narrowly authenticated transport and wrapper-timeout paths allowed for that
+output mode. Header prefixes containing terminal control or NUL bytes,
+incomplete or oversized blocks, conflicting retry metadata, and metadata
+rendered under forced terminal/color settings fail closed. NUL bytes in the
+response body are not metadata and remain byte-preserved.
+
+Genuine GitHub CLI transport failures use either its exact two-line DNS
+diagnostic or a single raw Go URL-error line. The helper matches the complete
+stderr file against a narrow transient allowlist and requires stdout to be
+empty; NUL bytes, oversized content, extra/debug lines, certificates,
+cancellation, and response-rendering modes fail closed. GitHub error bodies
+instead flow through `gh:`-prefixed stderr and can contain text shaped like
+`(HTTP NNN)`, so stderr HTTP or rate text is never authoritative.
+Authentication and authorization failures, other
+client errors, jq/template/configuration failures, GitHub CLI statuses `2` and
+`4`, arbitrary response bodies, and unknown text do not retry.
+
+Generic transient failures use capped exponential equal jitter: for an
+exponential cap `C`, the selected whole-second delay is in
+`[ceil(C / 2), C]`. Server `Retry-After` and rate-limit-reset delays are minimum
+waits and are never jittered or clamped downward. A structured rate-limit
+response without delay headers starts at 60 seconds and backs off
+exponentially. If a required server or rate-limit wait exceeds either the
+configured delay bound or the remaining elapsed-time budget, the helper stops
+and returns the last `gh` status instead of sleeping for less time.
+
+The elapsed-time budget covers both attempts and waits. Each attempt timeout is
+the smaller of `--attempt-timeout-seconds` and the remaining total budget. The
+clock and controls use whole seconds. API retries deliberately use the stdlib's
+Bash TERM-then-KILL timeout fallback until issue `#219` unifies the
+hard-termination contract across external timeout backends. Its one-second
+process-termination grace can make observed wall time slightly exceed the
+nominal budget. A wrapper-enforced attempt timeout has status `124`. No sleep
+is performed after the final attempt, and clock, jitter, or sleep failures
+after an attempt preserve that attempt's status.
+
+### Captured output
+
+Each invocation creates a mode-`0700` workspace and writes attempt stdout and
+stderr to separate mode-`0600` files. A small guardian is running before those
+files are created and removes the workspace if the owning shell disappears.
+This design leaves the caller's EXIT trap and shared cleanup registry alone.
+Intermediate attempt output is suppressed. On every success, including a
+sensitive call, the final stdout and stderr are replayed byte-for-byte to their
+original channels after any internally added header prefix is removed.
+Ordinary final failures receive the same channel-preserving replay unless an
+internally injected header prefix cannot be separated safely; in that case
+failure stdout is withheld, while a nominal success is converted to a replay
+failure. This preserves empty output, missing or repeated trailing newlines,
+and binary NUL bytes without using command substitution.
+
+Sensitive final failures replay neither captured channel. Their terminal and
+persistent-log diagnostics contain only the caller-vetted safe label (if any),
+method/status/attempt/budget context, and a notice that captured output was
+hidden. Managed completion waits until guardian shutdown and workspace cleanup
+finish. The guardian also performs best-effort cleanup after owner `SIGKILL`;
+a simultaneous guardian failure, host failure, or unavailable temporary
+filesystem can still leave mode-`0600` files for operating-system cleanup.
 
 ## Secret-safe command diagnostics
 
@@ -97,7 +249,8 @@ failure records, retry notices, persistent logs, and the nested authentication
 check performed by `gh_run` and `gh_report_command_failure`. A protected
 `gh_api_with_retry` may inspect captured failure text internally to decide
 whether and when to retry, but it does not replay that text on failure.
-Successful API output remains functional stdout and is returned unchanged.
+Successful API output remains functional stdout and is byte-preserved after
+any internal response-metadata prefix is removed.
 
 Sensitivity is explicit rather than heuristic. The helpers do not try to infer
 which `--header`, `--field`, `--raw-field`, `--option=value`, URL, extension,
