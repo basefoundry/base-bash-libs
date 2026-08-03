@@ -34,6 +34,20 @@ and versions are tracked in the repo-root `VERSION` file.
   handling in post-v1.4.0 development.
 - Preserved normal Bash command resolution in the timeout fallback when a shell
   function shares its name with an external executable.
+- Unified timed execution behind a framework-owned process-group supervisor
+  with TERM-to-KILL escalation, explicit infrastructure status `125`, and
+  capability detection for verified GNU `timeout`, `gtimeout`, and the Bash
+  clock fallback. Natural command status `124` is no longer confused with a
+  framework deadline.
+
+### Changed
+
+- Made timed foreground-TTY invocations fail closed with a safe diagnostic;
+  callers must provide a pipe or explicit non-terminal stdin for the v2 hard
+  descendant guarantee.
+- Made dry-run plans unconditional stderr diagnostics with a timestamped
+  `DRY-RUN` marker, independent of INFO/category thresholds and `--quiet`,
+  while keeping stdout data-clean and preserving sensitive-argument redaction.
 
 ### Documentation
 

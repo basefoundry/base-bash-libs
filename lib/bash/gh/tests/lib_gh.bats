@@ -1485,21 +1485,27 @@ EOF
     done
 }
 
-@test "gh_api_with_retry consistently uses the std Bash TERM-KILL timeout backend" {
+@test "gh_api_with_retry uses the shared TERM-KILL timeout supervisor contract" {
     install_gh_api_retry_fixture
     TEST_GH_API_SUCCESS_AFTER=3
-    std_command_path() {
-        printf 'unexpected timeout discovery: %s\n' "$2" >&2
-        return 99
-    }
 
     capture_command gh_api_with_retry --max-attempts 3 --base-delay-seconds 0 \
         --max-delay-seconds 1 -- repos/owner/repo
 
     [ "$status" -eq 0 ]
     [ "$(gh_api_retry_observed attempts)" -eq 3 ]
-    [ "$(gh_api_retry_observed timeout-paths)" = "empty,empty,empty" ]
-    [[ "$output" != *"unexpected timeout discovery"* ]]
+    # Detection happens once before the retry loop. The attempt seam records
+    # the same verified backend path for every attempt; an empty value means
+    # the Bash clock fallback was selected on this host.
+    local timeout_path
+    IFS=',' read -r -a timeout_paths <<< "$(gh_api_retry_observed timeout-paths)"
+    [ "${#timeout_paths[@]}" -eq 3 ]
+    for timeout_path in "${timeout_paths[@]}"; do
+        case "$timeout_path" in
+            empty | */timeout | */gtimeout) ;;
+            *) return 1 ;;
+        esac
+    done
 }
 
 @test "gh_api_with_retry bounds each timeout by the remaining total budget" {

@@ -983,12 +983,14 @@ __gh_api_call_hook__() {
 __gh_api_attempt__() {
     local __gh_attempt_timeout="$1" __gh_attempt_timeout_path="$2"
     local __gh_attempt_number="$3" __gh_attempt_stdout="$4" __gh_attempt_stderr="$5"
+    local __gh_attempt_outcome=command
     shift 5
 
     # Keep the timeout supervisor in the calling shell so caller-local Bash
     # functions and terminal input remain available to the attempted command.
     # The invocation workspace independently captures its output channels.
-    __std_run_once__ "$__gh_attempt_timeout" "$__gh_attempt_timeout_path" \
+    __std_run_once__ __gh_attempt_outcome \
+        "$__gh_attempt_timeout" "$__gh_attempt_timeout_path" \
         "$__gh_attempt_number" gh api "$@" \
         >|"$__gh_attempt_stdout" 2>|"$__gh_attempt_stderr"
 }
@@ -1691,10 +1693,10 @@ __gh_api_with_retry_impl__() {
         return 1
     fi
 
-    # The Bash fallback provides TERM-then-KILL enforcement. Until the generic
-    # timeout backend has the same hard contract (#219), do not delegate API
-    # attempts to a TERM-only external timeout implementation.
-    __gh_api_timeout_path=""
+    # std_run owns a single TERM-then-KILL supervisor. GNU timeout/gtimeout,
+    # when verified, provide only its deadline clock; the framework never
+    # delegates the GitHub argv directly to those binaries.
+    __std_timeout_backend_detect__ __gh_api_timeout_path
     __gh_api_hook_result=""
     if ! __gh_api_call_hook__ monotonic __gh_api_hook_result ||
         [[ ! "$__gh_api_hook_result" =~ ^[0-9]+$ ||
