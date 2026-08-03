@@ -25,6 +25,114 @@ create_fake_git() {
     chmod +x "$script"
 }
 
+# Deterministic retry seams. Individual tests configure the fixture globals or
+# replace one seam for a narrower assertion. No retry test needs wall-clock
+# sleeps or a live GitHub process.
+install_gh_api_retry_fixture() {
+    TEST_GH_API_CLOCK=0
+    TEST_GH_API_EPOCH=2000000000
+    TEST_GH_API_ATTEMPT_DURATION=0
+    TEST_GH_API_SUCCESS_AFTER=2
+    TEST_GH_API_FAILURE_STATUS=1
+    TEST_GH_API_FAILURE_STDOUT=""
+    TEST_GH_API_FAILURE_STDERR=$'Get "https://api.github.test/repos/owner/repo": read tcp 127.0.0.1:443->127.0.0.2:1234: read: connection reset by peer\n'
+    TEST_GH_API_SUCCESS_STDOUT=$'ok\n'
+    TEST_GH_API_SUCCESS_STDERR=""
+    TEST_GH_API_OBSERVATION_DIR="$TEST_TMPDIR/gh-api-observations"
+    mkdir -p "$TEST_GH_API_OBSERVATION_DIR"
+    TEST_GH_API_ATTEMPT_COUNT_FILE="$TEST_GH_API_OBSERVATION_DIR/attempt-count"
+    TEST_GH_API_SLEEP_CALLS_FILE="$TEST_GH_API_OBSERVATION_DIR/sleep-calls"
+    TEST_GH_API_TIMEOUT_CALLS_FILE="$TEST_GH_API_OBSERVATION_DIR/timeout-calls"
+    TEST_GH_API_TIMEOUT_PATHS_FILE="$TEST_GH_API_OBSERVATION_DIR/timeout-paths"
+    TEST_GH_API_JITTER_CALLS_FILE="$TEST_GH_API_OBSERVATION_DIR/jitter-calls"
+    TEST_GH_API_CAPTURE_MODE_FILE="$TEST_GH_API_OBSERVATION_DIR/capture-mode"
+    TEST_GH_API_FIRST_ARG_FILE="$TEST_GH_API_OBSERVATION_DIR/first-api-arg"
+    printf '0' > "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+    : > "$TEST_GH_API_SLEEP_CALLS_FILE"
+    : > "$TEST_GH_API_TIMEOUT_CALLS_FILE"
+    : > "$TEST_GH_API_TIMEOUT_PATHS_FILE"
+    : > "$TEST_GH_API_JITTER_CALLS_FILE"
+    : > "$TEST_GH_API_CAPTURE_MODE_FILE"
+    : > "$TEST_GH_API_FIRST_ARG_FILE"
+
+    gh() { return 0; }
+    __gh_api_monotonic_seconds__() {
+        printf -v "$1" '%s' "$TEST_GH_API_CLOCK"
+    }
+    __gh_api_epoch_seconds__() {
+        printf -v "$1" '%s' "$TEST_GH_API_EPOCH"
+    }
+    __gh_api_jitter_seconds__() {
+        local result_name="$1" cap="$2" delay=0
+        gh_api_append_observation "$TEST_GH_API_JITTER_CALLS_FILE" "$cap"
+        ((cap == 0)) || delay=$(((cap + 1) / 2))
+        printf -v "$result_name" '%s' "$delay"
+    }
+    __gh_api_sleep__() {
+        gh_api_append_observation "$TEST_GH_API_SLEEP_CALLS_FILE" "$1"
+        TEST_GH_API_CLOCK=$((TEST_GH_API_CLOCK + $1))
+    }
+    __gh_api_attempt__() {
+        local attempt_timeout="$1" attempt_timeout_path="$2"
+        local stdout_file="$4" stderr_file="$5" attempt_count=0
+        local fixture_arg fixture_include=0 fixture_stdout fixture_stderr
+
+        for fixture_arg in "${@:6}"; do
+            case "$fixture_arg" in
+                --include | -i) fixture_include=1 ;;
+            esac
+        done
+
+        IFS= read -r attempt_count < "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        attempt_count=$((attempt_count + 1))
+        printf '%s' "$attempt_count" > "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        gh_api_append_observation "$TEST_GH_API_TIMEOUT_CALLS_FILE" "$attempt_timeout"
+        gh_api_append_observation "$TEST_GH_API_TIMEOUT_PATHS_FILE" \
+            "${attempt_timeout_path:-empty}"
+        printf '%s' "${6-}" > "$TEST_GH_API_FIRST_ARG_FILE"
+        TEST_GH_API_CLOCK=$((TEST_GH_API_CLOCK + TEST_GH_API_ATTEMPT_DURATION))
+        : > "$stdout_file"
+        : > "$stderr_file"
+        if ((attempt_count >= TEST_GH_API_SUCCESS_AFTER)); then
+            fixture_stdout="$TEST_GH_API_SUCCESS_STDOUT"
+            fixture_stderr="$TEST_GH_API_SUCCESS_STDERR"
+        else
+            fixture_stdout="$TEST_GH_API_FAILURE_STDOUT"
+            fixture_stderr="$TEST_GH_API_FAILURE_STDERR"
+        fi
+        if ((fixture_include)) && [[ -n "$fixture_stdout" && "$fixture_stdout" != HTTP/* ]]; then
+            printf 'HTTP/2.0 200 OK\r\n\r\n' > "$stdout_file"
+        fi
+        printf '%s' "$fixture_stdout" >> "$stdout_file"
+        printf '%s' "$fixture_stderr" > "$stderr_file"
+        ((attempt_count >= TEST_GH_API_SUCCESS_AFTER)) && return 0
+        return "$TEST_GH_API_FAILURE_STATUS"
+    }
+}
+
+gh_api_append_observation() {
+    local observation_file="$1" observation_value="$2"
+
+    [[ ! -s "$observation_file" ]] || printf ',' >> "$observation_file"
+    printf '%s' "$observation_value" >> "$observation_file"
+}
+
+gh_api_retry_observed() {
+    local observation_file
+
+    case "$1" in
+        attempts) observation_file="$TEST_GH_API_ATTEMPT_COUNT_FILE" ;;
+        capture-mode) observation_file="$TEST_GH_API_CAPTURE_MODE_FILE" ;;
+        first-arg) observation_file="$TEST_GH_API_FIRST_ARG_FILE" ;;
+        jitter) observation_file="$TEST_GH_API_JITTER_CALLS_FILE" ;;
+        sleeps) observation_file="$TEST_GH_API_SLEEP_CALLS_FILE" ;;
+        timeout-paths) observation_file="$TEST_GH_API_TIMEOUT_PATHS_FILE" ;;
+        timeouts) observation_file="$TEST_GH_API_TIMEOUT_CALLS_FILE" ;;
+        *) return 1 ;;
+    esac
+    command cat -- "$observation_file"
+}
+
 @test "lib_gh can be sourced more than once" {
     source "$BASE_BASH_DIR/gh/lib_gh.sh"
 
@@ -709,129 +817,1073 @@ EOF
     [ "$status" = "develop" ]
 }
 
-@test "gh_api_with_retry retries retryable API pressure once" {
-    create_fake_gh <<'EOF'
-#!/usr/bin/env bash
-state_file="${TEST_TMPDIR:?}/gh-api-count"
-count=0
-[[ -f "$state_file" ]] && read -r count < "$state_file"
-count=$((count + 1))
-printf '%s\n' "$count" > "$state_file"
-if ((count == 1)); then
-    printf 'secondary rate limit; retry-after: 0\n' >&2
-    exit 1
-fi
-printf 'ok\n'
-EOF
+@test "gh_api_with_retry rejects malformed controls before execution without echoing values" {
+    local secret="retry-control-canary"
+    local invocation_file="$TEST_TMPDIR/gh-api-control-invoked"
 
-    capture_command gh_api_with_retry repos/owner/repo --jq .name
+    gh() {
+        printf 'invoked\n' > "$invocation_file"
+    }
 
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"GitHub API call failed on attempt 1; retrying once."* ]]
-    [[ "$output" == *"ok"* ]]
-    [ "$(cat "$TEST_TMPDIR/gh-api-count")" = "2" ]
-}
-
-@test "gh_api_with_retry sensitive retries and final failures never replay captured secrets" {
-    local secret="gh-api-canary with spaces"
-    local primary_log="$TEST_TMPDIR/gh-api-sensitive.log"
-    local primary_content
-
-    export GH_TEST_SECRET="$secret"
-    export BASE_CLI_PRIMARY_LOG="$primary_log"
-    export BASE_GH_API_MAX_ATTEMPTS=2
-    export BASE_GH_API_RETRY_DELAY_SECONDS=0
-    create_fake_gh <<'EOF'
-#!/usr/bin/env bash
-state_file="${TEST_TMPDIR:?}/gh-api-sensitive-count"
-count=0
-[[ -f "$state_file" ]] && read -r count < "$state_file"
-count=$((count + 1))
-printf '%s\n' "$count" > "$state_file"
-printf 'secondary rate limit; retry-after: 0; captured=%s\n' "${GH_TEST_SECRET:?}" >&2
-exit 29
-EOF
-
-    capture_command gh_api_with_retry --sensitive --safe-display "rotate deployment key" -- \
-        repos/owner/repo \
-        "spaced value $secret" \
-        "--option=$secret" \
-        --header "Authorization: Bearer $secret" \
-        "https://user:$secret@github.example.test/resource" \
-        --raw-field "token=$secret"
-
-    [ "$status" -eq 29 ]
-    [ "$(cat "$TEST_TMPDIR/gh-api-sensitive-count")" = "2" ]
-    [[ "$output" == *"rotate deployment key [sensitive GitHub operation; arguments hidden]"* ]]
-    [[ "$output" == *"retrying once"* ]]
-    [[ "$output" == *"attempt 2 of 2"* ]]
-    [[ "$output" == *"exit 29"* ]]
-    [[ "$output" == *"captured output hidden"* ]]
+    capture_command gh_api_with_retry --retry-policy "$secret" -- repos/owner/repo
+    [ "$status" -eq 1 ]
     [[ "$output" != *"$secret"* ]]
 
-    primary_content="$(cat "$primary_log")"
-    [[ "$primary_content" == *"rotate deployment key"* ]]
-    [[ "$primary_content" == *"retrying once"* ]]
-    [[ "$primary_content" == *"exit 29"* ]]
-    [[ "$primary_content" != *"$secret"* ]]
+    capture_command gh_api_with_retry --max-attempts 0 -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --max-attempts 2 --max-attempts 3 -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --base-delay-seconds 5 --max-delay-seconds 4 -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --attempt-timeout-seconds 601 -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --max-elapsed-seconds 3601 -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --retry-policy read-only repos/owner/repo
+    [ "$status" -eq 1 ]
+    capture_command gh_api_with_retry --safe-display "safe operation" -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    [ ! -e "$invocation_file" ]
 }
 
-@test "gh_api_with_retry sensitive success preserves functional stdout" {
-    local secret="successful-api-argv-canary"
+@test "gh_api_with_retry ignores retired retry environment variables" {
+    install_gh_api_retry_fixture
+    export BASE_GH_API_MAX_ATTEMPTS=1
+    export BASE_GH_API_RETRY_DELAY_SECONDS=59
 
-    create_fake_gh <<'EOF'
-#!/usr/bin/env bash
-printf '{"ok":true}\n'
-EOF
-
-    capture_command gh_api_with_retry --sensitive --safe-display "read protected API data" -- \
-        repos/owner/repo --header "Authorization: Bearer $secret"
+    capture_command gh_api_with_retry repos/owner/repo
 
     [ "$status" -eq 0 ]
-    [ "$output" = '{"ok":true}' ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    [ "$(gh_api_retry_observed first-arg)" = "--include" ]
+    [ "$(gh_api_retry_observed sleeps)" = "1" ]
+    [[ "$output" == *"ok"* ]]
 }
 
-@test "gh_api_with_retry avoids shadowed sleep functions between retries" {
-    local shadow_file="$TEST_TMPDIR/shadowed-sleep-called"
+@test "gh_api_with_retry does not collide with unrelated readonly caller names" {
+    local -r gh_api_capture_workspace="caller-workspace"
+    local -r gh_api_hook_result="caller-hook"
+    local -r gh_api_metadata_epoch="caller-epoch"
 
-    create_fake_gh <<'EOF'
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 429 Too Many Requests\r\nX-RateLimit-Remaining: 0\r\nX-RateLimit-Reset: 2000000001\r\n\r\nbody\n'
+    TEST_GH_API_FAILURE_STDERR=""
+
+    capture_command gh_api_with_retry --max-attempts 2 \
+        --max-elapsed-seconds 30 --max-delay-seconds 10 -- repos/owner/repo
+
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    [ "$gh_api_capture_workspace" = "caller-workspace" ]
+    [ "$gh_api_hook_result" = "caller-hook" ]
+    [ "$gh_api_metadata_epoch" = "caller-epoch" ]
+}
+
+@test "GitHub API argv classification matches gh pflag value and cluster forms" {
+    local method include stdin_backed file_backed graphql ambiguous
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        repos/owner/repo -iXGET
+    [ "$method" = "GET" ]
+    [ "$include" -eq 1 ]
+    [ "$ambiguous" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        repos/owner/repo --allow-escape-sequences
+    [ "$method" = "GET" ]
+    [ "$ambiguous" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        repos/owner/repo --include=TRUE --paginate=0
+    [ "$include" -eq 1 ]
+    [ "$ambiguous" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        -XiGET repos/owner/repo
+    [ "$method" = "IGET" ]
+    [ "$include" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        repos/owner/repo -ifkey=value
+    [ "$method" = "POST" ]
+    [ "$include" -eq 1 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        -fi repos/owner/repo
+    [ "$method" = "POST" ]
+    [ "$include" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        --method --include repos/owner/repo
+    [ "$method" = "--INCLUDE" ]
+    [ "$include" -eq 0 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        --input --include repos/owner/repo
+    [ "$method" = "POST" ]
+    [ "$include" -eq 0 ]
+    [ "$file_backed" -eq 1 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        repos/owner/repo --method GET -XGET
+    [ "$method" = "UNKNOWN" ]
+    [ "$ambiguous" -eq 1 ]
+
+    __gh_api_classify_argv__ method include stdin_backed file_backed graphql ambiguous \
+        graphql --raw-field query=@-
+    [ "$graphql" -eq 1 ]
+    [ "$stdin_backed" -eq 0 ]
+}
+
+@test "gh_api_with_retry defaults to reads and requires replay-safe attestation for mutations and files" {
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry repos/owner/repo --method POST
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [[ "$output" == *"outcome may be unknown"* ]]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry repos/owner/repo -f key=value
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry graphql
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy never -- repos/owner/repo
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry repos/owner/repo --future-gh-flag
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry repos/owner/repo --input "$TEST_TMPDIR/stable.json"
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy replay-safe -- \
+        repos/owner/repo --input "$TEST_TMPDIR/stable.json"
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+}
+
+@test "gh_api_with_retry never retries stdin-backed requests even with replay-safe attestation" {
+    local stdin_link="$TEST_TMPDIR/stdin-link" fifo_path="$TEST_TMPDIR/request.fifo"
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy replay-safe -- repos/owner/repo --input -
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [[ "$output" == *"may consume stdin"* ]]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy replay-safe -- repos/owner/repo -F payload=@-
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy replay-safe -- \
+        repos/owner/repo -F payload=literal=@-
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    install_gh_api_retry_fixture
+    capture_command gh_api_with_retry --retry-policy replay-safe -- repos/owner/repo -f payload=@-
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    ln -s /dev/stdin "$stdin_link"
+    install_gh_api_retry_fixture
+    if capture_command gh_api_with_retry --retry-policy replay-safe -- \
+        repos/owner/repo --input "$stdin_link"; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    if capture_command gh_api_with_retry --retry-policy replay-safe -- \
+        repos/owner/repo --input /dev/null; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    mkfifo "$fifo_path"
+    install_gh_api_retry_fixture
+    if capture_command gh_api_with_retry --retry-policy replay-safe -- \
+        repos/owner/repo --input "$fifo_path"; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+}
+
+@test "gh_api_with_retry recognizes only the bounded transient HTTP and transport allowlists" {
+    local code
+
+    for code in 408 425 429 500 502 503 504; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_FAILURE_STDOUT="HTTP/2 $code"$'\r\n\r\n'
+        TEST_GH_API_FAILURE_STDERR=$'gh: response body text is not retry authority\n'
+        capture_command gh_api_with_retry \
+            --base-delay-seconds 0 --max-delay-seconds 120 -- \
+            repos/owner/repo --include
+        [ "$status" -eq 0 ]
+        [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    done
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=255
+    TEST_GH_API_FAILURE_STDERR=$'Get "https://api.github.test/repos/owner/repo": dial tcp 127.0.0.1:443: connect: connection refused\n'
+    capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDERR=$'error connecting to github.example.test\ncheck your internet connection or https://githubstatus.com\n'
+    capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    for failure_text in \
+        'gh: attacker body says connection reset by peer (HTTP 422)' \
+        'Get "https://api.github.test/repos/owner/repo": tls: failed to verify certificate: x509: unknown authority' \
+        $'Get "https://api.github.test/repos/owner/repo": read tcp a: read: connection reset by peer\ndebug trace'; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_SUCCESS_AFTER=99
+        TEST_GH_API_FAILURE_STDERR="$failure_text"$'\n'
+        capture_command gh_api_with_retry repos/owner/repo
+        [ "$status" -eq 1 ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    done
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=124
+    TEST_GH_API_FAILURE_STDERR=""
+    capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+}
+
+@test "gh_api_with_retry injects structured status for ordinary reads and strips it exactly" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\r\n\r\nintermediate body\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: service unavailable (HTTP 503)\n'
+    TEST_GH_API_SUCCESS_STDOUT=$'HTTP/2.0 200 OK\r\nContent-Type: application/octet-stream\r\n\r\nfinal body\n'
+
+    capture_command gh_api_with_retry \
+        --base-delay-seconds 0 --max-delay-seconds 1 -- repos/owner/repo
+
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    [[ "$output" == *"final body"* ]]
+    [[ "$output" != *"HTTP/2.0 200"* ]]
+    [[ "$output" != *"intermediate body"* ]]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=1
+    TEST_GH_API_SUCCESS_STDOUT=$'HTTP/2.0 200 OK\r\nX-Test: café\r\n\r\nbyte-exact body'
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$output" = "byte-exact body" ]
+}
+
+@test "gh_api_with_retry rejects decorated or forced-terminal response metadata" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 503 Service Unavailable\r\n\033[1;34mRetry-After\033[0m: 0\r\n\r\nbody\n'
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\r\n\r\nbody\n'
+    CLICOLOR_FORCE=1 capture_command gh_api_with_retry repos/owner/repo --include
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+}
+
+@test "gh_api_with_retry does not retry auth cancellation certificate or gh usage failures" {
+    local failure_status failure_text
+
+    for failure_status in 2 4; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_FAILURE_STATUS="$failure_status"
+        TEST_GH_API_FAILURE_STDERR=$'gh: Service Unavailable (HTTP 503)\n'
+        capture_command gh_api_with_retry repos/owner/repo
+        [ "$status" -eq "$failure_status" ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    done
+
+    for failure_text in \
+        'gh: Bad credentials (HTTP 401)' \
+        'gh: request canceled by user' \
+        'gh: x509: certificate signed by unknown authority' \
+        'gh: jq: error: invalid expression'; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_FAILURE_STDERR="$failure_text"$'\n'
+        capture_command gh_api_with_retry repos/owner/repo
+        [ "$status" -eq 1 ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    done
+}
+
+@test "gh_api_with_retry preserves signal-derived statuses without retrying transient evidence" {
+    local signal_status
+
+    for signal_status in 130 137 143; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_SUCCESS_AFTER=99
+        TEST_GH_API_FAILURE_STATUS="$signal_status"
+        TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\n\r\n'
+        TEST_GH_API_FAILURE_STDERR=$'gh: response body text\n'
+        if capture_command gh_api_with_retry repos/owner/repo --include; then
+            :
+        fi
+        [ "$status" -eq "$signal_status" ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+        [ "$(gh_api_retry_observed sleeps)" = "" ]
+    done
+}
+
+@test "gh_api_with_retry restores and re-delivers custom signal traps after cleanup" {
+    local trap_marker="$TEST_TMPDIR/gh-api-caller-term-trap"
+    local before_trap after_trap rc=0
+
+    install_gh_api_retry_fixture
+    __gh_api_sleep__() {
+        kill -TERM "$BASHPID"
+        return 1
+    }
+    trap 'printf caller-term > "$trap_marker"' TERM
+    before_trap="$(trap -p TERM)"
+
+    gh_api_with_retry --max-attempts 2 --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo >/dev/null 2>/dev/null || rc=$?
+    after_trap="$(trap -p TERM)"
+    trap - TERM
+
+    [ "$rc" -eq 143 ]
+    [ "$(cat "$trap_marker")" = "caller-term" ]
+    [ "$after_trap" = "$before_trap" ]
+    [ -z "$(find "$TEST_TMPDIR" -type f -name 'stdout' -print -quit)" ]
+}
+
+@test "gh_api_with_retry honors an explicitly ignored caller signal" {
+    local before_trap after_trap rc=0
+
+    install_gh_api_retry_fixture
+    __gh_api_sleep__() {
+        kill -TERM "$BASHPID"
+        return 0
+    }
+    trap '' TERM
+    before_trap="$(trap -p TERM)"
+
+    gh_api_with_retry --max-attempts 2 --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo >/dev/null 2>/dev/null || rc=$?
+    after_trap="$(trap -p TERM)"
+    trap - TERM
+
+    [ "$rc" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    [ "$after_trap" = "$before_trap" ]
+}
+
+@test "gh_api_with_retry uses structured include headers and rejects body and metadata spoofing" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\nRetry-After: 0\r\n\r\n{"message":"busy"}\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: Service Unavailable (HTTP 503)\n'
+    if capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo --include; then
+        :
+    fi
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\nRetry-After: 0\nbody without a header terminator\n'
+    TEST_GH_API_FAILURE_STDERR=$'ordinary failure\n'
+    if capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo --include; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 200\r\nContent-Type: application/json\r\n\r\nHTTP/2 503\nRetry-After: 0\n'
+    TEST_GH_API_FAILURE_STDERR=$'ordinary failure\n'
+    if capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo --include; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'{"errors":[{"message":"HTTP/2 503 Retry-After: 0"}]}\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: Service Unavailable (HTTP 503)\n'
+    if capture_command gh_api_with_retry repos/owner/repo; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    local oversized_status="HTTP/2 503 " padding
+    printf -v padding '%*s' 70000 ""
+    oversized_status+="${padding// /x}"
+    TEST_GH_API_FAILURE_STDOUT="$oversized_status"$'\n\n'
+    TEST_GH_API_FAILURE_STDERR=$'ordinary failure\n'
+    if capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo --include; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 200\r\nX-RateLimit-Remaining: 0\r\nRetry-After: 0\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: jq: error: invalid expression\n'
+    if capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 120 -- \
+        repos/owner/repo --include; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+}
+
+@test "GitHub API response parsing fails closed on NUL metadata but preserves NUL response bodies" {
+    local response_file="$TEST_TMPDIR/nul-response.bin"
+    local replay_file="$TEST_TMPDIR/nul-replay.bin"
+    local expected_file="$TEST_TMPDIR/nul-expected.bin"
+    local header_status retry_after remaining reset invalid header_bytes
+
+    printf 'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\000spoof\r\n\r\nbody\n' > \
+        "$response_file"
+    __gh_api_parse_headers__ "$response_file" header_status retry_after \
+        remaining reset invalid header_bytes
+    [ "$header_status" = "" ]
+    [ "$retry_after" = "" ]
+    [ "$invalid" -eq 1 ]
+    [ "$header_bytes" -eq 0 ]
+
+    printf 'HTTP/2.0 200 OK\r\nContent-Type: application/octet-stream\r\n\r\nbody\000bytes\n' > \
+        "$response_file"
+    printf 'body\000bytes\n' > "$expected_file"
+    __gh_api_parse_headers__ "$response_file" header_status retry_after \
+        remaining reset invalid header_bytes
+    [ "$header_status" = "200" ]
+    [ "$invalid" -eq 0 ]
+    [ "$header_bytes" -gt 0 ]
+    __gh_api_replay_file__ "$response_file" "$header_bytes" > "$replay_file"
+    cmp "$expected_file" "$replay_file"
+}
+
+@test "gh_api_with_retry withholds NUL-bearing response metadata without retrying" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    __gh_api_attempt__() {
+        local stdout_file="$4" stderr_file="$5" attempt_count=0
+
+        IFS= read -r attempt_count < "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        attempt_count=$((attempt_count + 1))
+        printf '%s' "$attempt_count" > "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        printf 'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\000spoof\r\n\r\nsecret-body\n' > \
+            "$stdout_file"
+        : > "$stderr_file"
+        return 1
+    }
+
+    capture_command gh_api_with_retry --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo
+
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed sleeps)" = "" ]
+    [[ "$output" == *"stdout was withheld"* ]]
+    [[ "$output" != *"secret-body"* ]]
+}
+
+@test "gh_api_with_retry rejects malformed and conflicting delay metadata without sleeping" {
+    local response
+    local -a malformed_responses=(
+        $'HTTP/2.0 503 Service Unavailable\r\nRetry-After: abc\r\n\r\nbody\n'
+        $'HTTP/2.0 503 Service Unavailable\r\nRetry-After: -1\r\n\r\nbody\n'
+        $'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 1.5\r\n\r\nbody\n'
+        $'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 99999999999\r\n\r\nbody\n'
+        $'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 1\r\nRetry-After: 2\r\n\r\nbody\n'
+        $'HTTP/2.0 403 Forbidden\r\nX-RateLimit-Remaining: 0\r\nX-RateLimit-Reset: invalid\r\n\r\nbody\n'
+    )
+
+    for response in "${malformed_responses[@]}"; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_SUCCESS_AFTER=99
+        TEST_GH_API_FAILURE_STDOUT="$response"
+        TEST_GH_API_FAILURE_STDERR=""
+
+        capture_command gh_api_with_retry --max-attempts 3 \
+            --max-elapsed-seconds 30 --base-delay-seconds 0 \
+            --max-delay-seconds 10 -- repos/owner/repo
+
+        [ "$status" -eq 1 ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+        [ "$(gh_api_retry_observed sleeps)" = "" ]
+    done
+}
+
+@test "gh_api_with_retry rejects a NUL-suffixed transport diagnostic" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    __gh_api_attempt__() {
+        local stdout_file="$4" stderr_file="$5" attempt_count=0
+
+        IFS= read -r attempt_count < "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        attempt_count=$((attempt_count + 1))
+        printf '%s' "$attempt_count" > "$TEST_GH_API_ATTEMPT_COUNT_FILE"
+        : > "$stdout_file"
+        printf 'Get "https://api.github.test/repos/owner/repo": read tcp 127.0.0.1:443->127.0.0.2:1234: read: connection reset by peer\000attacker\n' > \
+            "$stderr_file"
+        return 1
+    }
+
+    capture_command gh_api_with_retry --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo
+
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed sleeps)" = "" ]
+}
+
+@test "GitHub API stderr size bound is enforced before content scanning" {
+    local stderr_file="$TEST_TMPDIR/oversized-stderr"
+    local tr_marker="$TEST_TMPDIR/tr-invoked" padding
+    local stderr_status transport invalid rate
+
+    cat > "$TEST_TMPDIR/bin/tr" <<'EOF'
 #!/usr/bin/env bash
-state_file="${TEST_TMPDIR:?}/gh-api-count"
-count=0
-[[ -f "$state_file" ]] && read -r count < "$state_file"
-count=$((count + 1))
-printf '%s\n' "$count" > "$state_file"
-if ((count == 1)); then
-    printf 'secondary rate limit; retry-after: 0\n' >&2
-    exit 1
-fi
-printf 'ok\n'
+: > "${TEST_GH_TR_MARKER:?}"
+exit 91
 EOF
-    sleep() {
-        printf 'shadowed sleep called\n' > "$shadow_file"
+    chmod +x "$TEST_TMPDIR/bin/tr"
+    TEST_GH_TR_MARKER="$tr_marker"
+    export TEST_GH_TR_MARKER
+    printf -v padding '%*s' 16387 ''
+    printf '%s' "${padding// /x}" > "$stderr_file"
+
+    __gh_api_parse_stderr__ "$stderr_file" stderr_status transport invalid rate
+
+    [ "$stderr_status" = "" ]
+    [ "$transport" -eq 0 ]
+    [ "$invalid" -eq 1 ]
+    [ ! -e "$tr_marker" ]
+}
+
+@test "gh_api_with_retry requires structured rate evidence and rejects stderr fallback text" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDERR=$'gh: Forbidden (HTTP 403)\n'
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 403\r\nX-RateLimit-Remaining: 0\r\nRetry-After: 0\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: Forbidden (HTTP 403)\n'
+    capture_command gh_api_with_retry --base-delay-seconds 0 --max-delay-seconds 120 -- \
+        repos/owner/repo --include
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDERR=$'gh: You have exceeded a secondary rate limit. Please wait. (HTTP 403)\n'
+    if capture_command gh_api_with_retry --max-delay-seconds 120 -- repos/owner/repo; then
+        :
+    fi
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed sleeps)" = "" ]
+}
+
+@test "gh_api_with_retry honors server minimum delays without jitter or downward clamping" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\nRetry-After: 7\r\n\r\n'
+    capture_command gh_api_with_retry --max-delay-seconds 10 -- repos/owner/repo --include
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed sleeps)" = "7" ]
+    [ "$(gh_api_retry_observed jitter)" = "" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_EPOCH=100
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 429\r\nX-RateLimit-Remaining: 0\r\nX-RateLimit-Reset: 107\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: rate limited (HTTP 429)\n'
+    capture_command gh_api_with_retry --max-delay-seconds 10 -- repos/owner/repo --include
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed sleeps)" = "7" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\nRetry-After: 11\r\n\r\n'
+    capture_command gh_api_with_retry --max-delay-seconds 10 -- repos/owner/repo --include
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed sleeps)" = "" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_EPOCH=100
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 429\r\nRetry-After: 5\r\nX-RateLimit-Remaining: 0\r\nX-RateLimit-Reset: 109\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: rate limited (HTTP 429)\n'
+    capture_command gh_api_with_retry --max-delay-seconds 10 -- repos/owner/repo --include
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed sleeps)" = "9" ]
+    [ "$(gh_api_retry_observed jitter)" = "" ]
+}
+
+@test "gh_api_with_retry applies equal jitter and exponential rate waits without delay headers" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=4
+    capture_command gh_api_with_retry --max-attempts 4 --base-delay-seconds 2 \
+        --max-delay-seconds 5 -- repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed jitter)" = "2,4,5" ]
+    [ "$(gh_api_retry_observed sleeps)" = "1,2,3" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=4
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 429\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: response body text\n'
+    capture_command gh_api_with_retry --max-attempts 4 --max-elapsed-seconds 3600 \
+        --max-delay-seconds 120 -- repos/owner/repo --include
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed sleeps)" = "60,120,120" ]
+    [ "$(gh_api_retry_observed jitter)" = "" ]
+}
+
+@test "GitHub API equal jitter seam always stays within its inclusive half-cap range" {
+    local cap delay lower iteration
+
+    for cap in 0 1 2 3 4 31 120 300; do
+        lower=$(((cap + 1) / 2))
+        for ((iteration = 0; iteration < 25; iteration++)); do
+            __gh_api_jitter_seconds__ delay "$cap"
+            ((delay >= lower))
+            ((delay <= cap))
+        done
+    done
+}
+
+@test "gh_api_with_retry consistently uses the std Bash TERM-KILL timeout backend" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=3
+    std_command_path() {
+        printf 'unexpected timeout discovery: %s\n' "$2" >&2
+        return 99
+    }
+
+    capture_command gh_api_with_retry --max-attempts 3 --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo
+
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 3 ]
+    [ "$(gh_api_retry_observed timeout-paths)" = "empty,empty,empty" ]
+    [[ "$output" != *"unexpected timeout discovery"* ]]
+}
+
+@test "gh_api_with_retry bounds each timeout by the remaining total budget" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_ATTEMPT_DURATION=3
+    capture_command gh_api_with_retry --max-attempts 2 --max-elapsed-seconds 7 \
+        --attempt-timeout-seconds 5 --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo
+    [ "$status" -eq 0 ]
+    [ "$(gh_api_retry_observed timeouts)" = "5,4" ]
+    [ "$(gh_api_retry_observed sleeps)" = "0" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_ATTEMPT_DURATION=3
+    capture_command gh_api_with_retry --max-attempts 2 --max-elapsed-seconds 3 \
+        --attempt-timeout-seconds 5 --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed timeouts)" = "3" ]
+    [ "$(gh_api_retry_observed sleeps)" = "" ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=124
+    TEST_GH_API_ATTEMPT_DURATION=1
+    __gh_api_sleep__() {
+        gh_api_append_observation "$TEST_GH_API_SLEEP_CALLS_FILE" "$1"
+        TEST_GH_API_CLOCK=$((TEST_GH_API_CLOCK + 1))
+    }
+    capture_command gh_api_with_retry --max-attempts 2 --max-elapsed-seconds 2 \
+        --attempt-timeout-seconds 2 --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo
+    [ "$status" -eq 124 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [ "$(gh_api_retry_observed timeouts)" = "2" ]
+}
+
+@test "gh_api_with_retry preserves the last gh status when clock sleep or jitter seams fail" {
+    local clock_reads=0
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=73
+    __gh_api_monotonic_seconds__() {
+        clock_reads=$((clock_reads + 1))
+        ((clock_reads == 4)) && return 1
+        printf -v "$1" '%s' "$TEST_GH_API_CLOCK"
+    }
+    capture_command gh_api_with_retry --max-attempts 3 --base-delay-seconds 0 \
+        --max-delay-seconds 1 -- repos/owner/repo
+    [ "$status" -eq 73 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=74
+    __gh_api_sleep__() { return 1; }
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 74 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_FAILURE_STATUS=75
+    __gh_api_jitter_seconds__() { return 1; }
+    capture_command gh_api_with_retry repos/owner/repo
+    [ "$status" -eq 75 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+}
+
+@test "gh_api_with_retry replays final binary channels exactly and cleans mode-0600 captures" {
+    local actual_stdout="$TEST_TMPDIR/actual.stdout" actual_stderr="$TEST_TMPDIR/actual.stderr"
+    local expected_stdout="$TEST_TMPDIR/expected.stdout" expected_stderr="$TEST_TMPDIR/expected.stderr"
+    local capture_dir="$TEST_TMPDIR/captures" rc
+
+    install_gh_api_retry_fixture
+    mkdir -p "$capture_dir"
+    TMPDIR="$capture_dir"
+    gh() { return 0; }
+    __gh_api_monotonic_seconds__() { printf -v "$1" '%s' 0; }
+    __gh_api_attempt__() {
+        local stdout_file="$4" stderr_file="$5"
+        local capture_mode
+        if capture_mode="$(stat -f '%Lp' "$stdout_file" 2>/dev/null)"; then
+            printf '%s' "$capture_mode" > "$TEST_GH_API_CAPTURE_MODE_FILE"
+        else
+            capture_mode="$(stat -c '%a' "$stdout_file")"
+            printf '%s' "$capture_mode" > "$TEST_GH_API_CAPTURE_MODE_FILE"
+        fi
+        printf 'HTTP/2.0 200 OK\r\n\r\nout\0value\n\n' > "$stdout_file"
+        printf 'err\0value' > "$stderr_file"
         return 0
     }
 
-    capture_command gh_api_with_retry repos/owner/repo --jq .name
+    if gh_api_with_retry --sensitive --safe-display "binary API read" -- \
+        repos/owner/repo > "$actual_stdout" 2> "$actual_stderr"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    printf 'out\0value\n\n' > "$expected_stdout"
+    printf 'err\0value' > "$expected_stderr"
 
-    unset -f sleep
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"ok"* ]]
-    [ ! -e "$shadow_file" ]
+    [ "$rc" -eq 0 ]
+    [ "$(gh_api_retry_observed capture-mode)" = "600" ]
+    cmp "$expected_stdout" "$actual_stdout"
+    cmp "$expected_stderr" "$actual_stderr"
+    [ -z "$(find "$capture_dir" -type f -print -quit)" ]
+
+    __gh_api_attempt__() {
+        local stdout_file="$4" stderr_file="$5"
+        printf 'HTTP/2.0 400 Bad Request\r\n\r\nfailed-out\0value\n\n' > "$stdout_file"
+        printf 'failed-err\0value' > "$stderr_file"
+        return 73
+    }
+    log_warn() { printf 'warn:%s\n' "${*: -1}" >> "$TEST_TMPDIR/separate.log"; }
+    log_error() { printf 'error:%s\n' "${*: -1}" >> "$TEST_TMPDIR/separate.log"; }
+    if gh_api_with_retry repos/owner/repo > "$actual_stdout" 2> "$actual_stderr"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    printf 'failed-out\0value\n\n' > "$expected_stdout"
+    printf 'failed-err\0value' > "$expected_stderr"
+
+    [ "$rc" -eq 73 ]
+    cmp "$expected_stdout" "$actual_stdout"
+    cmp "$expected_stderr" "$actual_stderr"
+    [ -z "$(find "$capture_dir" -type f -print -quit)" ]
 }
 
-@test "gh_api_with_retry preserves non-retryable failures" {
-    create_fake_gh <<'EOF'
+@test "GitHub API capture guardian completes workspace cleanup before normal shutdown returns" {
+    local workspace="" guardian_pid="" guardian_fd=""
+
+    std_make_temp_dir --keep workspace base-bash-libs-gh-api
+    chmod 700 "$workspace"
+    mkfifo "$workspace/guardian"
+    chmod 600 "$workspace/guardian"
+    __gh_api_start_capture_guardian__ guardian_pid guardian_fd "$BASHPID" \
+        "$workspace"
+    : > "$workspace/stdout"
+    : > "$workspace/stderr"
+    chmod 600 "$workspace/stdout" "$workspace/stderr"
+    /bin/sleep 1.2
+    [ -d "$workspace" ]
+
+    __gh_api_stop_capture_guardian__ "$guardian_pid" "$guardian_fd"
+
+    [ ! -e "$workspace" ]
+}
+
+@test "GitHub API capture guardian removes its workspace after owner SIGKILL" {
+    local workspace="$TEST_TMPDIR/guardian-owner-workspace"
+    local ready_file="$TEST_TMPDIR/guardian-owner-ready"
+    local child_pid_file="$TEST_TMPDIR/guardian-owner-child"
+    local owner_pid child_pid probe rc=0 workspace_removed=0 child_alive=0
+
+    (
+        local guardian_pid="" guardian_fd=""
+
+        mkdir "$workspace"
+        chmod 700 "$workspace"
+        mkfifo "$workspace/guardian"
+        chmod 600 "$workspace/guardian"
+        __gh_api_start_capture_guardian__ guardian_pid guardian_fd "$BASHPID" \
+            "$workspace" || exit 91
+        : > "$workspace/stdout"
+        : > "$workspace/stderr"
+        chmod 600 "$workspace/stdout" "$workspace/stderr"
+        /bin/sleep 30 &
+        printf '%s\n' "$!" > "$child_pid_file"
+        : > "$ready_file"
+        kill -KILL "$BASHPID"
+    ) &
+    owner_pid=$!
+    for ((probe = 0; probe < 200; probe++)); do
+        [[ -e "$ready_file" ]] && break
+        /bin/sleep 0.01
+    done
+    [[ -e "$ready_file" ]] || {
+        kill -KILL "$owner_pid" 2>/dev/null || true
+        wait "$owner_pid" 2>/dev/null || true
+        return 1
+    }
+    wait "$owner_pid" 2>/dev/null || rc=$?
+    [ "$rc" -eq 137 ]
+    IFS= read -r child_pid < "$child_pid_file"
+    for ((probe = 0; probe < 200; probe++)); do
+        [[ ! -e "$workspace" ]] && break
+        /bin/sleep 0.01
+    done
+    [[ ! -e "$workspace" ]] && workspace_removed=1
+    kill -0 "$child_pid" 2>/dev/null && child_alive=1
+    kill -KILL "$child_pid" 2>/dev/null || true
+
+    [ "$workspace_removed" -eq 1 ]
+    [ "$child_alive" -eq 1 ]
+}
+
+@test "gh_api_with_retry reports broken-pipe replay failure and still cleans captures" {
+    local script="$TEST_TMPDIR/gh-api-epipe.sh"
+    local capture_dir="$TEST_TMPDIR/epipe-captures"
+    local status_file="$TEST_TMPDIR/epipe-status"
+
+    mkdir -p "$capture_dir"
+    cat > "$script" <<'EOF'
 #!/usr/bin/env bash
-printf 'not found\n' >&2
-exit 4
+source "$1"
+source "$2"
+TMPDIR="$3"
+STATUS_FILE="$4"
+gh() { return 0; }
+__gh_api_attempt__() {
+    local stdout_file="$4" stderr_file="$5" index
+    : > "$stderr_file"
+    printf 'HTTP/2.0 200 OK\r\n\r\n' > "$stdout_file"
+    for ((index = 0; index < 4096; index++)); do
+        printf '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n'
+    done >> "$stdout_file"
+    return 0
+}
+set -o pipefail
+gh_api_with_retry repos/owner/repo 2>/dev/null | head -n 0 >/dev/null
+pipeline_status=$?
+set +o pipefail
+printf '%s' "$pipeline_status" > "$STATUS_FILE"
+exit 0
 EOF
+    chmod +x "$script"
 
-    capture_command gh_api_with_retry repos/owner/missing
+    bats_run "$BASH" "$script" \
+        "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" \
+        "$capture_dir" "$status_file"
 
-    [ "$status" -eq 4 ]
-    [[ "$output" == *"not found"* ]]
-    [[ "$output" != *"retrying"* ]]
+    [ "$status" -eq 0 ]
+    [ "$(cat "$status_file")" -ne 0 ]
+    [ -z "$(find "$capture_dir" -type f -print -quit)" ]
+}
+
+@test "gh_api_with_retry preserves caller EXIT trap and cleans captures after managed command exit" {
+    local script="$TEST_TMPDIR/gh-api-abrupt-exit.sh"
+    local capture_dir="$TEST_TMPDIR/abrupt-captures"
+    local trap_marker="$TEST_TMPDIR/caller-exit-trap-ran"
+    local status_file="$TEST_TMPDIR/abrupt-status"
+
+    mkdir -p "$capture_dir"
+    cat > "$script" <<'EOF'
+#!/usr/bin/env bash
+set -u
+source "$1"
+source "$2"
+TMPDIR="$3"
+TRAP_MARKER="$4"
+STATUS_FILE="$5"
+trap 'printf preserved > "$TRAP_MARKER"' EXIT
+gh() { exit 77; }
+gh_api_with_retry repos/owner/repo >/dev/null 2>/dev/null
+printf '%s' "$?" > "$STATUS_FILE"
+exit 0
+EOF
+    chmod +x "$script"
+
+    bats_run "$BASH" "$script" \
+        "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" \
+        "$capture_dir" "$trap_marker" "$status_file"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$status_file")" = "77" ]
+    [ "$(cat "$trap_marker")" = "preserved" ]
+    [ -z "$(find "$capture_dir" -type f -print -quit)" ]
+}
+
+@test "gh_api_with_retry removes sensitive captures when terminated during retry backoff" {
+    local capture_dir="$TEST_TMPDIR/signal-captures"
+    local sleep_pid_file="$TEST_TMPDIR/retry-sleep.pid" ready_file="$TEST_TMPDIR/retry-sleep.ready"
+    local call_pid sleep_pid rc=0 probe start_time
+
+    mkdir -p "$capture_dir"
+    TMPDIR="$capture_dir"
+    gh() { return 0; }
+    __gh_api_monotonic_seconds__() { printf -v "$1" '%s' 0; }
+    __gh_api_jitter_seconds__() { printf -v "$1" '%s' 2; }
+    __gh_api_attempt__() {
+        local stdout_file="$4" stderr_file="$5"
+        printf 'HTTP/2.0 503 Service Unavailable\r\n\r\nsecret=signal-canary\n' > "$stdout_file"
+        printf 'transient transport context\n' > "$stderr_file"
+        return 75
+    }
+    __gh_api_sleep__() {
+        /bin/sleep 30 &
+        printf '%s\n' "$!" > "$sleep_pid_file"
+        : > "$ready_file"
+        wait "$!"
+    }
+
+    start_time=$SECONDS
+    gh_api_with_retry --max-attempts 2 --max-delay-seconds 2 -- \
+        repos/owner/repo >/dev/null 2>/dev/null &
+    call_pid=$!
+    for ((probe = 0; probe < 100; probe++)); do
+        [[ -e "$ready_file" ]] && break
+        /bin/sleep 0.01
+    done
+    [[ -e "$ready_file" && -s "$sleep_pid_file" ]] || {
+        kill -KILL "$call_pid" 2>/dev/null || true
+        wait "$call_pid" 2>/dev/null || true
+        return 1
+    }
+    IFS= read -r sleep_pid < "$sleep_pid_file"
+    kill -TERM "$call_pid"
+    if wait "$call_pid"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 143 ]
+    [ "$((SECONDS - start_time))" -le 3 ]
+    ! kill -0 "$sleep_pid" 2>/dev/null
+    [ -z "$(find "$capture_dir" -type f -print -quit)" ]
+}
+
+@test "gh_api_with_retry protected failures hide captured output argv and persistent-log canaries" {
+    local secret="gh-api-retry-secret-canary"
+    local primary_log="$TEST_TMPDIR/gh-api-sensitive.log"
+    local primary_content
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STATUS=29
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\n\r\n'"captured=$secret"$'\n'
+    TEST_GH_API_FAILURE_STDERR="gh: captured=$secret"$'\n'
+    BASE_CLI_PRIMARY_LOG="$primary_log"
+
+    if capture_command gh_api_with_retry --sensitive --safe-display "rotate deployment key" \
+        --retry-policy replay-safe \
+        --max-attempts 2 --base-delay-seconds 0 --max-delay-seconds 1 -- \
+        repos/owner/repo --include --header "Authorization: Bearer $secret" \
+        --raw-field "token=$secret"; then
+        :
+    fi
+
+    [ "$status" -eq 29 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 2 ]
+    [[ "$output" == *"rotate deployment key [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"captured output hidden"* ]]
+    [[ "$output" != *"$secret"* ]]
+    primary_content="$(cat "$primary_log")"
+    [[ "$primary_content" != *"$secret"* ]]
+}
+
+@test "gh_api_with_retry final diagnostics report safe method HTTP attempt elapsed and budget context" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STATUS=255
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2 503\r\n\r\n'
+    TEST_GH_API_FAILURE_STDERR=$'gh: response body text\n'
+
+    if capture_command gh_api_with_retry --sensitive --safe-display "publish deployment" \
+        --retry-policy replay-safe --max-attempts 1 -- \
+        repos/owner/repo --include --method POST; then
+        :
+    fi
+
+    [ "$status" -eq 255 ]
+    [[ "$output" == *"publish deployment [sensitive GitHub operation; arguments hidden]"* ]]
+    [[ "$output" == *"method=POST"* || "$output" == *"method POST"* ]]
+    [[ "$output" == *"HTTP 503"* || "$output" == *"http=503"* ]]
+    [[ "$output" == *"attempt 1 of 1"* || "$output" == *"attempt=1/1"* ]]
+    [[ "$output" == *"elapsed"* ]]
+    [[ "$output" == *"budget"* ]]
+}
+
+@test "gh_api_with_retry preserves final statuses 1 2 4 124 and 255 without a final sleep" {
+    local expected_status
+
+    for expected_status in 1 2 4 124 255; do
+        install_gh_api_retry_fixture
+        TEST_GH_API_SUCCESS_AFTER=99
+        TEST_GH_API_FAILURE_STATUS="$expected_status"
+        if capture_command gh_api_with_retry --max-attempts 1 -- repos/owner/repo; then
+            :
+        fi
+        [ "$status" -eq "$expected_status" ]
+        [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+        [ "$(gh_api_retry_observed sleeps)" = "" ]
+    done
 }
 
 @test "gh_api_with_retry captures failures under set -e" {
@@ -839,7 +1891,7 @@ EOF
 
     create_fake_gh <<'EOF'
 #!/usr/bin/env bash
-printf 'not found\n' >&2
+printf 'gh: Not Found (HTTP 404)\n' >&2
 exit 4
 EOF
     cat > "$script" <<EOF
@@ -856,6 +1908,32 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 4 ]
-    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"Not Found"* ]]
     [[ "$output" != *"after"* ]]
+}
+
+@test "gh_api_with_retry works under noclobber and preserves that caller option" {
+    create_fake_gh <<'EOF'
+#!/usr/bin/env bash
+include=0
+for arg in "$@"; do
+    [[ "$arg" == --include ]] && include=1
+done
+((include == 0)) || printf 'HTTP/2.0 200 OK\r\n\r\n'
+printf 'noclobber-body\n'
+EOF
+
+    bats_run "$BASH" -c '
+        source "$1"
+        source "$2"
+        set -C
+        value="$(gh_api_with_retry --max-attempts 1 -- repos/owner/repo)" || exit $?
+        [[ -o noclobber ]] || exit 91
+        printf "value=%s\nnoclobber=on\n" "$value"
+    ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"value=noclobber-body"* ]]
+    [[ "$output" == *"noclobber=on"* ]]
+    [[ "$output" != *"cannot overwrite existing file"* ]]
 }

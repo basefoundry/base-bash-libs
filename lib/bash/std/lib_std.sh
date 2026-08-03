@@ -1575,7 +1575,9 @@ __std_run_with_timeout_fallback__() {
 
     std_make_temp_file timeout_marker base-bash-libs-timeout || return 1
 
-    if std_command_path command_path "${1-}" && [[ -n "$command_path" ]] && std_command_path setsid_path setsid; then
+    if ! declare -F -- "${1-}" >/dev/null &&
+        std_command_path command_path "${1-}" &&
+        [[ -n "$command_path" ]] && std_command_path setsid_path setsid; then
         "$setsid_path" "$@" &
         process_group=1
     else
@@ -2086,6 +2088,12 @@ std_make_temp_dir() {
     __std_make_temp_path__ std_make_temp_dir dir "$@"
 }
 
+# Private counterpart for reserved implementation-local result variables.
+# Public named-output helpers continue to reject the `__` namespace.
+__std_make_internal_temp_dir__() {
+    __std_make_temp_path__ __std_make_internal_temp_dir__ dir "$@"
+}
+
 ####################################################### ASSERTIONS ####################################################
 
 __is_valid_variable_name__() {
@@ -2099,9 +2107,14 @@ __std_assert_writable_output__() {
     local __std_output_declaration __std_output_attributes
 
     if [[ "$__std_output_name" == __* ]]; then
-        log_error -l base_bash_libs.std \
-            "$__std_output_function_name: result variable '$__std_output_name' uses the reserved '__' internal namespace."
-        return 1
+        case "$__std_output_function_name" in
+            __std_make_internal_temp_dir__) ;;
+            *)
+                log_error -l base_bash_libs.std \
+                    "$__std_output_function_name: result variable '$__std_output_name' uses the reserved '__' internal namespace."
+                return 1
+                ;;
+        esac
     fi
 
     __std_output_declaration="$(declare -p "$__std_output_name" 2>/dev/null || true)"

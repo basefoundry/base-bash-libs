@@ -19,12 +19,21 @@ and versions are tracked in the repo-root `VERSION` file.
   and GitHub helpers, allowing callers to publish a safe operation label while
   keeping protected argument values out of dry-run, retry, timeout, and final
   failure records.
+- Made GitHub API retries read-only by default, requiring an explicit
+  replay-safety policy for mutation-capable requests while bounding attempts,
+  per-attempt execution, elapsed time, server-directed waits, and jittered
+  exponential backoff.
+- Authenticated retry decisions from bounded HTTP response headers or narrowly
+  matched GitHub CLI transport errors, preventing response bodies and stderr
+  fragments from spoofing retryable status or rate-limit evidence.
 
 ### Fixed
 
 - Hardened file-section processing, allowed-dirty-path checks, temporary
   directory normalization, launcher symlink resolution, and pass-by-name output
   handling in post-v1.4.0 development.
+- Preserved normal Bash command resolution in the timeout fallback when a shell
+  function shares its name with an external executable.
 
 ### Documentation
 
