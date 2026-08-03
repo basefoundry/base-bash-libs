@@ -1543,75 +1543,580 @@ __std_sleep_interval__() {
     fi
 }
 
-__std_signal_process_tree__() {
-    local signal="$1" root_pid="$2" process_group="$3"
-    local pgrep_path ps_path child_pid child_pids=""
+__std_timeout_process_group_ids__() {
+    local __std_timeout_group_ps="$1" __std_timeout_group_pid="$2"
+    local __std_timeout_group_pgid_name="$3" __std_timeout_group_tpgid_name="$4"
+    local __std_timeout_group_output __std_timeout_group_pgid
+    local __std_timeout_group_tpgid __std_timeout_group_extra
 
-    if ((process_group)); then
-        kill "-$signal" -- "-$root_pid" 2>/dev/null || true
-        return 0
+    __std_timeout_group_output="$(
+        "$__std_timeout_group_ps" -o pgid= -o tpgid= -p \
+            "$__std_timeout_group_pid" 2>/dev/null
+    )" || return 1
+    read -r __std_timeout_group_pgid __std_timeout_group_tpgid \
+        __std_timeout_group_extra <<< "$__std_timeout_group_output"
+    [[ "$__std_timeout_group_pgid" =~ ^[1-9][0-9]*$ &&
+        "$__std_timeout_group_tpgid" =~ ^[1-9][0-9]*$ &&
+        -z "$__std_timeout_group_extra" ]] || return 1
+    printf -v "$__std_timeout_group_pgid_name" '%s' "$__std_timeout_group_pgid"
+    printf -v "$__std_timeout_group_tpgid_name" '%s' "$__std_timeout_group_tpgid"
+}
+
+# Recursively STOP every process visible in one process-table snapshot. The
+# dynamically scoped arrays belong to __std_timeout_signal_pid_tree__. A
+# stopped parent cannot fork; repeated complete snapshots converge on children
+# that were racing with an earlier STOP delivery.
+__std_timeout_freeze_pid_tree_visit__() {
+    local __std_timeout_tree_visit_pid="$1"
+    local __std_timeout_tree_candidate __std_timeout_tree_parent
+    local __std_timeout_tree_extra
+
+    [[ "$__std_timeout_tree_visit_pid" =~ ^[1-9][0-9]*$ ]] || return 0
+    kill -STOP "$__std_timeout_tree_visit_pid" 2>/dev/null || return 0
+    if [[ -z "${__std_timeout_tree_seen[$__std_timeout_tree_visit_pid]+present}" ]]; then
+        __std_timeout_tree_seen["$__std_timeout_tree_visit_pid"]=1
+        __std_timeout_tree_order+=("$__std_timeout_tree_visit_pid")
+        __std_timeout_tree_changed=1
+        printf '%s\n' "$__std_timeout_tree_visit_pid" >> \
+            "$__std_timeout_tree_snapshot_file" 2>/dev/null || true
     fi
 
-    if std_command_path pgrep_path pgrep; then
-        child_pids="$($pgrep_path -P "$root_pid" 2>/dev/null || true)"
-    fi
-    if [[ -z "$child_pids" ]] && std_command_path ps_path ps; then
-        child_pids="$($ps_path -eo pid=,ppid= 2>/dev/null | awk -v parent="$root_pid" '$2 == parent {print $1}' || true)"
-    fi
-    while IFS= read -r child_pid; do
-        [[ -n "$child_pid" ]] || continue
-        __std_signal_process_tree__ "$signal" "$child_pid" 0
-    done <<< "$child_pids"
+    while read -r __std_timeout_tree_candidate __std_timeout_tree_parent \
+        __std_timeout_tree_extra; do
+        [[ "$__std_timeout_tree_candidate" =~ ^[1-9][0-9]*$ &&
+            "$__std_timeout_tree_parent" =~ ^[1-9][0-9]*$ &&
+            -z "$__std_timeout_tree_extra" ]] || continue
+        [[ "$__std_timeout_tree_parent" == "$__std_timeout_tree_visit_pid" ]] ||
+            continue
+        __std_timeout_freeze_pid_tree_visit__ "$__std_timeout_tree_candidate"
+    done <<< "$__std_timeout_tree_process_snapshot"
+}
 
-    kill "-$signal" "$root_pid" 2>/dev/null || true
+__std_timeout_signal_pid_tree__() {
+    local __std_timeout_tree_signal="$1" __std_timeout_tree_root="$2"
+    local __std_timeout_tree_ps="$3"
+    local __std_timeout_tree_snapshot_file="$4"
+    local __std_timeout_tree_process_snapshot="" __std_timeout_tree_pid
+    local __std_timeout_tree_index __std_timeout_tree_pass
+    local __std_timeout_tree_changed=0
+    local -a __std_timeout_tree_order=()
+    local -A __std_timeout_tree_seen=()
+
+    # A prior graceful pass may have processes that reparented before KILL.
+    # Retain those exact PIDs for the one-second escalation window.
+    if [[ -r "$__std_timeout_tree_snapshot_file" ]]; then
+        while IFS= read -r __std_timeout_tree_pid; do
+            [[ "$__std_timeout_tree_pid" =~ ^[1-9][0-9]*$ ]] || continue
+            if [[ -z "${__std_timeout_tree_seen[$__std_timeout_tree_pid]+present}" ]]; then
+                __std_timeout_tree_seen["$__std_timeout_tree_pid"]=1
+                __std_timeout_tree_order+=("$__std_timeout_tree_pid")
+            fi
+        done < "$__std_timeout_tree_snapshot_file"
+    fi
+
+    if kill -STOP "$__std_timeout_tree_root" 2>/dev/null; then
+        if [[ -z "${__std_timeout_tree_seen[$__std_timeout_tree_root]+present}" ]]; then
+            __std_timeout_tree_seen["$__std_timeout_tree_root"]=1
+            __std_timeout_tree_order+=("$__std_timeout_tree_root")
+            printf '%s\n' "$__std_timeout_tree_root" >> \
+                "$__std_timeout_tree_snapshot_file" 2>/dev/null || true
+        fi
+        for ((__std_timeout_tree_pass = 0;
+            __std_timeout_tree_pass < 32;
+            __std_timeout_tree_pass++)); do
+            __std_timeout_tree_process_snapshot="$(
+                "$__std_timeout_tree_ps" -eo pid=,ppid= 2>/dev/null
+            )" || break
+            __std_timeout_tree_changed=0
+            __std_timeout_freeze_pid_tree_visit__ "$__std_timeout_tree_root"
+            ((__std_timeout_tree_changed == 0)) && break
+        done
+    fi
+
+    # Discovery order is parent-first, so reverse order signals children
+    # before their parents. This keeps the ancestry stable through traversal.
+    for ((__std_timeout_tree_index = ${#__std_timeout_tree_order[@]} - 1;
+        __std_timeout_tree_index >= 0;
+        __std_timeout_tree_index--)); do
+        kill "-$__std_timeout_tree_signal" \
+            "${__std_timeout_tree_order[$__std_timeout_tree_index]}" \
+            2>/dev/null || true
+    done
+    if [[ "$__std_timeout_tree_signal" != KILL ]]; then
+        for ((__std_timeout_tree_index = ${#__std_timeout_tree_order[@]} - 1;
+            __std_timeout_tree_index >= 0;
+            __std_timeout_tree_index--)); do
+            kill -CONT "${__std_timeout_tree_order[$__std_timeout_tree_index]}" \
+                2>/dev/null || true
+        done
+    fi
+}
+
+__std_timeout_command_wrapper__() {
+    local __std_timeout_wrapper_status=0 __std_timeout_wrapper_cancel_status=0
+    local __std_timeout_wrapper_child_pid=""
+
+    # This shell is a quiet process-group sentinel. The actual argv runs as a
+    # child in the same group; signal traps let the sentinel return normally
+    # while the supervisor finishes TERM/KILL escalation for descendants.
+    trap - EXIT
+    trap '__std_timeout_wrapper_cancel_status=129' HUP
+    trap '__std_timeout_wrapper_cancel_status=130' INT
+    trap '__std_timeout_wrapper_cancel_status=131' QUIT
+    trap '__std_timeout_wrapper_cancel_status=143' TERM
+    if [[ -n "${__std_timeout_timer_fd-}" ]]; then
+        exec {__std_timeout_timer_fd}>&-
+    fi
+    if ((__std_timeout_foreground_handshake)); then
+        printf 'ready\n' >| "$__std_timeout_ready_file" || return 1
+        kill -STOP "$BASHPID" || return 1
+        if ((__std_timeout_wrapper_cancel_status != 0)); then
+            printf '%s\n' "$__std_timeout_wrapper_cancel_status" >| \
+                "$__std_timeout_status_file" || return 1
+            return "$__std_timeout_wrapper_cancel_status"
+        fi
+    fi
+    if ((__std_timeout_wrapper_cancel_status != 0)); then
+        printf '%s\n' "$__std_timeout_wrapper_cancel_status" >| \
+            "$__std_timeout_status_file" || return 1
+        return "$__std_timeout_wrapper_cancel_status"
+    fi
+    # Keep argv as an asynchronous child of the sentinel. It shares either the
+    # sentinel's isolated group or the caller's TTY group, selected before this
+    # wrapper was launched. Waiting through a shell builtin lets the sentinel
+    # process signals while resistant descendants remain available for KILL
+    # escalation.
+    set +m
+    if ((__std_timeout_has_stdin)); then
+        "${__std_timeout_command_argv[@]}" <&0 &
+    else
+        "${__std_timeout_command_argv[@]}" <&- &
+    fi
+    __std_timeout_wrapper_child_pid=$!
+    while :; do
+        if wait "$__std_timeout_wrapper_child_pid" 2>/dev/null; then
+            __std_timeout_wrapper_status=0
+            break
+        else
+            __std_timeout_wrapper_status=$?
+        fi
+        # A trapped signal interrupts wait. Keep this stable ancestor alive
+        # until argv exits or the supervisor completes KILL escalation.
+        kill -0 "$__std_timeout_wrapper_child_pid" 2>/dev/null || break
+    done
+    if ((__std_timeout_wrapper_cancel_status != 0)); then
+        __std_timeout_wrapper_status="$__std_timeout_wrapper_cancel_status"
+    fi
+    printf '%s\n' "$__std_timeout_wrapper_status" >| "$__std_timeout_status_file" || return 1
+    return "$__std_timeout_wrapper_status"
+}
+
+__std_cancel_timeout_watchdog__() {
+    local __std_timeout_watchdog_pid="$1"
+
+    # Kill the whole watchdog group before reaping its leader, then repeat
+    # after wait.  The second kill closes the fork race where the watchdog
+    # starts its external sleep just as the first signal is delivered: once
+    # the leader is reaped, no new member can join the group.
+    kill -KILL -- "-$__std_timeout_watchdog_pid" 2>/dev/null || true
+    wait "$__std_timeout_watchdog_pid" 2>/dev/null || true
+    kill -KILL -- "-$__std_timeout_watchdog_pid" 2>/dev/null || true
+}
+
+__std_cancel_timeout_tree_watchdog__() {
+    local __std_timeout_watchdog_pid="$1" __std_timeout_watchdog_fd="$2"
+
+    { printf 'x' >&"$__std_timeout_watchdog_fd"; } 2>/dev/null || true
+    wait "$__std_timeout_watchdog_pid" 2>/dev/null || true
 }
 
 __std_run_with_timeout_fallback__() {
-    local timeout_seconds="$1"
+    local __std_timeout_seconds="$1"
     shift
-    local timeout_marker command_pid timer_pid command_status
-    local command_path setsid_path process_group=0
-    local kill_grace_seconds=1
+    local __std_timeout_marker="" __std_timeout_status_file=""
+    local __std_timeout_ready_file="" __std_timeout_tree_snapshot_file=""
+    local __std_timeout_final_status=1 __std_timeout_kill_grace=1
+    local __std_timeout_command_pid="" __std_timeout_timer_pid=""
+    local __std_timeout_timer_fd=""
+    local __std_timeout_run_status=1 __std_timeout_cancel_status=0
+    local __std_timeout_cancel_signal=""
+    local __std_timeout_stdin_fd="" __std_timeout_tty_fd="" __std_timeout_job_line
+    local __std_timeout_ps_path="" __std_timeout_caller_pgid=""
+    local __std_timeout_caller_tpgid=""
+    local __std_timeout_job_snapshot __std_timeout_command_job=""
+    local __std_timeout_saved_hup_trap __std_timeout_saved_int_trap
+    local __std_timeout_saved_quit_trap __std_timeout_saved_term_trap
+    local __std_timeout_hup_ignored=0 __std_timeout_int_ignored=0
+    local __std_timeout_quit_ignored=0 __std_timeout_term_ignored=0
+    local __std_timeout_monitor_was_enabled=0
+    local __std_timeout_child_status=""
+    local __std_timeout_has_stdin=0 __std_timeout_foreground_handshake=0
+    local __std_timeout_use_pid_tree=0 __std_timeout_tty_owner_checked=0
+    local __std_timeout_handshake_probe=0 __std_timeout_setup_failed=0
+    local __std_timeout_status_re='^([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+    local -a __std_timeout_command_argv=("$@")
 
-    std_make_temp_file timeout_marker base-bash-libs-timeout || return 1
+    # These files are owned by this invocation and removed below on every
+    # managed return path.  Do not register them with the shared EXIT
+    # dispatcher: installing and restoring an inherited EXIT trap inside a
+    # command substitution makes Bash execute that caller-owned trap when the
+    # substitution exits.
+    __std_make_internal_temp_file__ \
+        --keep __std_timeout_marker base-bash-libs-timeout || return 1
+    if ! __std_make_internal_temp_file__ \
+        --keep __std_timeout_status_file base-bash-libs-timeout-status; then
+        rm -f -- "$__std_timeout_marker"
+        return 1
+    fi
+    if ! __std_make_internal_temp_file__ \
+        --keep __std_timeout_ready_file base-bash-libs-timeout-ready; then
+        rm -f -- "$__std_timeout_marker" "$__std_timeout_status_file"
+        return 1
+    fi
+    if ! __std_make_internal_temp_file__ \
+        --keep __std_timeout_tree_snapshot_file base-bash-libs-timeout-tree; then
+        rm -f -- "$__std_timeout_marker" "$__std_timeout_status_file" \
+            "$__std_timeout_ready_file"
+        return 1
+    fi
 
-    if ! declare -F -- "${1-}" >/dev/null &&
-        std_command_path command_path "${1-}" &&
-        [[ -n "$command_path" ]] && std_command_path setsid_path setsid; then
-        "$setsid_path" "$@" &
-        process_group=1
+    [[ $- == *m* ]] && __std_timeout_monitor_was_enabled=1
+    __std_timeout_saved_hup_trap="$(trap -p HUP || true)"
+    __std_timeout_saved_int_trap="$(trap -p INT || true)"
+    __std_timeout_saved_quit_trap="$(trap -p QUIT || true)"
+    __std_timeout_saved_term_trap="$(trap -p TERM || true)"
+    [[ "$__std_timeout_saved_hup_trap" == "trap -- '' SIGHUP" ]] &&
+        __std_timeout_hup_ignored=1
+    [[ "$__std_timeout_saved_int_trap" == "trap -- '' SIGINT" ]] &&
+        __std_timeout_int_ignored=1
+    [[ "$__std_timeout_saved_quit_trap" == "trap -- '' SIGQUIT" ]] &&
+        __std_timeout_quit_ignored=1
+    [[ "$__std_timeout_saved_term_trap" == "trap -- '' SIGTERM" ]] &&
+        __std_timeout_term_ignored=1
+
+    # Job control gives the command (including a Bash function) a distinct
+    # process group without resolving it through PATH. Preserve an open stdin
+    # explicitly so Bash does not replace it with /dev/null for an asynchronous
+    # command; a caller-closed descriptor remains closed. When fd 0 is the
+    # caller-owned foreground terminal and process enumeration works, keep the
+    # wrapper in that foreground group so the main shell remains responsive to
+    # direct signals. That TTY-only branch supervises a frozen PID tree. Other
+    # calls retain isolated process-group enforcement. Opening /dev/tty also
+    # distinguishes a usable controlling terminal from an unrelated tty fd.
+    if [[ -e /dev/fd/0 ]]; then
+        if { exec {__std_timeout_stdin_fd}<&0; } 2>/dev/null; then
+            __std_timeout_has_stdin=1
+        else
+            __std_timeout_setup_failed=1
+        fi
+    fi
+    if ((__std_timeout_has_stdin)) && [[ -t 0 ]]; then
+        if { exec {__std_timeout_tty_fd}</dev/tty; } 2>/dev/null; then
+            __std_timeout_ps_path="$(type -P ps 2>/dev/null || true)"
+            if [[ -n "$__std_timeout_ps_path" && -x "$__std_timeout_ps_path" ]] &&
+                "$__std_timeout_ps_path" -eo pid=,ppid= >/dev/null 2>&1 &&
+                __std_timeout_process_group_ids__ "$__std_timeout_ps_path" \
+                    "$BASHPID" __std_timeout_caller_pgid \
+                    __std_timeout_caller_tpgid; then
+                __std_timeout_tty_owner_checked=1
+                if [[ "$__std_timeout_caller_pgid" == \
+                    "$__std_timeout_caller_tpgid" ]]; then
+                    __std_timeout_use_pid_tree=1
+                fi
+            fi
+            if ((__std_timeout_use_pid_tree)); then
+                exec {__std_timeout_tty_fd}<&-
+                __std_timeout_tty_fd=""
+            elif ((!__std_timeout_tty_owner_checked)); then
+                __std_timeout_foreground_handshake=1
+                exec {__std_timeout_tty_fd}<&-
+                __std_timeout_tty_fd=""
+            else
+                exec {__std_timeout_tty_fd}<&-
+                __std_timeout_tty_fd=""
+            fi
+        fi
+    fi
+    if ((__std_timeout_use_pid_tree)); then
+        if ! rm -f -- "$__std_timeout_ready_file" 2>/dev/null ||
+            ! command mkfifo "$__std_timeout_ready_file" 2>/dev/null ||
+            ! command chmod 600 "$__std_timeout_ready_file" 2>/dev/null ||
+            ! exec {__std_timeout_timer_fd}<>"$__std_timeout_ready_file"; then
+            __std_timeout_setup_failed=1
+        elif ! rm -f -- "$__std_timeout_ready_file" 2>/dev/null; then
+            exec {__std_timeout_timer_fd}>&-
+            __std_timeout_timer_fd=""
+            __std_timeout_setup_failed=1
+        fi
+    fi
+
+    if ((__std_timeout_setup_failed)); then
+        __std_timeout_final_status=1
     else
-        "$@" &
+        if ((__std_timeout_use_pid_tree)); then
+            set +m
+        else
+            set -m
+        fi
+        if ((__std_timeout_has_stdin)); then
+            __std_timeout_command_wrapper__ <&"$__std_timeout_stdin_fd" &
+        else
+            __std_timeout_command_wrapper__ <&- &
+        fi
+        __std_timeout_command_pid=$!
+        if ((__std_timeout_has_stdin)); then
+            exec {__std_timeout_stdin_fd}<&-
+            __std_timeout_stdin_fd=""
+        fi
+
+        if ((__std_timeout_hup_ignored)); then
+            trap '' HUP
+        elif ((__std_timeout_use_pid_tree)); then
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=HUP; __std_timeout_cancel_status=129; }; __std_timeout_signal_pid_tree__ HUP "$__std_timeout_command_pid" "$__std_timeout_ps_path" "$__std_timeout_tree_snapshot_file"' HUP
+        else
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=HUP; __std_timeout_cancel_status=129; }; kill -HUP -- "-$__std_timeout_command_pid" 2>/dev/null || true' HUP
+        fi
+        if ((__std_timeout_int_ignored)); then
+            trap '' INT
+        elif ((__std_timeout_use_pid_tree)); then
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=INT; __std_timeout_cancel_status=130; }; __std_timeout_signal_pid_tree__ INT "$__std_timeout_command_pid" "$__std_timeout_ps_path" "$__std_timeout_tree_snapshot_file"' INT
+        else
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=INT; __std_timeout_cancel_status=130; }; kill -INT -- "-$__std_timeout_command_pid" 2>/dev/null || true' INT
+        fi
+        if ((__std_timeout_quit_ignored)); then
+            trap '' QUIT
+        elif ((__std_timeout_use_pid_tree)); then
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=QUIT; __std_timeout_cancel_status=131; }; __std_timeout_signal_pid_tree__ QUIT "$__std_timeout_command_pid" "$__std_timeout_ps_path" "$__std_timeout_tree_snapshot_file"' QUIT
+        else
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=QUIT; __std_timeout_cancel_status=131; }; kill -QUIT -- "-$__std_timeout_command_pid" 2>/dev/null || true' QUIT
+        fi
+        if ((__std_timeout_term_ignored)); then
+            trap '' TERM
+        elif ((__std_timeout_use_pid_tree)); then
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=TERM; __std_timeout_cancel_status=143; }; __std_timeout_signal_pid_tree__ TERM "$__std_timeout_command_pid" "$__std_timeout_ps_path" "$__std_timeout_tree_snapshot_file"' TERM
+        else
+            trap '[[ -n "$__std_timeout_cancel_signal" ]] || { __std_timeout_cancel_signal=TERM; __std_timeout_cancel_status=143; }; kill -TERM -- "-$__std_timeout_command_pid" 2>/dev/null || true' TERM
+        fi
+
+        if ((__std_timeout_use_pid_tree)); then
+            # This watchdog remains in the caller's group and has no sleep
+            # child. A retained FIFO descriptor makes normal cancellation an
+            # immediate byte write, without changing terminal ownership or
+            # introducing an external-sleep fork race.
+            (
+                trap - EXIT
+                trap '' HUP INT QUIT TERM
+                if IFS= read -r -n 1 -t "$__std_timeout_seconds" \
+                    -u "$__std_timeout_timer_fd"; then
+                    exit 0
+                fi
+                printf '1' >| "$__std_timeout_marker"
+                __std_timeout_signal_pid_tree__ TERM \
+                    "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                    "$__std_timeout_tree_snapshot_file"
+                __std_sleep_interval__ "$__std_timeout_kill_grace"
+                __std_timeout_signal_pid_tree__ KILL \
+                    "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                    "$__std_timeout_tree_snapshot_file"
+            ) </dev/null >/dev/null 2>&1 &
+            __std_timeout_timer_pid=$!
+            if ((__std_timeout_monitor_was_enabled)); then
+                set -m
+            else
+                set +m
+            fi
+        else
+            # Isolate the watchdog so fast completion can cancel its external
+            # sleep without a fork race.
+            set -m
+            (
+                trap - EXIT
+                trap '' HUP INT QUIT TERM
+                __std_sleep_interval__ "$__std_timeout_seconds"
+                printf '1' >| "$__std_timeout_marker"
+                kill -TERM -- "-$__std_timeout_command_pid" 2>/dev/null || true
+                __std_sleep_interval__ "$__std_timeout_kill_grace"
+                kill -KILL -- "-$__std_timeout_command_pid" 2>/dev/null || true
+            ) &
+            __std_timeout_timer_pid=$!
+        fi
+
+        if ((__std_timeout_foreground_handshake)); then
+            # The sentinel publishes readiness and self-stops before it can
+            # launch argv. Resolve only a stopped job with the exact group
+            # leader, eliminating the fast-exit race between `jobs` and `fg`.
+            for ((__std_timeout_handshake_probe = 0;
+                __std_timeout_handshake_probe < 200;
+                __std_timeout_handshake_probe++)); do
+                if [[ -s "$__std_timeout_ready_file" ]]; then
+                    __std_timeout_job_snapshot="$(jobs -s -l 2>/dev/null || true)"
+                    while IFS= read -r __std_timeout_job_line; do
+                        if [[ "$__std_timeout_job_line" =~ ^\[([0-9]+)\][+-]?[[:space:]]+([0-9]+)[[:space:]] ]] &&
+                            [[ "${BASH_REMATCH[2]}" == "$__std_timeout_command_pid" ]]; then
+                            __std_timeout_command_job="%${BASH_REMATCH[1]}"
+                            break
+                        fi
+                    done <<< "$__std_timeout_job_snapshot"
+                    [[ -n "$__std_timeout_command_job" ]] && break
+                fi
+                if ((__std_timeout_cancel_status != 0)) ||
+                    ! kill -0 "$__std_timeout_command_pid" 2>/dev/null; then
+                    break
+                fi
+                __std_sleep_interval__ 0.01 || break
+            done
+        fi
+
+        if [[ -n "$__std_timeout_command_job" ]]; then
+            # Bash requires fd 2 to reference the controlling terminal before
+            # `fg` will transfer terminal ownership. The stopped handshake
+            # makes the job stable, so this channel cannot receive a stale-job
+            # diagnostic. Only the builtin's command echo is hidden.
+            if fg "$__std_timeout_command_job" >/dev/null 2<&0; then
+                __std_timeout_run_status=0
+            else
+                __std_timeout_run_status=$?
+            fi
+        elif ((__std_timeout_foreground_handshake)); then
+            # A stopped sentinel cannot handle a pending signal until resumed.
+            kill -CONT -- "-$__std_timeout_command_pid" 2>/dev/null || true
+            kill -KILL -- "-$__std_timeout_command_pid" 2>/dev/null || true
+            wait "$__std_timeout_command_pid" 2>/dev/null || true
+            if ((__std_timeout_cancel_status != 0)); then
+                __std_timeout_run_status="$__std_timeout_cancel_status"
+            else
+                __std_timeout_run_status=1
+            fi
+        elif wait "$__std_timeout_command_pid" 2>/dev/null; then
+            __std_timeout_run_status=0
+        else
+            __std_timeout_run_status=$?
+        fi
+
+        if ((__std_timeout_cancel_status != 0)); then
+            trap '' HUP INT QUIT TERM
+            if ((__std_timeout_use_pid_tree)); then
+                __std_cancel_timeout_tree_watchdog__ \
+                    "$__std_timeout_timer_pid" "$__std_timeout_timer_fd"
+            else
+                __std_cancel_timeout_watchdog__ "$__std_timeout_timer_pid"
+            fi
+            __std_sleep_interval__ "$__std_timeout_kill_grace" || true
+            if ((__std_timeout_use_pid_tree)); then
+                __std_timeout_signal_pid_tree__ KILL \
+                    "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                    "$__std_timeout_tree_snapshot_file"
+            else
+                kill -KILL -- "-$__std_timeout_command_pid" 2>/dev/null || true
+            fi
+            wait "$__std_timeout_command_pid" 2>/dev/null || true
+            __std_timeout_final_status="$__std_timeout_cancel_status"
+        elif [[ -s "$__std_timeout_marker" ]]; then
+            # Once the deadline marker exists, let TERM's full grace/KILL
+            # sequence finish even if the direct parent exited on TERM.
+            wait "$__std_timeout_timer_pid" 2>/dev/null || true
+            __std_timeout_final_status=124
+        else
+            if ((__std_timeout_use_pid_tree)); then
+                __std_cancel_timeout_tree_watchdog__ \
+                    "$__std_timeout_timer_pid" "$__std_timeout_timer_fd"
+            else
+                __std_cancel_timeout_watchdog__ "$__std_timeout_timer_pid"
+            fi
+
+            # Close the marker-versus-cancellation race: if the watchdog
+            # published the deadline immediately before it was reaped,
+            # complete escalation here.
+            if [[ -s "$__std_timeout_marker" ]]; then
+                if ((__std_timeout_use_pid_tree)); then
+                    __std_timeout_signal_pid_tree__ TERM \
+                        "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                        "$__std_timeout_tree_snapshot_file"
+                else
+                    kill -TERM -- "-$__std_timeout_command_pid" 2>/dev/null || true
+                fi
+                __std_sleep_interval__ "$__std_timeout_kill_grace" || true
+                if ((__std_timeout_use_pid_tree)); then
+                    __std_timeout_signal_pid_tree__ KILL \
+                        "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                        "$__std_timeout_tree_snapshot_file"
+                else
+                    kill -KILL -- "-$__std_timeout_command_pid" 2>/dev/null || true
+                fi
+                wait "$__std_timeout_command_pid" 2>/dev/null || true
+                __std_timeout_final_status=124
+            elif IFS= read -r __std_timeout_child_status < "$__std_timeout_status_file" &&
+                [[ "$__std_timeout_child_status" =~ $__std_timeout_status_re ]]; then
+                __std_timeout_final_status="$__std_timeout_child_status"
+            else
+                __std_timeout_final_status="$__std_timeout_run_status"
+            fi
+
+            # A signal-derived status can arrive before resistant descendants
+            # have left the managed group. Finish cancellation deterministically.
+            if ((__std_timeout_final_status >= 128 && __std_timeout_final_status <= 192)) && {
+                ((__std_timeout_use_pid_tree)) ||
+                    kill -0 -- "-$__std_timeout_command_pid" 2>/dev/null;
+            }; then
+                if ((__std_timeout_use_pid_tree)); then
+                    __std_timeout_signal_pid_tree__ \
+                        "$((__std_timeout_final_status - 128))" \
+                        "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                        "$__std_timeout_tree_snapshot_file"
+                else
+                    kill "-$((__std_timeout_final_status - 128))" -- \
+                        "-$__std_timeout_command_pid" 2>/dev/null || true
+                fi
+                __std_sleep_interval__ "$__std_timeout_kill_grace" || true
+                if ((__std_timeout_use_pid_tree)); then
+                    __std_timeout_signal_pid_tree__ KILL \
+                        "$__std_timeout_command_pid" "$__std_timeout_ps_path" \
+                        "$__std_timeout_tree_snapshot_file"
+                else
+                    kill -KILL -- "-$__std_timeout_command_pid" 2>/dev/null || true
+                fi
+                wait "$__std_timeout_command_pid" 2>/dev/null || true
+            fi
+        fi
     fi
-    command_pid=$!
 
-    (
-        __std_sleep_interval__ "$timeout_seconds"
-        printf '1' > "$timeout_marker"
-        __std_signal_process_tree__ TERM "$command_pid" "$process_group"
-        __std_sleep_interval__ "$kill_grace_seconds"
-        __std_signal_process_tree__ KILL "$command_pid" "$process_group"
-    ) &
-    timer_pid=$!
+    if [[ -n "$__std_timeout_tty_fd" ]]; then
+        exec {__std_timeout_tty_fd}<&-
+    fi
+    if [[ -n "$__std_timeout_stdin_fd" ]]; then
+        exec {__std_timeout_stdin_fd}<&-
+    fi
+    if [[ -n "$__std_timeout_timer_fd" ]]; then
+        exec {__std_timeout_timer_fd}>&-
+    fi
 
-    if wait "$command_pid" 2>/dev/null; then
-        command_status=0
+    if ((__std_timeout_monitor_was_enabled)); then
+        set -m
     else
-        command_status=$?
+        set +m
+    fi
+    rm -f -- "$__std_timeout_marker" "$__std_timeout_status_file" \
+        "$__std_timeout_ready_file" "$__std_timeout_tree_snapshot_file"
+
+    trap - HUP INT QUIT TERM
+    # trap -p emits shell-quoted commands owned by Bash itself.
+    # shellcheck disable=SC2294
+    [[ -z "$__std_timeout_saved_hup_trap" ]] || eval "$__std_timeout_saved_hup_trap"
+    # shellcheck disable=SC2294
+    [[ -z "$__std_timeout_saved_int_trap" ]] || eval "$__std_timeout_saved_int_trap"
+    # shellcheck disable=SC2294
+    [[ -z "$__std_timeout_saved_quit_trap" ]] || eval "$__std_timeout_saved_quit_trap"
+    # shellcheck disable=SC2294
+    [[ -z "$__std_timeout_saved_term_trap" ]] || eval "$__std_timeout_saved_term_trap"
+
+    # The temporary supervisor trap must not consume a caller-owned signal.
+    # Cleanup and exact trap restoration happen first; default dispositions
+    # terminate here, while custom handlers run before this function returns.
+    if [[ -n "$__std_timeout_cancel_signal" ]]; then
+        builtin kill "-$__std_timeout_cancel_signal" "$BASHPID"
     fi
 
-    if kill -0 "$timer_pid" 2>/dev/null; then
-        kill -KILL "$timer_pid" 2>/dev/null || true
-    fi
-    wait "$timer_pid" 2>/dev/null || true
-
-    if [[ -s "$timeout_marker" ]]; then
-        command_status=124
-    fi
-    rm -f -- "$timeout_marker"
-    std_unregister_cleanup_path "$timeout_marker"
-
-    return "$command_status"
+    return "$__std_timeout_final_status"
 }
 
 ############################################## FILE AND DIRECTORY HANDLING ############################################
@@ -2075,6 +2580,12 @@ std_make_temp_file() {
     __std_make_temp_path__ std_make_temp_file file "$@"
 }
 
+# Private counterpart for reserved implementation-local result variables.
+# Public named-output helpers continue to reject the `__` namespace.
+__std_make_internal_temp_file__() {
+    __std_make_temp_path__ __std_make_internal_temp_file__ file "$@"
+}
+
 #
 # std_make_temp_dir - Creates a temporary directory and stores its path in a named variable.
 #
@@ -2108,7 +2619,7 @@ __std_assert_writable_output__() {
 
     if [[ "$__std_output_name" == __* ]]; then
         case "$__std_output_function_name" in
-            __std_make_internal_temp_dir__) ;;
+            __std_make_internal_temp_file__ | __std_make_internal_temp_dir__) ;;
             *)
                 log_error -l base_bash_libs.std \
                     "$__std_output_function_name: result variable '$__std_output_name' uses the reserved '__' internal namespace."

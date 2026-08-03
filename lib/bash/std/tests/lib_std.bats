@@ -117,6 +117,155 @@ PY
     bats_run python3 "$driver" "$input" "$@"
 }
 
+run_pty_signal_command() {
+    local signal_name="$1" main_pid_file="$2" ready_file="$3"
+    local driver="$TEST_TMPDIR/pty-signal-driver.py"
+    shift 3
+
+    cat > "$driver" <<'PY'
+import errno
+import os
+import pty
+import select
+import signal
+import sys
+import time
+
+signal_name = sys.argv[1]
+main_pid_file = sys.argv[2]
+ready_file = sys.argv[3]
+command = sys.argv[4:]
+
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(command[0], command)
+
+deadline = time.monotonic() + 10
+while not os.path.exists(ready_file):
+    if time.monotonic() > deadline:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        sys.exit(124)
+    time.sleep(0.002)
+
+with open(main_pid_file, encoding="ascii") as stream:
+    main_pid = int(stream.read())
+if signal_name == "CTRL_C":
+    os.write(fd, b"\x03")
+else:
+    os.kill(main_pid, getattr(signal, "SIG" + signal_name))
+
+output = bytearray()
+status = None
+deadline = time.monotonic() + 10
+while status is None:
+    if time.monotonic() > deadline:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        status = 124
+        break
+    readable, _, _ = select.select([fd], [], [], 0.05)
+    if readable:
+        try:
+            chunk = os.read(fd, 4096)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                chunk = b""
+            else:
+                raise
+        if chunk:
+            output.extend(chunk)
+    waited, child_status = os.waitpid(pid, os.WNOHANG)
+    if waited:
+        if os.WIFEXITED(child_status):
+            status = os.WEXITSTATUS(child_status)
+        elif os.WIFSIGNALED(child_status):
+            status = 128 + os.WTERMSIG(child_status)
+        else:
+            status = 1
+
+while True:
+    readable, _, _ = select.select([fd], [], [], 0)
+    if not readable:
+        break
+    try:
+        chunk = os.read(fd, 4096)
+    except OSError as exc:
+        if exc.errno == errno.EIO:
+            break
+        raise
+    if not chunk:
+        break
+    output.extend(chunk)
+
+os.close(fd)
+sys.stdout.buffer.write(output)
+sys.exit(status if status is not None else 1)
+PY
+
+    bats_run python3 "$driver" "$signal_name" "$main_pid_file" \
+        "$ready_file" "$@"
+}
+
+create_timeout_signal_disposition_script() {
+    local script_path="$1"
+
+    create_script "$script_path" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+disposition="\$1"
+main_pid_file="\$2"
+ready_file="\$3"
+marker_file="\$4"
+child_pid_file="\$5"
+printf '%s\n' "\$BASHPID" >| "\$main_pid_file"
+
+case "\$disposition" in
+    custom)
+        trap 'printf "handled\\n" >| "\$marker_file"' TERM
+        ;;
+    ignored)
+        trap '' TERM
+        ;;
+    *)
+        exit 64
+        ;;
+esac
+before_trap="\$(trap -p TERM)"
+
+signal_worker() {
+    if [[ "\$disposition" == custom ]]; then
+        trap '' TERM
+        (trap '' TERM; while :; do /bin/sleep 1; done) &
+        printf '%s\n' "\$!" >| "\$child_pid_file"
+        : >| "\$ready_file"
+        wait
+    else
+        : >| "\$ready_file"
+        /bin/sleep 0.2
+        return 42
+    fi
+}
+
+if __std_run_with_timeout_fallback__ 30 signal_worker; then
+    rc=0
+else
+    rc=\$?
+fi
+after_trap="\$(trap -p TERM)"
+if [[ "\$before_trap" == "\$after_trap" ]]; then
+    state=preserved
+else
+    state=changed
+fi
+printf 'rc=%s state=%s\n' "\$rc" "\$state"
+EOF
+}
+
 setup() {
     setup_test_tmpdir
     PATH="$BASE_TEST_ORIG_PATH"
@@ -1787,6 +1936,432 @@ EOF
     [ "$rc" -eq 73 ]
 }
 
+@test "std_run fallback preserves piped stdin shell functions and exact fast status 127" {
+    local script="$TEST_TMPDIR/run-timeout-pipe-status.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+fallback_reader() {
+    local value
+    IFS= read -r value
+    printf 'read=%s\n' "\$value"
+}
+printf 'pipe-value\n' | __std_run_with_timeout_fallback__ 5 fallback_reader || exit 1
+for ((iteration = 0; iteration < 20; iteration++)); do
+    if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 127'; then
+        rc=0
+    else
+        rc=\$?
+    fi
+    ((rc == 127)) || exit 1
+done
+printf 'statuses=exact\n'
+EOF
+
+    bats_run "$script"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"read=pipe-value"* ]]
+    [[ "$output" == *"statuses=exact"* ]]
+}
+
+@test "std_run fallback reads from a foreground tty without leaking job diagnostics" {
+    local script="$TEST_TMPDIR/run-timeout-tty-input.sh" normalized
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+tty_reader() {
+    local value
+    IFS= read -r value
+    printf 'read=%s\n' "\$value"
+}
+if __std_run_with_timeout_fallback__ 20 tty_reader; then
+    rc=0
+else
+    rc=\$?
+fi
+printf 'rc=%s\n' "\$rc"
+EOF
+
+    run_pty_command $'tty-value\n' "$script"
+    normalized="$(normalize_tty_output "$output")"
+
+    [ "$status" -eq 0 ]
+    [[ "$normalized" == *"read=tty-value"* ]]
+    [[ "$normalized" == *"rc=0"* ]]
+    [[ "$normalized" != *"Terminated:"* ]]
+    [[ "$normalized" != *"Killed:"* ]]
+}
+
+@test "std_run fallback kills a resistant tty process group without channel contamination" {
+    local script="$TEST_TMPDIR/run-timeout-tty-tree.sh"
+    local child_pid_file="$TEST_TMPDIR/run-timeout-tty-tree.pid"
+    local normalized child_pid
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+child_pid_file="\$1"
+resistant_tree() {
+    trap '' TERM INT
+    (trap '' TERM INT; while :; do /bin/sleep 1; done) &
+    printf '%s\n' "\$!" > "\$child_pid_file"
+    wait
+}
+if __std_run_with_timeout_fallback__ 1 resistant_tree; then
+    rc=0
+else
+    rc=\$?
+fi
+printf 'rc=%s\n' "\$rc"
+EOF
+
+    run_pty_command '' "$script" "$child_pid_file"
+    normalized="$(normalize_tty_output "$output")"
+    child_pid="$(cat "$child_pid_file")"
+
+    [ "$status" -eq 0 ]
+    [[ "$normalized" == *"rc=124"* ]]
+    [[ "$normalized" != *"Terminated:"* ]]
+    [[ "$normalized" != *"Killed:"* ]]
+    if kill -0 "$child_pid" 2>/dev/null; then
+        kill -KILL "$child_pid" 2>/dev/null || true
+        return 1
+    fi
+}
+
+@test "std_run fallback reads from read-only foreground tty and preserves caller state" {
+    ps -eo pid=,ppid= >/dev/null 2>&1 ||
+        skip "The process-listing command is unavailable in this environment."
+
+    local script="$TEST_TMPDIR/run-timeout-readonly-tty.sh" normalized
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+exec 0</dev/tty
+trap ':' HUP
+trap ':' INT
+trap ':' QUIT
+trap ':' TERM
+before_traps="\$(trap -p HUP INT QUIT TERM)"
+[[ \$- == *m* ]] && before_monitor=on || before_monitor=off
+tty_reader() {
+    local value
+    IFS= read -r value
+    printf 'read=%s\n' "\$value"
+}
+if __std_run_with_timeout_fallback__ 20 tty_reader; then
+    rc=0
+else
+    rc=\$?
+fi
+after_traps="\$(trap -p HUP INT QUIT TERM)"
+[[ \$- == *m* ]] && after_monitor=on || after_monitor=off
+if [[ "\$before_traps" == "\$after_traps" &&
+    "\$before_monitor" == "\$after_monitor" ]]; then
+    state=preserved
+else
+    state=changed
+fi
+printf 'rc=%s state=%s monitor=%s\n' "\$rc" "\$state" "\$after_monitor"
+EOF
+
+    run_pty_command $'readonly-value\n' "$script"
+    normalized="$(normalize_tty_output "$output")"
+
+    [ "$status" -eq 0 ]
+    [[ "$normalized" == *"read=readonly-value"* ]]
+    [[ "$normalized" == *"rc=0 state=preserved monitor=off"* ]]
+    [[ "$normalized" != *"read error"* ]]
+    [[ "$normalized" != *"Terminated:"* ]]
+    [[ "$normalized" != *"Killed:"* ]]
+}
+
+@test "std_run fallback keeps foreground and background tty fast paths quiet" {
+    ps -eo pid=,ppid= >/dev/null 2>&1 ||
+        skip "The process-listing command is unavailable in this environment."
+
+    local script="$TEST_TMPDIR/run-timeout-tty-fast.sh" normalized mode
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+mode="\${1-}"
+[[ "\$mode" != on ]] || set -m
+failures=0
+for ((iteration = 0; iteration < 20; iteration++)); do
+    if __std_run_with_timeout_fallback__ 5 true; then
+        rc=0
+    else
+        rc=\$?
+    fi
+    ((rc == 0)) || failures=\$((failures + 1))
+done
+if [[ "\$mode" == on ]]; then
+    exec {tty_input}<&0
+    (
+        __std_run_with_timeout_fallback__ 5 true <&"\$tty_input"
+    ) &
+    background_pid=\$!
+    if wait "\$background_pid"; then
+        background_rc=0
+    else
+        background_rc=\$?
+    fi
+else
+    background_rc=0
+fi
+printf 'failures=%s background=%s monitor=%s\n' \
+    "\$failures" "\$background_rc" \
+    "\$( [[ \$- == *m* ]] && printf on || printf off )"
+EOF
+
+    for mode in off on; do
+        if [[ "$mode" == on ]]; then
+            run_pty_command '' "$script" on
+        else
+            run_pty_command '' "$script"
+        fi
+        normalized="$(normalize_tty_output "$output")"
+        [ "$status" -eq 0 ]
+        [[ "$normalized" == *"failures=0 background=0 monitor=$mode"* ]]
+        [[ "$normalized" != *"read error"* ]]
+        [[ "$normalized" != *"Terminated:"* ]]
+        [[ "$normalized" != *"Killed:"* ]]
+        [[ "$normalized" != *"fg:"* ]]
+    done
+}
+
+@test "std_run fallback directly cancels a resistant foreground tty tree" {
+    ps -eo pid=,ppid= >/dev/null 2>&1 ||
+        skip "The process-listing command is unavailable in this environment."
+
+    local script="$TEST_TMPDIR/run-timeout-tty-signals.sh"
+    local signal_name expected expected_output main_pid_file ready_file child_pid_file
+    local normalized child_pid
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+main_pid_file="\$1"
+ready_file="\$2"
+child_pid_file="\$3"
+trap - HUP INT QUIT TERM
+printf '%s\n' "\$BASHPID" > "\$main_pid_file"
+resistant_reader() {
+    trap '' HUP INT QUIT TERM
+    (trap '' HUP INT QUIT TERM; while :; do /bin/sleep 1; done) &
+    printf '%s\n' "\$!" > "\$child_pid_file"
+    : > "\$ready_file"
+    local value
+    IFS= read -r value
+    while :; do /bin/sleep 1; done
+}
+if __std_run_with_timeout_fallback__ 30 resistant_reader; then
+    rc=0
+else
+    rc=\$?
+fi
+printf 'rc=%s\n' "\$rc"
+EOF
+
+    for signal_name in HUP INT QUIT TERM CTRL_C; do
+        expected_output=""
+        case "$signal_name" in
+            HUP) expected=129 ;;
+            INT | CTRL_C) expected=130 ;;
+            # Non-interactive Bash ignores SIGQUIT after `trap - QUIT`, so a
+            # successful redelivery resumes and exposes the exact 131 return.
+            QUIT) expected=0; expected_output="rc=131" ;;
+            TERM) expected=143 ;;
+        esac
+        main_pid_file="$TEST_TMPDIR/tty-$signal_name.main"
+        ready_file="$TEST_TMPDIR/tty-$signal_name.ready"
+        child_pid_file="$TEST_TMPDIR/tty-$signal_name.child"
+
+        run_pty_signal_command "$signal_name" "$main_pid_file" "$ready_file" \
+            "$script" "$main_pid_file" "$ready_file" "$child_pid_file"
+        normalized="$(normalize_tty_output "$output")"
+        child_pid="$(cat "$child_pid_file")"
+
+        if [ "$status" -ne "$expected" ]; then
+            printf 'signal=%s expected=%s actual=%s output=%q\n' \
+                "$signal_name" "$expected" "$status" "$normalized" >&3
+            return 1
+        fi
+        if [[ -n "$expected_output" ]]; then
+            [[ "$normalized" == *"$expected_output"* ]]
+        else
+            [[ "$normalized" != *"rc="* ]]
+        fi
+        [[ "$normalized" != *"read error"* ]]
+        [[ "$normalized" != *"Terminated:"* ]]
+        [[ "$normalized" != *"Killed:"* ]]
+        if kill -0 "$child_pid" 2>/dev/null; then
+            kill -KILL "$child_pid" 2>/dev/null || true
+            return 1
+        fi
+    done
+}
+
+@test "std_run fallback composes custom and ignored TERM dispositions without a tty" {
+    local script="$TEST_TMPDIR/run-timeout-signal-disposition.sh"
+    local disposition main_pid_file ready_file marker_file child_pid_file
+    local stdout_file stderr_file target_pid main_pid target_status actual_output
+    local child_pid probe
+
+    create_timeout_signal_disposition_script "$script"
+
+    for disposition in custom ignored; do
+        main_pid_file="$TEST_TMPDIR/non-tty-$disposition.main"
+        ready_file="$TEST_TMPDIR/non-tty-$disposition.ready"
+        marker_file="$TEST_TMPDIR/non-tty-$disposition.marker"
+        child_pid_file="$TEST_TMPDIR/non-tty-$disposition.child"
+        stdout_file="$TEST_TMPDIR/non-tty-$disposition.out"
+        stderr_file="$TEST_TMPDIR/non-tty-$disposition.err"
+
+        "$script" "$disposition" "$main_pid_file" "$ready_file" \
+            "$marker_file" "$child_pid_file" </dev/null \
+            >"$stdout_file" 2>"$stderr_file" &
+        target_pid=$!
+        for ((probe = 0; probe < 1000; probe++)); do
+            [[ -s "$main_pid_file" && -e "$ready_file" ]] && break
+            /bin/sleep 0.002
+        done
+        if [[ ! -s "$main_pid_file" || ! -e "$ready_file" ]]; then
+            kill -KILL "$target_pid" 2>/dev/null || true
+            wait "$target_pid" 2>/dev/null || true
+            return 1
+        fi
+        main_pid="$(cat "$main_pid_file")"
+        kill -TERM "$main_pid"
+        if wait "$target_pid"; then
+            target_status=0
+        else
+            target_status=$?
+        fi
+        actual_output="$(cat "$stdout_file")"
+
+        [ "$target_status" -eq 0 ]
+        [ ! -s "$stderr_file" ]
+        if [[ "$disposition" == custom ]]; then
+            [[ "$actual_output" == *"rc=143 state=preserved"* ]]
+            [ "$(cat "$marker_file")" = handled ]
+            child_pid="$(cat "$child_pid_file")"
+            for ((probe = 0; probe < 100; probe++)); do
+                kill -0 "$child_pid" 2>/dev/null || break
+                /bin/sleep 0.01
+            done
+            if kill -0 "$child_pid" 2>/dev/null; then
+                kill -KILL "$child_pid" 2>/dev/null || true
+                return 1
+            fi
+        else
+            [[ "$actual_output" == *"rc=42 state=preserved"* ]]
+            [ ! -e "$marker_file" ]
+            [ ! -e "$child_pid_file" ]
+        fi
+    done
+}
+
+@test "std_run fallback composes custom and ignored TERM dispositions on an active tty" {
+    ps -eo pid=,ppid= >/dev/null 2>&1 ||
+        skip "The process-listing command is unavailable in this environment."
+
+    local script="$TEST_TMPDIR/run-timeout-tty-signal-disposition.sh"
+    local disposition main_pid_file ready_file marker_file child_pid_file
+    local normalized child_pid probe
+
+    create_timeout_signal_disposition_script "$script"
+
+    for disposition in custom ignored; do
+        main_pid_file="$TEST_TMPDIR/tty-$disposition.main"
+        ready_file="$TEST_TMPDIR/tty-$disposition.ready"
+        marker_file="$TEST_TMPDIR/tty-$disposition.marker"
+        child_pid_file="$TEST_TMPDIR/tty-$disposition.child"
+
+        run_pty_signal_command TERM "$main_pid_file" "$ready_file" \
+            "$script" "$disposition" "$main_pid_file" "$ready_file" \
+            "$marker_file" "$child_pid_file"
+        normalized="$(normalize_tty_output "$output")"
+
+        [ "$status" -eq 0 ]
+        [[ "$normalized" != *"read error"* ]]
+        [[ "$normalized" != *"Terminated:"* ]]
+        [[ "$normalized" != *"Killed:"* ]]
+        if [[ "$disposition" == custom ]]; then
+            [[ "$normalized" == *"rc=143 state=preserved"* ]]
+            [ "$(cat "$marker_file")" = handled ]
+            child_pid="$(cat "$child_pid_file")"
+            for ((probe = 0; probe < 100; probe++)); do
+                kill -0 "$child_pid" 2>/dev/null || break
+                /bin/sleep 0.01
+            done
+            if kill -0 "$child_pid" 2>/dev/null; then
+                kill -KILL "$child_pid" 2>/dev/null || true
+                return 1
+            fi
+        else
+            [[ "$normalized" == *"rc=42 state=preserved"* ]]
+            [ ! -e "$marker_file" ]
+            [ ! -e "$child_pid_file" ]
+        fi
+    done
+}
+
+@test "std_run fallback preserves caller traps monitor state and unrelated readonly names" {
+    local before_trap after_trap before_monitor after_monitor rc
+    readonly command_status=99 timeout_status_file=/dev/null
+    trap ':' HUP
+    before_trap="$(trap -p HUP)"
+    [[ $- == *m* ]] && before_monitor=1 || before_monitor=0
+
+    if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    after_trap="$(trap -p HUP)"
+    [[ $- == *m* ]] && after_monitor=1 || after_monitor=0
+    trap - HUP
+    [ "$rc" -eq 42 ]
+    [ "$after_trap" = "$before_trap" ]
+    [ "$after_monitor" -eq "$before_monitor" ]
+}
+
+@test "std_run fallback supports noclobber and preserves its caller state" {
+    local script="$TEST_TMPDIR/run-timeout-noclobber.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+set -C
+[[ -o noclobber ]] && before=on || before=off
+if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
+    fast_rc=0
+else
+    fast_rc=\$?
+fi
+if __std_run_with_timeout_fallback__ 1 /bin/bash -c \
+    'trap "" TERM; /bin/sleep 3'; then
+    timeout_rc=0
+else
+    timeout_rc=\$?
+fi
+[[ -o noclobber ]] && after=on || after=off
+printf 'fast=%s timeout=%s before=%s after=%s\n' \
+    "\$fast_rc" "\$timeout_rc" "\$before" "\$after"
+EOF
+
+    bats_run "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "fast=42 timeout=124 before=on after=on" ]
+}
+
 @test "std_run fallback timeout kills commands that ignore TERM" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local marker_file="$TEST_TMPDIR/term-ignored.marker"
@@ -1817,29 +2392,54 @@ EOF
     [ ! -e "$marker_file" ]
 }
 
-@test "std_run fallback timeout marker is registered for cleanup" {
+@test "std_run fallback sidecars preserve an inherited EXIT trap in command substitution" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
-    local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
-    local output_file="$TEST_TMPDIR/timeout-fallback-output.txt"
-    local old_path="$PATH"
+    local caller_dir="$TEST_TMPDIR/caller-owned"
+    local script="$TEST_TMPDIR/timeout-command-substitution.sh"
 
     mkdir -p "$fake_bin"
     ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
     ln -s "$(command -v rm)" "$fake_bin/rm"
     ln -s "$(command -v sleep)" "$fake_bin/sleep"
+    mkdir -p "$caller_dir"
 
-    eval "$(declare -f std_register_cleanup_path | sed '1s/std_register_cleanup_path/__orig_std_register_cleanup_path/')"
-    std_register_cleanup_path() {
-        printf '%s\n' "$@" >> "$registration_file"
-        __orig_std_register_cleanup_path "$@"
-    }
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+export TMPDIR="$TEST_TMPDIR"
+caller_dir="$caller_dir"
+trap 'rm -rf -- "\$caller_dir"' EXIT
+value="\$(PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback)" || exit \$?
+[[ -d "\$caller_dir" ]] || exit 91
+printf 'value=%s\ncaller-dir=present\n' "\$value"
+trap - EXIT
+EOF
 
-    PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
-    PATH="$old_path"
-    unset -f std_register_cleanup_path __orig_std_register_cleanup_path
+    bats_run "$script"
 
-    [ "$(cat "$output_file")" = "fallback" ]
-    [[ "$(cat "$registration_file")" == *"base-bash-libs-timeout."* ]]
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"value=fallback"* ]]
+    [[ "$output" == *"caller-dir=present"* ]]
+    ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout.*" >/dev/null
+    ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout-status.*" >/dev/null
+}
+
+@test "std_run fallback fast success leaves no watchdog sleep descendants" {
+    local before_file="$TEST_TMPDIR/watchdog-before.txt"
+    local after_file="$TEST_TMPDIR/watchdog-after.txt"
+    local iteration pid
+
+    pgrep -f '^/bin/sleep 29$' > "$before_file" 2>/dev/null || true
+    for ((iteration = 0; iteration < 40; iteration++)); do
+        __std_run_with_timeout_fallback__ 29 true
+    done
+    /bin/sleep 0.1
+    pgrep -f '^/bin/sleep 29$' > "$after_file" 2>/dev/null || true
+
+    while IFS= read -r pid; do
+        [[ -n "$pid" ]] || continue
+        grep -Fxq "$pid" "$before_file" || return 1
+    done < "$after_file"
 }
 
 @test "std_run fallback timeout terminates descendants" {
