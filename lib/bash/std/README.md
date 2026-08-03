@@ -517,6 +517,32 @@ std_run --timeout 30 --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
 should prefer `--max-attempts` because it makes clear that the value is the total
 number of attempts, not retries after the first attempt.
 
+For a timed command, the framework sends `TERM` at the per-attempt deadline,
+waits one second, and then sends `KILL` to the supervised process group. The
+one-second escalation grace is part of the hard upper-bound contract, so a
+single attempt normally takes at most `timeout + 1` seconds plus scheduler and
+startup overhead. With `A` total attempts and retry delay `D`, the policy's
+nominal upper bound is `A * (timeout + 1) + (A - 1) * D`, plus that small
+overhead. `--timeout` is never silently converted into a best-effort warning.
+
+The runner capability-detects a GNU `timeout`, GNU `gtimeout`, or the Bash
+fallback. A verified external binary is used only as a deadline clock; it
+never receives the caller's command or arguments. The framework owns the
+process group and always applies the same status contract: `124` means the
+framework deadline fired, `125` means supervision could not be established
+safely, and a command's natural exit status (including `124`) is preserved.
+Caller signals are restored and re-delivered after cleanup with their normal
+signal-derived status. Managed same-user descendants in the process group are
+covered. A process that deliberately detaches/reparents itself, or is stuck in
+an uninterruptible kernel wait, is outside any user-space Bash guarantee.
+
+Timed commands require non-terminal stdin. This fail-closed rule prevents a
+foreground TTY job-control path from claiming a hard descendant guarantee.
+Use an explicit pipe or `</dev/null` when the command does not need terminal
+input; a foreground TTY invocation returns `125` without executing the
+command. This restriction is intentional for v2 and is independent of which
+timeout backend was detected.
+
 Use `std_run` for commands plus arguments. Keep shell features such as
 pipelines, redirection, process substitution, and complex conditionals explicit
 in the calling script so the code remains clear.
@@ -535,8 +561,11 @@ valid only with `--sensitive`. Invalid protected controls return `1` without
 executing the command, and their diagnostics do not repeat an offending token
 after sensitive mode has been selected.
 
-Timeout execution prefers `timeout` or `gtimeout` when available and otherwise
-uses a Bash fallback so scripts work on macOS and Linux.
+In dry-run mode, the plan is emitted as a timestamped `DRY-RUN` record directly
+to stderr, even when INFO logging, category gates, or `--quiet` would suppress
+ordinary diagnostics. Stdout remains reserved for command data, and the exact
+argv is rendered without executing anything. Sensitive plans retain the same
+redaction rules as other framework diagnostics.
 
 ## Importing Other Bash Libraries
 

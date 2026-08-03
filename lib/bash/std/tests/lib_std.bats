@@ -1918,6 +1918,21 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
+@test "std_run preserves a natural 124 status instead of calling it a timeout" {
+    local stderr_file="$TEST_TMPDIR/natural-124.err"
+    local rc
+
+    if std_run --no-exit --timeout 5 /bin/bash -c 'exit 124' 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 124 ]
+    [[ "$(cat "$stderr_file")" == *"Command failed (exit 124)"* ]]
+    [[ "$(cat "$stderr_file")" != *"Command timed out"* ]]
+}
+
 @test "std_run fallback preserves Bash function resolution over same-named executables" {
     local rc
 
@@ -1965,18 +1980,15 @@ EOF
     [[ "$output" == *"statuses=exact"* ]]
 }
 
-@test "std_run fallback reads from a foreground tty without leaking job diagnostics" {
-    local script="$TEST_TMPDIR/run-timeout-tty-input.sh" normalized
+@test "std_run fallback refuses a foreground tty without executing" {
+    local script="$TEST_TMPDIR/run-timeout-tty-refused.sh"
+    local marker="$TEST_TMPDIR/run-timeout-tty-refused.marker"
+    local normalized
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-tty_reader() {
-    local value
-    IFS= read -r value
-    printf 'read=%s\n' "\$value"
-}
-if __std_run_with_timeout_fallback__ 20 tty_reader; then
+if __std_run_with_timeout_fallback__ 1 /bin/touch "$marker"; then
     rc=0
 else
     rc=\$?
@@ -1984,54 +1996,19 @@ fi
 printf 'rc=%s\n' "\$rc"
 EOF
 
-    run_pty_command $'tty-value\n' "$script"
+    run_pty_command '' "$script"
     normalized="$(normalize_tty_output "$output")"
 
     [ "$status" -eq 0 ]
-    [[ "$normalized" == *"read=tty-value"* ]]
-    [[ "$normalized" == *"rc=0"* ]]
+    [[ "$normalized" == *"rc=125"* ]]
+    [[ "$normalized" == *"TIMEOUT ERROR"* ]]
     [[ "$normalized" != *"Terminated:"* ]]
     [[ "$normalized" != *"Killed:"* ]]
-}
-
-@test "std_run fallback kills a resistant tty process group without channel contamination" {
-    local script="$TEST_TMPDIR/run-timeout-tty-tree.sh"
-    local child_pid_file="$TEST_TMPDIR/run-timeout-tty-tree.pid"
-    local normalized child_pid
-
-    create_script "$script" <<EOF
-#!/usr/bin/env bash
-source "$STDLIB_PATH"
-child_pid_file="\$1"
-resistant_tree() {
-    trap '' TERM INT
-    (trap '' TERM INT; while :; do /bin/sleep 1; done) &
-    printf '%s\n' "\$!" > "\$child_pid_file"
-    wait
-}
-if __std_run_with_timeout_fallback__ 1 resistant_tree; then
-    rc=0
-else
-    rc=\$?
-fi
-printf 'rc=%s\n' "\$rc"
-EOF
-
-    run_pty_command '' "$script" "$child_pid_file"
-    normalized="$(normalize_tty_output "$output")"
-    child_pid="$(cat "$child_pid_file")"
-
-    [ "$status" -eq 0 ]
-    [[ "$normalized" == *"rc=124"* ]]
-    [[ "$normalized" != *"Terminated:"* ]]
-    [[ "$normalized" != *"Killed:"* ]]
-    if kill -0 "$child_pid" 2>/dev/null; then
-        kill -KILL "$child_pid" 2>/dev/null || true
-        return 1
-    fi
+    [ ! -e "$marker" ]
 }
 
 @test "std_run fallback reads from read-only foreground tty and preserves caller state" {
+    skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
 
@@ -2080,6 +2057,7 @@ EOF
 }
 
 @test "std_run fallback keeps foreground and background tty fast paths quiet" {
+    skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
 
@@ -2135,6 +2113,7 @@ EOF
 }
 
 @test "std_run fallback directly cancels a resistant foreground tty tree" {
+    skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
 
@@ -2267,6 +2246,7 @@ EOF
 }
 
 @test "std_run fallback composes custom and ignored TERM dispositions on an active tty" {
+    skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
 
@@ -2689,7 +2669,12 @@ EOF
     mkdir -p "$fake_bin"
     create_script "$fake_bin/timeout" <<'EOF'
 #!/usr/bin/env bash
-shift
+if [[ "${1-}" == --version ]]; then
+    printf 'timeout (GNU coreutils) 9.5\n'
+    exit 0
+fi
+[[ "${1-}" == --foreground && "${2-}" == --signal=KILL ]] || exit 125
+shift 3
 "$@"
 EOF
     create_script "$script" <<'EOF'
@@ -2720,15 +2705,135 @@ EOF
     [ "$(cat "$counter_file")" = "3" ]
 }
 
-@test "std_run fallback timeout returns 1 when marker creation fails" {
+@test "std_run capability detection prefers verified GNU gtimeout after rejecting another timeout" {
+    local fake_bin="$TEST_TMPDIR/timeout-capability-bin"
+    local detected=""
+
+    mkdir -p "$fake_bin"
+    create_script "$fake_bin/timeout" <<'EOF'
+#!/bin/bash
+printf 'timeout (BusyBox) 1.36.0\n'
+EOF
+    create_script "$fake_bin/gtimeout" <<'EOF'
+#!/bin/bash
+if [[ "${1-}" == --version ]]; then
+    printf 'timeout (GNU coreutils) 9.5\n'
+    exit 0
+fi
+exit 125
+EOF
+
+    PATH="$fake_bin" __std_timeout_backend_detect__ detected
+
+    [ "$detected" = "$fake_bin/gtimeout" ]
+}
+
+@test "std_run capability detection falls back to Bash when timeout tools are unavailable" {
+    local fake_bin="$TEST_TMPDIR/no-timeout-tools"
+    local detected="sentinel"
+
+    mkdir -p "$fake_bin"
+    PATH="$fake_bin" __std_timeout_backend_detect__ detected
+
+    [ -z "$detected" ]
+}
+
+@test "std_run reports external timeout-clock failures as infrastructure without retrying" {
+    local fake_bin="$TEST_TMPDIR/broken-timeout-clock"
+    local counter_file="$TEST_TMPDIR/broken-timeout-counter"
+    local stderr_file="$TEST_TMPDIR/broken-timeout.err"
+    local rc
+
+    mkdir -p "$fake_bin"
+    create_script "$fake_bin/timeout" <<'EOF'
+#!/bin/bash
+if [[ "${1-}" == --version ]]; then
+    printf 'timeout (GNU coreutils) 9.5\n'
+    exit 0
+fi
+exit 7
+EOF
+    create_script "$TEST_TMPDIR/should-not-run.sh" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$1" ]] && count="$(cat "$1")"
+printf '%s\n' "$((count + 1))" > "$1"
+/bin/sleep 3
+EOF
+    ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
+    ln -s "$(command -v rm)" "$fake_bin/rm"
+
+    if PATH="$fake_bin" std_run --no-exit --max-attempts 3 --timeout 1 \
+        /bin/bash "$TEST_TMPDIR/should-not-run.sh" "$counter_file" \
+        2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 125 ]
+    [ "$(cat "$counter_file")" = "1" ]
+    [[ "$(cat "$stderr_file")" == *"could not be supervised safely"* ]]
+    [[ "$(cat "$stderr_file")" != *"attempt 1 of 3; retrying"* ]]
+}
+
+@test "std_run external GNU clock still keeps TERM-KILL ownership in the framework" {
+    local fake_bin="$TEST_TMPDIR/working-timeout-clock"
+    local marker_file="$TEST_TMPDIR/external-clock.marker"
+    local observation_file="$TEST_TMPDIR/external-clock.argv"
+    local stderr_file="$TEST_TMPDIR/external-clock.err"
+    local rc
+
+    mkdir -p "$fake_bin"
+    create_script "$fake_bin/timeout" <<'EOF'
+#!/bin/bash
+if [[ "${1-}" == --version ]]; then
+    printf 'timeout (GNU coreutils) 9.5\n'
+    exit 0
+fi
+[[ "${1-}" == --foreground && "${2-}" == --signal=KILL ]] || exit 125
+printf '%s\n' "${*:4}" > "$BASE_TEST_TIMEOUT_CLOCK_ARGS"
+duration="${3%s}"
+shift 3
+if IFS= read -r -n 1 -t "$duration" byte; then
+    "$@"
+else
+    exit 124
+fi
+EOF
+    create_script "$TEST_TMPDIR/external-clock-command.sh" <<EOF
+#!/usr/bin/env bash
+trap '' TERM
+/bin/sleep 3
+printf 'completed\n' > "$marker_file"
+EOF
+
+    if BASE_TEST_TIMEOUT_CLOCK_ARGS="$observation_file" \
+        PATH="$fake_bin:$BASE_TEST_ORIG_PATH" \
+        std_run --no-exit --quiet --timeout 1 \
+        /bin/bash "$TEST_TMPDIR/external-clock-command.sh" \
+        2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 124 ]
+    [ ! -e "$marker_file" ]
+    [ ! -s "$stderr_file" ]
+    grep -Fq '/bin/dd' "$observation_file"
+    ! grep -Fq 'external-clock-command' "$observation_file"
+}
+
+@test "std_run timeout returns infrastructure status when control-channel setup fails" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local stderr_file="$TEST_TMPDIR/timeout-marker-failure.err"
     local rc
 
     mkdir -p "$fake_bin"
 
-    eval "$(declare -f std_make_temp_file | sed '1s/std_make_temp_file/__orig_std_make_temp_file/')"
-    std_make_temp_file() {
+    eval "$(declare -f __std_make_internal_temp_file__ | sed '1s/__std_make_internal_temp_file__/__orig_std_make_internal_temp_file__/')"
+    __std_make_internal_temp_file__() {
         return 1
     }
 
@@ -2737,14 +2842,13 @@ EOF
     else
         rc=$?
     fi
-    unset -f std_make_temp_file __orig_std_make_temp_file
+    unset -f __std_make_internal_temp_file__ __orig_std_make_internal_temp_file__
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 125 ]
 }
 
-@test "std_run fallback timeout kills timer with SIGKILL after command exits" {
+@test "std_run timeout control channels are canceled after fast completion" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
-    local kill_log="$TEST_TMPDIR/timeout-kill.log"
     local output_file="$TEST_TMPDIR/timeout-kill-output.txt"
     local rc
 
@@ -2753,18 +2857,13 @@ EOF
     ln -s "$(command -v rm)" "$fake_bin/rm"
     ln -s "$(command -v sleep)" "$fake_bin/sleep"
 
-    kill() {
-        printf '%s\n' "$*" >> "$kill_log"
-        builtin kill "$@"
-    }
-
     PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
     rc=$?
-    unset -f kill
 
     [ "$rc" -eq 0 ]
     [ "$(cat "$output_file")" = "fallback" ]
-    [[ "$(cat "$kill_log")" == *"-KILL "* ]]
+    ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout-clock.*" >/dev/null
+    ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout-status.*" >/dev/null
 }
 
 @test "std_run rejects invalid execution policy options" {
@@ -2811,6 +2910,24 @@ EOF
     [[ "$(cat "$stderr_file")" == *"30s timeout"* ]]
     [[ "$(cat "$stderr_file")" == *"3 attempts"* ]]
     [[ "$(cat "$stderr_file")" == *"2s retry delay"* ]]
+}
+
+@test "std_run dry-run stays visible with quiet and disabled INFO while stdout stays clean" {
+    local stdout_file="$TEST_TMPDIR/dry-run-always-visible.out"
+    local stderr_file="$TEST_TMPDIR/dry-run-always-visible.err"
+    local primary_log="$TEST_TMPDIR/dry-run-always-visible.log"
+
+    set_log_level FATAL
+    set_log_category_level -l base_bash_libs FATAL
+    DRY_RUN=1 BASE_CLI_PRIMARY_LOG="$primary_log" \
+        std_run --no-exit --quiet --timeout 5 printf '%s\n' 'planned value' \
+        >"$stdout_file" 2>"$stderr_file"
+
+    [ ! -s "$stdout_file" ]
+    [ "$(grep -c 'DRY-RUN' "$stderr_file")" -eq 1 ]
+    grep -Fq 'planned\ value' "$stderr_file"
+    grep -Fq '5s timeout' "$stderr_file"
+    [ "$(grep -c 'DRY-RUN' "$primary_log")" -eq 1 ]
 }
 
 @test "safe_mkdir creates directories and tolerates existing paths with -p" {

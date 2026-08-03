@@ -184,13 +184,16 @@ and returns the last `gh` status instead of sleeping for less time.
 
 The elapsed-time budget covers both attempts and waits. Each attempt timeout is
 the smaller of `--attempt-timeout-seconds` and the remaining total budget. The
-clock and controls use whole seconds. API retries deliberately use the stdlib's
-Bash TERM-then-KILL timeout fallback until issue `#219` unifies the
-hard-termination contract across external timeout backends. Its one-second
-process-termination grace can make observed wall time slightly exceed the
-nominal budget. A wrapper-enforced attempt timeout has status `124`. No sleep
-is performed after the final attempt, and clock, jitter, or sleep failures
-after an attempt preserve that attempt's status.
+clock and controls use whole seconds. GitHub retries use the stdlib's shared
+TERM-then-KILL supervisor: a verified GNU `timeout` or `gtimeout` is only a
+deadline clock, while the framework owns the process group and sends `TERM`,
+waits one second, then sends `KILL`. If neither external clock is available,
+the Bash clock fallback provides the same public contract. A wrapper-enforced
+attempt timeout has status `124`; supervisor setup failures use `125`, and a
+natural command status (including `124`) is preserved. The one-second grace
+can make observed wall time slightly exceed the nominal budget. No sleep is
+performed after the final attempt, and clock, jitter, or sleep failures after
+an attempt preserve that attempt's status.
 
 ### Captured output
 
