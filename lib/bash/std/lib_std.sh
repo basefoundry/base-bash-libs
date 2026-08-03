@@ -1755,25 +1755,33 @@ __std_timeout_watchdog__() {
     local __std_timeout_watchdog_path="$2"
     local __std_timeout_watchdog_fd="$3"
     local __std_timeout_watchdog_command_pid="$4"
+    local __std_timeout_watchdog_status_file="$5"
     local __std_timeout_watchdog_clock_status=125
     local __std_timeout_watchdog_final_status=125
 
     if __std_timeout_wait_clock__ "$__std_timeout_watchdog_path" \
         "$__std_timeout_watchdog_seconds" "$__std_timeout_watchdog_fd"; then
-        return 0
+        __std_timeout_watchdog_final_status=0
+        builtin printf 'T%03d' "$__std_timeout_watchdog_final_status" \
+            >|"$__std_timeout_watchdog_status_file" 2>/dev/null || true
     else
         __std_timeout_watchdog_clock_status=$?
-    fi
-    case "$__std_timeout_watchdog_clock_status" in
-        124) __std_timeout_watchdog_final_status=124 ;;
-        *)   __std_timeout_watchdog_final_status=125 ;;
-    esac
+        case "$__std_timeout_watchdog_clock_status" in
+            124) __std_timeout_watchdog_final_status=124 ;;
+            *)   __std_timeout_watchdog_final_status=125 ;;
+        esac
+        # Publish the timer result before escalation. The supervisor must not
+        # mistake the wrapper's signal-derived status (143/137) for the
+        # deadline or clock outcome that caused the escalation.
+        builtin printf 'T%03d' "$__std_timeout_watchdog_final_status" \
+            >|"$__std_timeout_watchdog_status_file" 2>/dev/null || true
 
-    builtin kill -TERM -- "-$__std_timeout_watchdog_command_pid" \
-        2>/dev/null || true
-    __std_sleep_interval__ 1 || true
-    builtin kill -KILL -- "-$__std_timeout_watchdog_command_pid" \
-        2>/dev/null || true
+        builtin kill -TERM -- "-$__std_timeout_watchdog_command_pid" \
+            2>/dev/null || true
+        __std_sleep_interval__ 1 || true
+        builtin kill -KILL -- "-$__std_timeout_watchdog_command_pid" \
+            2>/dev/null || true
+    fi
     return "$__std_timeout_watchdog_final_status"
 }
 
@@ -1820,6 +1828,7 @@ __std_run_with_timeout_supervisor__() {
     local __std_timeout_final_status=125 __std_timeout_outcome=infrastructure
     local __std_timeout_fifo="" __std_timeout_status_fifo=""
     local __std_timeout_status_file=""
+    local __std_timeout_timer_status_file=""
     local __std_timeout_mkfifo_path="" __std_timeout_chmod_path=""
     local __std_timeout_timer_fd="" __std_timeout_status_fd=""
     local __std_timeout_stderr_fd=""
@@ -1827,6 +1836,7 @@ __std_run_with_timeout_supervisor__() {
     local __std_timeout_command_pid="" __std_timeout_timer_pid=""
     local __std_timeout_timer_status=125 __std_timeout_run_status=125
     local __std_timeout_child_status="" __std_timeout_status_record=""
+    local __std_timeout_timer_early_status="" __std_timeout_timer_status_record=""
     local __std_timeout_release_byte=""
     local __std_timeout_cancel_status=0 __std_timeout_cancel_signal=""
     local __std_timeout_saved_hup_trap __std_timeout_saved_int_trap
@@ -1869,6 +1879,14 @@ __std_run_with_timeout_supervisor__() {
         __std_timeout_emit_error__ "could not allocate the private timeout status record."
         return 125
     fi
+    if ! __std_make_internal_temp_file__ --keep \
+        __std_timeout_timer_status_file base-bash-libs-timeout-timer-record; then
+        rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" \
+            "$__std_timeout_status_file"
+        printf -v "$__std_timeout_outcome_result_name" '%s' infrastructure
+        __std_timeout_emit_error__ "could not allocate the private timeout timer record."
+        return 125
+    fi
     if ! __std_timeout_mkfifo_path__ __std_timeout_mkfifo_path ||
         ! __std_timeout_chmod_path__ __std_timeout_chmod_path ||
         ! rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" 2>/dev/null ||
@@ -1877,11 +1895,12 @@ __std_run_with_timeout_supervisor__() {
             2>/dev/null ||
         ! "$__std_timeout_chmod_path" 600 "$__std_timeout_fifo" \
             "$__std_timeout_status_fifo" "$__std_timeout_status_file" \
+            "$__std_timeout_timer_status_file" \
             2>/dev/null ||
         ! exec {__std_timeout_timer_fd}<>"$__std_timeout_fifo" ||
         ! exec {__std_timeout_status_fd}<>"$__std_timeout_status_fifo"; then
         rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" \
-            "$__std_timeout_status_file"
+            "$__std_timeout_status_file" "$__std_timeout_timer_status_file"
         __std_timeout_emit_error__ "could not create the private timeout control channels."
         printf -v "$__std_timeout_outcome_result_name" '%s' infrastructure
         return 125
@@ -1894,7 +1913,7 @@ __std_run_with_timeout_supervisor__() {
         exec {__std_timeout_timer_fd}>&-
         exec {__std_timeout_status_fd}>&-
         rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" \
-            "$__std_timeout_status_file"
+            "$__std_timeout_status_file" "$__std_timeout_timer_status_file"
         __std_timeout_emit_error__ "could not preserve command stdin."
         printf -v "$__std_timeout_outcome_result_name" '%s' infrastructure
         return 125
@@ -1937,7 +1956,8 @@ __std_run_with_timeout_supervisor__() {
             __std_timeout_command_pid=$!
             __std_timeout_watchdog__ "$__std_timeout_seconds" \
                 "$__std_timeout_path" "$__std_timeout_timer_fd" \
-                "$__std_timeout_command_pid" 2>/dev/null &
+                "$__std_timeout_command_pid" \
+                "$__std_timeout_timer_status_file" 2>/dev/null &
             __std_timeout_timer_pid=$!
             # Remove the process-group sentinel from Bash's job table before
             # escalation. Its terminal status is carried by the private
@@ -1964,7 +1984,17 @@ __std_run_with_timeout_supervisor__() {
         fi
     else
         while [[ -z "$__std_timeout_child_status" &&
+            -z "$__std_timeout_timer_early_status" &&
             "$__std_timeout_cancel_status" == 0 ]]; do
+            if [[ -s "$__std_timeout_timer_status_file" ]]; then
+                __std_timeout_timer_status_record="$(<"$__std_timeout_timer_status_file")"
+                case "$__std_timeout_timer_status_record" in
+                    T[0-9][0-9][0-9])
+                        __std_timeout_timer_early_status="$((10#${__std_timeout_timer_status_record:1}))"
+                        break
+                        ;;
+                esac
+            fi
             if [[ -s "$__std_timeout_status_file" ]]; then
                 __std_timeout_status_record="$(<"$__std_timeout_status_file")"
                 if [[ "$__std_timeout_status_record" =~ ^S[0-9]{3}$ ]]; then
@@ -1984,6 +2014,19 @@ __std_run_with_timeout_supervisor__() {
             else
                 __std_timeout_timer_status=$?
             fi
+            if [[ -z "$__std_timeout_child_status" &&
+                -s "$__std_timeout_status_file" ]]; then
+                __std_timeout_status_record="$(<"$__std_timeout_status_file")"
+                case "$__std_timeout_status_record" in
+                    S[0-9][0-9][0-9])
+                        __std_timeout_child_status="$((10#${__std_timeout_status_record:1}))"
+                        ;;
+                esac
+            fi
+            if [[ -z "$__std_timeout_child_status" &&
+                -n "$__std_timeout_timer_early_status" ]]; then
+                __std_timeout_timer_status="$__std_timeout_timer_early_status"
+            fi
             __std_sleep_interval__ 1 || true
             builtin kill -KILL -- "-$__std_timeout_command_pid" \
                 2>/dev/null || true
@@ -1996,6 +2039,19 @@ __std_run_with_timeout_supervisor__() {
                 __std_timeout_timer_status=0
             else
                 __std_timeout_timer_status=$?
+            fi
+            if [[ -z "$__std_timeout_child_status" &&
+                -s "$__std_timeout_status_file" ]]; then
+                __std_timeout_status_record="$(<"$__std_timeout_status_file")"
+                case "$__std_timeout_status_record" in
+                    S[0-9][0-9][0-9])
+                        __std_timeout_child_status="$((10#${__std_timeout_status_record:1}))"
+                        ;;
+                esac
+            fi
+            if [[ -z "$__std_timeout_child_status" &&
+                -n "$__std_timeout_timer_early_status" ]]; then
+                __std_timeout_timer_status="$__std_timeout_timer_early_status"
             fi
             if [[ -n "$__std_timeout_cancel_signal" ]]; then
                 __std_timeout_final_status="$__std_timeout_cancel_status"
@@ -2020,8 +2076,18 @@ __std_run_with_timeout_supervisor__() {
                         # canceled.  Preserve that command result even when
                         # an older Bash/coreutils combination reports the
                         # canceled clock as an infrastructure failure.
-                        __std_timeout_final_status="$__std_timeout_run_status"
-                        __std_timeout_outcome=command
+                        if ((__std_timeout_run_status == 137 ||
+                            __std_timeout_run_status == 143)); then
+                            # These are the wrapper statuses produced when an
+                            # external clock fails and escalates the group.
+                            # Do not expose the wrapper's signal status as a
+                            # natural command result.
+                            __std_timeout_final_status=125
+                            __std_timeout_outcome=infrastructure
+                        else
+                            __std_timeout_final_status="$__std_timeout_run_status"
+                            __std_timeout_outcome=command
+                        fi
                         ;;
                     *)
                         __std_timeout_final_status=125
@@ -2051,7 +2117,7 @@ __std_run_with_timeout_supervisor__() {
         exec {__std_timeout_stderr_fd}>&-
     fi
     rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" \
-        "$__std_timeout_status_file"
+        "$__std_timeout_status_file" "$__std_timeout_timer_status_file"
 
     if ((__std_timeout_monitor_was_enabled)); then
         set -m
