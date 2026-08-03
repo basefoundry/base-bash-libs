@@ -2000,9 +2000,10 @@ __std_run_with_timeout_supervisor__() {
             if [[ -n "$__std_timeout_cancel_signal" ]]; then
                 __std_timeout_final_status="$__std_timeout_cancel_status"
                 __std_timeout_outcome=interrupted
-            elif [[ -n "$__std_timeout_child_status" &&
-                "$__std_timeout_child_status" =~ ^(0|[1-9][0-9]{0,2})$ ]] &&
-                ((10#$__std_timeout_child_status <= 255)); then
+            elif [[ -n "$__std_timeout_child_status" ]]; then
+                # The private status record is written only by the wrapper as
+                # S%03d from Bash's wait status, so a non-empty record is
+                # already constrained to the command's 0..255 exit range.
                 __std_timeout_run_status="$__std_timeout_child_status"
                 case "$__std_timeout_timer_status" in
                     0)
