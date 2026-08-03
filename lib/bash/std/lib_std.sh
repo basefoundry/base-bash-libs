@@ -2053,10 +2053,6 @@ __std_run_with_timeout_supervisor__() {
     rm -f -- "$__std_timeout_fifo" "$__std_timeout_status_fifo" \
         "$__std_timeout_status_file"
 
-    if ((__std_timeout_final_status == 125)); then
-        __std_timeout_emit_error__ "supervisor state: outcome=$__std_timeout_outcome timer=$__std_timeout_timer_status child=${__std_timeout_child_status:-none} command_pid=${__std_timeout_command_pid:-none}"
-    fi
-
     if ((__std_timeout_monitor_was_enabled)); then
         set -m
     else
