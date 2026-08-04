@@ -510,10 +510,26 @@ git_get_current_branch() {
 # @param $2 script_path The path to a script file tracked in a git repo.
 #
 # Returns:
-#   - 0 if up to date or the check is skipped (no git, no upstream, not a repo).
+#   - 0 if the repository is current or ahead, or the check is skipped for a
+#     documented non-error state (missing git, not a repo, untracked script,
+#     detached HEAD, or missing upstream).
 #   - 1 on invalid usage.
-#   - 2 if the repo is behind its upstream (script may be stale).
-#   - 3 if the script has local modifications.
+#   - 2 if the repository is behind its upstream (the script may be stale).
+#   - 3 if the script has local modifications and the comparison completed or
+#     was skipped for a documented non-error state.
+#   - 4 if the repository has diverged from its upstream.
+#   - 5 if Git metadata, diff, fetch, or comparison commands fail.
+#
+# Status precedence:
+#   - A dirty script takes precedence over a successful comparison, including
+#     behind, ahead, diverged, and known skip states.
+#   - An operational failure takes precedence over the dirty status because the
+#     result cannot be trusted.
+#   - A failed comparison never reports the repository as up to date.
+#
+# Expected skip states are not failures, but they are always logged explicitly.
+# They return 3 when the tracked script is dirty so callers cannot lose that
+# fact merely because an upstream comparison is unavailable.
 #
 check_script_up_to_date() {
     local fetch_before_check=false script_path
@@ -542,66 +558,182 @@ check_script_up_to_date() {
     fi
 
     local script_dir repo_root prefix rel_path
-    script_dir=$(dirname "$script_path")
-    repo_root=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null) || {
-        log_info -l base_bash_libs.git "Not in a git repo; skipping latest-version check."
-        return 0
+    script_dir=$(dirname -- "$script_path") || {
+        log_error -l base_bash_libs.git "Unable to resolve the script directory for '$script_path'."
+        return 5
     }
-    prefix=$(git -C "$script_dir" rev-parse --show-prefix 2>/dev/null) || {
-        log_info -l base_bash_libs.git "Unable to resolve repo-relative path; skipping latest-version check."
-        return 0
-    }
-    rel_path="${prefix}$(basename "$script_path")"
 
-    if ! git -C "$repo_root" ls-files --error-unmatch "$rel_path" >/dev/null 2>&1; then
-        log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
-        return 0
+    local repo_probe repo_probe_status
+    if repo_probe=$(git -C "$script_dir" rev-parse --is-inside-work-tree 2>&1); then
+        if [[ "$repo_probe" != true ]]; then
+            log_info -l base_bash_libs.git "Script '$script_path' is not in a Git worktree; skipping latest-version check."
+            return 0
+        fi
+    else
+        repo_probe_status=$?
+        if [[ "$repo_probe" == *"not a git repository"* ||
+            "$repo_probe" == *"not a git repo"* ]]; then
+            log_info -l base_bash_libs.git "Not in a Git repo; skipping latest-version check."
+            return 0
+        fi
+        log_error -l base_bash_libs.git "Unable to discover the Git repository for '$script_path' (git status $repo_probe_status)."
+        return 5
     fi
 
-    local dirty=false
-    if ! git -C "$repo_root" diff --quiet -- "$rel_path"; then
-        dirty=true
+    local repo_root_status
+    if repo_root=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null); then
+        :
+    else
+        repo_root_status=$?
+        log_error -l base_bash_libs.git "Unable to resolve the Git repository root for '$script_path' (git status $repo_root_status)."
+        return 5
     fi
-    if ! git -C "$repo_root" diff --cached --quiet -- "$rel_path"; then
-        dirty=true
+    local prefix_status
+    if prefix=$(git -C "$script_dir" rev-parse --show-prefix 2>/dev/null); then
+        :
+    else
+        prefix_status=$?
+        log_error -l base_bash_libs.git "Unable to resolve the repo-relative path for '$script_path' (git status $prefix_status)."
+        return 5
     fi
+    rel_path="${prefix}$(basename -- "$script_path")"
+
+    local tracked_status
+    if git -C "$repo_root" ls-files --error-unmatch -- "$rel_path" >/dev/null 2>&1; then
+        tracked_status=0
+    else
+        tracked_status=$?
+    fi
+    case "$tracked_status" in
+        0)
+            ;;
+        1)
+            log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
+            return 0
+            ;;
+        *)
+            log_error -l base_bash_libs.git "Unable to determine whether '$rel_path' is tracked (git status $tracked_status)."
+            return 5
+            ;;
+    esac
+
+    local dirty=false diff_status
+    if git -C "$repo_root" diff --quiet -- "$rel_path"; then
+        diff_status=0
+    else
+        diff_status=$?
+    fi
+    case "$diff_status" in
+        0)
+            ;;
+        1)
+            dirty=true
+            ;;
+        *)
+            log_error -l base_bash_libs.git "Unable to inspect working-tree changes for '$rel_path' (git status $diff_status)."
+            return 5
+            ;;
+    esac
+    if git -C "$repo_root" diff --cached --quiet -- "$rel_path"; then
+        diff_status=0
+    else
+        diff_status=$?
+    fi
+    case "$diff_status" in
+        0)
+            ;;
+        1)
+            dirty=true
+            ;;
+        *)
+            log_error -l base_bash_libs.git "Unable to inspect staged changes for '$rel_path' (git status $diff_status)."
+            return 5
+            ;;
+    esac
     if [[ "$dirty" == true ]]; then
         log_warn -l base_bash_libs.git "Script '$rel_path' has local modifications; version may not match repo."
     fi
 
-    local upstream behind ahead
-    upstream=$(git -C "$repo_root" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || {
-        log_info -l base_bash_libs.git "No upstream branch configured; skipping latest-version check."
-        return 0
-    }
+    local branch_name branch_status
+    if branch_name=$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null); then
+        :
+    else
+        branch_status=$?
+        if ((branch_status == 1)); then
+            log_info -l base_bash_libs.git "Repository is in a detached HEAD state; skipping latest-version check."
+            [[ "$dirty" == true ]] && return 3
+            return 0
+        fi
+        log_error -l base_bash_libs.git "Unable to determine the current Git branch (git status $branch_status)."
+        return 5
+    fi
+
+    local upstream upstream_result upstream_status
+    if upstream_result=$(git -C "$repo_root" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>&1); then
+        upstream="$upstream_result"
+    else
+        upstream_status=$?
+        if [[ "$upstream_result" == *"no upstream"* ||
+            "$upstream_result" == *"does not have any upstream"* ]]; then
+            log_info -l base_bash_libs.git "No upstream branch configured for '$branch_name'; skipping latest-version check."
+            [[ "$dirty" == true ]] && return 3
+            return 0
+        fi
+        log_error -l base_bash_libs.git "Unable to resolve the upstream for '$branch_name' (git status $upstream_status)."
+        return 5
+    fi
+    if [[ -z "$upstream" || "$upstream" == *$'\n'* ]]; then
+        log_error -l base_bash_libs.git "Git returned an invalid upstream for '$branch_name'."
+        return 5
+    fi
 
     if [[ "$fetch_before_check" == true ]]; then
         if git -C "$repo_root" fetch --quiet; then
             log_info -l base_bash_libs.git "Fetched upstream state before latest-version check."
         else
-            log_warn -l base_bash_libs.git "Unable to fetch upstream state; using local remote-tracking refs."
+            log_error -l base_bash_libs.git "Unable to fetch upstream state for '$upstream'; freshness is unknown."
+            return 5
         fi
     else
         log_debug -l base_bash_libs.git "Using local remote-tracking refs; pass --fetch for a live remote check."
     fi
 
-    behind=$(git -C "$repo_root" rev-list --count HEAD.."$upstream" 2>/dev/null)
-    ahead=$(git -C "$repo_root" rev-list --count "$upstream"..HEAD 2>/dev/null)
-    if [[ -n "$behind" && "$behind" -gt 0 ]]; then
+    local behind ahead rev_list_status
+    if behind=$(git -C "$repo_root" rev-list --count "HEAD..$upstream" 2>/dev/null); then
+        :
+    else
+        rev_list_status=$?
+        log_error -l base_bash_libs.git "Unable to compare HEAD with '$upstream' (git status $rev_list_status); freshness is unknown."
+        return 5
+    fi
+    if ahead=$(git -C "$repo_root" rev-list --count "$upstream..HEAD" 2>/dev/null); then
+        :
+    else
+        rev_list_status=$?
+        log_error -l base_bash_libs.git "Unable to compare '$upstream' with HEAD (git status $rev_list_status); freshness is unknown."
+        return 5
+    fi
+    if [[ ! "$behind" =~ ^[0-9]+$ || ! "$ahead" =~ ^[0-9]+$ ]]; then
+        log_error -l base_bash_libs.git "Git returned invalid freshness counts for '$upstream'; freshness is unknown."
+        return 5
+    fi
+
+    if ((behind > 0 && ahead > 0)); then
+        log_warn -l base_bash_libs.git "Repository has diverged from $upstream ($behind commit(s) behind, $ahead commit(s) ahead)."
+        [[ "$dirty" == true ]] && return 3
+        return 4
+    fi
+    if ((behind > 0)); then
         log_warn -l base_bash_libs.git "Repository is $behind commit(s) behind $upstream. Script may be out of date."
-        if [[ "$dirty" == true ]]; then
-            return 3
-        fi
+        [[ "$dirty" == true ]] && return 3
         return 2
-    elif [[ -n "$ahead" && "$ahead" -gt 0 ]]; then
+    fi
+    if ((ahead > 0)); then
         log_info -l base_bash_libs.git "Repository is $ahead commit(s) ahead of $upstream."
     else
         log_info -l base_bash_libs.git "Repository is up to date with $upstream."
     fi
 
-    if [[ "$dirty" == true ]]; then
-        return 3
-    fi
-
+    [[ "$dirty" == true ]] && return 3
     return 0
 }

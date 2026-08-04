@@ -32,6 +32,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Hardened file-section processing, allowed-dirty-path checks, temporary
   directory normalization, launcher symlink resolution, and pass-by-name output
   handling in post-v1.4.0 development.
+- Corrected Git freshness checks to preserve dirty-script status across
+  documented skip states, distinguish divergent repositories, and fail closed
+  when repository metadata, fetch, diff, or revision comparison commands fail.
 - Preserved normal Bash command resolution in the timeout fallback when a shell
   function shares its name with an external executable.
 - Unified timed execution behind a framework-owned process-group supervisor

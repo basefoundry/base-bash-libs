@@ -1054,3 +1054,258 @@ EOF
     [[ "$output" == *"has local modifications"* ]]
     [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
+
+@test "check_script_up_to_date preserves dirty status when no upstream exists" {
+    local repo="$TEST_TMPDIR/repo"
+    local script_path="$repo/scripts/tool.sh"
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/scripts"
+    printf '#!/usr/bin/env bash\n' > "$script_path"
+    commit_all "$repo" "Initial script"
+    printf 'echo dirty\n' >> "$script_path"
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 3 ]
+    [[ "$output" == *"has local modifications"* ]]
+    [[ "$output" == *"No upstream branch configured"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date reports a clean missing-upstream skip explicitly" {
+    local repo="$TEST_TMPDIR/repo"
+    local script_path="$repo/scripts/tool.sh"
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/scripts"
+    printf '#!/usr/bin/env bash\n' > "$script_path"
+    commit_all "$repo" "Initial script"
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No upstream branch configured"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date reports detached HEAD without claiming freshness" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git -C "$repo" checkout --detach HEAD >/dev/null 2>&1
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"detached HEAD state"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date preserves dirty status in detached HEAD" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git -C "$repo" checkout --detach HEAD >/dev/null 2>&1
+    printf 'echo dirty\n' >> "$script_path"
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 3 ]
+    [[ "$output" == *"has local modifications"* ]]
+    [[ "$output" == *"detached HEAD state"* ]]
+}
+
+@test "check_script_up_to_date reports untracked scripts as an explicit skip" {
+    local repo="$TEST_TMPDIR/repo"
+    local script_path="$repo/scripts/tool.sh"
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/scripts"
+    printf 'tracked\n' > "$repo/README"
+    commit_all "$repo" "Initial file"
+    printf '#!/usr/bin/env bash\n' > "$script_path"
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"is not tracked in git"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date reports non-repository paths as an explicit skip" {
+    local repo="$TEST_TMPDIR/not-a-repo"
+    local script_path="$repo/scripts/tool.sh"
+
+    mkdir -p "$(dirname "$script_path")"
+    printf '#!/usr/bin/env bash\n' > "$script_path"
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Not in a Git repo"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date distinguishes a repository ahead of upstream" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    printf 'echo local\n' >> "$script_path"
+    git -C "$repo" add scripts/tool.sh
+    git -C "$repo" commit -m "Local update" >/dev/null 2>&1
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ahead of origin/main"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date returns a distinct status for divergence" {
+    local other="$TEST_TMPDIR/other"
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git clone "$remote" "$other" >/dev/null 2>&1
+    git -C "$other" config user.name "Bats Test"
+    git -C "$other" config user.email "bats@example.com"
+    printf 'echo remote\n' >> "$other/scripts/tool.sh"
+    git -C "$other" add scripts/tool.sh
+    git -C "$other" commit -m "Remote update" >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
+    git -C "$repo" fetch origin >/dev/null 2>&1
+    printf 'echo local\n' >> "$script_path"
+    git -C "$repo" add scripts/tool.sh
+    git -C "$repo" commit -m "Local update" >/dev/null 2>&1
+
+    bats_run check_script_up_to_date "$script_path"
+
+    [ "$status" -eq 4 ]
+    [[ "$output" == *"has diverged from origin/main"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date fails closed when fetch fails" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "fetch" ]]; then
+            printf 'network unavailable\n' >&2
+            return 1
+        fi
+        command git "$@"
+    }
+
+    bats_run check_script_up_to_date --fetch "$script_path"
+    unset -f git
+
+    [ "$status" -eq 5 ]
+    [[ "$output" == *"freshness is unknown"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date fails closed when rev-list fails" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "rev-list" ]]; then
+            printf 'comparison unavailable\n' >&2
+            return 2
+        fi
+        command git "$@"
+    }
+
+    bats_run check_script_up_to_date "$script_path"
+    unset -f git
+
+    [ "$status" -eq 5 ]
+    [[ "$output" == *"freshness is unknown"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date reports repository discovery failures" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "rev-parse" &&
+            "${4:-}" == "--is-inside-work-tree" ]]; then
+            printf 'fatal: repository metadata unavailable\n' >&2
+            return 2
+        fi
+        command git "$@"
+    }
+
+    bats_run check_script_up_to_date "$script_path"
+    unset -f git
+
+    [ "$status" -eq 5 ]
+    [[ "$output" == *"Unable to discover the Git repository"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date reports diff inspection failures" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local script_path="$repo/scripts/tool.sh"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
+    git() {
+        if [[ "${1:-}" == "-C" && "${3:-}" == "diff" && "${4:-}" == "--quiet" ]]; then
+            printf 'permission denied\n' >&2
+            return 2
+        fi
+        command git "$@"
+    }
+
+    bats_run check_script_up_to_date "$script_path"
+    unset -f git
+
+    [ "$status" -eq 5 ]
+    [[ "$output" == *"Unable to inspect working-tree changes"* ]]
+    [[ "$output" != *"up to date"* ]]
+}
+
+@test "check_script_up_to_date preserves statuses under caller shell options" {
+    local mode
+    local repo="$TEST_TMPDIR/repo"
+    local script_path="$repo/scripts/tool.sh"
+
+    init_git_repo "$repo"
+    mkdir -p "$repo/scripts"
+    printf '#!/usr/bin/env bash\n' > "$script_path"
+    commit_all "$repo" "Initial script"
+    printf 'echo dirty\n' >> "$script_path"
+
+    for mode in off e u p eu ep up eup; do
+        bats_run "$BASH" -c '
+            mode="$1"
+            case "$mode" in *e*) set -e ;; esac
+            case "$mode" in *u*) set -u ;; esac
+            case "$mode" in *p*) set -o pipefail ;; esac
+            source "$2"
+            source "$3"
+            check_script_up_to_date "$4"
+        ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$script_path"
+
+        [ "$status" -eq 3 ]
+        [[ "$output" != *"unbound variable"* ]]
+    done
+}

@@ -67,13 +67,29 @@ log_info "Current branch: $branch"
 - `git_update_repo` only treats an allowed dirty path as safe when every tracked
   change stays within that path. Rename records must have both source and
   destination inside the allowed path.
-- `check_script_up_to_date` treats missing git state, untracked scripts, or missing upstreams as skip conditions rather than hard failures.
+- `check_script_up_to_date` treats a missing file, unavailable Git executable,
+  non-repository path, untracked script, detached HEAD, and missing upstream as
+  explicit skip states rather than hard failures. A dirty tracked script still
+  returns status `3` when one of those skip states prevents comparison.
 - `check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
-- `check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first, then compares against the refreshed upstream ref. If fetch fails, the helper logs a warning and falls back to local remote-tracking refs.
-- `check_script_up_to_date` returns `2` when the repository is behind upstream,
-  and `3` when the script has local modifications. If both are true, local
-  modifications take precedence and the helper returns `3` after logging both
-  conditions.
+- `check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first,
+  then compares against the refreshed upstream ref. If fetch fails, the helper
+  returns status `5`; it never reports freshness from an unverified comparison.
+
+### `check_script_up_to_date` statuses
+
+| Status | Meaning |
+| ---: | --- |
+| `0` | Current or ahead of upstream, or an explicit non-error skip state. |
+| `1` | Invalid usage. |
+| `2` | Behind upstream; the script may be stale. |
+| `3` | The tracked script has local modifications. This takes precedence over a successful current, ahead, behind, or diverged comparison, and over documented skip states. |
+| `4` | The repository has diverged from upstream. |
+| `5` | Operational failure while discovering repository metadata, inspecting changes, fetching, or comparing revisions. Freshness is unknown. |
+
+Operational failures take precedence over the dirty status because the result
+cannot be trusted. Every status is accompanied by an explicit diagnostic, and
+failed Git commands never fall through to an “up to date” result.
 
 ## Tests
 
