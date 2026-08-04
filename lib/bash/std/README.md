@@ -125,9 +125,14 @@ such output names are rejected before caller state is changed.
 - `std_register_cleanup_hook <function>`,
   `std_unregister_cleanup_hook <function>`: add or remove a named cleanup
   function from the shared exit dispatcher.
-- `std_register_cleanup_path <absolute_path...>`,
-  `std_unregister_cleanup_path <absolute_path...>`: add or remove safe paths
-  from exit cleanup; invalid paths are rejected.
+- `std_register_cleanup_path [--unsafe] <absolute_path...>`,
+  `std_unregister_cleanup_path <absolute_path...>`: add or remove paths from
+  exit cleanup; invalid, broad, protected, and relative paths are rejected.
+  Normal registration snapshots every path component and refuses deletion if a
+  symlink, parent directory, rename, or other identity substitution changes
+  the registered resource. `--unsafe` explicitly opts out of that ownership
+  proof for a specific path, but protected roots and system/shared directories
+  remain rejected.
 - `std_make_temp_file [--keep] <result_var> [prefix]` and
   `std_make_temp_dir [--keep] <result_var> [prefix]`: create a temporary path,
   store it in the caller variable, and register it for cleanup unless
@@ -640,10 +645,12 @@ std_register_cleanup_path "$workspace"
 
 Cleanup paths are removed with `rm -rf --` from a shared `EXIT` trap. Paths must
 be absolute so cleanup cannot drift when a script changes directory after
-registration. Empty paths, root paths, and current/parent directory traversal
-components are rejected before registration. When one call mixes safe and unsafe
-paths, safe paths are registered, unsafe paths are rejected, and the helper
-returns nonzero.
+registration. Empty paths, root paths, current/parent directory traversal
+components, broad roots, home, system directories, and shared temporary roots
+are rejected before registration. Normal paths are identity-checked at exit;
+if a parent is renamed or replaced, cleanup refuses to remove the new object.
+When one call mixes valid and invalid paths, valid paths are registered, invalid
+paths are rejected, and the helper returns nonzero.
 
 When a script removes or moves a registered path before exit, unregister it so
 the shared cleanup registry only contains paths that may still need fallback
@@ -665,13 +672,17 @@ std_register_cleanup_hook cleanup_workspace
 std_unregister_cleanup_hook cleanup_workspace
 ```
 
-Hooks run in registration order and duplicate registrations are ignored. If an
-`EXIT` trap already exists when the first cleanup hook or path is registered,
-that existing trap is preserved and runs before the stdlib cleanup hooks. The
-shared dispatcher remains installed only while at least one hook or path is
-registered. Removing the final registration restores the prior `EXIT` trap if
-the dispatcher still owns it; a trap installed later by the caller is never
-overwritten during unregistration.
+Hooks and paths unwind in strict last-in, first-out order, and duplicate
+registrations are ignored. If an `EXIT` trap already exists when the first
+cleanup hook or path is registered, that existing trap is preserved and runs
+before the registered resources. Caller `EXIT`, `INT`, `TERM`, and `DEBUG`
+traps installed later are composed with the dispatcher instead of silently
+replacing it. Cleanup runs at most once, preserves the primary exit status,
+and reports secondary hook/path failures without skipping later resources.
+Signals received during cleanup are latched and reflected in the final status.
+The shared dispatcher remains installed only while at least one hook or path is
+registered. Removing the final registration restores the caller traps that the
+dispatcher still owns.
 
 ## Temporary Path Helpers
 
