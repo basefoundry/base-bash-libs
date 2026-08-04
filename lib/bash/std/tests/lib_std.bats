@@ -3570,7 +3570,7 @@ EOF
     [ ! -e "$link" ]
     [ -d "$target" ]
 
-    std_register_cleanup_path --unsafe "$TMPDIR" 2>"$stderr_file" || rc=$?
+    std_register_cleanup_path --unsafe /tmp 2>"$stderr_file" || rc=$?
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"broad or protected path"* ]]
 
