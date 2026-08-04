@@ -5,6 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 # shellcheck source=/dev/null
 source "$repo_root/lib/bash/std/lib_std.sh"
 
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+
 import "$repo_root/lib/bash/file/lib_file.sh"
 
 example_file="${TMPDIR:-/tmp}/base-bash-libs-example.$$"

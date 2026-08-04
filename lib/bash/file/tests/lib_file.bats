@@ -5,6 +5,8 @@ load ../../tests/test_helper.sh
 setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
+    declare -a setup_args=()
+    base_bash_libs_init setup_args --source "$BASE_BASH_DIR/file/tests/lib_file.bats" --
     source "$BASE_BASH_DIR/file/lib_file.sh"
 }
 
@@ -39,6 +41,8 @@ file_mode() {
     cat > "$script" <<EOF
 #!/usr/bin/env bash
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 printf 'line-one' > "\$1"
 update_file_section "\$1" "# BEGIN" "# END" "first"
@@ -103,6 +107,8 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 update_file_section
 printf 'after\n'
@@ -127,6 +133,8 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 update_file_section "\$1" "# BEGIN" "# END"
 printf 'strict=preserved\n'
@@ -307,6 +315,8 @@ EOF
     cat > "$script" <<EOF
 #!/usr/bin/env bash
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 trap 'printf "caller\n" >> "$log_file"' EXIT
 before_trap="\$(trap -p EXIT)"

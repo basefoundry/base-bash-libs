@@ -8,6 +8,8 @@ Source the stdlib before this library:
 
 ```bash
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" --
 import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
 ```
 

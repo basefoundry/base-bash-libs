@@ -8,6 +8,8 @@ setup() {
     mkdir -p "$TEST_TMPDIR/bin"
     PATH="$TEST_TMPDIR/bin:$BASE_TEST_ORIG_PATH"
     source "$BASE_BASH_DIR/std/lib_std.sh"
+    declare -a setup_args=()
+    base_bash_libs_init setup_args --source "$BASE_BASH_DIR/gh/tests/lib_gh.bats" --
     source "$BASE_BASH_DIR/gh/lib_gh.sh"
 }
 
@@ -163,6 +165,8 @@ gh_api_retry_observed() {
                 case "$mode" in *u*) set -u ;; esac
                 case "$mode" in *p*) set -o pipefail ;; esac
                 source "$2"
+                declare -a app_args=()
+                base_bash_libs_init app_args --
                 source "$3"
                 "$4"
                 rc=$?
@@ -301,6 +305,8 @@ EOF
             case "$mode" in *u*) set -u ;; esac
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
+            declare -a app_args=()
+            base_bash_libs_init app_args --
             source "$3"
             PATH="$4:$PATH"
             gh_run issue list
@@ -318,6 +324,8 @@ EOF
             case "$mode" in *u*) set -u ;; esac
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
+            declare -a app_args=()
+            base_bash_libs_init app_args --
             source "$3"
             PATH="$4:$PATH"
             gh_run --sensitive --safe-display "strict protected operation" -- issue list
@@ -402,6 +410,8 @@ EOF
 
     bats_run "$BASH" -c '
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args --
         source "$2"
         PATH="$3"
         gh_require_cli "$4"
@@ -572,6 +582,8 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/gh/lib_gh.sh"
 PATH="$TEST_TMPDIR/bin:$BASE_TEST_ORIG_PATH"
 gh_run issue create --title Example
@@ -610,6 +622,8 @@ EOF
 
     bats_run "$BASH" -c '
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args --
         source "$2"
         PATH="$3"
         gh_run issue list
@@ -1711,6 +1725,8 @@ EOF
     cat > "$script" <<'EOF'
 #!/usr/bin/env bash
 source "$1"
+declare -a app_args=()
+base_bash_libs_init app_args --
 source "$2"
 TMPDIR="$3"
 STATUS_FILE="$4"
@@ -1753,6 +1769,8 @@ EOF
 #!/usr/bin/env bash
 set -u
 source "$1"
+declare -a app_args=()
+base_bash_libs_init app_args --
 source "$2"
 TMPDIR="$3"
 TRAP_MARKER="$4"
@@ -1904,6 +1922,8 @@ EOF
 #!/usr/bin/env bash
 set -e
 source "$BASE_BASH_DIR/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/gh/lib_gh.sh"
 PATH="$TEST_TMPDIR/bin:$PATH"
 gh_api_with_retry repos/owner/missing
@@ -1931,6 +1951,8 @@ EOF
 
     bats_run "$BASH" -c '
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args --
         source "$2"
         set -C
         value="$(gh_api_with_retry --max-attempts 1 -- repos/owner/repo)" || exit $?

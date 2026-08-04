@@ -29,11 +29,12 @@ modules.
 ## Caller Runtime Contract
 
 All public modules support Bash 4.2 or newer with every combination of caller-
-selected `errexit`, `nounset`, and `pipefail`. Sourcing a module does not change
-those settings, any other `set` or `shopt` option, `IFS`, `OPTIND`, the working
-directory, the umask, traps, or ordinary positional arguments. The stdlib's
-documented wrapper flags are the exception: its initializer removes recognized
-wrapper flags and publishes the filtered positional arguments.
+selected `errexit`, `nounset`, and `pipefail`. Sourcing a module is passive: it
+does not change those settings, any other `set` or `shopt` option, `IFS`,
+`OPTIND`, the working directory, the umask, traps, exports, or ordinary
+positional arguments. After sourcing `lib_std.sh`, callers explicitly invoke
+`base_bash_libs_init` to initialize runtime state and receive wrapper-filtered
+arguments in a caller-owned array.
 
 Public API calls preserve the same process state unless their documented
 purpose is to change it. Examples of intentional mutation include PATH helpers,

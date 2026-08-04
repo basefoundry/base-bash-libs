@@ -76,6 +76,11 @@ main() {
         smoke_fail "unable to source lib_std.sh."
         return 1
     fi
+    local -a smoke_args=()
+    if ! base_bash_libs_init smoke_args --source "${BASH_SOURCE[0]}" --; then
+        smoke_fail "unable to initialize lib_std.sh."
+        return 1
+    fi
 
     if ! check_bash_version; then
         smoke_fail "the running Bash did not satisfy the supported version check."

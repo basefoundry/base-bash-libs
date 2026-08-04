@@ -63,6 +63,8 @@ Source the installed stdlib from the Homebrew prefix:
 ```bash
 base_bash_libs_prefix="$(brew --prefix basefoundry/base/base-bash-libs)"
 source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
@@ -115,6 +117,8 @@ Source the stdlib from that checkout:
 ```bash
 base_bash_libs_dir="$PWD/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
@@ -145,6 +149,8 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
 import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
 import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"

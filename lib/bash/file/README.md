@@ -27,6 +27,8 @@ settings; they do not impose a strict-mode policy on the calling script.
 
 ```bash
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" --
 source "/absolute/path/to/lib/bash/file/lib_file.sh"
 
 update_file_section ~/.bash_profile "# BEGIN APP" "# END APP" \

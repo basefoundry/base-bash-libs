@@ -5,12 +5,21 @@ load ../../tests/test_helper.sh
 setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
+    declare -a setup_args=()
+    base_bash_libs_init setup_args --source "$BASE_BASH_DIR/list/tests/lib_list.bats" --
     source "$BASE_BASH_DIR/list/lib_list.sh"
 }
 
 create_script() {
     local script_path="$1"
-    cat > "$script_path"
+    local content source_line init_lines
+    content="$(cat)"
+    source_line="source \"$BASE_BASH_DIR/std/lib_std.sh\""
+    if [[ "$content" == *"$source_line"* ]]; then
+        init_lines=$'declare -a base_bash_libs_test_args=()\nbase_bash_libs_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
+        content="${content/"$source_line"/"$source_line"$'\n'"$init_lines"}"
+    fi
+    printf '%s\n' "$content" > "$script_path"
     chmod +x "$script_path"
 }
 
@@ -54,6 +63,8 @@ create_script() {
                 case "$mode" in *u*) set -u ;; esac
                 case "$mode" in *p*) set -o pipefail ;; esac
                 source "$2"
+                declare -a app_args=()
+                base_bash_libs_init app_args --
                 source "$3"
                 "$4"
                 exit $?
