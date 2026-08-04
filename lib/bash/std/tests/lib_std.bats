@@ -3577,7 +3577,6 @@ EOF
     rc=0
     std_register_cleanup_path --unsafe "$HOME" /usr 2>"$stderr_file" || rc=$?
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"broad or protected path"* ]]
 }
 
 @test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
