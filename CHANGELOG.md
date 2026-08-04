@@ -29,6 +29,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Hardened cleanup unwinding with LIFO ordering, exactly-once execution,
+  caller-trap composition, signal-safe status propagation, path-component
+  identity checks, and fail-closed handling for symlink or renamed-parent
+  substitutions.
 - Hardened file-section processing, allowed-dirty-path checks, temporary
   directory normalization, launcher symlink resolution, and pass-by-name output
   handling in post-v1.4.0 development.

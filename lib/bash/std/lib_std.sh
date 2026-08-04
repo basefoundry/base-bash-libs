@@ -33,7 +33,9 @@
 #   exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
 #   fatal_error msg...           # Convenience wrapper: exit with last status or 1.
 #   std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
-#   std_register_cleanup_path p  # Remove files/directories from the shared EXIT trap.
+#   std_register_cleanup_path p  # Remove owned files/directories from EXIT cleanup.
+#   std_register_cleanup_path --unsafe p
+#                                # Explicitly opt out of path-identity proof.
 #   std_unregister_cleanup_path p
 #                                # Drop files/directories from the shared EXIT cleanup list.
 #   std_make_temp_file var [pfx] # Create a temp file and store its path in var.
@@ -220,10 +222,25 @@ fi
 readonly __SCRIPT_DIR__
 declare -ga __std_cleanup_hooks=()
 declare -ga __std_cleanup_paths=()
+declare -ga __std_cleanup_entries=()
+declare -gA __std_cleanup_path_fingerprints=()
 declare -g __std_cleanup_dispatcher_installed=0
+declare -g __std_cleanup_dispatcher_running=0
+declare -g __std_cleanup_dispatcher_finished=0
+declare -g __std_cleanup_pending_signal_status=0
+declare -g __std_cleanup_debug_guard_running=0
 declare -g __std_original_exit_trap=""
 declare -g __std_original_exit_trap_spec=""
 declare -g __std_cleanup_dispatcher_trap_spec=""
+declare -g __std_original_int_trap=""
+declare -g __std_original_int_trap_spec=""
+declare -g __std_cleanup_int_trap_spec="__not-installed__"
+declare -g __std_original_term_trap=""
+declare -g __std_original_term_trap_spec=""
+declare -g __std_cleanup_term_trap_spec="__not-installed__"
+declare -g __std_original_debug_trap=""
+declare -g __std_original_debug_trap_spec=""
+declare -g __std_cleanup_debug_trap_spec="__not-installed__"
 
 ############################################ BASH VERSION CHECKER #######################################################
 
@@ -2282,11 +2299,29 @@ safe_truncate() {
 
 ######################################################## CLEANUP #######################################################
 
-__std_get_exit_trap_command__() {
-    local result_name="$1" trap_spec=""
-    local trap_prefix="trap -- '" trap_suffix="' EXIT"
+__std_return_status__() {
+    return "$1"
+}
 
-    trap_spec="$(trap -p EXIT || true)"
+__std_get_trap_command__() {
+    local result_name="${1-}" signal="${2-}" trap_name trap_spec=""
+    local trap_prefix="trap -- '" trap_suffix
+
+    case "$signal" in
+        EXIT | DEBUG)
+            trap_name="$signal"
+            ;;
+        INT | TERM)
+            trap_name="SIG$signal"
+            ;;
+        *)
+            printf -v "$result_name" '%s' ""
+            return 1
+            ;;
+    esac
+
+    trap_suffix="' $trap_name"
+    trap_spec="$(trap -p "$signal" || true)"
     if [[ "$trap_spec" == "$trap_prefix"*"$trap_suffix" ]]; then
         trap_spec="${trap_spec#"$trap_prefix"}"
         trap_spec="${trap_spec%"$trap_suffix"}"
@@ -2296,33 +2331,203 @@ __std_get_exit_trap_command__() {
     fi
 }
 
-__std_return_status__() {
-    return "$1"
+__std_get_exit_trap_command__() {
+    __std_get_trap_command__ "$1" EXIT
+}
+
+__std_restore_trap_spec__() {
+    local signal="$1" trap_spec="$2"
+
+    if [[ -n "$trap_spec" ]]; then
+        eval "$trap_spec"
+    else
+        trap - "$signal"
+    fi
+}
+
+__std_run_saved_trap_command__() {
+    local trap_command="$1" exit_status="$2"
+
+    [[ -n "$trap_command" ]] || return 0
+    (
+        __std_return_status__ "$exit_status"
+        eval "$trap_command"
+    ) || true
+}
+
+__std_stat_path_identity__() {
+    local result_name="$1" path="$2" stat_identity
+
+    if stat_identity="$(stat -c '%d:%i' -- "$path" 2>/dev/null)"; then
+        printf -v "$result_name" '%s' "$stat_identity"
+        return 0
+    fi
+    if stat_identity="$(stat -f '%d:%i' -- "$path" 2>/dev/null)"; then
+        printf -v "$result_name" '%s' "$stat_identity"
+        return 0
+    fi
+    return 1
+}
+
+__std_capture_cleanup_path_fingerprint__() {
+    local result_name="$1" path="$2" current="$2" component_identity path_fingerprint=""
+
+    [[ -e "$path" || -L "$path" ]] || return 1
+    while :; do
+        __std_stat_path_identity__ component_identity "$current" || return 1
+        path_fingerprint+="$current"$'\t'"$component_identity"$'\n'
+        [[ "$current" == "/" ]] && break
+        current="$(dirname -- "$current")" || return 1
+    done
+
+    printf -v "$result_name" '%s' "$path_fingerprint"
+}
+
+__std_cleanup_path_fingerprint_matches__() {
+    local path="$1" fingerprint="${__std_cleanup_path_fingerprints[$1]-}"
+    local expected_path expected_identity actual_identity
+
+    [[ -n "$fingerprint" && "$fingerprint" != UNSAFE ]] || return 1
+    while IFS=$'\t' read -r expected_path expected_identity; do
+        [[ -n "$expected_path" ]] || continue
+        __std_stat_path_identity__ actual_identity "$expected_path" || return 1
+        [[ "$actual_identity" == "$expected_identity" ]] || return 1
+    done <<< "$fingerprint"
+}
+
+__std_cleanup_delete_path__() {
+    local cleanup_path="$1"
+    local fingerprint="${__std_cleanup_path_fingerprints[$cleanup_path]-}"
+
+    [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || return 0
+    if [[ "$fingerprint" != UNSAFE ]] &&
+        ! __std_cleanup_path_fingerprint_matches__ "$cleanup_path"; then
+        log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' changed identity; refusing to remove it."
+        return 1
+    fi
+    if [[ "$fingerprint" == UNSAFE ]]; then
+        log_warn -l base_bash_libs.std "Removing explicitly unsafe cleanup path '$cleanup_path'."
+    fi
+    if ! rm -rf -- "$cleanup_path"; then
+        log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
+        return 1
+    fi
+    return 0
+}
+
+__std_cleanup_refresh_signal_traps__() {
+    local current_int_trap current_term_trap
+
+    current_int_trap="$(trap -p INT || true)"
+    if [[ "$current_int_trap" != "$__std_cleanup_int_trap_spec" ]]; then
+        __std_original_int_trap_spec="$current_int_trap"
+        __std_get_trap_command__ __std_original_int_trap INT || true
+        if [[ -n "$current_int_trap" && -z "$__std_original_int_trap" ]]; then
+            __std_cleanup_int_trap_spec="$current_int_trap"
+        else
+            trap '__std_cleanup_signal_exit__ INT 130' INT
+            __std_cleanup_int_trap_spec="$(trap -p INT || true)"
+        fi
+    fi
+
+    current_term_trap="$(trap -p TERM || true)"
+    if [[ "$current_term_trap" != "$__std_cleanup_term_trap_spec" ]]; then
+        __std_original_term_trap_spec="$current_term_trap"
+        __std_get_trap_command__ __std_original_term_trap TERM || true
+        if [[ -n "$current_term_trap" && -z "$__std_original_term_trap" ]]; then
+            __std_cleanup_term_trap_spec="$current_term_trap"
+        else
+            trap '__std_cleanup_signal_exit__ TERM 143' TERM
+            __std_cleanup_term_trap_spec="$(trap -p TERM || true)"
+        fi
+    fi
+}
+
+__std_cleanup_refresh_traps__() {
+    local current_exit_trap
+
+    ((__std_cleanup_dispatcher_installed)) || return 0
+    current_exit_trap="$(trap -p EXIT || true)"
+    if [[ "$current_exit_trap" != "$__std_cleanup_dispatcher_trap_spec" ]]; then
+        __std_original_exit_trap_spec="$current_exit_trap"
+        __std_get_exit_trap_command__ __std_original_exit_trap || true
+        trap '__std_run_cleanup_hooks__' EXIT
+        __std_cleanup_dispatcher_trap_spec="$(trap -p EXIT || true)"
+    fi
+    __std_cleanup_refresh_signal_traps__
+}
+
+__std_cleanup_debug_guard__() {
+    local current_debug_status=$?
+
+    ((current_debug_status)) && :
+    ((__std_cleanup_dispatcher_installed)) || return 0
+    (( __std_cleanup_debug_guard_running )) && return 0
+    __std_cleanup_debug_guard_running=1
+
+    if [[ -n "$__std_original_debug_trap" ]]; then
+        (eval "$__std_original_debug_trap") || true
+    fi
+    __std_cleanup_refresh_traps__
+    __std_cleanup_debug_guard_running=0
+    return 0
+}
+
+__std_cleanup_signal_exit__() {
+    local signal="$1" exit_status="$2"
+
+    case "$signal" in
+        INT)
+            __std_run_saved_trap_command__ "$__std_original_int_trap" "$exit_status"
+            ;;
+        TERM)
+            __std_run_saved_trap_command__ "$__std_original_term_trap" "$exit_status"
+            ;;
+    esac
+
+    if (( __std_cleanup_dispatcher_running )); then
+        __std_cleanup_pending_signal_status="$exit_status"
+        return 0
+    fi
+    exit "$exit_status"
 }
 
 __std_run_cleanup_hooks__() {
-    local exit_status=$? hook cleanup_path
+    local exit_status=$? entry entry_type entry_value index
+
+    (( __std_cleanup_dispatcher_finished )) && return "$exit_status"
+    (( __std_cleanup_dispatcher_running )) && return "$exit_status"
+    __std_cleanup_dispatcher_running=1
+    trap - DEBUG
 
     if [[ -n "${__std_original_exit_trap:-}" ]]; then
-        (
-            __std_return_status__ "$exit_status"
-            eval "$__std_original_exit_trap"
-        ) || true
+        __std_run_saved_trap_command__ "$__std_original_exit_trap" "$exit_status"
     fi
 
-    for hook in "${__std_cleanup_hooks[@]+"${__std_cleanup_hooks[@]}"}"; do
-        if ! "$hook"; then
-            log_warn -l base_bash_libs.std "Cleanup hook '$hook' failed."
-        fi
+    for ((index=${#__std_cleanup_entries[@]} - 1; index >= 0; index--)); do
+        entry="${__std_cleanup_entries[index]}"
+        entry_type="${entry%%:*}"
+        entry_value="${entry#*:}"
+        case "$entry_type" in
+            hook)
+                if ! "$entry_value"; then
+                    log_warn -l base_bash_libs.std "Cleanup hook '$entry_value' failed."
+                fi
+                ;;
+            path)
+                __std_cleanup_delete_path__ "$entry_value" || true
+                ;;
+        esac
     done
 
-    for cleanup_path in "${__std_cleanup_paths[@]+"${__std_cleanup_paths[@]}"}"; do
-        [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || continue
-        if ! rm -rf -- "$cleanup_path"; then
-            log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
-        fi
-    done
-
+    if (( __std_cleanup_pending_signal_status )); then
+        exit_status="$__std_cleanup_pending_signal_status"
+    fi
+    __std_cleanup_dispatcher_finished=1
+    __std_cleanup_dispatcher_running=0
+    if (( __std_cleanup_pending_signal_status )); then
+        exit "$exit_status"
+    fi
     return "$exit_status" 2>/dev/null || exit "$exit_status"
 }
 
@@ -2331,34 +2536,72 @@ __std_install_cleanup_dispatcher__() {
         return 0
     fi
 
+    __std_cleanup_dispatcher_running=0
+    __std_cleanup_dispatcher_finished=0
+    __std_cleanup_pending_signal_status=0
     __std_original_exit_trap_spec="$(trap -p EXIT || true)"
     __std_get_exit_trap_command__ __std_original_exit_trap
+    __std_original_int_trap_spec="$(trap -p INT || true)"
+    __std_get_trap_command__ __std_original_int_trap INT || true
+    __std_original_term_trap_spec="$(trap -p TERM || true)"
+    __std_get_trap_command__ __std_original_term_trap TERM || true
+    __std_original_debug_trap_spec="$(trap -p DEBUG || true)"
+    __std_get_trap_command__ __std_original_debug_trap DEBUG || true
+    __std_cleanup_int_trap_spec="__not-installed__"
+    __std_cleanup_term_trap_spec="__not-installed__"
+    __std_cleanup_debug_trap_spec="__not-installed__"
     trap '__std_run_cleanup_hooks__' EXIT
     __std_cleanup_dispatcher_trap_spec="$(trap -p EXIT || true)"
+    trap '__std_cleanup_debug_guard__' DEBUG
+    __std_cleanup_debug_trap_spec="$(trap -p DEBUG || true)"
     __std_cleanup_dispatcher_installed=1
+    __std_cleanup_refresh_signal_traps__
     return 0
 }
 
 __std_maybe_uninstall_cleanup_dispatcher__() {
-    local current_exit_trap_spec
+    local current_exit_trap_spec current_int_trap_spec
+    local current_term_trap_spec current_debug_trap_spec
 
     ((__std_cleanup_dispatcher_installed)) || return 0
-    if [[ -n "${__std_cleanup_hooks[0]+set}" || -n "${__std_cleanup_paths[0]+set}" ]]; then
+    if ((${#__std_cleanup_entries[@]})); then
         return 0
     fi
 
+    __std_cleanup_debug_guard_running=1
     current_exit_trap_spec="$(trap -p EXIT || true)"
     if [[ "$current_exit_trap_spec" == "$__std_cleanup_dispatcher_trap_spec" ]]; then
         trap - EXIT
-        if [[ -n "$__std_original_exit_trap_spec" ]]; then
-            eval "$__std_original_exit_trap_spec"
-        fi
+        __std_restore_trap_spec__ EXIT "$__std_original_exit_trap_spec"
+    fi
+    current_int_trap_spec="$(trap -p INT || true)"
+    if [[ "$current_int_trap_spec" == "$__std_cleanup_int_trap_spec" ]]; then
+        __std_restore_trap_spec__ INT "$__std_original_int_trap_spec"
+    fi
+    current_term_trap_spec="$(trap -p TERM || true)"
+    if [[ "$current_term_trap_spec" == "$__std_cleanup_term_trap_spec" ]]; then
+        __std_restore_trap_spec__ TERM "$__std_original_term_trap_spec"
+    fi
+    current_debug_trap_spec="$(trap -p DEBUG || true)"
+    if [[ "$current_debug_trap_spec" == "$__std_cleanup_debug_trap_spec" ||
+        "$current_debug_trap_spec" == *"__std_cleanup_debug_guard__"* ]]; then
+        __std_restore_trap_spec__ DEBUG "$__std_original_debug_trap_spec"
     fi
 
     __std_cleanup_dispatcher_installed=0
+    __std_cleanup_debug_guard_running=0
     __std_original_exit_trap=""
     __std_original_exit_trap_spec=""
     __std_cleanup_dispatcher_trap_spec=""
+    __std_original_int_trap=""
+    __std_original_int_trap_spec=""
+    __std_cleanup_int_trap_spec="__not-installed__"
+    __std_original_term_trap=""
+    __std_original_term_trap_spec=""
+    __std_cleanup_term_trap_spec="__not-installed__"
+    __std_original_debug_trap=""
+    __std_original_debug_trap_spec=""
+    __std_cleanup_debug_trap_spec="__not-installed__"
     return 0
 }
 
@@ -2389,6 +2632,7 @@ std_register_cleanup_hook() {
     done
 
     __std_cleanup_hooks+=("$hook")
+    __std_cleanup_entries+=("hook:$hook")
     __std_install_cleanup_dispatcher__
     return 0
 }
@@ -2400,8 +2644,8 @@ std_register_cleanup_hook() {
 #   std_unregister_cleanup_hook cleanup_workspace
 #
 std_unregister_cleanup_hook() {
-    local hook="${1-}" existing_hook
-    local -a remaining_hooks=()
+    local hook="${1-}" existing_hook entry entry_type entry_value
+    local -a remaining_hooks=() remaining_entries=()
 
     if (($# != 1)); then
         log_error -l base_bash_libs.std "std_unregister_cleanup_hook: expected exactly one function name."
@@ -2413,6 +2657,15 @@ std_unregister_cleanup_hook() {
         remaining_hooks+=("$existing_hook")
     done
     __std_cleanup_hooks=("${remaining_hooks[@]+"${remaining_hooks[@]}"}")
+    for entry in "${__std_cleanup_entries[@]+"${__std_cleanup_entries[@]}"}"; do
+        entry_type="${entry%%:*}"
+        entry_value="${entry#*:}"
+        if [[ "$entry_type" == hook && "$entry_value" == "$hook" ]]; then
+            continue
+        fi
+        remaining_entries+=("$entry")
+    done
+    __std_cleanup_entries=("${remaining_entries[@]+"${remaining_entries[@]}"}")
     __std_maybe_uninstall_cleanup_dispatcher__
     return 0
 }
@@ -2431,24 +2684,55 @@ __std_is_safe_cleanup_path__() {
     return 0
 }
 
+__std_is_broad_cleanup_path__() {
+    local path="${1-}"
+    local home_dir="${HOME:-}" tmp_dir="${TMPDIR:-}"
+
+    [[ "$path" == "/" ]] && return 0
+    [[ -n "$home_dir" && "$path" == "$home_dir" ]] && return 0
+    [[ -n "$tmp_dir" && "$path" == "$tmp_dir" ]] && return 0
+    case "$path" in
+        /tmp | /var/tmp | /private/tmp | /private/var/tmp | \
+        /bin | /bin/* | /sbin | /sbin/* | /usr | /usr/* | /etc | /etc/* | \
+        /var | /System | /System/* | /Library | /Library/* | \
+        /Applications | /Applications/* | /dev | /dev/*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 #
 # std_register_cleanup_path - Registers files or directories for removal at shell exit.
 #
 # Paths are removed with `rm -rf --` from the shared EXIT trap. Paths must be
 # absolute so cleanup cannot drift when a script changes directory after
-# registration. Empty paths, root paths, and paths containing current/parent
-# directory traversal components are rejected to avoid broad accidental
-# deletion. Safe paths in the same call are still registered, and the function
-# returns nonzero if any path was rejected.
+# registration. The normal form snapshots every path component (device and
+# inode) at registration and refuses deletion if any component is replaced.
+# `--unsafe` opts out of that identity proof for a specific path, but broad
+# roots and system/shared directories remain rejected in all modes.
 #
 # Usage:
 #   workspace="$(mktemp -d)"
 #   std_register_cleanup_path "$workspace"
+#   std_register_cleanup_path --unsafe "$legacy_path"
 #
 std_register_cleanup_path() {
-    local path existing_path
-    local already_registered had_valid_path=0 status=0
+    local path existing_path fingerprint
+    local unsafe=0 already_registered had_valid_path=0 status=0
 
+    if (($# == 0)); then
+        log_warn -l base_bash_libs.std "std_register_cleanup_path: No paths provided."
+        return 0
+    fi
+
+    if [[ "${1-}" == "--unsafe" ]]; then
+        unsafe=1
+        shift
+    fi
+    if [[ "${1-}" == "--" ]]; then
+        shift
+    fi
     if (($# == 0)); then
         log_warn -l base_bash_libs.std "std_register_cleanup_path: No paths provided."
         return 0
@@ -2457,6 +2741,21 @@ std_register_cleanup_path() {
     for path; do
         if ! __std_is_safe_cleanup_path__ "$path"; then
             log_error -l base_bash_libs.std "std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
+            status=1
+            continue
+        fi
+        if __std_is_broad_cleanup_path__ "$path"; then
+            log_error -l base_bash_libs.std "std_register_cleanup_path: refusing to register broad or protected path '$path'."
+            status=1
+            continue
+        fi
+        if (( ! unsafe )) && [[ -L "$path" ]]; then
+            log_error -l base_bash_libs.std "std_register_cleanup_path: refusing to register symlink '$path' without --unsafe."
+            status=1
+            continue
+        fi
+        if (( ! unsafe )) && ! [[ -e "$path" ]]; then
+            log_error -l base_bash_libs.std "std_register_cleanup_path: path '$path' does not exist for ownership proof."
             status=1
             continue
         fi
@@ -2469,7 +2768,18 @@ std_register_cleanup_path() {
                 break
             fi
         done
-        ((already_registered)) || __std_cleanup_paths+=("$path")
+        if (( ! already_registered )); then
+            if (( unsafe )); then
+                fingerprint=UNSAFE
+            elif ! __std_capture_cleanup_path_fingerprint__ fingerprint "$path"; then
+                log_error -l base_bash_libs.std "std_register_cleanup_path: unable to snapshot ownership for '$path'."
+                status=1
+                continue
+            fi
+            __std_cleanup_paths+=("$path")
+            __std_cleanup_entries+=("path:$path")
+            __std_cleanup_path_fingerprints["$path"]="$fingerprint"
+        fi
     done
 
     if ((had_valid_path)); then
@@ -2491,9 +2801,9 @@ std_register_cleanup_path() {
 #   std_unregister_cleanup_path "$workspace"
 #
 std_unregister_cleanup_path() {
-    local path existing_path
+    local path existing_path entry entry_type entry_value
     local should_remove had_valid_path=0 status=0
-    local -a paths_to_remove=() remaining_paths=()
+    local -a paths_to_remove=() remaining_paths=() remaining_entries=()
 
     if (($# == 0)); then
         log_warn -l base_bash_libs.std "std_unregister_cleanup_path: No paths provided."
@@ -2523,6 +2833,24 @@ std_unregister_cleanup_path() {
             ((should_remove)) || remaining_paths+=("$existing_path")
         done
         __std_cleanup_paths=("${remaining_paths[@]+"${remaining_paths[@]}"}")
+        for entry in "${__std_cleanup_entries[@]+"${__std_cleanup_entries[@]}"}"; do
+            entry_type="${entry%%:*}"
+            entry_value="${entry#*:}"
+            should_remove=0
+            if [[ "$entry_type" == path ]]; then
+                for path in "${paths_to_remove[@]+"${paths_to_remove[@]}"}"; do
+                    if [[ "$entry_value" == "$path" ]]; then
+                        should_remove=1
+                        break
+                    fi
+                done
+            fi
+            ((should_remove)) || remaining_entries+=("$entry")
+        done
+        __std_cleanup_entries=("${remaining_entries[@]+"${remaining_entries[@]}"}")
+        for path in "${paths_to_remove[@]+"${paths_to_remove[@]}"}"; do
+            unset "__std_cleanup_path_fingerprints[$path]"
+        done
     fi
 
     __std_maybe_uninstall_cleanup_dispatcher__

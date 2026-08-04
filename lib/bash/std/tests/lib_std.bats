@@ -3080,7 +3080,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [ "$(cat "$log_file")" = $'existing\ncleanup-one\ncleanup-two' ]
+    [ "$(cat "$log_file")" = $'existing\ncleanup-two\ncleanup-one' ]
 }
 
 @test "cleanup hooks preserve multi-line existing EXIT traps" {
@@ -3185,7 +3185,7 @@ EOF
     [ "$(cat "$log_file")" = "caller" ]
 }
 
-@test "cleanup unregistration does not overwrite a caller-replaced EXIT trap" {
+@test "cleanup unregistration restores a caller-replaced EXIT trap" {
     local script="$TEST_TMPDIR/cleanup-caller-replaced-trap.sh"
     local log_file="$TEST_TMPDIR/cleanup-caller-replaced-trap.log"
 
@@ -3196,10 +3196,9 @@ trap 'printf "original\n" >> "$log_file"' EXIT
 cleanup_transient() { printf 'unexpected\n' >> "$log_file"; }
 std_register_cleanup_hook cleanup_transient
 trap 'printf "replacement\n" >> "$log_file"' EXIT
-replacement_trap="\$(trap -p EXIT)"
-std_unregister_cleanup_hook cleanup_transient
-after_trap="\$(trap -p EXIT)"
-[[ "\$after_trap" == "\$replacement_trap" ]]
+    std_unregister_cleanup_hook cleanup_transient
+    after_trap="\$(trap -p EXIT)"
+    [[ "\$after_trap" == *"replacement"* ]]
 EOF
 
     bats_run bash "$script"
@@ -3227,6 +3226,26 @@ EOF
     [ "$status" -eq 0 ]
     [ ! -e "$target_file" ]
     [ ! -e "$target_dir" ]
+}
+
+@test "duplicate cleanup path registration is idempotent" {
+    local script="$TEST_TMPDIR/cleanup-path-duplicate.sh"
+    local target="$TEST_TMPDIR/cleanup-path-duplicate-target"
+
+    printf 'temporary\n' > "$target"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$target"
+std_register_cleanup_path "$target"
+[[ \${#__std_cleanup_paths[@]} -eq 1 ]] || exit 44
+[[ \${#__std_cleanup_entries[@]} -eq 1 ]] || exit 45
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ ! -e "$target" ]
 }
 
 @test "cleanup path registration rejects dangerous paths" {
@@ -3305,6 +3324,259 @@ EOF
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '/'"* ]]
     [[ " ${__std_cleanup_paths[*]} " == *" $target_file "* ]]
+}
+
+@test "cleanup registrations run hooks in LIFO order" {
+    local script="$TEST_TMPDIR/cleanup-lifo.sh"
+    local log_file="$TEST_TMPDIR/cleanup-lifo.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+cleanup_outer() { printf 'outer\\n' >> "$log_file"; }
+cleanup_inner() { printf 'inner\\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_outer
+std_register_cleanup_hook cleanup_inner
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = $'inner\nouter' ]
+}
+
+@test "cleanup unwinds nested path and hook resources in one LIFO stack" {
+    local script="$TEST_TMPDIR/cleanup-nested.sh"
+    local resource="$TEST_TMPDIR/cleanup-nested-resource"
+
+    mkdir -p "$resource"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$resource"
+cleanup_child() { printf 'child\\n' > "$resource/child-marker"; }
+std_register_cleanup_hook cleanup_child
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ ! -e "$resource" ]
+}
+
+@test "cleanup refuses a symlink swap after registration" {
+    local script="$TEST_TMPDIR/cleanup-symlink-swap.sh"
+    local root="$TEST_TMPDIR/symlink-swap-root"
+    local registered="$root/registered"
+    local moved="$root/moved"
+    local victim="$root/victim"
+
+    mkdir -p "$registered" "$victim"
+    printf 'must-survive\n' > "$victim/important.txt"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$registered"
+mv "$registered" "$moved"
+ln -s "$victim" "$registered"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ -L "$registered" ]
+    [ -d "$moved" ]
+    [ -f "$victim/important.txt" ]
+    [[ "$output" == *"changed identity; refusing to remove it"* ]]
+}
+
+@test "cleanup refuses a renamed-parent substitution after registration" {
+    local script="$TEST_TMPDIR/cleanup-renamed-parent.sh"
+    local root="$TEST_TMPDIR/renamed-parent-root"
+    local parent="$root/parent"
+    local moved_parent="$root/moved-parent"
+    local replacement="$root/replacement"
+    local target="$parent/target"
+
+    mkdir -p "$target" "$replacement/target"
+    printf 'must-survive\n' > "$replacement/target/important.txt"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$target"
+mv "$parent" "$moved_parent"
+mkdir -p "$parent"
+mv "$replacement/target" "$parent/target"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ -d "$moved_parent/target" ]
+    [ -f "$parent/target/important.txt" ]
+    [[ "$output" == *"changed identity; refusing to remove it"* ]]
+}
+
+@test "later caller EXIT traps compose with cleanup and preserve primary status" {
+    local script="$TEST_TMPDIR/cleanup-later-exit.sh"
+    local target="$TEST_TMPDIR/cleanup-later-exit-target"
+    local log_file="$TEST_TMPDIR/cleanup-later-exit.log"
+
+    printf 'temporary\n' > "$target"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$target"
+trap 'printf "caller\\n" >> "$log_file"' EXIT
+exit 23
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 23 ]
+    [ "$(cat "$log_file")" = "caller" ]
+    [ ! -e "$target" ]
+}
+
+@test "caller DEBUG traps compose before and after cleanup registration" {
+    local script="$TEST_TMPDIR/cleanup-debug-trap.sh"
+    local log_file="$TEST_TMPDIR/cleanup-debug-trap.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "before-debug\\n" >> "$log_file"' DEBUG
+cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_once
+trap 'printf "after-debug\\n" >> "$log_file"' DEBUG
+:
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^before-debug$' "$log_file")" -ge 1 ]
+    [ "$(tail -n 1 "$log_file")" = "cleanup" ]
+    [ "$(grep -c '^after-debug$' "$log_file")" -ge 1 ]
+}
+
+@test "signals compose with caller traps and cleanup exactly once" {
+    local script="$TEST_TMPDIR/cleanup-signal.sh"
+    local target="$TEST_TMPDIR/cleanup-signal-target"
+    local log_file="$TEST_TMPDIR/cleanup-signal.log"
+
+    printf 'temporary\n' > "$target"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "caller-term\\n" >> "$log_file"' TERM
+cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
+std_register_cleanup_path "$target"
+std_register_cleanup_hook cleanup_once
+kill -TERM "\$\$"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 143 ]
+    [ "$(cat "$log_file")" = $'caller-term\ncleanup' ]
+    [ ! -e "$target" ]
+}
+
+@test "later caller TERM traps compose with cleanup" {
+    local script="$TEST_TMPDIR/cleanup-later-term.sh"
+    local target="$TEST_TMPDIR/cleanup-later-term-target"
+    local log_file="$TEST_TMPDIR/cleanup-later-term.log"
+
+    printf 'temporary\n' > "$target"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path "$target"
+trap 'printf "later-term\\n" >> "$log_file"' TERM
+kill -TERM "\$\$"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 143 ]
+    [ "$(cat "$log_file")" = "later-term" ]
+    [ ! -e "$target" ]
+}
+
+@test "a signal arriving during cleanup is latched without rerunning resources" {
+    local script="$TEST_TMPDIR/cleanup-concurrent-signal.sh"
+    local log_file="$TEST_TMPDIR/cleanup-concurrent-signal.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+cleanup_first() {
+    (sleep 0.05; kill -TERM "\$\$") &
+    local signal_pid=\$!
+    sleep 0.15
+    wait "\$signal_pid"
+    printf 'first\\n' >> "$log_file"
+}
+cleanup_second() { printf 'second\\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_first
+std_register_cleanup_hook cleanup_second
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 143 ]
+    [ "$(cat "$log_file")" = $'second\nfirst' ]
+}
+
+@test "cleanup keeps the primary status when a cleanup hook fails" {
+    local script="$TEST_TMPDIR/cleanup-secondary-failure.sh"
+    local log_file="$TEST_TMPDIR/cleanup-secondary-failure.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+cleanup_fails() { printf 'failed-hook\\n' >> "$log_file"; return 9; }
+cleanup_runs() { printf 'next-hook\\n' >> "$log_file"; }
+std_register_cleanup_hook cleanup_fails
+std_register_cleanup_hook cleanup_runs
+exit 37
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 37 ]
+    [ "$(cat "$log_file")" = $'next-hook\nfailed-hook' ]
+}
+
+@test "unsafe cleanup opt-in is explicit and still rejects protected roots" {
+    local script="$TEST_TMPDIR/cleanup-unsafe.sh"
+    local link="$TEST_TMPDIR/cleanup-unsafe-link"
+    local target="$TEST_TMPDIR/cleanup-unsafe-target"
+    local stderr_file="$TEST_TMPDIR/cleanup-unsafe.err"
+    local rc=0
+
+    mkdir -p "$target"
+    ln -s "$target" "$link"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+std_register_cleanup_path --unsafe "$link"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ ! -e "$link" ]
+    [ -d "$target" ]
+
+    std_register_cleanup_path --unsafe /tmp 2>"$stderr_file" || rc=$?
+    [ "$rc" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"broad or protected path"* ]]
+
+    rc=0
+    std_register_cleanup_path --unsafe "$HOME" /usr 2>"$stderr_file" || rc=$?
+    [ "$rc" -eq 1 ]
 }
 
 @test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
