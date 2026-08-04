@@ -721,6 +721,9 @@ contract_run_mode() {
         contract_source_module "$module"
     done
 
+    local -a contract_init_args=()
+    base_bash_libs_init contract_init_args --source "$contract_script_dir/bash-option-contract.sh" --
+
     contract_run_api_smoke std contract_std_api_smoke
     contract_run_api_smoke str contract_str_api_smoke
     contract_run_api_smoke list contract_list_api_smoke

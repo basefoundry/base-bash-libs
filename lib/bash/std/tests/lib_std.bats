@@ -6,7 +6,16 @@ readonly STDLIB_PATH="$BASE_BASH_DIR/std/lib_std.sh"
 
 create_script() {
     local script_path="$1"
-    cat > "$script_path"
+    local source_line init_lines content
+    shift
+
+    content="$(cat)"
+    source_line="source \"$STDLIB_PATH\""
+    if [[ "$content" == *"$source_line"* && "$content" != *"base-bash-libs: passive-source"* ]]; then
+        init_lines=$'declare -a base_bash_libs_test_args=()\nbase_bash_libs_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
+        content="${content/"$source_line"/"$source_line"$'\n'"$init_lines"}"
+    fi
+    printf '%s\n' "$content" > "$script_path"
     chmod +x "$script_path"
 }
 
@@ -271,10 +280,98 @@ setup() {
     PATH="$BASE_TEST_ORIG_PATH"
     unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE BASE_CLI_PRIMARY_LOG
     source "$STDLIB_PATH"
+    declare -a setup_args=()
+    base_bash_libs_init setup_args -- "$@"
 }
 
 teardown() {
     PATH="$BASE_TEST_ORIG_PATH"
+}
+
+@test "sourcing stdlib is passive and preserves caller state" {
+    bats_run bash -c '
+        set -euo pipefail
+        stdlib_path="$1"
+        set -- "argument with spaces" "" "literal-*"
+        IFS="| "
+        OPTIND=7
+        umask 027
+        shopt -s extglob nullglob nocasematch
+        trap ":" EXIT HUP INT TERM
+        before_args=$(printf "%s\\n" "$#" "${1-}" "${2-}" "${3-}")
+        before_set=$(set +o)
+        before_shopt=$(shopt -p)
+        before_traps=$(trap -p)
+        before_exports=$(export -p)
+        before_cwd=$(pwd -P)
+        source "$stdlib_path"
+        after_args=$(printf "%s\\n" "$#" "${1-}" "${2-}" "${3-}")
+        [[ "$before_args" == "$after_args" ]]
+        [[ "$before_set" == "$(set +o)" ]]
+        [[ "$before_shopt" == "$(shopt -p)" ]]
+        [[ "$before_traps" == "$(trap -p)" ]]
+        [[ "$before_exports" == "$(export -p)" ]]
+        [[ "$before_cwd" == "$(pwd -P)" ]]
+        [[ ! -v __SCRIPT_ARGS__ && ! -v __SCRIPT_DIR__ ]]
+        [[ ! -v _log_levels && ! -v __std_cleanup_hooks ]]
+        printf "passive=yes\\nargs=%s\\n" "$#"
+    ' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"passive=yes"* ]]
+    [[ "$output" == *"args=3"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "explicit init filters args, publishes context, and is idempotent" {
+    local script="$TEST_TMPDIR/explicit-init.sh"
+    local expected_dir
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+# base-bash-libs: passive-source
+source "$STDLIB_PATH"
+set -- --debug-wrapper alpha --color -- --debug-wrapper omega
+before="\$*"
+declare -a filtered=()
+base_bash_libs_init filtered --source "\$0" -- "\$@"
+[[ "\$*" == "\$before" ]]
+printf 'filtered=%s\n' "\${filtered[*]}"
+printf 'original=%s\n' "\${__SCRIPT_ARGS__[*]}"
+printf 'source-dir=%s\n' "\$__SCRIPT_DIR__"
+if base_bash_libs_init filtered --source "\$0" -- "\$@"; then
+    printf 'repeat=same\n'
+else
+    exit 41
+fi
+if base_bash_libs_init filtered --source "\$0" -- changed; then
+    exit 42
+else
+    printf 'different=diagnosed\n'
+fi
+EOF
+
+    expected_dir="$(cd "$(dirname "$script")" && pwd -P)"
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"filtered=alpha -- --debug-wrapper omega"* ]]
+    [[ "$output" == *"original=--debug-wrapper alpha --color -- --debug-wrapper omega"* ]]
+    [[ "$output" == *"source-dir=$expected_dir"* ]]
+    [[ "$output" == *"repeat=same"* ]]
+    [[ "$output" == *"different=diagnosed"* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "stdlib source guard rejects caller-owned incompatible metadata" {
+    bats_run bash -c '
+        BASE_BASH_LIBS_STD_SOURCE_GUARD=1
+        BASE_BASH_LIBS_STD_SOURCE_VERSION=0.0.0
+        source "$1"
+    ' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"incompatible base-bash-libs stdlib versions"* ]]
 }
 
 @test "deprecated --verbose-wrapper preserves original args and enables VERBOSE compatibility" {
@@ -417,6 +514,8 @@ EOF
         set -euo pipefail
         cd -- "$2"
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args -- "$@"
         source_dir=""
         get_my_source_dir source_dir
         [[ "$-" == *e* && "$-" == *u* ]]
@@ -1370,6 +1469,8 @@ EOF
     bats_run bash -c '
         set -euo pipefail
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args -- "$@"
         log_info_enter
         log_info_leave
         printf "after-log\n"
@@ -1386,6 +1487,8 @@ EOF
     bats_run bash -c '
         set -euo pipefail
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args -- "$@"
         set_log_level NOT_A_LEVEL
         printf "after-log-error\n"
     ' bash "$STDLIB_PATH"
@@ -2581,6 +2684,8 @@ EOF
     create_script "$runner_script" <<'EOF'
 #!/usr/bin/env bash
 source "$1"
+declare -a runner_args=()
+base_bash_libs_init runner_args --
 primary_log="$2"
 command_script="$3"
 canary="$4"
@@ -3855,6 +3960,8 @@ EOF
     for candidate in var_name var_name_re function_name output_name declaration attributes logger color message source_path; do
         bats_run "$BASH" -c '
             source "$1"
+            declare -a app_args=()
+            base_bash_libs_init app_args --
             printf -v "$2" %s unchanged
             readonly "$2"
             std_command_path "$2" bash

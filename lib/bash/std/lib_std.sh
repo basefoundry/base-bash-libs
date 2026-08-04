@@ -19,13 +19,14 @@
 # Sourcing:
 #   source "<repo>/lib/bash/std/lib_std.sh"
 #
-# Caller-visible globals:
+# Caller-visible metadata:
 #   BASE_BASH_LIBS_VERSION
 #                    Package version read from the repository/package VERSION file.
 #   BASE_BASH_LIBS_STDLIB_LOADED
-#                    Set to 1 after lib_std.sh has initialized successfully.
-#   __SCRIPT_ARGS__   Original "$@" before lib_std consumed global flags.
-#   __SCRIPT_DIR__    Absolute path to the script that sourced the library.
+#                    Set to 1 after lib_std.sh has been loaded successfully.
+#
+# Runtime globals such as __SCRIPT_ARGS__ and __SCRIPT_DIR__ are published only
+# by base_bash_libs_init. Sourcing this file never consumes or rewrites "$@".
 #
 # Core helpers:
 #   std_run [opts] cmd ...
@@ -66,9 +67,12 @@
 #   add_to_path -p "/opt/tools"  # inject directories without duplicates.
 #
 # Notes:
-#   - Global options --debug-wrapper/--verbose-wrapper/--utc-wrapper/--color are stripped from "$@" automatically.
+#   - Call base_bash_libs_init <result_array> [--source <script>] [--] [argv...]
+#     before using stateful helpers. It strips --debug-wrapper,
+#     --verbose-wrapper, --utc-wrapper, and --color into the result array.
 #   - --verbose-wrapper is deprecated compatibility surface; prefer --debug-wrapper.
-#   - Wrappers may override the caller path seen by this library through BASE_BASH_BOOTSTRAP_SOURCE.
+#   - BASE_BASH_BOOTSTRAP_SOURCE is accepted as a source-path fallback by the
+#     explicit initializer, not consumed while this file is sourced.
 #
 
 ################################################# INITIALIZATION #######################################################
@@ -79,7 +83,6 @@ __lib_std_require_supported_bash__() {
         printf '%s\n' "Your shell is not Bash." >&2
         return 1
     fi
-
     if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2))); then
         printf '%s\n' "Error: This script requires Bash 4.2 or higher." >&2
         printf '%s\n' "Your version ($BASH_VERSION) is not compatible." >&2
@@ -87,53 +90,67 @@ __lib_std_require_supported_bash__() {
     fi
 }
 
+# Runtime state remains passive, but loading an unsupported interpreter is a
+# deterministic contract error rather than a partially-defined library.
 __lib_std_require_supported_bash__ || return 1 2>/dev/null || exit 1
 unset -f __lib_std_require_supported_bash__
 
-#
-# Make sure we do nothing in case the library is sourced more than once in the same shell.
-# This prevents functions from being redefined and initialization from running multiple times.
-#
-[[ -n "${__stdlib_sourced__-}" ]] && return
-__stdlib_sourced__=1
-readonly __LIB_STD_PATH__="${BASH_SOURCE[0]}"
+__base_bash_libs_read_package_version__() {
+    local source_path="${1-}" version_file version
 
-# lib_std.sh lives at lib/bash/std/lib_std.sh in the packaged repository.
-# Walking three levels up reaches the package root that owns VERSION.
-__BASE_BASH_LIBS_ROOT__="$(
-    cd -- "$(dirname -- "$__LIB_STD_PATH__")/../../.." &>/dev/null && pwd -P
-)" || {
-    printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$__LIB_STD_PATH__'." >&2
-    return 1 2>/dev/null || exit 1
-}
-readonly __BASE_BASH_LIBS_ROOT__
-
-__lib_std_read_package_version__() {
-    local version_file="$1" version
-
-    if [[ ! -r "$version_file" ]]; then
+    [[ -n "$source_path" ]] || return 1
+    version_file="$(cd -- "$(dirname -- "$source_path")/../../.." &>/dev/null && pwd -P)/VERSION" || return 1
+    [[ -r "$version_file" ]] || {
         printf '%s\n' "Error: base-bash-libs VERSION file is not readable: $version_file" >&2
         return 1
-    fi
-
+    }
     IFS= read -r version < "$version_file" || [[ -n "$version" ]] || {
         printf '%s\n' "Error: Unable to read base-bash-libs version from: $version_file" >&2
         return 1
     }
-
-    if [[ -z "$version" ]]; then
+    [[ -n "$version" ]] || {
         printf '%s\n' "Error: base-bash-libs VERSION file is empty: $version_file" >&2
         return 1
-    fi
-
+    }
     printf '%s' "$version"
 }
 
-BASE_BASH_LIBS_VERSION="$(__lib_std_read_package_version__ "$__BASE_BASH_LIBS_ROOT__/VERSION")" || {
+# A source guard is deliberately package-prefixed and readonly. It is the only
+# source-time state other than immutable package metadata. Re-sourcing the same
+# version is a no-op; attempting to mix versions fails before definitions are
+# replaced.
+if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_GUARD+x}" ]]; then
+    if [[ "${BASE_BASH_LIBS_STD_SOURCE_VERSION-}" != "$(__base_bash_libs_read_package_version__ "${BASH_SOURCE[0]}")" ||
+        "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" != "${BASH_SOURCE[0]}" ]]; then
+        printf '%s\n' "Error: incompatible base-bash-libs stdlib versions or sources are already loaded (loaded ${BASE_BASH_LIBS_STD_SOURCE_VERSION:-unknown} from ${BASE_BASH_LIBS_STD_SOURCE_PATH:-unknown}, requested $(__base_bash_libs_read_package_version__ "${BASH_SOURCE[0]}" 2>/dev/null || printf 'unknown') from ${BASH_SOURCE[0]})." >&2
+        unset -f __base_bash_libs_read_package_version__
+        return 1 2>/dev/null || exit 1
+    fi
+    unset -f __base_bash_libs_read_package_version__
+    return 0
+fi
+
+if [[ -n "${BASE_BASH_LIBS_VERSION+x}" || -n "${BASE_BASH_LIBS_STDLIB_LOADED+x}" ]]; then
+    printf '%s\n' "Error: base-bash-libs metadata names are already owned by the caller; refusing to overwrite them." >&2
+    return 1 2>/dev/null || exit 1
+fi
+
+readonly BASE_BASH_LIBS_STD_SOURCE_PATH="${BASH_SOURCE[0]}"
+readonly BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &>/dev/null && pwd -P)" || {
+    printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$BASE_BASH_LIBS_STD_SOURCE_PATH'." >&2
+    return 1 2>/dev/null || exit 1
+}
+BASE_BASH_LIBS_VERSION="$(__base_bash_libs_read_package_version__ "$BASE_BASH_LIBS_STD_SOURCE_PATH")" || {
     return 1 2>/dev/null || exit 1
 }
 readonly BASE_BASH_LIBS_VERSION
-unset -f __lib_std_read_package_version__
+readonly BASE_BASH_LIBS_STD_SOURCE_VERSION="$BASE_BASH_LIBS_VERSION"
+readonly BASE_BASH_LIBS_STD_SOURCE_GUARD=1
+# Used by companion libraries as a source-order guard. This marker means the
+# definitions and immutable metadata are loaded; it does not imply runtime init.
+# shellcheck disable=SC2034
+readonly BASE_BASH_LIBS_STDLIB_LOADED=1
+unset -f __base_bash_libs_read_package_version__
 
 __base_bash_libs_is_dotted_numeric_version__() {
     local version="${1-}" version_re='^[0-9]+([.][0-9]+)*$'
@@ -193,55 +210,6 @@ base_bash_libs_require_version() {
     return 0
 }
 
-#
-# Memorize the original script arguments at the very beginning.
-# This allows the library to parse global options before the main script does.
-# We retain the original arguments in __SCRIPT_ARGS__ and the script source directory in __SCRIPT_DIR__ as readonly
-# variables which could be used by the caller. When a wrapper preloads this library on behalf of another script, it can
-# provide BASE_BASH_BOOTSTRAP_SOURCE so __SCRIPT_DIR__ still resolves to the real command script.
-#
-readonly __SCRIPT_ARGS__=("$@")
-__new_args__=()
-__script_source__="${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}"
-if [[ -n "$__script_source__" ]]; then
-    __SCRIPT_DIR__=$(
-        cd -- "$(dirname -- "$__script_source__")" &>/dev/null && pwd -P
-    ) || {
-        printf '%s\n' "Error: Unable to resolve caller directory from '$__script_source__'." >&2
-        return 1 2>/dev/null || exit 1
-    }
-else
-    # An interactive shell or a top-level `bash -c` source has no outer
-    # BASH_SOURCE frame. In that case relative imports are anchored to the
-    # directory in which the caller sourced the library.
-    __SCRIPT_DIR__="$(pwd -P)" || {
-        printf '%s\n' "Error: Unable to resolve the current caller directory." >&2
-        return 1 2>/dev/null || exit 1
-    }
-fi
-readonly __SCRIPT_DIR__
-declare -ga __std_cleanup_hooks=()
-declare -ga __std_cleanup_paths=()
-declare -ga __std_cleanup_entries=()
-declare -gA __std_cleanup_path_fingerprints=()
-declare -g __std_cleanup_dispatcher_installed=0
-declare -g __std_cleanup_dispatcher_running=0
-declare -g __std_cleanup_dispatcher_finished=0
-declare -g __std_cleanup_pending_signal_status=0
-declare -g __std_cleanup_debug_guard_running=0
-declare -g __std_original_exit_trap=""
-declare -g __std_original_exit_trap_spec=""
-declare -g __std_cleanup_dispatcher_trap_spec=""
-declare -g __std_original_int_trap=""
-declare -g __std_original_int_trap_spec=""
-declare -g __std_cleanup_int_trap_spec="__not-installed__"
-declare -g __std_original_term_trap=""
-declare -g __std_original_term_trap_spec=""
-declare -g __std_cleanup_term_trap_spec="__not-installed__"
-declare -g __std_original_debug_trap=""
-declare -g __std_original_debug_trap_spec=""
-declare -g __std_cleanup_debug_trap_spec="__not-installed__"
-
 ############################################ BASH VERSION CHECKER #######################################################
 
 #
@@ -295,60 +263,232 @@ check_bash_version() {
 
 ###################################################### INIT ############################################################
 
-#
-# __stdlib_init__ - The main initialization function for this library.
-#
-# This is the only function that executes when the library is sourced.
-# It sets up the environment by:
-#   1. Initializing the logging system.
-#   2. Parsing global command-line options like --debug, --verbose, --color.
-#
-__stdlib_init__() {
-    __log_init__
-    set_log_category_level -l base_bash_libs INFO
+__std_init_validate_result_array__() {
+    local result_name="${1-}" declaration attributes nocasematch_enabled=0 attributes_ok=0
 
-    #
-    # Handle global arguments and strip them from the list before passing control to the main script.
-    # The environment variables LOG_DEBUG and LOG_UTC are recognized by the Python logging framework:
-    #   - LOG_DEBUG=1 sets the log level to DEBUG (Bash logging has VERBOSE but Python has only DEBUG)
-    #   - LOG_UTC=1   forces timestamps to use UTC
-    #
-    local arg parse_options=1
-    __color__=0
-    for arg in "${__SCRIPT_ARGS__[@]+"${__SCRIPT_ARGS__[@]}"}"; do
-        if ((parse_options)) && [[ "$arg" == "--" ]]; then
-            __new_args__+=("$arg")
-            parse_options=0
+    [[ "$result_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
+        printf '%s\n' "base_bash_libs_init: result name must be a valid Bash variable name." >&2
+        return 1
+    }
+    [[ "$result_name" != __* ]] || {
+        printf '%s\n' "base_bash_libs_init: result name '$result_name' uses the reserved internal namespace." >&2
+        return 1
+    }
+    declaration="$(declare -p "$result_name" 2>/dev/null || true)"
+    [[ -n "$declaration" ]] || {
+        printf '%s\n' "base_bash_libs_init: result '$result_name' must be a caller-declared indexed array." >&2
+        return 1
+    }
+    attributes="${declaration#declare -}"
+    attributes="${attributes%% *}"
+    if shopt -q nocasematch; then
+        nocasematch_enabled=1
+        shopt -u nocasematch
+    fi
+    if [[ "$attributes" == *a* &&
+        "$attributes" != *A* &&
+        "$attributes" != *r* ]]; then
+        attributes_ok=1
+    fi
+    if ((nocasematch_enabled)); then
+        shopt -s nocasematch
+    fi
+    ((attributes_ok)) || {
+        printf '%s\n' "base_bash_libs_init: result '$result_name' must be a caller-declared indexed array." >&2
+        return 1
+    }
+}
+
+__std_init_publish_array__() {
+    local result_name="$1" value
+    shift
+    eval "$result_name=()"
+    for value; do
+        eval "$result_name+=(\"\$value\")"
+    done
+}
+
+__std_init_args_match__() {
+    local index=0
+    (($# == ${#__SCRIPT_ARGS__[@]})) || return 1
+    for index in "${!__SCRIPT_ARGS__[@]}"; do
+        [[ "${__SCRIPT_ARGS__[$index]}" == "$1" ]] || return 1
+        shift
+    done
+}
+
+__std_initialize_runtime_state__() {
+    local script_dir="$1"
+    shift
+
+    if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
+        [[ "${BASE_BASH_LIBS_STD_INITIALIZED}" == 1 ]] || {
+            printf '%s\n' "base_bash_libs_init: runtime state marker is owned by the caller." >&2
+            return 1
+        }
+        return 0
+    fi
+
+    if [[ -n "${BASE_BASH_LIBS_STD_INIT_SOURCE+x}" || -n "${__SCRIPT_ARGS__+x}" || -n "${__SCRIPT_DIR__+x}" ]]; then
+        printf '%s\n' "base_bash_libs_init: initialization names are already owned by the caller." >&2
+        return 1
+    fi
+
+    __log_init__
+    declare -g __color__=0
+    declare -ga __std_cleanup_hooks=()
+    declare -ga __std_cleanup_paths=()
+    declare -ga __std_cleanup_entries=()
+    declare -gA __std_cleanup_path_fingerprints=()
+    declare -g __std_cleanup_dispatcher_installed=0
+    declare -g __std_cleanup_dispatcher_running=0
+    declare -g __std_cleanup_dispatcher_finished=0
+    declare -g __std_cleanup_pending_signal_status=0
+    declare -g __std_cleanup_debug_guard_running=0
+    declare -g __std_original_exit_trap=""
+    declare -g __std_original_exit_trap_spec=""
+    declare -g __std_cleanup_dispatcher_trap_spec=""
+    declare -g __std_original_int_trap=""
+    declare -g __std_original_int_trap_spec=""
+    declare -g __std_cleanup_int_trap_spec="__not-installed__"
+    declare -g __std_original_term_trap=""
+    declare -g __std_original_term_trap_spec=""
+    declare -g __std_cleanup_term_trap_spec="__not-installed__"
+    declare -g __std_original_debug_trap=""
+    declare -g __std_original_debug_trap_spec=""
+    declare -g __std_cleanup_debug_trap_spec="__not-installed__"
+
+    readonly BASE_BASH_LIBS_STD_INIT_SOURCE="$script_dir"
+    declare -ga __SCRIPT_ARGS__=("$@")
+    readonly -a __SCRIPT_ARGS__
+    declare -g __SCRIPT_DIR__="$script_dir"
+    readonly __SCRIPT_DIR__
+    readonly BASE_BASH_LIBS_STD_INITIALIZED=1
+}
+
+#
+# base_bash_libs_init - Explicitly initializes runtime state and filters wrapper
+# flags into a caller-owned indexed array. Sourcing the library never invokes
+# this function and never mutates positional parameters.
+#
+# Usage:
+#   declare -a app_args=()
+#   base_bash_libs_init app_args --source "$script" -- "$@"
+#
+base_bash_libs_init() {
+    local result_name="${1-}" source_path="" script_dir="" arg
+    local parse_config=1 color_requested=0 configure_runtime=0
+    local -a input_args=() filtered_args=()
+
+    (($# >= 1)) || {
+        printf '%s\n' "base_bash_libs_init: expected a result array name." >&2
+        return 1
+    }
+    __std_init_validate_result_array__ "$result_name" || return 1
+    shift
+
+    while (($#)); do
+        if ((parse_config)) && [[ "$1" == "--source" ]]; then
+            (($# >= 2)) || {
+                printf '%s\n' "base_bash_libs_init: --source requires a script path." >&2
+                return 1
+            }
+            source_path="$2"
+            shift 2
             continue
         fi
-        if ((parse_options)); then
+        if ((parse_config)) && [[ "$1" == "--" ]]; then
+            parse_config=0
+            shift
+            input_args+=("$@")
+            break
+        fi
+        input_args+=("$1")
+        shift
+    done
+
+    source_path="${source_path:-${BASE_BASH_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}}"
+    if [[ -n "$source_path" ]]; then
+        script_dir="$(cd -- "$(dirname -- "$source_path")" &>/dev/null && pwd -P)" || {
+            printf '%s\n' "base_bash_libs_init: unable to resolve source directory from '$source_path'." >&2
+            return 1
+        }
+    else
+        script_dir="$(pwd -P)" || {
+            printf '%s\n' "base_bash_libs_init: unable to resolve the current caller directory." >&2
+            return 1
+        }
+    fi
+
+    if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
+        [[ "${BASE_BASH_LIBS_STD_INIT_SOURCE:-}" == "$script_dir" ]] || {
+            printf '%s\n' "base_bash_libs_init: already initialized for '$BASE_BASH_LIBS_STD_INIT_SOURCE'; requested '$script_dir'." >&2
+            return 1
+        }
+        __std_init_args_match__ "${input_args[@]+${input_args[@]}}" || {
+            printf '%s\n' "base_bash_libs_init: repeated initialization received different argv; refusing to hide the mismatch." >&2
+            return 1
+        }
+    else
+        configure_runtime=1
+        __std_initialize_runtime_state__ "$script_dir" "${input_args[@]+${input_args[@]}}" || return 1
+    fi
+
+    parse_config=1
+    for arg in "${input_args[@]+${input_args[@]}}"; do
+        if ((parse_config)) && [[ "$arg" == "--" ]]; then
+            filtered_args+=("$arg")
+            parse_config=0
+            continue
+        fi
+        if ((parse_config)); then
             case "$arg" in
                 --debug-wrapper)
-                    set_log_level DEBUG
-                    set_log_category_level -l base_bash_libs DEBUG
-                    export LOG_DEBUG=1
+                    if ((configure_runtime)); then
+                        set_log_level DEBUG
+                        set_log_category_level -l base_bash_libs DEBUG
+                        export LOG_DEBUG=1
+                    fi
                     ;;
                 --verbose-wrapper)
-                    # Deprecated compatibility option; prefer --debug-wrapper.
-                    set_log_level VERBOSE
-                    set_log_category_level -l base_bash_libs VERBOSE
-                    export LOG_DEBUG=1
+                    if ((configure_runtime)); then
+                        set_log_level VERBOSE
+                        set_log_category_level -l base_bash_libs VERBOSE
+                        export LOG_DEBUG=1
+                    fi
                     ;;
                 --utc-wrapper)
-                    export LOG_UTC=1
+                    if ((configure_runtime)); then
+                        export LOG_UTC=1
+                    fi
                     ;;
                 --color)
-                    __color__=1
+                    color_requested=1
                     ;;
                 *)
-                    __new_args__+=("$arg")
+                    filtered_args+=("$arg")
                     ;;
             esac
         else
-            __new_args__+=("$arg")
+            filtered_args+=("$arg")
         fi
     done
-    __init_colors__
+
+    if ((configure_runtime)); then
+        __color__="$color_requested"
+        __init_colors__
+        set_log_category_level -l base_bash_libs INFO
+        # Re-apply explicit debug levels after the default category gate.
+        for arg in "${input_args[@]+${input_args[@]}}"; do
+            if [[ "$arg" == "--debug-wrapper" ]]; then
+                set_log_category_level -l base_bash_libs DEBUG
+            elif [[ "$arg" == "--verbose-wrapper" ]]; then
+                set_log_category_level -l base_bash_libs VERBOSE
+            fi
+        done
+    fi
+
+    __std_init_publish_array__ "$result_name" "${filtered_args[@]+${filtered_args[@]}}"
     return 0
 }
 
@@ -375,7 +515,7 @@ import() {
     for lib; do
         import_path="$lib"
         if [[ "$lib" != /* ]]; then
-           [[ $__SCRIPT_DIR__ ]] || { printf '%s\n' "ERROR: __SCRIPT_DIR__ not set; import functionality needs it" >&2; exit 1; }
+           [[ -n "${__SCRIPT_DIR__-}" ]] || { printf '%s\n' "ERROR: base_bash_libs_init must run before relative imports" >&2; exit 1; }
            import_path="$__SCRIPT_DIR__/$lib"
         fi
         if [[ -f "$import_path" ]]; then
@@ -489,7 +629,7 @@ print_path() {
 # __log_init__ - Initializes the logging system.
 #
 # Sets up colors for interactive terminals and defines the log level hierarchy.
-# This is called automatically by __stdlib_init__.
+# This is called by base_bash_libs_init.
 #
 __log_init__() {
     # Map log level strings (FATAL, ERROR, etc.) to numeric values.
@@ -549,7 +689,7 @@ __log_source_location__() {
         __std_log_source_caller_rest="${__std_log_source_caller_info#* }"
         __std_log_source_caller_file="${__std_log_source_caller_rest#* }"
         if [[ -n "$__std_log_source_caller_file" &&
-            "$__std_log_source_caller_file" != "$__LIB_STD_PATH__" ]]; then
+            "$__std_log_source_caller_file" != "$BASE_BASH_LIBS_STD_SOURCE_PATH" ]]; then
             __std_log_source_path="$__std_log_source_caller_file"
             __std_log_source_line="$__std_log_source_caller_line"
             break
@@ -690,7 +830,7 @@ __print_log_record__() {
 
 #
 # __init_colors__ - Initialize colors used for logging
-# This is called from __stdlib_init__
+# This is called from base_bash_libs_init.
 #
 __init_colors__() {
     # If --color was not passed, NO_COLOR is set, or the log stream is not a terminal, disable colors.
@@ -3654,16 +3794,3 @@ wait_for_enter() {
 }
 
 #################################################### END OF FUNCTIONS ##################################################
-
-#
-# The only function that would be called upon sourcing of the library
-#
-__stdlib_init__
-# Used by companion libraries as a source-order guard.
-# shellcheck disable=SC2034
-readonly BASE_BASH_LIBS_STDLIB_LOADED=1
-
-# This is the crucial step: it resets the positional parameters ($@, $1, etc.)
-# of the *calling script* to the new, filtered list of arguments.
-set -- "${__new_args__[@]+"${__new_args__[@]}"}"
-unset __new_args__ __script_source__ __stdlib_init__ __log_init__ __init_colors__

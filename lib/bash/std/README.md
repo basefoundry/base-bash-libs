@@ -62,6 +62,9 @@ such output names are rejected before caller state is changed.
 
 ### Runtime and Imports
 
+- `base_bash_libs_init <result_array> [--source <script>] -- [argv...]`:
+  explicitly initializes runtime state and returns wrapper-filtered application
+  arguments without mutating the caller's positional parameters.
 - `base_bash_libs_require_version <version>`: exits with a diagnostic when the
   loaded package version is older than the requested dotted numeric version.
 - `check_bash_version`: returns zero for Bash 4.2 or newer and reports the
@@ -198,29 +201,50 @@ re-exec the caller.
 
 ## Initialization Contract
 
-Sourcing `lib_std.sh` runs a small one-time initializer:
+Sourcing `lib_std.sh` is passive. It publishes function definitions, immutable
+package metadata, and a collision-safe load guard, but it does not consume or
+rewrite positional parameters, install traps, export runtime controls, change
+shell options, initialize logging, or create caller-owned generic state.
 
-- initializes the logging level map
-- records the original script arguments in `__SCRIPT_ARGS__`
-- derives the caller's source directory in `__SCRIPT_DIR__`
-- exposes the package version in `BASE_BASH_LIBS_VERSION`
-- exposes the successful stdlib load marker in `BASE_BASH_LIBS_STDLIB_LOADED`
-- consumes Base wrapper flags such as `--debug-wrapper`, `--utc-wrapper`, and
-  `--color`; the compatibility flag `--verbose-wrapper` is deprecated
-- resets the caller's positional parameters to the filtered argument list
+Call `base_bash_libs_init` exactly once for the application lifecycle:
 
-Caller-visible globals:
+```bash
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+
+# The caller owns this explicit handoff; the library never changes "$@".
+main "${app_args[@]}"
+```
+
+The first argument is a caller-declared indexed array. Optional `--source`
+identifies the application script for relative imports and diagnostics. The
+arguments after the configuration separator `--` are copied into the result
+array after these wrapper controls are consumed:
+
+- `--debug-wrapper` enables DEBUG logging for the terminal and the stdlib
+  category.
+- `--verbose-wrapper` retains the deprecated VERBOSE compatibility level.
+- `--utc-wrapper` exports `LOG_UTC=1` for the initialized runtime.
+- `--color` enables terminal colors when stderr is a TTY and `NO_COLOR` is not
+  set.
+
+Initialization is idempotent for the same script context and argv. A repeated
+call with different context or argv fails with a diagnostic instead of silently
+changing a running application's configuration. Companion libraries should be
+imported after initialization.
+
+Caller-visible metadata:
 
 - `BASE_BASH_LIBS_VERSION`: readonly package version read from the root
   `VERSION` file
 - `BASE_BASH_LIBS_STDLIB_LOADED`: readonly marker set to `1` after
-  `lib_std.sh` has initialized successfully
+  `lib_std.sh` has loaded successfully; it does not imply runtime init
 - `__SCRIPT_ARGS__`: original arguments before wrapper flags were stripped
 - `__SCRIPT_DIR__`: absolute source directory for the script being bootstrapped
 
-When a Base wrapper preloads the stdlib for another command, it can set
-`BASE_BASH_BOOTSTRAP_SOURCE` so `__SCRIPT_DIR__` still points at the command
-script rather than the wrapper.
+`__SCRIPT_ARGS__` and `__SCRIPT_DIR__` are published only by the explicit
+initializer. A launcher may pass `--source` directly; `BASE_BASH_BOOTSTRAP_SOURCE`
+is only a fallback for callers that cannot provide that option.
 
 The library preserves caller-selected `errexit`, `nounset`, and `pipefail`
 settings and supports every combination on Bash 4.2 or newer. It does not
@@ -837,12 +861,15 @@ For standalone scripts that source the library directly:
 #!/usr/bin/env bash
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
 
+declare -a app_args=()
+base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+
 main() {
     set_log_level DEBUG
     std_run echo "hello"
 }
 
-main "$@"
+main "${app_args[@]}"
 ```
 
 ## What Belongs Here

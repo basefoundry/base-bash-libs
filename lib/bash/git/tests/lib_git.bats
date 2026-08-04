@@ -5,6 +5,8 @@ load ../../tests/test_helper.sh
 setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
+    declare -a setup_args=()
+    base_bash_libs_init setup_args --source "$BASE_BASH_DIR/git/tests/lib_git.bats" --
     source "$BASE_BASH_DIR/git/lib_git.sh"
 }
 
@@ -49,6 +51,8 @@ setup() {
                 case "$mode" in *u*) set -u ;; esac
                 case "$mode" in *p*) set -o pipefail ;; esac
                 source "$2"
+                declare -a app_args=()
+                base_bash_libs_init app_args --source "$0" --
                 source "$3"
                 "$4"
                 rc=$?
@@ -129,6 +133,8 @@ setup() {
             case "$mode" in *u*) set -u ;; esac
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
+            declare -a app_args=()
+            base_bash_libs_init app_args --
             source "$3"
             git_branch_merged_to_ref "$4" feature main
             rc=$?
@@ -206,6 +212,8 @@ EOF
     bats_run "$BASH" -c '
         set -u
         source "$1"
+        declare -a app_args=()
+        base_bash_libs_init app_args --
         source "$2"
         git() {
             printf "%s\n" \
@@ -1301,6 +1309,8 @@ EOF
             case "$mode" in *u*) set -u ;; esac
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
+            declare -a app_args=()
+            base_bash_libs_init app_args --
             source "$3"
             check_script_up_to_date "$4"
         ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$script_path"

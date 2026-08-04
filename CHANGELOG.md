@@ -49,6 +49,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Made `lib_std.sh` sourcing passive and introduced the explicit, idempotent
+  `base_bash_libs_init` lifecycle API. Wrapper flags now return through a
+  caller-owned array without hidden positional-parameter mutation; launchers,
+  examples, and companion-library tests initialize explicitly.
 - Made timed foreground-TTY invocations fail closed with a safe diagnostic;
   callers must provide a pipe or explicit non-terminal stdin for the v2 hard
   descendant guarantee.
