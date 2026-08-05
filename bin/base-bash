@@ -381,10 +381,12 @@ EOF
 __base_bash_libs_launcher_init_write_tests_run__() {
     cat <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-command -v bats >/dev/null 2>&1 || { printf 'ERROR: bats is required\n' >&2; exit 1; }
-bats "$repo_root/tests/app.bats"
+if ! command -v bats >/dev/null 2>&1; then
+    printf 'ERROR: bats is required\n' >&2
+    exit 1
+fi
+bats "$repo_root/tests/app.bats" || exit $?
 EOF
 }
 
@@ -408,9 +410,11 @@ EOF
 __base_bash_libs_launcher_init_write_shfmt__() {
     cat <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
-command -v shfmt >/dev/null 2>&1 || { printf 'ERROR: shfmt is required\n' >&2; exit 1; }
-shfmt -d bin/app lib/app.sh tests/app.bats
+if ! command -v shfmt >/dev/null 2>&1; then
+    printf 'ERROR: shfmt is required\n' >&2
+    exit 1
+fi
+shfmt -d bin/app lib/app.sh tests/app.bats || exit $?
 EOF
 }
 
