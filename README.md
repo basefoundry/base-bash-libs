@@ -60,6 +60,12 @@ or `curl | bash` installer is used.
 The v2 API charter, effect/status contract, and complete public-surface audit
 are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
 mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
+Start with the [versioned v2 documentation](docs/README.md), especially the
+[five-minute quickstart](docs/v2/quickstart.md) and the
+[v1.4.0-to-v2 migration guide](docs/v2/migration-v1.4-to-v2.md).
+See the [support policy](docs/support-policy.md),
+[threat model](docs/threat-model.md), and [security policy](SECURITY.md) before
+embedding the framework in a production or privileged workflow.
 The machine-readable module/API contract is in
 [`base_api_manifest.yaml`](base_api_manifest.yaml), with its schema documented
 in [`docs/api-manifest-schema.md`](docs/api-manifest-schema.md) and its
