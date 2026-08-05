@@ -20,7 +20,7 @@ The library improves Bash-based scripting in a few practical ways:
   another command may pipe or capture.
 - **Readable failures**: fatal errors include a message and Bash stack trace
   instead of a mysterious non-zero exit.
-- **Safe command execution**: `bl_std_run` preserves argument boundaries, supports
+- **Safe command execution**: `base_std_run` preserves argument boundaries, supports
   dry-run mode, timeout, retry, and can either exit or return a status.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
@@ -65,112 +65,112 @@ such output names are rejected before caller state is changed.
 
 ### Runtime and Imports
 
-- `bl_init <result_array> [--source <script>] -- [argv...]`:
+- `base_init <result_array> [--source <script>] -- [argv...]`:
   explicitly initializes runtime state and returns wrapper-filtered application
   arguments without mutating the caller's positional parameters.
-- `bl_require_version <version>`: returns `1` when the loaded package version
+- `base_require_version <version>`: returns `1` when the loaded package version
   is older and `2` for malformed usage/version values.
-- `bl_std_check_bash_version`: returns zero for Bash 4.2 or newer and reports the
+- `base_std_check_bash_version`: returns zero for Bash 4.2 or newer and reports the
   required version otherwise.
-- `bl_std_is_interactive`: returns zero when stdin is attached to an interactive TTY.
-- `bl_std_import <path>`: sources a relative path from `BASE_BASH_LIBS_SCRIPT_DIR` or an
+- `base_std_is_interactive`: returns zero when stdin is attached to an interactive TTY.
+- `base_std_import <path>`: sources a relative path from `BASE_BASH_LIBS_SCRIPT_DIR` or an
   absolute path; returns a recoverable failure when the library cannot be sourced.
-- `bl_std_get_my_source_dir <result_var>`: stores the caller script directory in a
+- `base_std_get_my_source_dir <result_var>`: stores the caller script directory in a
   validated variable without printing it.
 
 ### Logging and Messages
 
-- `bl_std_set_log_level [-l <logger>] <level>`: changes terminal verbosity and returns
+- `base_std_set_log_level [-l <logger>] <level>`: changes terminal verbosity and returns
   nonzero for an unknown level or logger option error.
-- `bl_std_set_log_category_level -l <category> <level>`: changes the independent gate
+- `base_std_set_log_category_level -l <category> <level>`: changes the independent gate
   for a category and its dotted descendants.
-- `bl_std_log_is_enabled [-l <category>] <level>`: returns zero when the category gate
+- `base_std_log_is_enabled [-l <category>] <level>`: returns zero when the category gate
   and at least one configured sink accept the level.
-- `bl_std_log_fatal`, `bl_std_log_error`, `bl_std_log_warn`, `bl_std_log_info`, `bl_std_log_debug`,
-  `bl_std_log_verbose <message...>`: write a structured message to stderr at the
-  named level. `bl_std_log_verbose` is deprecated; use `bl_std_log_debug`.
-- `bl_std_log_info_file`, `bl_std_log_debug_file`, `bl_std_log_verbose_file [-l <logger>] <file>`:
+- `base_std_log_fatal`, `base_std_log_error`, `base_std_log_warn`, `base_std_log_info`, `base_std_log_debug`,
+  `base_std_log_verbose <message...>`: write a structured message to stderr at the
+  named level. `base_std_log_verbose` is deprecated; use `base_std_log_debug`.
+- `base_std_log_info_file`, `base_std_log_debug_file`, `base_std_log_verbose_file [-l <logger>] <file>`:
   log a file's contents at the requested level when that level is enabled.
-  `bl_std_log_verbose_file` is deprecated; use `bl_std_log_debug_file`.
-- `bl_std_log_info_enter`, `bl_std_log_debug_enter`, `bl_std_log_verbose_enter` and
-  `bl_std_log_info_leave`, `bl_std_log_debug_leave`, `bl_std_log_verbose_leave`: log the current
+  `base_std_log_verbose_file` is deprecated; use `base_std_log_debug_file`.
+- `base_std_log_info_enter`, `base_std_log_debug_enter`, `base_std_log_verbose_enter` and
+  `base_std_log_info_leave`, `base_std_log_debug_leave`, `base_std_log_verbose_leave`: log the current
   function boundary without arguments. The `log_verbose_*` forms are
   deprecated; use the DEBUG forms.
-- `bl_std_print_error`, `bl_std_print_warn`, `bl_std_print_info`, `bl_std_print_success <message...>`:
+- `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, `base_std_print_success <message...>`:
   write an unstructured user-facing message to stderr.
-- `bl_std_print_bold`, `bl_std_print_message <message...>`: write an unstructured message to
-  stdout; `bl_std_print_bold` applies terminal formatting when enabled.
-- `bl_std_print_tty <message...>`: writes only when stdout is attached to a TTY.
-- `bl_std_dump_trace`: writes the current Bash call stack to stderr.
+- `base_std_print_bold`, `base_std_print_message <message...>`: write an unstructured message to
+  stdout; `base_std_print_bold` applies terminal formatting when enabled.
+- `base_std_print_tty <message...>`: writes only when stdout is attached to a TTY.
+- `base_std_dump_trace`: writes the current Bash call stack to stderr.
 
 ### Command and Error Control
 
-- `bl_std_run [policy options] <command> [args...]`: runs an argument-preserving
+- `base_std_run [policy options] <command> [args...]`: runs an argument-preserving
   command, returning or exiting with its status according to the selected
   policy. See [Running Commands Safely](#running-commands-safely).
-- `bl_std_exit_if_error <status> [message...]`: returns for zero and exits with the
+- `base_std_exit_if_error <status> [message...]`: returns for zero and exits with the
   supplied status after logging a message for nonzero status.
-- `bl_std_fatal_error <message...>`: logs a fatal error, prints a trace, and exits.
-- `bl_std_is_dry_run`: returns zero when `BASE_BASH_LIBS_DRY_RUN` is truthy.
+- `base_std_fatal_error <message...>`: logs a fatal error, prints a trace, and exits.
+- `base_std_is_dry_run`: returns zero when `BASE_BASH_LIBS_DRY_RUN` is truthy.
 
 ### PATH and Filesystem Helpers
 
-- `bl_std_add_to_path [-p] [-n] <directory...>`: prepends or appends existing PATH
+- `base_std_add_to_path [-p] [-n] <directory...>`: prepends or appends existing PATH
   entries, optionally allowing missing directories; returns nonzero on invalid
   options or update failure.
-- `bl_std_dedupe_path`: removes duplicate and empty PATH entries in place.
-- `bl_std_print_path`: prints one PATH entry per line.
-- `bl_std_safe_mkdir [-p] <directory...>`, `bl_std_safe_touch <file...>`,
-  `bl_std_safe_truncate <file...>`, and `bl_std_safe_cd <directory>`: perform the named
+- `base_std_dedupe_path`: removes duplicate and empty PATH entries in place.
+- `base_std_print_path`: prints one PATH entry per line.
+- `base_std_safe_mkdir [-p] <directory...>`, `base_std_safe_touch <file...>`,
+  `base_std_safe_truncate <file...>`, and `base_std_safe_cd <directory>`: perform the named
   filesystem operation with explicit diagnostics and failure statuses.
-- `bl_std_safe_unalias <name...>`: removes aliases when present and ignores names that
+- `base_std_safe_unalias <name...>`: removes aliases when present and ignores names that
   are not aliases.
 
 ### Cleanup and Temporary State
 
-- `bl_std_register_cleanup_hook <function>`,
-  `bl_std_unregister_cleanup_hook <function>`: add or remove a named cleanup
+- `base_std_register_cleanup_hook <function>`,
+  `base_std_unregister_cleanup_hook <function>`: add or remove a named cleanup
   function from the shared exit dispatcher.
-- `bl_std_register_cleanup_path [--unsafe] <absolute_path...>`,
-  `bl_std_unregister_cleanup_path <absolute_path...>`: add or remove paths from
+- `base_std_register_cleanup_path [--unsafe] <absolute_path...>`,
+  `base_std_unregister_cleanup_path <absolute_path...>`: add or remove paths from
   exit cleanup; invalid, broad, protected, and relative paths are rejected.
   Normal registration snapshots every path component and refuses deletion if a
   symlink, parent directory, rename, or other identity substitution changes
   the registered resource. `--unsafe` explicitly opts out of that ownership
   proof for a specific path, but protected roots and system/shared directories
   remain rejected.
-- `bl_std_make_temp_file [--keep] <result_var> [prefix]` and
-  `bl_std_make_temp_dir [--keep] <result_var> [prefix]`: create a temporary path,
+- `base_std_make_temp_file [--keep] <result_var> [prefix]` and
+  `base_std_make_temp_dir [--keep] <result_var> [prefix]`: create a temporary path,
   store it in the caller variable, and register it for cleanup unless
   `--keep` is used.
 
 ### Introspection and Assertions
 
-- `bl_std_command_path <result_var> <command>`: stores the resolved executable
+- `base_std_command_path <result_var> <command>`: stores the resolved executable
   path or returns nonzero when the command is unavailable.
-- `bl_std_function_exists <name>`: returns zero when a Bash function exists.
-- `bl_std_assert_function_exists <name...>`: exits through `bl_std_fatal_error` when one or
-  more required functions are missing or invalid. Use `bl_std_function_exists` for
+- `base_std_function_exists <name>`: returns zero when a Bash function exists.
+- `base_std_assert_function_exists <name...>`: exits through `base_std_fatal_error` when one or
+  more required functions are missing or invalid. Use `base_std_function_exists` for
   a non-fatal predicate.
-- `bl_std_assert_variable_name <name...>`: validates Bash variable names.
-- `bl_std_assert_indexed_array <name...>` and `bl_std_assert_associative_array <name...>`:
+- `base_std_assert_variable_name <name...>`: validates Bash variable names.
+- `base_std_assert_indexed_array <name...>` and `base_std_assert_associative_array <name...>`:
   validate caller-owned array declarations.
-- `bl_std_assert_not_null <variable...>`: validates that named variables are set and
+- `base_std_assert_not_null <variable...>`: validates that named variables are set and
   non-empty without treating values as variable names accidentally.
-- `bl_std_assert_integer <variable...>` and
-  `bl_std_assert_integer_range <variable> <min> <max>`: validate the values of named
+- `base_std_assert_integer <variable...>` and
+  `base_std_assert_integer_range <variable> <min> <max>`: validate the values of named
   variables as decimal integers and enforce inclusive bounds.
-- `bl_std_assert_arg_count <actual> <expected> [max]`: validates exact or ranged
+- `base_std_assert_arg_count <actual> <expected> [max]`: validates exact or ranged
   positional argument counts.
-- `bl_std_assert_command_exists <command...>`, `bl_std_assert_file_exists <path...>`,
-  `bl_std_assert_executable <path...>`, and `bl_std_assert_dir_exists <path...>`: validate
+- `base_std_assert_command_exists <command...>`, `base_std_assert_file_exists <path...>`,
+  `base_std_assert_executable <path...>`, and `base_std_assert_dir_exists <path...>`: validate
   required commands or filesystem objects.
 
 ### Interactive Helpers
 
-- `bl_std_ask_yes_no <prompt> [yes|no]`: prompts on a TTY, accepts Enter as
+- `base_std_ask_yes_no <prompt> [yes|no]`: prompts on a TTY, accepts Enter as
   the displayed `[y/N]` or `[Y/n]` default, and returns the user's decision.
-- `bl_std_wait_for_enter [prompt]`: waits for Enter on a TTY and returns nonzero when
+- `base_std_wait_for_enter [prompt]`: waits for Enter on a TTY and returns nonzero when
   no usable terminal is available.
 
 ## Loading The Library
@@ -187,12 +187,12 @@ Standalone scripts can also use the `base-bash` launcher when it is installed on
 ```bash
 #!/usr/bin/env base-bash
 
-bl_launcher_import_base_bash_lib str/lib_str.sh
+base_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local name="  Example  "
-    bl_str_trim name
-    bl_std_run echo "$name"
+    base_str_trim name
+    base_std_run echo "$name"
 }
 ```
 
@@ -209,11 +209,11 @@ package metadata, and a collision-safe load guard, but it does not consume or
 rewrite positional parameters, install traps, export runtime controls, change
 shell options, initialize logging, or create caller-owned generic state.
 
-Call `bl_init` exactly once for the application lifecycle:
+Call `base_init` exactly once for the application lifecycle:
 
 ```bash
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 
 # The caller owns this explicit handoff; the library never changes "$@".
 main "${app_args[@]}"
@@ -253,18 +253,18 @@ The library preserves caller-selected `errexit`, `nounset`, and `pipefail`
 settings and supports every combination on Bash 4.2 or newer. It does not
 enable or disable those options for the caller. A top-level interactive or
 `bash -c` source has no outer `BASH_SOURCE` frame; without a bootstrap override,
-`BASE_BASH_LIBS_SCRIPT_DIR` and `bl_std_get_my_source_dir` use the current working directory in
+`BASE_BASH_LIBS_SCRIPT_DIR` and `base_std_get_my_source_dir` use the current working directory in
 that case. Predicate helpers can intentionally return nonzero, so callers using
 `errexit` should invoke them in `if`, `while`, `&&`, or another normal Bash
 conditional context.
 
 ## Version Requirements
 
-Use `bl_require_version` when a downstream script depends on APIs
+Use `base_require_version` when a downstream script depends on APIs
 added after the first public release:
 
 ```bash
-bl_require_version 1.1.0
+base_require_version 1.1.0
 ```
 
 The helper compares dotted numeric versions, returns silently when the loaded
@@ -276,10 +276,10 @@ library is new enough, and exits with a clear fatal error when the loaded
 Use structured logging for operational messages:
 
 ```bash
-bl_std_log_info "Installing package '$name'."
-bl_std_log_warn "Cache directory does not exist: $cache_dir"
-bl_std_log_error "Unable to read manifest '$manifest_path'."
-bl_std_log_debug "resolved_home=$resolved_home"
+base_std_log_info "Installing package '$name'."
+base_std_log_warn "Cache directory does not exist: $cache_dir"
+base_std_log_error "Unable to read manifest '$manifest_path'."
+base_std_log_debug "resolved_home=$resolved_home"
 ```
 
 Available levels:
@@ -292,8 +292,8 @@ Available levels:
 - `VERBOSE` (deprecated compatibility level)
 
 `DEBUG` is the most detailed supported level for new code. `VERBOSE`,
-`bl_std_log_verbose`, `bl_std_log_verbose_file`,
-`bl_std_log_verbose_enter`, `bl_std_log_verbose_leave`,
+`base_std_log_verbose`, `base_std_log_verbose_file`,
+`base_std_log_verbose_enter`, `base_std_log_verbose_leave`,
 and `--verbose-wrapper` remain available as explicitly deprecated v2 controls.
 They do not define generic v1 aliases and do not emit runtime deprecation
 warnings.
@@ -301,22 +301,22 @@ warnings.
 Change terminal verbosity with:
 
 ```bash
-bl_std_set_log_level DEBUG
+base_std_set_log_level DEBUG
 ```
 
 The `-l` identifier on a log call selects both its category gate and any
 explicitly configured named terminal logger. For example:
 
 ```bash
-bl_std_set_log_level -l artifact DEBUG
-bl_std_log_debug -l artifact "registry key: $key"
+base_std_set_log_level -l artifact DEBUG
+base_std_log_debug -l artifact "registry key: $key"
 ```
 
 Terminal verbosity and category gates answer different questions:
 
-- `bl_std_set_log_level` controls what appears on the terminal. An unconfigured named
+- `base_std_set_log_level` controls what appears on the terminal. An unconfigured named
   logger inherits the default terminal level.
-- `bl_std_set_log_category_level` controls whether a component may emit a record at
+- `base_std_set_log_category_level` controls whether a component may emit a record at
   all. Categories inherit from the nearest explicitly configured dotted parent,
   then from `default`.
 - `BASE_BASH_LIBS_PRIMARY_LOG`, when it names an eligible path, receives accepted
@@ -325,7 +325,7 @@ Terminal verbosity and category gates answer different questions:
 The primary sink is best-effort and never changes application status. An
 existing target must be an owned, writable, regular non-symlink file; a missing
 target needs an existing writable and searchable parent directory. The library
-does not create parent directories. `bl_std_log_is_enabled` checks this eligibility
+does not create parent directories. `base_std_log_is_enabled` checks this eligibility
 without creating or changing the target. Before appending, the library creates
 or normalizes the primary log to mode `0600`; setup and write failures are
 suppressed and disable that path for the remainder of the process.
@@ -334,13 +334,13 @@ The global default category gate is permissive for compatibility. Applications
 can keep their own DEBUG output while limiting a reusable component:
 
 ```bash
-bl_std_set_log_level DEBUG
-bl_std_set_log_category_level -l reusable_library INFO
-bl_std_set_log_category_level -l reusable_library.network DEBUG
+base_std_set_log_level DEBUG
+base_std_set_log_category_level -l reusable_library INFO
+base_std_set_log_category_level -l reusable_library.network DEBUG
 
-bl_std_log_debug "application diagnostic"
-bl_std_log_debug -l reusable_library "suppressed library diagnostic"
-bl_std_log_debug -l reusable_library.network "enabled network diagnostic"
+base_std_log_debug "application diagnostic"
+base_std_log_debug -l reusable_library "suppressed library diagnostic"
+base_std_log_debug -l reusable_library.network "enabled network diagnostic"
 ```
 
 The library's own records use these categories:
@@ -356,14 +356,14 @@ can enable its own DEBUG terminal output without also enabling reusable-library
 DEBUG records:
 
 ```bash
-bl_std_set_log_level DEBUG
+base_std_set_log_level DEBUG
 
 # Opt in to every base-bash-libs DEBUG category:
-bl_std_set_log_category_level -l base_bash_libs DEBUG
+base_std_set_log_category_level -l base_bash_libs DEBUG
 
 # Or keep the parent at INFO and enable one component:
-bl_std_set_log_category_level -l base_bash_libs INFO
-bl_std_set_log_category_level -l base_bash_libs.git DEBUG
+base_std_set_log_category_level -l base_bash_libs INFO
+base_std_set_log_category_level -l base_bash_libs.git DEBUG
 ```
 
 `--debug-wrapper` enables both DEBUG terminal output and the
@@ -371,18 +371,18 @@ bl_std_set_log_category_level -l base_bash_libs.git DEBUG
 enable both at VERBOSE during the compatibility window.
 
 Merely sourcing `lib_std.sh` does not log the caller process argument vector.
-Explicit command execution is different: ordinary `bl_std_run` dry-run and
+Explicit command execution is different: ordinary `base_std_run` dry-run and
 failure diagnostics intentionally render the command arguments with Bash
 `%q`. Arguments may contain credentials or other sensitive data, so use
-`bl_std_run --sensitive` for a protected command and apply schema-aware redaction
+`base_std_run --sensitive` for a protected command and apply schema-aware redaction
 before writing any caller-owned invocation diagnostic.
 
-Use `bl_std_log_is_enabled` to avoid constructing an expensive diagnostic unless a
+Use `base_std_log_is_enabled` to avoid constructing an expensive diagnostic unless a
 terminal or persistent sink will consume it:
 
 ```bash
-if bl_std_log_is_enabled -l reusable_library.network DEBUG; then
-    bl_std_log_debug -l reusable_library.network "response=$(render_large_response)"
+if base_std_log_is_enabled -l reusable_library.network DEBUG; then
+    base_std_log_debug -l reusable_library.network "response=$(render_large_response)"
 fi
 ```
 
@@ -390,48 +390,48 @@ For user-facing messages that should not include timestamps or source
 locations, use:
 
 ```bash
-bl_std_print_error "Invalid project name."
-bl_std_print_warn "Using default workspace."
-bl_std_print_info "Setup complete."
-bl_std_print_success "Done."
-bl_std_print_message "plain stdout message"
+base_std_print_error "Invalid project name."
+base_std_print_warn "Using default workspace."
+base_std_print_info "Setup complete."
+base_std_print_success "Done."
+base_std_print_message "plain stdout message"
 ```
 
-`log_*`, `bl_std_print_error`, `bl_std_print_warn`, `bl_std_print_info`, and `bl_std_print_success` write to
-stderr. `bl_std_print_bold` and `bl_std_print_message` write to stdout.
+`log_*`, `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, and `base_std_print_success` write to
+stderr. `base_std_print_bold` and `base_std_print_message` write to stdout.
 
 Colors are only enabled for terminal stderr when `--color` is passed. Set
 `NO_COLOR` to disable colored output even when `--color` is present.
 
 ## Error Handling
 
-Use `bl_std_fatal_error` when the script cannot continue:
+Use `base_std_fatal_error` when the script cannot continue:
 
 ```bash
-[[ -f "$manifest_path" ]] || bl_std_fatal_error "Manifest '$manifest_path' was not found."
+[[ -f "$manifest_path" ]] || base_std_fatal_error "Manifest '$manifest_path' was not found."
 ```
 
-Use `bl_std_exit_if_error` when checking a command's explicit status:
+Use `base_std_exit_if_error` when checking a command's explicit status:
 
 ```bash
 some_command
-bl_std_exit_if_error $? "some_command failed."
+base_std_exit_if_error $? "some_command failed."
 ```
 
 Fatal failures log the message, dump a Bash stack trace, and exit with the
 original failing status when possible.
 
 Not every user mistake should be fatal. Command-line usage errors should usually
-print usage and return `2` rather than calling `bl_std_fatal_error`, because the command
+print usage and return `2` rather than calling `base_std_fatal_error`, because the command
 itself is fine and the user simply gave invalid arguments.
 
 ## Running Commands Safely
 
-`bl_std_run` is the preferred helper for external command execution:
+`base_std_run` is the preferred helper for external command execution:
 
 ```bash
-bl_std_run git status --short
-bl_std_run touch "file with spaces.txt"
+base_std_run git status --short
+base_std_run touch "file with spaces.txt"
 ```
 
 It improves on ad hoc command strings because it:
@@ -442,25 +442,25 @@ It improves on ad hoc command strings because it:
 - can replace sensitive command text with a protected marker and safe label
 - can bound each attempt with `--timeout`
 - can retry transient failures with `--max-attempts` and `--retry-delay`
-- exits through `bl_std_exit_if_error` by default when a command fails
+- exits through `base_std_exit_if_error` by default when a command fails
 
 Dry-run mode:
 
 ```bash
 BASE_BASH_LIBS_DRY_RUN=true
-bl_std_run brew install jq
+base_std_run brew install jq
 ```
 
 `BASE_BASH_LIBS_DRY_RUN` and `BASE_BASH_LIBS_DRY_RUN` both accept `true`, `1`, `yes`, and `on`. Use
-`bl_std_is_dry_run` when a script needs to branch on the same normalized dry-run state
-without executing a command through `bl_std_run`.
+`base_std_is_dry_run` when a script needs to branch on the same normalized dry-run state
+without executing a command through `base_std_run`.
 
 Protect framework-generated diagnostics for a command whose arguments contain
 credentials or other sensitive values with `--sensitive`. Protected calls must
 use `--` to separate runner options from the command:
 
 ```bash
-bl_std_run \
+base_std_run \
     --sensitive \
     --safe-display "upload release asset" \
     -- \
@@ -503,8 +503,8 @@ so their diagnostics retain exact, copy-pastable argument boundaries.
 Handle a failing command yourself with `--no-exit`:
 
 ```bash
-if ! bl_std_run --no-exit grep "needle" "$file"; then
-    bl_std_log_info "needle was not present; continuing"
+if ! base_std_run --no-exit grep "needle" "$file"; then
+    base_std_log_info "needle was not present; continuing"
 fi
 ```
 
@@ -512,8 +512,8 @@ For expected probe failures where the caller handles the status, add `--quiet`
 to suppress the warning:
 
 ```bash
-if ! bl_std_run --no-exit --quiet test -f "$optional_file"; then
-    bl_std_log_debug "Optional file is absent."
+if ! base_std_run --no-exit --quiet test -f "$optional_file"; then
+    base_std_log_debug "Optional file is absent."
 fi
 ```
 
@@ -521,14 +521,14 @@ Add a per-attempt timeout when a command must finish within a bounded number of
 seconds:
 
 ```bash
-bl_std_run --timeout 30 curl -fsSL "$health_url"
+base_std_run --timeout 30 curl -fsSL "$health_url"
 ```
 
 Timeouts return status `124` when the caller uses `--no-exit`:
 
 ```bash
-if ! bl_std_run --no-exit --quiet --timeout 5 nc -z localhost 5432; then
-    bl_std_log_warn "database port did not open within 5 seconds"
+if ! base_std_run --no-exit --quiet --timeout 5 nc -z localhost 5432; then
+    base_std_log_warn "database port did not open within 5 seconds"
 fi
 ```
 
@@ -536,14 +536,14 @@ Retry transient failures by setting the total attempt count. `--retry-delay`
 adds a fixed sleep between failed attempts:
 
 ```bash
-bl_std_run --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
+base_std_run --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
 ```
 
 Timeout and retry compose directly. The timeout is per attempt, not a total
 budget for all attempts:
 
 ```bash
-bl_std_run --timeout 30 --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
+base_std_run --timeout 30 --max-attempts 3 --retry-delay 2 curl -fsSL "$artifact_url"
 ```
 
 `--retry-attempts` is accepted as an alias for `--max-attempts`, but new code
@@ -576,16 +576,16 @@ input; a foreground TTY invocation returns `125` without executing the
 command. This restriction is intentional for v2 and is independent of which
 timeout backend was detected.
 
-Use `bl_std_run` for commands plus arguments. Keep shell features such as
+Use `base_std_run` for commands plus arguments. Keep shell features such as
 pipelines, redirection, process substitution, and complex conditionals explicit
 in the calling script so the code remains clear.
 
-Unknown `bl_std_run` options beginning with `--` are rejected before command
-execution. If the command itself begins with `--`, terminate `bl_std_run` options
+Unknown `base_std_run` options beginning with `--` are rejected before command
+execution. If the command itself begins with `--`, terminate `base_std_run` options
 first:
 
 ```bash
-bl_std_run -- --command-name arg
+base_std_run -- --command-name arg
 ```
 
 The separator is optional for ordinary commands whose name does not begin with
@@ -602,33 +602,33 @@ redaction rules as other framework diagnostics.
 
 ## Importing Other Bash Libraries
 
-Use `bl_std_import` to source helper libraries:
+Use `base_std_import` to source helper libraries:
 
 ```bash
-bl_std_import file/lib_file.sh
-bl_std_import /absolute/path/to/another_lib.sh
+base_std_import file/lib_file.sh
+base_std_import /absolute/path/to/another_lib.sh
 ```
 
 Relative imports resolve from `BASE_BASH_LIBS_SCRIPT_DIR`, which is the directory of the
 script being bootstrapped.
 
-Important Bash detail: imported files are sourced inside the `bl_std_import` function.
+Important Bash detail: imported files are sourced inside the `base_std_import` function.
 If an imported library needs global variables, declare them with `-g`:
 
 ```bash
 declare -gA MY_LOOKUP=()
 ```
 
-Without `-g`, Bash may create locals scoped to the bl_std_import function.
+Without `-g`, Bash may create locals scoped to the base_std_import function.
 
 ## PATH Helpers
 
-Use `bl_std_add_to_path` instead of hand-editing PATH:
+Use `base_std_add_to_path` instead of hand-editing PATH:
 
 ```bash
-bl_std_add_to_path "/opt/tool/bin"
-bl_std_add_to_path -p "$HOME/.local/bin"
-bl_std_add_to_path -n "$maybe_created_later/bin"
+base_std_add_to_path "/opt/tool/bin"
+base_std_add_to_path -p "$HOME/.local/bin"
+base_std_add_to_path -n "$maybe_created_later/bin"
 ```
 
 Options:
@@ -636,11 +636,11 @@ Options:
 - `-p`: prepend instead of append
 - `-n`: do not require the directory to already exist
 
-`bl_std_add_to_path` de-duplicates PATH after adding entries. You can also call:
+`base_std_add_to_path` de-duplicates PATH after adding entries. You can also call:
 
 ```bash
-bl_std_dedupe_path
-bl_std_print_path
+base_std_dedupe_path
+base_std_print_path
 ```
 
 ## Filesystem Helpers
@@ -648,17 +648,17 @@ bl_std_print_path
 The safe filesystem helpers collect failures and report them clearly:
 
 ```bash
-bl_std_safe_mkdir -p "$state_dir" "$cache_dir"
-bl_std_safe_touch "$log_file"
-bl_std_safe_truncate "$log_file"
-bl_std_safe_cd "$project_root"
+base_std_safe_mkdir -p "$state_dir" "$cache_dir"
+base_std_safe_touch "$log_file"
+base_std_safe_truncate "$log_file"
+base_std_safe_cd "$project_root"
 ```
 
 These helpers are useful in setup scripts where a partially completed operation
 should fail loudly and explain which path could not be created, touched, or
 entered.
 
-`bl_std_safe_mkdir` accepts only `-p` as an option. Calling it without directory
+`base_std_safe_mkdir` accepts only `-p` as an option. Calling it without directory
 arguments logs a warning and returns success without creating anything.
 
 ## Cleanup Helpers
@@ -668,7 +668,7 @@ removed on exit:
 
 ```bash
 workspace="$(mktemp -d)"
-bl_std_register_cleanup_path "$workspace"
+base_std_register_cleanup_path "$workspace"
 ```
 
 Cleanup paths are removed with `rm -rf --` from a shared `EXIT` trap. Paths must
@@ -686,7 +686,7 @@ cleanup:
 
 ```bash
 rm -rf -- "$workspace"
-bl_std_unregister_cleanup_path "$workspace"
+base_std_unregister_cleanup_path "$workspace"
 ```
 
 For custom cleanup, register a function name:
@@ -696,8 +696,8 @@ cleanup_workspace() {
     rm -rf -- "$workspace"
 }
 
-bl_std_register_cleanup_hook cleanup_workspace
-bl_std_unregister_cleanup_hook cleanup_workspace
+base_std_register_cleanup_hook cleanup_workspace
+base_std_unregister_cleanup_hook cleanup_workspace
 ```
 
 Hooks and paths unwind in strict last-in, first-out order, and duplicate
@@ -718,8 +718,8 @@ Use temp helpers when a script needs a scratch file or directory and wants the
 path stored in a variable:
 
 ```bash
-bl_std_make_temp_file temp_file base
-bl_std_make_temp_dir temp_dir workspace
+base_std_make_temp_file temp_file base
+base_std_make_temp_dir temp_dir workspace
 ```
 
 Both helpers create paths under `${TMPDIR:-/tmp}` using `mktemp` templates that
@@ -727,14 +727,14 @@ work on macOS/BSD and GNU systems. The created path is registered for exit
 cleanup by default:
 
 ```bash
-bl_std_make_temp_dir workspace_dir
+base_std_make_temp_dir workspace_dir
 printf 'payload\n' > "$workspace_dir/input.txt"
 ```
 
 Pass `--keep` when the caller intentionally owns cleanup:
 
 ```bash
-bl_std_make_temp_file --keep report_path report
+base_std_make_temp_file --keep report_path report
 ```
 
 The optional prefix is a filename prefix, not a directory path. It must be
@@ -743,32 +743,32 @@ the temp root should be somewhere other than `/tmp`.
 
 ## Introspection Helpers
 
-Use `bl_std_command_path` when a script needs the path to an external command but
+Use `base_std_command_path` when a script needs the path to an external command but
 wants to decide what to do if it is absent:
 
 ```bash
-if bl_std_command_path git_path git; then
-    bl_std_run "$git_path" status --short
+if base_std_command_path git_path git; then
+    base_std_run "$git_path" status --short
 else
-    bl_std_log_warn "git is not available; skipping repository status."
+    base_std_log_warn "git is not available; skipping repository status."
 fi
 ```
 
 The helper stores an executable path in the named result variable and returns
 nonzero with an empty result when the command is not found.
 
-Use `bl_std_function_exists` for predicate-style checks:
+Use `base_std_function_exists` for predicate-style checks:
 
 ```bash
-if bl_std_function_exists cleanup_workspace; then
-    bl_std_register_cleanup_hook cleanup_workspace
+if base_std_function_exists cleanup_workspace; then
+    base_std_register_cleanup_hook cleanup_workspace
 fi
 ```
 
-Use `bl_std_assert_function_exists` when missing functions should be fatal:
+Use `base_std_assert_function_exists` when missing functions should be fatal:
 
 ```bash
-bl_std_assert_function_exists main cleanup_workspace
+base_std_assert_function_exists main cleanup_workspace
 ```
 
 ## Validation Helpers
@@ -776,40 +776,40 @@ bl_std_assert_function_exists main cleanup_workspace
 Use assertions near the top of functions to make assumptions explicit:
 
 ```bash
-bl_std_assert_arg_count "$#" 2
-bl_std_assert_variable_name result_var array_var
-bl_std_assert_indexed_array values
-bl_std_assert_associative_array options
-bl_std_assert_not_null BASE_HOME project_name
-bl_std_assert_integer retry_count
-bl_std_assert_integer_range retry_count 0 5
-bl_std_assert_command_exists git brew
-bl_std_assert_function_exists main cleanup_workspace
-bl_std_assert_file_exists "$manifest_path"
-bl_std_assert_executable "$project_root/bin/build"
-bl_std_assert_dir_exists "$project_root"
+base_std_assert_arg_count "$#" 2
+base_std_assert_variable_name result_var array_var
+base_std_assert_indexed_array values
+base_std_assert_associative_array options
+base_std_assert_not_null BASE_HOME project_name
+base_std_assert_integer retry_count
+base_std_assert_integer_range retry_count 0 5
+base_std_assert_command_exists git brew
+base_std_assert_function_exists main cleanup_workspace
+base_std_assert_file_exists "$manifest_path"
+base_std_assert_executable "$project_root/bin/build"
+base_std_assert_dir_exists "$project_root"
 ```
 
-`bl_std_assert_not_null` takes variable names, not expanded values. Use
-`bl_std_assert_not_null TOKEN`, not `bl_std_assert_not_null "$TOKEN"`. When an argument is not
-a valid Bash variable name, `bl_std_assert_not_null` reports likely misuse without
+`base_std_assert_not_null` takes variable names, not expanded values. Use
+`base_std_assert_not_null TOKEN`, not `base_std_assert_not_null "$TOKEN"`. When an argument is not
+a valid Bash variable name, `base_std_assert_not_null` reports likely misuse without
 echoing the invalid value.
 
-Use `bl_std_assert_variable_name` when a helper accepts variable names but does not
+Use `base_std_assert_variable_name` when a helper accepts variable names but does not
 require those variables to exist or contain values.
 
-Use `bl_std_assert_indexed_array` when a helper accepts a caller-owned array by name.
+Use `base_std_assert_indexed_array` when a helper accepts a caller-owned array by name.
 Callers should declare those variables with `declare -a` or an indexed-array
 assignment before passing them to array-mutating helpers.
 
-Use `bl_std_assert_associative_array` when a helper accepts a caller-owned associative
+Use `base_std_assert_associative_array` when a helper accepts a caller-owned associative
 array by name. Callers should declare those variables with `declare -A` before
 passing them to map-mutating helpers.
 
 The assertions favor clear failure messages over scattered one-off tests. Some
 helpers check all provided values and report all missing items together.
-Use `bl_std_assert_executable` for explicit paths to project-local tools or scripts;
-use `bl_std_assert_command_exists` for commands that should be discoverable through
+Use `base_std_assert_executable` for explicit paths to project-local tools or scripts;
+use `base_std_assert_command_exists` for commands that should be discoverable through
 `PATH`.
 
 ## Interactive Helpers
@@ -817,19 +817,19 @@ use `bl_std_assert_command_exists` for commands that should be discoverable thro
 For interactive scripts:
 
 ```bash
-if bl_std_ask_yes_no "Continue?"; then
-    bl_std_log_info "Continuing."
+if base_std_ask_yes_no "Continue?"; then
+    base_std_log_info "Continuing."
 fi
 
-bl_std_wait_for_enter "Press Enter after reviewing the output."
+base_std_wait_for_enter "Press Enter after reviewing the output."
 ```
 
-Use `bl_std_is_interactive` before prompting from code paths that might run in CI,
+Use `base_std_is_interactive` before prompting from code paths that might run in CI,
 cron, or another non-interactive environment:
 
 ```bash
-if bl_std_is_interactive; then
-    bl_std_ask_yes_no "Install optional tools?" || return 0
+if base_std_is_interactive; then
+    base_std_ask_yes_no "Install optional tools?" || return 0
 fi
 ```
 
@@ -844,13 +844,13 @@ main() {
     local project="${1:-}"
 
     if [[ -z "$project" ]]; then
-        bl_std_print_error "Project name is required."
+        base_std_print_error "Project name is required."
         return 2
     fi
 
-    bl_std_assert_command_exists git
-    bl_std_log_info "Checking project '$project'."
-    bl_std_run git status --short
+    base_std_assert_command_exists git
+    base_std_log_info "Checking project '$project'."
+    base_std_run git status --short
 }
 
 main "$@"
@@ -866,11 +866,11 @@ For standalone scripts that source the library directly:
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
 
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 
 main() {
-    bl_std_set_log_level DEBUG
-    bl_std_run echo "hello"
+    base_std_set_log_level DEBUG
+    base_std_run echo "hello"
 }
 
 main "${app_args[@]}"

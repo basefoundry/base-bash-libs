@@ -10,23 +10,23 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly BASE_BASH_LIBS_GIT_LOADED=1
 
-bl_git_detect_default_branch() {
+base_git_detect_default_branch() {
     if (($# != 2)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_detect_default_branch <repo_dir> <result_variable_name>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_detect_default_branch <repo_dir> <result_variable_name>"
         return 1
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_git_detect_default_branch "${2-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_git_detect_default_branch "${2-}" || return 1
 
     local __base_bash_libs_git_detect_repo_dir="$1"
     local __base_bash_libs_git_detect_result_name="$2"
     local __base_bash_libs_git_detect_branch
 
     if [[ -z "$__base_bash_libs_git_detect_repo_dir" || -z "$__base_bash_libs_git_detect_result_name" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_detect_default_branch <repo_dir> <result_variable_name>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_detect_default_branch <repo_dir> <result_variable_name>"
         return 1
     fi
-    bl_std_assert_variable_name "$__base_bash_libs_git_detect_result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ bl_git_detect_default_branch "$__base_bash_libs_git_detect_result_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_git_detect_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_git_detect_default_branch "$__base_bash_libs_git_detect_result_name" || return 1
 
     if __base_bash_libs_git_detect_branch="$(git -C "$__base_bash_libs_git_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
         __base_bash_libs_git_detect_branch="${__base_bash_libs_git_detect_branch#origin/}"
@@ -51,9 +51,9 @@ bl_git_detect_default_branch() {
     return 1
 }
 
-bl_git_worktree_path_for_branch() {
+base_git_worktree_path_for_branch() {
     if (($# < 1 || $# > 2)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_worktree_path_for_branch <branch> [repo_dir]"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"
         return 1
     fi
 
@@ -64,13 +64,13 @@ bl_git_worktree_path_for_branch() {
     local -a git_cmd=(git)
 
     [[ -n "$branch" ]] || {
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_worktree_path_for_branch <branch> [repo_dir]"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"
         return 1
     }
 
     [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
     if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
-        bl_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
+        base_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
     while IFS= read -r line; do
@@ -91,9 +91,9 @@ bl_git_worktree_path_for_branch() {
     return 1
 }
 
-bl_git_list_worktree_branches() {
+base_git_list_worktree_branches() {
     if (($# > 1)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_list_worktree_branches [repo_dir]"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_list_worktree_branches [repo_dir]"
         return 1
     fi
 
@@ -103,7 +103,7 @@ bl_git_list_worktree_branches() {
 
     [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
     if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
-        bl_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
+        base_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
     output+=$'\n'
@@ -128,9 +128,9 @@ bl_git_list_worktree_branches() {
     done <<<"$output"
 }
 
-bl_git_branch_upstream() {
+base_git_branch_upstream() {
     if (($# != 2)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_branch_upstream <repo_dir> <branch>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_branch_upstream <repo_dir> <branch>"
         return 1
     fi
 
@@ -138,16 +138,16 @@ bl_git_branch_upstream() {
     local branch="$2"
 
     if [[ -z "$repo_dir" || -z "$branch" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_branch_upstream <repo_dir> <branch>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_branch_upstream <repo_dir> <branch>"
         return 1
     fi
 
     git -C "$repo_dir" for-each-ref --format='%(upstream:short)' "refs/heads/$branch"
 }
 
-bl_git_branch_merged_to_ref() {
+base_git_branch_merged_to_ref() {
     if (($# != 3)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_branch_merged_to_ref <repo_dir> <branch> <ref>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_branch_merged_to_ref <repo_dir> <branch> <ref>"
         return 1
     fi
 
@@ -156,16 +156,16 @@ bl_git_branch_merged_to_ref() {
     local ref="$3"
 
     if [[ -z "$repo_dir" || -z "$branch" || -z "$ref" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_branch_merged_to_ref <repo_dir> <branch> <ref>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_branch_merged_to_ref <repo_dir> <branch> <ref>"
         return 1
     fi
 
     git -C "$repo_dir" merge-base --is-ancestor "refs/heads/$branch" "$ref" >/dev/null 2>&1
 }
 
-bl_git_list_remote_branches() {
+base_git_list_remote_branches() {
     if (($# > 1)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_list_remote_branches [repo_dir]"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_list_remote_branches [repo_dir]"
         return 1
     fi
 
@@ -173,7 +173,7 @@ bl_git_list_remote_branches() {
     local output ref _sha
 
     if ! output="$(git -C "$repo_dir" ls-remote --heads origin)"; then
-        bl_std_log_error -l base_bash_libs.git "Unable to list remote branches from origin."
+        base_std_log_error -l base_bash_libs.git "Unable to list remote branches from origin."
         return 1
     fi
     while IFS=$' \t' read -r _sha ref; do
@@ -201,14 +201,14 @@ __base_bash_libs_git_only_path_dirty__() {
     local allowed_path="$1"
     local status_file status_record status_code path related_path
 
-    bl_std_make_temp_file status_file base-git-status || return 1
+    base_std_make_temp_file status_file base-git-status || return 1
     if ! git status --porcelain=v1 --untracked-files=no --ignore-submodules=none -z > "$status_file"; then
-        bl_std_unregister_cleanup_path "$status_file"
+        base_std_unregister_cleanup_path "$status_file"
         rm -f -- "$status_file"
         return 1
     fi
     if [[ ! -s "$status_file" ]]; then
-        bl_std_unregister_cleanup_path "$status_file"
+        base_std_unregister_cleanup_path "$status_file"
         rm -f -- "$status_file"
         return 1
     fi
@@ -218,7 +218,7 @@ __base_bash_libs_git_only_path_dirty__() {
         status_code="${status_record:0:2}"
         path="${status_record:3}"
         if ! __base_bash_libs_git_path_matches_allowed_path__ "$path" "$allowed_path"; then
-            bl_std_unregister_cleanup_path "$status_file"
+            base_std_unregister_cleanup_path "$status_file"
             rm -f -- "$status_file"
             return 1
         fi
@@ -226,14 +226,14 @@ __base_bash_libs_git_only_path_dirty__() {
         if [[ "$status_code" == *R* || "$status_code" == *C* ]]; then
             if ! IFS= read -r -d '' related_path ||
                 ! __base_bash_libs_git_path_matches_allowed_path__ "$related_path" "$allowed_path"; then
-                bl_std_unregister_cleanup_path "$status_file"
+                base_std_unregister_cleanup_path "$status_file"
                 rm -f -- "$status_file"
                 return 1
             fi
         fi
     done < "$status_file"
 
-    bl_std_unregister_cleanup_path "$status_file"
+    base_std_unregister_cleanup_path "$status_file"
     rm -f -- "$status_file"
     return 0
 }
@@ -292,11 +292,11 @@ __base_bash_libs_git_update_repo_finish__() {
 
     if [[ -n "$git_log" ]]; then
         rm -f -- "$git_log"
-        bl_std_unregister_cleanup_path "$git_log"
+        base_std_unregister_cleanup_path "$git_log"
     fi
     if [[ -n "$submodule_log" ]]; then
         rm -f -- "$submodule_log"
-        bl_std_unregister_cleanup_path "$submodule_log"
+        base_std_unregister_cleanup_path "$submodule_log"
     fi
     return "$status"
 }
@@ -309,14 +309,14 @@ __base_bash_libs_git_pull_with_retry__() {
     local attempt=1
 
     if [[ ! "$max_attempts" =~ ^[0-9]+$ ]] || ((max_attempts < 1)); then
-        bl_std_log_warn -l base_bash_libs.git "BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS must be a positive integer; using 2."
+        base_std_log_warn -l base_bash_libs.git "BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS must be a positive integer; using 2."
         max_attempts=2
     fi
 
     while ((attempt <= max_attempts)); do
         if git pull --ff-only >"$git_log" 2>&1; then
             if ((attempt > 1)); then
-                bl_std_log_debug -l base_bash_libs.git "git pull succeeded on attempt $attempt."
+                base_std_log_debug -l base_bash_libs.git "git pull succeeded on attempt $attempt."
             fi
             return 0
         fi
@@ -326,11 +326,11 @@ __base_bash_libs_git_pull_with_retry__() {
         fi
 
         if ((max_attempts == 2)); then
-            bl_std_log_warn -l base_bash_libs.git "git pull failed on attempt $attempt; retrying once."
+            base_std_log_warn -l base_bash_libs.git "git pull failed on attempt $attempt; retrying once."
         else
-            bl_std_log_warn -l base_bash_libs.git "git pull failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
+            base_std_log_warn -l base_bash_libs.git "git pull failed on attempt $attempt; retrying (attempt $((attempt + 1)) of $max_attempts)."
         fi
-        [[ -s "$git_log" ]] && bl_std_log_debug_file -l base_bash_libs.git "$git_log"
+        [[ -s "$git_log" ]] && base_std_log_debug_file -l base_bash_libs.git "$git_log"
         attempt=$((attempt + 1))
     done
 }
@@ -346,9 +346,9 @@ __base_bash_libs_git_pull_with_retry__() {
 # Environment:
 #   BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS Positive integer retry count for `git pull --ff-only`; defaults to 2.
 #
-bl_git_update_repo() {
+base_git_update_repo() {
     if (($# < 1 || $# > 3)); then
-        bl_std_log_info -l base_bash_libs.git "Usage: bl_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
+        base_std_log_info -l base_bash_libs.git "Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
         return 1
     fi
 
@@ -358,21 +358,21 @@ bl_git_update_repo() {
     local git_log submodule_log=""
 
     if [[ -z "$git_repo" ]]; then
-        bl_std_log_error -l base_bash_libs.git "No git repository path provided."
-        bl_std_log_info -l base_bash_libs.git "Usage: bl_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
+        base_std_log_error -l base_bash_libs.git "No git repository path provided."
+        base_std_log_info -l base_bash_libs.git "Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
         return 1
     fi
 
     if [[ ! -d "$git_repo" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Git repo not found at '$git_repo'"
+        base_std_log_error -l base_bash_libs.git "Git repo not found at '$git_repo'"
         return 1
     fi
 
-    bl_std_make_temp_file git_log git_log || {
-        bl_std_log_error -l base_bash_libs.git "Unable to create temporary git log file."
+    base_std_make_temp_file git_log git_log || {
+        base_std_log_error -l base_bash_libs.git "Unable to create temporary git log file."
         return 1
     }
-    # bl_git_update_repo intentionally works inside the target repository because
+    # base_git_update_repo intentionally works inside the target repository because
     # the submodule update sequence below needs the repository as its cwd.
     if ! pushd "$git_repo" > /dev/null; then
         # If cd fails, we can't proceed.
@@ -382,7 +382,7 @@ bl_git_update_repo() {
 
     # Check if it's a valid git repo
     if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-        bl_std_log_error -l base_bash_libs.git "'$git_repo' is not a Git repository."
+        base_std_log_error -l base_bash_libs.git "'$git_repo' is not a Git repository."
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
@@ -392,7 +392,7 @@ bl_git_update_repo() {
     expected_branch="$(__base_bash_libs_git_expected_update_branch__ "$expected_branch")"
     current_branch=$(git rev-parse --abbrev-ref HEAD)
     if [[ "$current_branch" != "$expected_branch" ]]; then
-        bl_std_log_debug -l base_bash_libs.git "Current branch of '$git_repo' is '${current_branch}', not '$expected_branch'. Skipping update."
+        base_std_log_debug -l base_bash_libs.git "Current branch of '$git_repo' is '${current_branch}', not '$expected_branch'. Skipping update."
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 0
         return $?
     fi
@@ -406,35 +406,35 @@ bl_git_update_repo() {
     fi
     if [[ "$dirty" == true ]]; then
         if [[ -n "$allowed_dirty_path" ]] && __base_bash_libs_git_only_path_dirty__ "$allowed_dirty_path"; then
-            bl_std_log_debug -l base_bash_libs.git "Repo '$git_repo' only has tracked changes in '$allowed_dirty_path'; attempting git pull."
+            base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' only has tracked changes in '$allowed_dirty_path'; attempting git pull."
         else
-            bl_std_log_debug -l base_bash_libs.git "Repo '$git_repo' has local changes; skipping auto-update. Commit or stash to enable git pull."
+            base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' has local changes; skipping auto-update. Commit or stash to enable git pull."
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 0
             return $?
         fi
     fi
 
     if ! __base_bash_libs_git_pull_with_retry__ "$git_log"; then
-        bl_std_log_error -l base_bash_libs.git "git pull failed on repo '$git_repo'"
-        [[ -s "$git_log" ]] && bl_std_log_info_file -l base_bash_libs.git "$git_log"
+        base_std_log_error -l base_bash_libs.git "git pull failed on repo '$git_repo'"
+        [[ -s "$git_log" ]] && base_std_log_info_file -l base_bash_libs.git "$git_log"
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
 
     # it is safe to run submodule commands even if the repo has no submodules
-    if ! bl_std_make_temp_file submodule_log git-submodule-log; then
-        bl_std_log_error -l base_bash_libs.git "Unable to create temporary submodule log file."
+    if ! base_std_make_temp_file submodule_log git-submodule-log; then
+        base_std_log_error -l base_bash_libs.git "Unable to create temporary submodule log file."
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
     if ! { git submodule init && git submodule sync && git submodule update; } >"$submodule_log" 2>&1; then
-        bl_std_log_error -l base_bash_libs.git "git submodule update failed on repo '$git_repo'"
-        [[ -s "$submodule_log" ]] && bl_std_log_info_file -l base_bash_libs.git "$submodule_log"
+        base_std_log_error -l base_bash_libs.git "git submodule update failed on repo '$git_repo'"
+        [[ -s "$submodule_log" ]] && base_std_log_info_file -l base_bash_libs.git "$submodule_log"
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1 "$submodule_log"
         return $?
     fi
 
-    bl_std_log_debug -l base_bash_libs.git "Git repo '$git_repo' updated to latest '$expected_branch'"
+    base_std_log_debug -l base_bash_libs.git "Git repo '$git_repo' updated to latest '$expected_branch'"
     __base_bash_libs_git_update_repo_finish__ "$git_log" true 0 "$submodule_log"
     return $?
 }
@@ -455,26 +455,26 @@ bl_git_update_repo() {
 #   - An empty string "" if the directory doesn't exist or is not a Git repo.
 #   - The function itself returns an exit code of 0 on success, 1 on invalid usage.
 #
-bl_git_get_current_branch() {
+base_git_get_current_branch() {
     if (($# != 2)); then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_get_current_branch <directory> <result_variable_name>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_get_current_branch <directory> <result_variable_name>"
         return 1
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_git_get_current_branch "${2-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_git_get_current_branch "${2-}" || return 1
 
     local __base_bash_libs_git_branch_target_dir="$1"
     local __base_bash_libs_git_branch_result_name="$2"
 
     # --- Argument Validation ---
     if [[ -z "$__base_bash_libs_git_branch_target_dir" || -z "$__base_bash_libs_git_branch_result_name" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_get_current_branch <directory> <result_variable_name>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_get_current_branch <directory> <result_variable_name>"
         return 1
     fi
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_git_branch_result_name"; then
-        bl_std_log_error -l base_bash_libs.git "bl_git_get_current_branch: result variable name must be a valid Bash variable name."
+        base_std_log_error -l base_bash_libs.git "base_git_get_current_branch: result variable name must be a valid Bash variable name."
         return 1
     fi
-    __base_bash_libs_std_assert_writable_output__ bl_git_get_current_branch "$__base_bash_libs_git_branch_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_git_get_current_branch "$__base_bash_libs_git_branch_result_name" || return 1
 
     printf -v "$__base_bash_libs_git_branch_result_name" '%s' ""
 
@@ -531,52 +531,52 @@ bl_git_get_current_branch() {
 # They return 3 when the tracked script is dirty so callers cannot lose that
 # fact merely because an upstream comparison is unavailable.
 #
-bl_git_check_script_up_to_date() {
+base_git_check_script_up_to_date() {
     local fetch_before_check=false script_path
 
     if (($# == 2)); then
         if [[ "$1" != "--fetch" ]]; then
-            bl_std_log_error -l base_bash_libs.git "Usage: bl_git_check_script_up_to_date [--fetch] <script_path>"
+            base_std_log_error -l base_bash_libs.git "Usage: base_git_check_script_up_to_date [--fetch] <script_path>"
             return 1
         fi
         fetch_before_check=true
         shift
     elif (($# != 1)) || [[ "$1" == "--fetch" ]]; then
-        bl_std_log_error -l base_bash_libs.git "Usage: bl_git_check_script_up_to_date [--fetch] <script_path>"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_check_script_up_to_date [--fetch] <script_path>"
         return 1
     fi
     script_path="$1"
 
     if [[ ! -e "$script_path" ]]; then
-        bl_std_log_warn -l base_bash_libs.git "Script '$script_path' not found; skipping latest-version check."
+        base_std_log_warn -l base_bash_libs.git "Script '$script_path' not found; skipping latest-version check."
         return 0
     fi
 
     if ! command -v git &> /dev/null; then
-        bl_std_log_info -l base_bash_libs.git "git not available; skipping latest-version check."
+        base_std_log_info -l base_bash_libs.git "git not available; skipping latest-version check."
         return 0
     fi
 
     local script_dir repo_root prefix rel_path
     script_dir=$(dirname -- "$script_path") || {
-        bl_std_log_error -l base_bash_libs.git "Unable to resolve the script directory for '$script_path'."
+        base_std_log_error -l base_bash_libs.git "Unable to resolve the script directory for '$script_path'."
         return 5
     }
 
     local repo_probe repo_probe_status
     if repo_probe=$(git -C "$script_dir" rev-parse --is-inside-work-tree 2>&1); then
         if [[ "$repo_probe" != true ]]; then
-            bl_std_log_info -l base_bash_libs.git "Script '$script_path' is not in a Git worktree; skipping latest-version check."
+            base_std_log_info -l base_bash_libs.git "Script '$script_path' is not in a Git worktree; skipping latest-version check."
             return 0
         fi
     else
         repo_probe_status=$?
         if [[ "$repo_probe" == *"not a git repository"* ||
             "$repo_probe" == *"not a git repo"* ]]; then
-            bl_std_log_info -l base_bash_libs.git "Not in a Git repo; skipping latest-version check."
+            base_std_log_info -l base_bash_libs.git "Not in a Git repo; skipping latest-version check."
             return 0
         fi
-        bl_std_log_error -l base_bash_libs.git "Unable to discover the Git repository for '$script_path' (git status $repo_probe_status)."
+        base_std_log_error -l base_bash_libs.git "Unable to discover the Git repository for '$script_path' (git status $repo_probe_status)."
         return 5
     fi
 
@@ -585,7 +585,7 @@ bl_git_check_script_up_to_date() {
         :
     else
         repo_root_status=$?
-        bl_std_log_error -l base_bash_libs.git "Unable to resolve the Git repository root for '$script_path' (git status $repo_root_status)."
+        base_std_log_error -l base_bash_libs.git "Unable to resolve the Git repository root for '$script_path' (git status $repo_root_status)."
         return 5
     fi
     local prefix_status
@@ -593,7 +593,7 @@ bl_git_check_script_up_to_date() {
         :
     else
         prefix_status=$?
-        bl_std_log_error -l base_bash_libs.git "Unable to resolve the repo-relative path for '$script_path' (git status $prefix_status)."
+        base_std_log_error -l base_bash_libs.git "Unable to resolve the repo-relative path for '$script_path' (git status $prefix_status)."
         return 5
     fi
     rel_path="${prefix}$(basename -- "$script_path")"
@@ -608,11 +608,11 @@ bl_git_check_script_up_to_date() {
         0)
             ;;
         1)
-            bl_std_log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
+            base_std_log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
             return 0
             ;;
         *)
-            bl_std_log_error -l base_bash_libs.git "Unable to determine whether '$rel_path' is tracked (git status $tracked_status)."
+            base_std_log_error -l base_bash_libs.git "Unable to determine whether '$rel_path' is tracked (git status $tracked_status)."
             return 5
             ;;
     esac
@@ -630,7 +630,7 @@ bl_git_check_script_up_to_date() {
             dirty=true
             ;;
         *)
-            bl_std_log_error -l base_bash_libs.git "Unable to inspect working-tree changes for '$rel_path' (git status $diff_status)."
+            base_std_log_error -l base_bash_libs.git "Unable to inspect working-tree changes for '$rel_path' (git status $diff_status)."
             return 5
             ;;
     esac
@@ -646,12 +646,12 @@ bl_git_check_script_up_to_date() {
             dirty=true
             ;;
         *)
-            bl_std_log_error -l base_bash_libs.git "Unable to inspect staged changes for '$rel_path' (git status $diff_status)."
+            base_std_log_error -l base_bash_libs.git "Unable to inspect staged changes for '$rel_path' (git status $diff_status)."
             return 5
             ;;
     esac
     if [[ "$dirty" == true ]]; then
-        bl_std_log_warn -l base_bash_libs.git "Script '$rel_path' has local modifications; version may not match repo."
+        base_std_log_warn -l base_bash_libs.git "Script '$rel_path' has local modifications; version may not match repo."
     fi
 
     local branch_name branch_status
@@ -660,11 +660,11 @@ bl_git_check_script_up_to_date() {
     else
         branch_status=$?
         if ((branch_status == 1)); then
-            bl_std_log_info -l base_bash_libs.git "Repository is in a detached HEAD state; skipping latest-version check."
+            base_std_log_info -l base_bash_libs.git "Repository is in a detached HEAD state; skipping latest-version check."
             [[ "$dirty" == true ]] && return 3
             return 0
         fi
-        bl_std_log_error -l base_bash_libs.git "Unable to determine the current Git branch (git status $branch_status)."
+        base_std_log_error -l base_bash_libs.git "Unable to determine the current Git branch (git status $branch_status)."
         return 5
     fi
 
@@ -675,27 +675,27 @@ bl_git_check_script_up_to_date() {
         upstream_status=$?
         if [[ "$upstream_result" == *"no upstream"* ||
             "$upstream_result" == *"does not have any upstream"* ]]; then
-            bl_std_log_info -l base_bash_libs.git "No upstream branch configured for '$branch_name'; skipping latest-version check."
+            base_std_log_info -l base_bash_libs.git "No upstream branch configured for '$branch_name'; skipping latest-version check."
             [[ "$dirty" == true ]] && return 3
             return 0
         fi
-        bl_std_log_error -l base_bash_libs.git "Unable to resolve the upstream for '$branch_name' (git status $upstream_status)."
+        base_std_log_error -l base_bash_libs.git "Unable to resolve the upstream for '$branch_name' (git status $upstream_status)."
         return 5
     fi
     if [[ -z "$upstream" || "$upstream" == *$'\n'* ]]; then
-        bl_std_log_error -l base_bash_libs.git "Git returned an invalid upstream for '$branch_name'."
+        base_std_log_error -l base_bash_libs.git "Git returned an invalid upstream for '$branch_name'."
         return 5
     fi
 
     if [[ "$fetch_before_check" == true ]]; then
         if git -C "$repo_root" fetch --quiet; then
-            bl_std_log_info -l base_bash_libs.git "Fetched upstream state before latest-version check."
+            base_std_log_info -l base_bash_libs.git "Fetched upstream state before latest-version check."
         else
-            bl_std_log_error -l base_bash_libs.git "Unable to fetch upstream state for '$upstream'; freshness is unknown."
+            base_std_log_error -l base_bash_libs.git "Unable to fetch upstream state for '$upstream'; freshness is unknown."
             return 5
         fi
     else
-        bl_std_log_debug -l base_bash_libs.git "Using local remote-tracking refs; pass --fetch for a live remote check."
+        base_std_log_debug -l base_bash_libs.git "Using local remote-tracking refs; pass --fetch for a live remote check."
     fi
 
     local behind ahead rev_list_status
@@ -703,35 +703,35 @@ bl_git_check_script_up_to_date() {
         :
     else
         rev_list_status=$?
-        bl_std_log_error -l base_bash_libs.git "Unable to compare HEAD with '$upstream' (git status $rev_list_status); freshness is unknown."
+        base_std_log_error -l base_bash_libs.git "Unable to compare HEAD with '$upstream' (git status $rev_list_status); freshness is unknown."
         return 5
     fi
     if ahead=$(git -C "$repo_root" rev-list --count "$upstream..HEAD" 2>/dev/null); then
         :
     else
         rev_list_status=$?
-        bl_std_log_error -l base_bash_libs.git "Unable to compare '$upstream' with HEAD (git status $rev_list_status); freshness is unknown."
+        base_std_log_error -l base_bash_libs.git "Unable to compare '$upstream' with HEAD (git status $rev_list_status); freshness is unknown."
         return 5
     fi
     if [[ ! "$behind" =~ ^[0-9]+$ || ! "$ahead" =~ ^[0-9]+$ ]]; then
-        bl_std_log_error -l base_bash_libs.git "Git returned invalid freshness counts for '$upstream'; freshness is unknown."
+        base_std_log_error -l base_bash_libs.git "Git returned invalid freshness counts for '$upstream'; freshness is unknown."
         return 5
     fi
 
     if ((behind > 0 && ahead > 0)); then
-        bl_std_log_warn -l base_bash_libs.git "Repository has diverged from $upstream ($behind commit(s) behind, $ahead commit(s) ahead)."
+        base_std_log_warn -l base_bash_libs.git "Repository has diverged from $upstream ($behind commit(s) behind, $ahead commit(s) ahead)."
         [[ "$dirty" == true ]] && return 3
         return 4
     fi
     if ((behind > 0)); then
-        bl_std_log_warn -l base_bash_libs.git "Repository is $behind commit(s) behind $upstream. Script may be out of date."
+        base_std_log_warn -l base_bash_libs.git "Repository is $behind commit(s) behind $upstream. Script may be out of date."
         [[ "$dirty" == true ]] && return 3
         return 2
     fi
     if ((ahead > 0)); then
-        bl_std_log_info -l base_bash_libs.git "Repository is $ahead commit(s) ahead of $upstream."
+        base_std_log_info -l base_bash_libs.git "Repository is $ahead commit(s) ahead of $upstream."
     else
-        bl_std_log_info -l base_bash_libs.git "Repository is up to date with $upstream."
+        base_std_log_info -l base_bash_libs.git "Repository is up to date with $upstream."
     fi
 
     [[ "$dirty" == true ]] && return 3
