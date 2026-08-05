@@ -12,13 +12,17 @@ required_files=(
   LICENSE
   NOTICE
   base_manifest.yaml
+  base_api_manifest.yaml
   docs/versioning-policy.md
   docs/v2-api-contract.md
   docs/v2-symbol-map.md
+  docs/api-reference.md
+  docs/api-manifest-schema.md
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   bin/base-bash
   scripts/release
+  scripts/api-manifest
   scripts/migrate-v2-symbols
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
@@ -27,29 +31,9 @@ required_files=(
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
   examples/cookbook-args-lists-strings.sh
-  lib/bash/README.md
-  lib/bash/std/lib_std.sh
-  lib/bash/std/tests/lib_std.bats
-  lib/bash/file/lib_file.sh
-  lib/bash/file/tests/lib_file.bats
-  lib/bash/git/lib_git.sh
-  lib/bash/git/tests/lib_git.bats
-  lib/bash/gh/README.md
-  lib/bash/gh/lib_gh.sh
-  lib/bash/gh/tests/lib_gh.bats
-  lib/bash/str/README.md
-  lib/bash/str/lib_str.sh
-  lib/bash/str/tests/lib_str.bats
-  lib/bash/arg/README.md
-  lib/bash/arg/lib_arg.sh
-  lib/bash/arg/tests/lib_arg.bats
-  lib/bash/list/README.md
-  lib/bash/list/lib_list.sh
-  lib/bash/list/tests/lib_list.bats
-  lib/bash/tests/test_helper.sh
-  tests/launcher.bats
   tests/release.bats
   tests/namespace-contract.bats
+  tests/api-manifest.bats
   tests/lint-warnings.sh
 )
 
@@ -110,27 +94,24 @@ for file in "${required_files[@]}"; do
   }
 done
 
-readme_test_paths=(
-  "lib/bash/std/README.md|lib/bash/std/tests/lib_std.bats"
-  "lib/bash/file/README.md|lib/bash/file/tests/lib_file.bats"
-  "lib/bash/git/README.md|lib/bash/git/tests/lib_git.bats"
-  "lib/bash/gh/README.md|lib/bash/gh/tests/lib_gh.bats"
-  "lib/bash/str/README.md|lib/bash/str/tests/lib_str.bats"
-  "lib/bash/arg/README.md|lib/bash/arg/tests/lib_arg.bats"
-  "lib/bash/list/README.md|lib/bash/list/tests/lib_list.bats"
-)
+manifest_artifacts="$(scripts/api-manifest artifact-paths)" || exit $?
+while IFS= read -r file; do
+  [[ -n "$file" ]] && required_files+=("$file")
+done <<<"$manifest_artifacts"
 
-for mapping in "${readme_test_paths[@]}"; do
-  IFS='|' read -r readme test_path <<<"$mapping"
+manifest_module_paths="$(scripts/api-manifest module-paths)" || exit $?
+while IFS=$'\t' read -r module_kind readme test_path; do
+  [[ -n "$module_kind" && -n "$readme" && -n "$test_path" ]] || continue
   [[ -f "$test_path" ]] || {
     printf 'Documented BATS path does not exist: %s\n' "$test_path" >&2
     exit 1
   }
+  [[ "$module_kind" != sourceable-library ]] && continue
   grep -F "$test_path" "$readme" >/dev/null || {
     printf 'README does not document its BATS path: %s -> %s\n' "$readme" "$test_path" >&2
     exit 1
   }
-done
+done <<<"$manifest_module_paths"
 
 printf 'Repository baseline is present.\n'
 
@@ -206,8 +187,15 @@ for command in shellcheck bats; do
   }
 done
 
+manifest_source_paths="$(scripts/api-manifest source-paths)" || exit $?
+manifest_shellcheck_paths=()
+while IFS= read -r file; do
+  [[ -n "$file" ]] && manifest_shellcheck_paths+=("$file")
+done <<<"$manifest_source_paths"
+
 run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
+  scripts/api-manifest \
   scripts/release \
   scripts/migrate-v2-symbols \
   tests/fixtures/basectl-release-stub \
@@ -219,30 +207,21 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   examples/std-usage.sh \
   examples/cookbook-cleanup-temp.sh \
   examples/cookbook-args-lists-strings.sh \
-  lib/bash/std/lib_std.sh \
-  lib/bash/file/lib_file.sh \
-  lib/bash/git/lib_git.sh \
-  lib/bash/gh/lib_gh.sh \
-  lib/bash/str/lib_str.sh \
-  lib/bash/arg/lib_arg.sh \
-  lib/bash/list/lib_list.sh \
   lib/bash/tests/test_helper.sh \
-  tests/launcher.bats \
+  "${manifest_shellcheck_paths[@]}" \
   tests/release.bats \
-  tests/namespace-contract.bats
+  tests/namespace-contract.bats \
+  tests/api-manifest.bats
 
 bats_files=(
-  tests/launcher.bats
   tests/release.bats
   tests/namespace-contract.bats
-  lib/bash/std/tests/lib_std.bats
-  lib/bash/file/tests/lib_file.bats
-  lib/bash/git/tests/lib_git.bats
-  lib/bash/gh/tests/lib_gh.bats
-  lib/bash/str/tests/lib_str.bats
-  lib/bash/arg/tests/lib_arg.bats
-  lib/bash/list/tests/lib_list.bats
+  tests/api-manifest.bats
 )
+manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
+while IFS= read -r file; do
+  [[ -n "$file" ]] && bats_files+=("$file")
+done <<<"$manifest_test_paths"
 
 run_stage "BATS test suites" bats \
   "${bats_files[@]}" || exit $?

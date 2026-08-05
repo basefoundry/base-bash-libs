@@ -45,6 +45,10 @@ See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 The v2 API charter, effect/status contract, and complete public-surface audit
 are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
 mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
+The machine-readable module/API contract is in
+[`base_api_manifest.yaml`](base_api_manifest.yaml), with its schema documented
+in [`docs/api-manifest-schema.md`](docs/api-manifest-schema.md) and its
+generated reference in [`docs/api-reference.md`](docs/api-reference.md).
 
 ## Installation and Usage
 
@@ -197,7 +201,9 @@ event, immutable consumption, and the post-GA support contract.
 
 Release preparation and downstream Homebrew/Base handoffs are documented in
 [`docs/release-process.md`](docs/release-process.md). The machine-readable
-release contract lives in [`base_manifest.yaml`](base_manifest.yaml).
+release contract lives in [`base_manifest.yaml`](base_manifest.yaml); the
+machine-readable API and module contract lives in
+[`base_api_manifest.yaml`](base_api_manifest.yaml).
 
 ## License
 
