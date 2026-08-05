@@ -12,6 +12,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Added a repository-owned v2 release guard that permits only the planned
   alpha, beta, release-candidate, and GA identifiers while locking publication
   until the verified-artifact and pre-GA release-candidate gates are complete.
+- Added the versioned `base_api_manifest.yaml` module/API contract, its
+  Bash-native validator and generators, and manifest-driven module/test/artifact
+  discovery for repository validation.
 
 ### Security
 
@@ -59,8 +62,8 @@ and versions are tracked in the repo-root `VERSION` file.
   `base_init` lifecycle API. Wrapper flags now return through a
   caller-owned array without hidden positional-parameter mutation; launchers,
   examples, and companion-library tests initialize explicitly.
-- Namespaced the v2 public API, runtime globals, environment controls, load
-  guards, and internal symbols under the `base_bash_libs_` contract. Legacy
+- Namespaced the v2 public API under the coherent `base_` contract while
+  retaining `BASE_BASH_LIBS_` globals and `__base_bash_libs_` internals. Legacy
   generic names are removed; see `docs/v2-symbol-map.md` for migration.
 - Made timed foreground-TTY invocations fail closed with a safe diagnostic;
   callers must provide a pipe or explicit non-terminal stdin for the v2 hard

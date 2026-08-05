@@ -35,8 +35,9 @@ or chained source fragments.
 The v2 public namespace is deliberately collision-resistant so a library can
 be sourced into an existing application without taking generic names:
 
-- Public functions use `base_bash_libs_<module>_<name>` (with the two stdlib
-  lifecycle exceptions documented in `lib/bash/README.md`).
+- Public functions use `base_<module>_<name>` (with the two stdlib lifecycle
+  functions `base_init` and `base_require_version` documented in
+  `lib/bash/README.md`).
 - Framework-owned globals, environment controls, metadata, and load guards use
   `BASE_BASH_LIBS_...`.
 - Internal functions use `__base_bash_libs_<module>_...__` and are not callable
