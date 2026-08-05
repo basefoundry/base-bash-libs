@@ -10,7 +10,7 @@ Source the stdlib before this library:
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" --
-base_std_import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
+base_std_import gh/lib_gh.sh
 ```
 
 ## Public Functions

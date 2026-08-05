@@ -41,7 +41,7 @@ helpers manage branch selection, retries, and cleanup.
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" --
-source "/absolute/path/to/lib/bash/git/lib_git.sh"
+base_std_import git/lib_git.sh
 
 branch=""
 base_git_get_current_branch "$PWD" branch

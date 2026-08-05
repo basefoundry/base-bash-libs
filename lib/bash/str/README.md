@@ -36,7 +36,7 @@ helpers are available.
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" --
-source "/absolute/path/to/lib/bash/str/lib_str.sh"
+base_std_import str/lib_str.sh
 
 name="  Example Project  "
 base_str_trim name

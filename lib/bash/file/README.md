@@ -33,7 +33,7 @@ settings; they do not impose a strict-mode policy on the calling script.
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" --
-source "/absolute/path/to/lib/bash/file/lib_file.sh"
+base_std_import file/lib_file.sh
 
 base_file_update_file_section ~/.bash_profile "# BEGIN APP" "# END APP" \
     "export APP_HOME=/opt/app" \

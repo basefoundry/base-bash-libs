@@ -766,30 +766,24 @@ EOF
     [[ "$normalized" == *"colors=disabled"* ]]
 }
 
-@test "base_std_import loads relative and absolute libraries" {
-    local relative_dir="$TEST_TMPDIR/helpers"
-    local absolute_lib="$TEST_TMPDIR/absolute.sh"
+@test "base_std_import loads package-relative libraries independent of cwd and is idempotent" {
     local script="$TEST_TMPDIR/base_std_import-driver.sh"
-
-    mkdir -p "$relative_dir"
-    cat > "$relative_dir/relative.sh" <<'EOF'
-REL_IMPORTED="relative"
-EOF
-    cat > "$absolute_lib" <<'EOF'
-ABS_IMPORTED="absolute"
-EOF
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-base_std_import helpers/relative.sh "$absolute_lib"
-printf 'rel=%s abs=%s\n' "\$REL_IMPORTED" "\$ABS_IMPORTED"
+base_std_import str/lib_str.sh
+base_std_import str/lib_str.sh
+value='  package-relative  '
+base_str_trim value
+printf 'value=<%s> state=%s\n' "\$value" "\${__base_bash_libs_std_import_state[*]}"
 EOF
 
-    bats_run bash "$script"
+    bats_run bash -c "cd \"$TEST_TMPDIR\" && \"$script\""
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"rel=relative abs=absolute"* ]]
+    [[ "$output" == *"value=<package-relative>"* ]]
+    [[ "$output" == *"loaded"* ]]
 }
 
 @test "base_std_import returns a recoverable failure when a library is missing" {
@@ -805,26 +799,29 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Library 'missing.sh' does not exist"* ]]
+    [[ "$output" == *"module 'missing.sh' does not exist"* ]]
     [[ "$output" == *"after=1"* ]]
 }
 
 @test "base_std_import failure does not leave relative base_std_import directory on the stack" {
+    local package_dir="$TEST_TMPDIR/package"
     local script_dir="$TEST_TMPDIR/driver"
-    local helper_dir="$script_dir/helpers"
+    local helper_dir="$package_dir/lib/bash/helpers"
     local run_dir="$TEST_TMPDIR/run"
     local script="$script_dir/base_std_import-failing-helper.sh"
     local cwd_file="$TEST_TMPDIR/base_std_import-exit-pwd.txt"
     local dirs_file="$TEST_TMPDIR/base_std_import-exit-dirs.txt"
 
-    mkdir -p "$helper_dir" "$run_dir"
+    mkdir -p "$helper_dir" "$run_dir" "$script_dir"
+    cp -R "$BASE_REPO_ROOT/lib/bash" "$package_dir/lib/"
+    cp "$BASE_REPO_ROOT/VERSION" "$package_dir/VERSION"
     cat > "$helper_dir/failing.sh" <<EOF
 trap 'pwd > "$cwd_file"; dirs -p > "$dirs_file"' EXIT
 base_std_exit_if_error 7 "helper failed during base_std_import"
 EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
-source "$STDLIB_PATH"
+source "$package_dir/lib/bash/std/lib_std.sh"
 base_std_import helpers/failing.sh
 EOF
 
@@ -834,6 +831,106 @@ EOF
     [ "$(cat "$cwd_file")" = "$run_dir" ]
     [ "$(head -n 1 "$dirs_file")" = "$run_dir" ]
     [[ "$(cat "$dirs_file")" != *"$script_dir"* ]]
+}
+
+@test "base_std_import rejects absolute, traversal, and package-escaping symlink paths" {
+    local package_dir="$TEST_TMPDIR/safety package"
+    local outside="$TEST_TMPDIR/outside.sh"
+    local escaped="$package_dir/lib/bash/escape/lib_escape.sh"
+
+    mkdir -p "$package_dir/lib"
+    cp -R "$BASE_REPO_ROOT/lib/bash" "$package_dir/lib/"
+    cp "$BASE_REPO_ROOT/VERSION" "$package_dir/VERSION"
+    printf 'printf escaped\n' > "$outside"
+    mkdir -p "$(dirname "$escaped")"
+    ln -s "$outside" "$escaped"
+
+    run bash -c '
+        source "$1"
+        base_std_import "$2"; printf "absolute=%s\n" "$?"
+        base_std_import ../outside.sh; printf "traversal=%s\n" "$?"
+        base_std_import escape/lib_escape.sh; printf "escape=%s\n" "$?"
+    ' bash "$package_dir/lib/bash/std/lib_std.sh" "$outside"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"absolute=2"* ]]
+    [[ "$output" == *"traversal=2"* ]]
+    [[ "$output" == *"escape=2"* ]]
+}
+
+@test "base_std_import promotes top-level module declarations to globals" {
+    local package_dir="$TEST_TMPDIR/scope package"
+    local module_dir="$package_dir/lib/bash/test"
+    local module="$module_dir/lib_scope.sh"
+
+    mkdir -p "$package_dir/lib" "$module_dir"
+    cp -R "$BASE_REPO_ROOT/lib/bash" "$package_dir/lib/"
+    cp "$BASE_REPO_ROOT/VERSION" "$package_dir/VERSION"
+    cat > "$module" <<'EOF'
+declare -A BASE_BASH_LIBS_SCOPE_TEST=([state]=global)
+EOF
+
+    run bash -c '
+        source "$1/lib/bash/std/lib_std.sh"
+        base_std_import test/lib_scope.sh
+        declare -p BASE_BASH_LIBS_SCOPE_TEST
+    ' bash "$package_dir"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"declare -A BASE_BASH_LIBS_SCOPE_TEST"* ]]
+}
+
+@test "copy-only library artifacts report embedded release identity without VERSION" {
+    local artifact_dir="$TEST_TMPDIR/copy artifact"
+    local output
+
+    mkdir -p "$artifact_dir/lib"
+    cp -R "$BASE_REPO_ROOT/lib/bash" "$artifact_dir/lib/"
+    rm -f "$artifact_dir/VERSION"
+
+    output="$(cd "$TEST_TMPDIR" && bash -c '
+        source "$1/lib/bash/std/lib_std.sh"
+        base_std_import str/lib_str.sh
+        printf "version=%s provenance=%s commit=%s dirty=%s\n" \
+            "$BASE_BASH_LIBS_VERSION" "$BASE_BASH_LIBS_PROVENANCE" \
+            "$BASE_BASH_LIBS_COMMIT" "$BASE_BASH_LIBS_DIRTY_STATE"
+    ' bash "$artifact_dir")"
+
+    [[ "$output" == *"version=1.4.0"* ]]
+    [[ "$output" == *"provenance=release-artifact"* ]]
+    [[ "$output" == *"commit=unknown"* ]]
+    [[ "$output" == *"dirty=unknown"* ]]
+}
+
+@test "symlinked package roots and spaced paths keep one physical package identity" {
+    local link_path="$TEST_TMPDIR/spaced package"
+    local output
+
+    ln -s "$BASE_REPO_ROOT" "$link_path"
+    output="$(cd "$TEST_TMPDIR" && bash -c '
+        source "$1/lib/bash/std/lib_std.sh"
+        base_std_import str/lib_str.sh
+        printf "root=%s version=%s\n" "$BASE_BASH_LIBS_STD_ROOT" "$BASE_BASH_LIBS_VERSION"
+    ' bash "$link_path")"
+
+    [[ "$output" == *"root=$BASE_REPO_ROOT"* ]]
+    [[ "$output" == *"version=1.4.0"* ]]
+}
+
+@test "mixed-major stdlib inputs fail with migration guidance" {
+    local other_root="$TEST_TMPDIR/v2-input"
+    local output
+
+    mkdir -p "$other_root/lib"
+    cp -R "$BASE_REPO_ROOT/lib/bash" "$other_root/lib/"
+    printf '2.0.0\n' > "$other_root/VERSION"
+
+    output="$(bash -c '
+        source "$1/lib/bash/std/lib_std.sh"
+        source "$2/lib/bash/std/lib_std.sh"
+    ' bash "$BASE_REPO_ROOT" "$other_root" 2>&1 || true)"
+
+    [[ "$output" == *"mixed-major base-bash-libs module graph refused"* ]]
+    [[ "$output" == *"v1 inputs are not fallback-loaded by v2"* ]]
 }
 
 @test "base_std_add_to_path appends an existing directory only once" {

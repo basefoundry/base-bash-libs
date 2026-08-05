@@ -15,6 +15,9 @@ namespace:
 # the manifest with ordinary shell tools without installing a YAML runtime.
 environment:
   - BASE_BASH_LIBS_VERSION|readonly-global|loaded package version
+  - BASE_BASH_LIBS_COMMIT|readonly-global|full source commit or embedded release commit
+  - BASE_BASH_LIBS_DIRTY_STATE|readonly-global|clean, dirty, or unknown checkout state
+  - BASE_BASH_LIBS_PROVENANCE|readonly-global|checkout, release-artifact, source-archive, copy, or unknown
   - BASE_BASH_LIBS_DRY_RUN|caller-control|dry-run policy requested by the caller
   - BASE_BASH_LIBS_PRIMARY_LOG|caller-control|primary persistent log sink
   - BASE_CLI_PRIMARY_LOG|caller-input|Base shared primary log sink
@@ -30,8 +33,10 @@ optional_commands: git,gh,timeout,gtimeout
 
 artifacts:
   - base_api_manifest.yaml|source|canonical API and module manifest
+  - lib/bash/base-bash-libs.release|runtime-metadata|embedded release identity for copied and installed artifacts
   - docs/api-reference.md|generated|scripts/api-manifest generate|checked-in
   - docs/api-manifest-schema.md|documentation|API manifest schema and tooling
+  - docs/pinned-consumption.md|documentation|immutable pin and artifact verification procedure
   - docs/v2-api-contract.md|documentation|normative API behavior charter
   - docs/v2-symbol-map.md|documentation|v2 migration and symbol map
   - lib/bash/README.md|documentation|package layout and namespace contract

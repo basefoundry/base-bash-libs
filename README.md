@@ -81,7 +81,7 @@ script should run with the stdlib preloaded from its shebang:
 ```bash
 #!/usr/bin/env base-bash
 
-base_launcher_import_base_bash_lib str/lib_str.sh
+base_std_import str/lib_str.sh
 
 main() {
     local name="  Example  "
@@ -91,15 +91,10 @@ main() {
 }
 ```
 
-Load companion libraries with absolute imports from the same package:
+Load companion libraries with package-relative imports from the loaded package:
 
 ```bash
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
-base_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
+base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh
 ```
 
 ### Source Checkout
@@ -129,15 +124,10 @@ base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
-Load companion libraries with absolute imports from the same checkout:
+Load companion libraries with package-relative imports from the same checkout:
 
 ```bash
-base_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh
 ```
 
 You can also run source-checkout scripts through the launcher:
@@ -158,17 +148,20 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
-base_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-base_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
-version from the repository/package `VERSION` file. Downstream scripts can use
-that readonly constant when they need to display the loaded library version.
+version from the repository/package `VERSION` file, or from the embedded
+`lib/bash/base-bash-libs.release` metadata when a supported artifact contains
+only the library tree. Downstream scripts can use that readonly constant when
+they need to display the loaded library version.
+
+The stdlib also exposes `BASE_BASH_LIBS_COMMIT`,
+`BASE_BASH_LIBS_DIRTY_STATE`, and `BASE_BASH_LIBS_PROVENANCE`. Checkouts report
+their actual full commit and clean/dirty state; release archives, Homebrew
+installs, vendored trees, and standalone copies use the identity embedded in
+`base-bash-libs.release` and never infer a commit from the caller's cwd.
 Use `base_require_version` to require a minimum library version:
 
 ```bash
@@ -199,6 +192,8 @@ to 0.x. See the [versioning and release-line policy](docs/versioning-policy.md)
 for prerelease identifiers, publication gates, the withdrawn July 2026 v2
 event, immutable consumption, and the post-GA support contract.
 
+Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
+documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
 Release preparation and downstream Homebrew/Base handoffs are documented in
 [`docs/release-process.md`](docs/release-process.md). The machine-readable
 release contract lives in [`base_manifest.yaml`](base_manifest.yaml); the

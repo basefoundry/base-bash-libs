@@ -99,6 +99,9 @@ git tag -d v2.0.0
 
 ## Immutable Consumption
 
+The complete checkout, archive, Homebrew, vendored, and standalone verification
+procedure is maintained in [`pinned-consumption.md`](pinned-consumption.md).
+
 Do not install from an unpinned default-branch checkout. Until a verified v2
 asset exists, pin the current stable source to the full `v1.4.0` release commit:
 
