@@ -91,6 +91,14 @@ main() {
 }
 ```
 
+The launcher contract is intentionally conventional: `base-bash --help` and
+`base-bash --version` return `0` with stdout data, `base-bash check` performs a
+non-mutating installation/package diagnostic, and malformed launcher usage
+returns `2` with stderr diagnostics. Use `base-bash --` before a script path
+that begins with `-`; application argv and the application `main` status are
+preserved. See the [v2 launcher contract](docs/v2-api-contract.md#6-launcher-contract-v2-rc)
+for lifecycle, cleanup, signal, and wrapper-flag details.
+
 Load companion libraries with package-relative imports from the loaded package:
 
 ```bash

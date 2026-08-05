@@ -9,6 +9,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Added the v2 RC launcher contract: conventional stdout help/version commands,
+  a non-mutating `base-bash check` diagnostic, explicit status classes, exact
+  application argv forwarding, lifecycle/cleanup/signal coverage, and
+  supported-Bash re-exec diagnostics.
 - Added a repository-owned v2 release guard that permits only the planned
   alpha, beta, release-candidate, and GA identifiers while locking publication
   until the verified-artifact and pre-GA release-candidate gates are complete.

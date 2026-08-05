@@ -247,12 +247,12 @@ statuses, and side effects are normative in the linked module README and
 - Documentation: [`docs/v2-api-contract.md`](../docs/v2-api-contract.md)
 - Tests: [`tests/launcher.bats`](../tests/launcher.bats)
 - Dependencies: `std`
-- Optional commands: `bash,basename,dirname,realpath,readlink`
+- Optional commands: `awk,basename,cat,cp,date,dirname,grep,mktemp,mv,readlink,rm,sed,bash,git,gh,timeout,gtimeout`
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
-- Inputs: executable arguments and package paths documented by the launcher
-- Outputs: process status and delegated script output
-- Statuses: launcher boundary may terminate; helpers return documented status
-- Side effects: starts a child script and sources the stdlib at the boundary
+- Inputs: --help, --version, check, or [--] <script> [args...]; BASE_BASH_LIBS_DIR may select a package path
+- Outputs: help/version/check records and delegated script output; application stdout remains application-owned
+- Statuses: help/version 0; check 0 or 1; usage errors 2; delegated application status is preserved
+- Side effects: sources the stdlib and starts the delegated script; check is non-mutating
 
 #### Public symbols
 

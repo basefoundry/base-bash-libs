@@ -113,3 +113,20 @@ declarations while it is sourced. Module authors can therefore write normal
 module-level declarations without knowing that the loader itself is a
 function; declarations executed later inside public functions retain normal
 Bash scope rules. Every module remains a single physical `.sh` file.
+
+## Standalone launcher contract
+
+`bin/base-bash` provides the application boundary for scripts that use the
+stdlib. `base-bash --help` and `--version` are successful stdout commands;
+malformed invocations use stderr and status `2`. `base-bash check` is a
+non-mutating diagnostic for Bash support, installation health, package identity,
+imports, and external tools. See the normative [v2 launcher contract](../../docs/v2-api-contract.md#6-launcher-contract-v2-rc)
+for the complete stream, status, lifecycle, signal, cleanup, and wrapper-flag
+mapping rules.
+
+The launcher initializes once, sources the application once, calls `main` once,
+and preserves application argv boundaries and the primary application status.
+It does not enable strict mode. Use `--` before a script path that begins with
+a dash; the launcher separator itself is not forwarded. The standard cleanup
+registry composes application hooks with existing traps and preserves `130` for
+INT and `143` for TERM.
