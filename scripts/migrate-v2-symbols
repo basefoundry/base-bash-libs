@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-# Rewrite the documented v1 base-bash-libs symbols to their v2 names.
+# Rewrite documented v1 and pre-release v2 base-bash-libs symbols to the v2
+# `bl_` names.
 # This is a mechanical aid, not a compatibility layer; review the diff and run
 # the consumer's tests after applying it.
 
@@ -53,64 +54,64 @@ legacy_names=(
 )
 
 v2_names=(
-    base_bash_libs_std_is_interactive base_bash_libs_std_check_bash_version
-    base_bash_libs_std_import base_bash_libs_std_add_to_path
-    base_bash_libs_std_dedupe_path base_bash_libs_std_print_path
-    base_bash_libs_std_set_log_level base_bash_libs_std_set_log_category_level
-    base_bash_libs_std_log_is_enabled base_bash_libs_std_log_fatal
-    base_bash_libs_std_log_error base_bash_libs_std_log_warn
-    base_bash_libs_std_log_info base_bash_libs_std_log_debug
-    base_bash_libs_std_log_verbose base_bash_libs_std_log_info_file
-    base_bash_libs_std_log_debug_file base_bash_libs_std_log_verbose_file
-    base_bash_libs_std_log_info_enter base_bash_libs_std_log_debug_enter
-    base_bash_libs_std_log_verbose_enter base_bash_libs_std_log_info_leave
-    base_bash_libs_std_log_debug_leave base_bash_libs_std_log_verbose_leave
-    base_bash_libs_std_print_error base_bash_libs_std_print_warn
-    base_bash_libs_std_print_info base_bash_libs_std_print_success
-    base_bash_libs_std_print_bold base_bash_libs_std_print_message
-    base_bash_libs_std_print_tty base_bash_libs_std_dump_trace
-    base_bash_libs_std_exit_if_error base_bash_libs_std_fatal_error
-    base_bash_libs_std_is_dry_run base_bash_libs_std_run
-    base_bash_libs_std_safe_mkdir base_bash_libs_std_safe_touch
-    base_bash_libs_std_safe_truncate base_bash_libs_std_safe_cd
-    base_bash_libs_std_safe_unalias base_bash_libs_std_register_cleanup_hook
-    base_bash_libs_std_unregister_cleanup_hook
-    base_bash_libs_std_register_cleanup_path
-    base_bash_libs_std_unregister_cleanup_path base_bash_libs_std_make_temp_file
-    base_bash_libs_std_make_temp_dir base_bash_libs_std_command_path
-    base_bash_libs_std_function_exists base_bash_libs_std_assert_variable_name
-    base_bash_libs_std_assert_indexed_array
-    base_bash_libs_std_assert_associative_array
-    base_bash_libs_std_assert_function_exists base_bash_libs_std_assert_not_null
-    base_bash_libs_std_assert_integer base_bash_libs_std_assert_integer_range
-    base_bash_libs_std_assert_arg_count base_bash_libs_std_assert_command_exists
-    base_bash_libs_std_assert_file_exists base_bash_libs_std_assert_executable
-    base_bash_libs_std_assert_dir_exists base_bash_libs_std_get_my_source_dir
-    base_bash_libs_std_ask_yes_no base_bash_libs_std_wait_for_enter
-    base_bash_libs_file_section_exists
-    base_bash_libs_file_section_needs_update
-    base_bash_libs_file_update_file_section base_bash_libs_git_detect_default_branch
-    base_bash_libs_git_worktree_path_for_branch
-    base_bash_libs_git_list_worktree_branches base_bash_libs_git_branch_upstream
-    base_bash_libs_git_branch_merged_to_ref base_bash_libs_git_list_remote_branches
-    base_bash_libs_git_update_repo base_bash_libs_git_get_current_branch
-    base_bash_libs_git_check_script_up_to_date base_bash_libs_gh_require_cli
-    base_bash_libs_gh_auth_status_diagnostics
-    base_bash_libs_gh_report_command_failure base_bash_libs_gh_run
-    base_bash_libs_gh_repo_from_remote_url base_bash_libs_gh_infer_repo_from_origin
-    base_bash_libs_gh_repo_default_branch base_bash_libs_gh_api_with_retry
-    base_bash_libs_str_lower base_bash_libs_str_upper base_bash_libs_str_ltrim
-    base_bash_libs_str_rtrim base_bash_libs_str_trim base_bash_libs_str_contains
-    base_bash_libs_str_starts_with base_bash_libs_str_ends_with
-    base_bash_libs_str_split base_bash_libs_str_join base_bash_libs_arg_parse
-    base_bash_libs_list_append base_bash_libs_list_prepend
-    base_bash_libs_list_remove base_bash_libs_list_contains
-    base_bash_libs_list_unique base_bash_libs_list_length
-    base_bash_libs_launcher_die base_bash_libs_launcher_resolve_path
-    base_bash_libs_launcher_package_root base_bash_libs_launcher_ensure_supported_bash
-    base_bash_libs_launcher_lib_dir_is_usable base_bash_libs_launcher_resolve_lib_dir
-    base_bash_libs_launcher_source_stdlib base_bash_libs_launcher_import_base_bash_lib
-    base_bash_libs_launcher_run_script base_bash_libs_launcher_usage
+    bl_std_is_interactive bl_std_check_bash_version
+    bl_std_import bl_std_add_to_path
+    bl_std_dedupe_path bl_std_print_path
+    bl_std_set_log_level bl_std_set_log_category_level
+    bl_std_log_is_enabled bl_std_log_fatal
+    bl_std_log_error bl_std_log_warn
+    bl_std_log_info bl_std_log_debug
+    bl_std_log_verbose bl_std_log_info_file
+    bl_std_log_debug_file bl_std_log_verbose_file
+    bl_std_log_info_enter bl_std_log_debug_enter
+    bl_std_log_verbose_enter bl_std_log_info_leave
+    bl_std_log_debug_leave bl_std_log_verbose_leave
+    bl_std_print_error bl_std_print_warn
+    bl_std_print_info bl_std_print_success
+    bl_std_print_bold bl_std_print_message
+    bl_std_print_tty bl_std_dump_trace
+    bl_std_exit_if_error bl_std_fatal_error
+    bl_std_is_dry_run bl_std_run
+    bl_std_safe_mkdir bl_std_safe_touch
+    bl_std_safe_truncate bl_std_safe_cd
+    bl_std_safe_unalias bl_std_register_cleanup_hook
+    bl_std_unregister_cleanup_hook
+    bl_std_register_cleanup_path
+    bl_std_unregister_cleanup_path bl_std_make_temp_file
+    bl_std_make_temp_dir bl_std_command_path
+    bl_std_function_exists bl_std_assert_variable_name
+    bl_std_assert_indexed_array
+    bl_std_assert_associative_array
+    bl_std_assert_function_exists bl_std_assert_not_null
+    bl_std_assert_integer bl_std_assert_integer_range
+    bl_std_assert_arg_count bl_std_assert_command_exists
+    bl_std_assert_file_exists bl_std_assert_executable
+    bl_std_assert_dir_exists bl_std_get_my_source_dir
+    bl_std_ask_yes_no bl_std_wait_for_enter
+    bl_file_section_exists
+    bl_file_section_needs_update
+    bl_file_update_file_section bl_git_detect_default_branch
+    bl_git_worktree_path_for_branch
+    bl_git_list_worktree_branches bl_git_branch_upstream
+    bl_git_branch_merged_to_ref bl_git_list_remote_branches
+    bl_git_update_repo bl_git_get_current_branch
+    bl_git_check_script_up_to_date bl_gh_require_cli
+    bl_gh_auth_status_diagnostics
+    bl_gh_report_command_failure bl_gh_run
+    bl_gh_repo_from_remote_url bl_gh_infer_repo_from_origin
+    bl_gh_repo_default_branch bl_gh_api_with_retry
+    bl_str_lower bl_str_upper bl_str_ltrim
+    bl_str_rtrim bl_str_trim bl_str_contains
+    bl_str_starts_with bl_str_ends_with
+    bl_str_split bl_str_join bl_arg_parse
+    bl_list_append bl_list_prepend
+    bl_list_remove bl_list_contains
+    bl_list_unique bl_list_length
+    bl_launcher_die bl_launcher_resolve_path
+    bl_launcher_package_root bl_launcher_ensure_supported_bash
+    bl_launcher_lib_dir_is_usable bl_launcher_resolve_lib_dir
+    bl_launcher_source_stdlib bl_launcher_import_base_bash_lib
+    bl_launcher_run_script bl_launcher_usage
 )
 
 global_legacy_names=(
@@ -135,7 +136,7 @@ global_v2_names=(
     BASE_BASH_LIBS_PRIMARY_LOG BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS
     BASE_BASH_LIBS_FILE_START_MARKER BASE_BASH_LIBS_FILE_END_MARKER
     BASE_BASH_LIBS_FILE_NEW_CONTENT_FILE BASE_BASH_LIBS_DRY_RUN
-    BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_STDLIB_LOADED BASE_BASH_LIBS_FILE_LOADED
+    BASE_BASH_LIBS_STDLIB_LOADED BASE_BASH_LIBS_FILE_LOADED
     BASE_BASH_LIBS_GIT_LOADED BASE_BASH_LIBS_GH_LOADED BASE_BASH_LIBS_STR_LOADED
     BASE_BASH_LIBS_ARG_LOADED BASE_BASH_LIBS_LIST_LOADED
     BASE_BASH_LIBS_STD_LOG_LEVELS BASE_BASH_LIBS_STD_LOGGER_LEVELS
@@ -161,6 +162,9 @@ internal_v2_prefixes=(
 
 rewrite_file() {
     local file="$1" index old new
+    # #223 briefly shipped the longer pre-release function namespace. Rewrite
+    # it first so the legacy-name pass below can handle the original v1 names.
+    perl -pi -e 's/\bbase_bash_libs_std_/bl_std_/g; s/\bbase_bash_libs_file_/bl_file_/g; s/\bbase_bash_libs_git_/bl_git_/g; s/\bbase_bash_libs_gh_/bl_gh_/g; s/\bbase_bash_libs_str_/bl_str_/g; s/\bbase_bash_libs_arg_/bl_arg_/g; s/\bbase_bash_libs_list_/bl_list_/g; s/\bbase_bash_libs_launcher_/bl_launcher_/g; s/\bbase_bash_libs_init\b/bl_init/g; s/\bbase_bash_libs_require_version\b/bl_require_version/g' "$file"
     for index in "${!legacy_names[@]}"; do
         old="${legacy_names[$index]}"
         new="${v2_names[$index]}"

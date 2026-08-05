@@ -9,7 +9,7 @@ helpers are available.
 
 ## Public API
 
-- `base_bash_libs_arg_parse <options_array> <positionals_array> <specs_array> -- [args...]`
+- `bl_arg_parse <options_array> <positionals_array> <specs_array> -- [args...]`
   Parse exact flag, value, and repeatable options into caller-owned arrays.
   Returns `0` on success, `1` for invalid caller-owned variable contracts, and
   `2` for malformed specs, unknown options, or missing values; caller-owned
@@ -24,7 +24,7 @@ Aliasing is rejected before any caller-owned output is changed.
 ```bash
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" --
+bl_init app_args --source "${BASH_SOURCE[0]}" --
 source "/absolute/path/to/lib/bash/arg/lib_arg.sh"
 
 declare -A options=()
@@ -36,10 +36,10 @@ specs=(
   "include|repeatable|--include|-I"
 )
 
-base_bash_libs_arg_parse options positionals specs -- "$@" || exit $?
+bl_arg_parse options positionals specs -- "$@" || exit $?
 
 if [[ "${options[verbose]-}" == "1" ]]; then
-    base_bash_libs_std_set_log_level DEBUG
+    bl_std_set_log_level DEBUG
 fi
 ```
 

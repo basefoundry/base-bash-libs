@@ -10,90 +10,90 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly BASE_BASH_LIBS_STR_LOADED=1
 
-base_bash_libs_str_lower() {
-    base_bash_libs_std_assert_arg_count "$#" 1
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_lower "${1-}" || return 1
+bl_str_lower() {
+    bl_std_assert_arg_count "$#" 1
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_lower "${1-}" || return 1
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_var_name"
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_lower "$__base_bash_libs_str_var_name" || return 1
+    bl_std_assert_variable_name "$__base_bash_libs_str_var_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_lower "$__base_bash_libs_str_var_name" || return 1
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "${__base_bash_libs_str_value,,}"
 }
 
-base_bash_libs_str_upper() {
-    base_bash_libs_std_assert_arg_count "$#" 1
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_upper "${1-}" || return 1
+bl_str_upper() {
+    bl_std_assert_arg_count "$#" 1
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_upper "${1-}" || return 1
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_var_name"
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_upper "$__base_bash_libs_str_var_name" || return 1
+    bl_std_assert_variable_name "$__base_bash_libs_str_var_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_upper "$__base_bash_libs_str_var_name" || return 1
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "${__base_bash_libs_str_value^^}"
 }
 
-base_bash_libs_str_ltrim() {
-    base_bash_libs_std_assert_arg_count "$#" 1
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_ltrim "${1-}" || return 1
+bl_str_ltrim() {
+    bl_std_assert_arg_count "$#" 1
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_ltrim "${1-}" || return 1
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_var_name"
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_ltrim "$__base_bash_libs_str_var_name" || return 1
+    bl_std_assert_variable_name "$__base_bash_libs_str_var_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_ltrim "$__base_bash_libs_str_var_name" || return 1
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     __base_bash_libs_str_value="${__base_bash_libs_str_value#"${__base_bash_libs_str_value%%[![:space:]]*}"}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "$__base_bash_libs_str_value"
 }
 
-base_bash_libs_str_rtrim() {
-    base_bash_libs_std_assert_arg_count "$#" 1
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_rtrim "${1-}" || return 1
+bl_str_rtrim() {
+    bl_std_assert_arg_count "$#" 1
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_rtrim "${1-}" || return 1
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_var_name"
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_rtrim "$__base_bash_libs_str_var_name" || return 1
+    bl_std_assert_variable_name "$__base_bash_libs_str_var_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_rtrim "$__base_bash_libs_str_var_name" || return 1
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     __base_bash_libs_str_value="${__base_bash_libs_str_value%"${__base_bash_libs_str_value##*[![:space:]]}"}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "$__base_bash_libs_str_value"
 }
 
-base_bash_libs_str_trim() {
-    base_bash_libs_std_assert_arg_count "$#" 1
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_trim "${1-}" || return 1
-    base_bash_libs_str_ltrim "$1" || return $?
-    base_bash_libs_str_rtrim "$1" || return $?
+bl_str_trim() {
+    bl_std_assert_arg_count "$#" 1
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_trim "${1-}" || return 1
+    bl_str_ltrim "$1" || return $?
+    bl_str_rtrim "$1" || return $?
 }
 
-base_bash_libs_str_contains() {
+bl_str_contains() {
     local value="${1-}" needle="${2-}"
 
-    base_bash_libs_std_assert_arg_count "$#" 2
+    bl_std_assert_arg_count "$#" 2
     [[ "$value" == *"$needle"* ]]
 }
 
-base_bash_libs_str_starts_with() {
+bl_str_starts_with() {
     local value="${1-}" prefix="${2-}"
 
-    base_bash_libs_std_assert_arg_count "$#" 2
+    bl_std_assert_arg_count "$#" 2
     [[ "$value" == "$prefix"* ]]
 }
 
-base_bash_libs_str_ends_with() {
+bl_str_ends_with() {
     local value="${1-}" suffix="${2-}"
 
-    base_bash_libs_std_assert_arg_count "$#" 2
+    bl_std_assert_arg_count "$#" 2
     [[ "$value" == *"$suffix" ]]
 }
 
 # Splits a value into a caller-owned indexed array. Empty fields are preserved,
 # including the final empty field produced by a trailing separator.
-base_bash_libs_str_split() {
-    base_bash_libs_std_assert_arg_count "$#" 3
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_split "${1-}" || return 1
+bl_str_split() {
+    bl_std_assert_arg_count "$#" 3
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_split "${1-}" || return 1
     local __base_bash_libs_str_split_result_name="$1" __base_bash_libs_str_split_value="$2" __base_bash_libs_str_split_separator="$3"
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_split_result_name"
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_split "$__base_bash_libs_str_split_result_name" || return 1
-    base_bash_libs_std_assert_indexed_array "$__base_bash_libs_str_split_result_name"
+    bl_std_assert_variable_name "$__base_bash_libs_str_split_result_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_split "$__base_bash_libs_str_split_result_name" || return 1
+    bl_std_assert_indexed_array "$__base_bash_libs_str_split_result_name"
 
     local -a __base_bash_libs_str_split_fields=()
     local __base_bash_libs_str_split_remainder="$__base_bash_libs_str_split_value"
@@ -111,19 +111,19 @@ base_bash_libs_str_split() {
     eval "$__base_bash_libs_str_split_result_name=(\"\${__base_bash_libs_str_split_fields[@]}\")"
 }
 
-base_bash_libs_str_join() {
-    base_bash_libs_std_assert_arg_count "$#" 3
-    __base_bash_libs_std_assert_public_variable_names__ base_bash_libs_str_join "${1-}" "${3-}" || return 1
+bl_str_join() {
+    bl_std_assert_arg_count "$#" 3
+    __base_bash_libs_std_assert_public_variable_names__ bl_str_join "${1-}" "${3-}" || return 1
     local __base_bash_libs_str_join_result_name="$1" __base_bash_libs_str_join_separator="$2" __base_bash_libs_str_join_array_name="$3"
 
-    base_bash_libs_std_assert_variable_name "$__base_bash_libs_str_join_result_name" "$__base_bash_libs_str_join_array_name"
+    bl_std_assert_variable_name "$__base_bash_libs_str_join_result_name" "$__base_bash_libs_str_join_array_name"
     if [[ "$__base_bash_libs_str_join_result_name" == "$__base_bash_libs_str_join_array_name" ]]; then
-        base_bash_libs_std_log_error -l base_bash_libs.str \
-            "base_bash_libs_str_join: result and source variables must be distinct; '$__base_bash_libs_str_join_result_name' was provided for both."
+        bl_std_log_error -l base_bash_libs.str \
+            "bl_str_join: result and source variables must be distinct; '$__base_bash_libs_str_join_result_name' was provided for both."
         return 1
     fi
-    __base_bash_libs_std_assert_writable_output__ base_bash_libs_str_join "$__base_bash_libs_str_join_result_name" || return 1
-    base_bash_libs_std_assert_indexed_array "$__base_bash_libs_str_join_array_name"
+    __base_bash_libs_std_assert_writable_output__ bl_str_join "$__base_bash_libs_str_join_result_name" || return 1
+    bl_std_assert_indexed_array "$__base_bash_libs_str_join_array_name"
 
     local __base_bash_libs_str_join_joined="" __base_bash_libs_str_join_value __base_bash_libs_str_join_has_value=0
     local -a __base_bash_libs_str_join_values=()

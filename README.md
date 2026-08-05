@@ -42,8 +42,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   membership checks, deduplication, and length results.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
-The v2 naming contract and complete v1-to-v2 migration map are in
-[`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
+The v2 API charter, effect/status contract, and complete public-surface audit
+are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
+mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
 
 ## Installation and Usage
 
@@ -66,7 +67,7 @@ Source the installed stdlib from the Homebrew prefix:
 base_bash_libs_prefix="$(brew --prefix basefoundry/base/base-bash-libs)"
 source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
@@ -76,25 +77,25 @@ script should run with the stdlib preloaded from its shebang:
 ```bash
 #!/usr/bin/env base-bash
 
-base_bash_libs_launcher_import_base_bash_lib str/lib_str.sh
+bl_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local name="  Example  "
-    base_bash_libs_str_trim name
-    base_bash_libs_std_log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
-    base_bash_libs_std_run echo "$name"
+    bl_str_trim name
+    bl_std_log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
+    bl_std_run echo "$name"
 }
 ```
 
 Load companion libraries with absolute imports from the same package:
 
 ```bash
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
-base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
+bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
 ```
 
 ### Source Checkout
@@ -120,19 +121,19 @@ Source the stdlib from that checkout:
 base_bash_libs_dir="$PWD/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
 Load companion libraries with absolute imports from the same checkout:
 
 ```bash
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 You can also run source-checkout scripts through the launcher:
@@ -152,22 +153,22 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+bl_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+bl_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
 version from the repository/package `VERSION` file. Downstream scripts can use
 that readonly constant when they need to display the loaded library version.
-Use `base_bash_libs_require_version` to require a minimum library version:
+Use `bl_require_version` to require a minimum library version:
 
 ```bash
-base_bash_libs_require_version 1.4.0
+bl_require_version 1.4.0
 ```
 
 ## Examples

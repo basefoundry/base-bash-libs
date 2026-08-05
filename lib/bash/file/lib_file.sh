@@ -31,7 +31,7 @@ __base_bash_libs_file_resolve_target_path__() {
     while [[ -L "$path" ]]; do
         ((depth += 1))
         if ((depth > 40)); then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Too many symlink levels while resolving '$2'."
+            bl_std_log_error -l base_bash_libs.file "Too many symlink levels while resolving '$2'."
             return 1
         fi
 
@@ -55,7 +55,7 @@ __base_bash_libs_file_validate_markers__() {
         "$beginning_marker" == "$end_marker" ||
         "$beginning_marker" == *$'\n'* || "$beginning_marker" == *$'\r'* ||
         "$end_marker" == *$'\n'* || "$end_marker" == *$'\r'* ]]; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Section markers must be non-empty, distinct, single-line values."
+        bl_std_log_error -l base_bash_libs.file "Section markers must be non-empty, distinct, single-line values."
         return 2
     fi
     return 0
@@ -70,6 +70,30 @@ __base_bash_libs_file_mode__() {
     fi
 
     stat -f '%Lp' "$file_path"
+}
+
+__base_bash_libs_file_fingerprint__() {
+    local result_name="$1" file_path="$2" fingerprint
+
+    if fingerprint="$(stat -c '%d:%i:%s:%Y:%Z' -- "$file_path" 2>/dev/null)"; then
+        printf -v "$result_name" '%s' "$fingerprint"
+        return 0
+    fi
+    if fingerprint="$(stat -f '%d:%i:%z:%m:%c' -- "$file_path" 2>/dev/null)"; then
+        printf -v "$result_name" '%s' "$fingerprint"
+        return 0
+    fi
+    return 1
+}
+
+__base_bash_libs_file_commit_temp__() {
+    local temp_file="$1" target_file="$2" expected_fingerprint="$3" current_fingerprint
+
+    if ! __base_bash_libs_file_fingerprint__ current_fingerprint "$target_file" ||
+        [[ "$current_fingerprint" != "$expected_fingerprint" ]]; then
+        return 6
+    fi
+    mv -f -- "$temp_file" "$target_file"
 }
 
 __base_bash_libs_file_preserve_file_mode__() {
@@ -88,7 +112,7 @@ __base_bash_libs_file_remove_temp_paths__() {
     for path; do
         if [[ -n "$path" ]]; then
             rm -f -- "$path"
-            base_bash_libs_std_unregister_cleanup_path "$path"
+            bl_std_unregister_cleanup_path "$path"
         fi
     done
     return 0
@@ -103,7 +127,7 @@ __base_bash_libs_file_make_target_temp__() {
     temp_dir="$(cd -- "$target_dir" && pwd -P)" || return 1
 
     temp_path="$(mktemp "$temp_dir/$target_base.XXXXXX" 2>/dev/null)" || return 1
-    if ! base_bash_libs_std_register_cleanup_path "$temp_path"; then
+    if ! bl_std_register_cleanup_path "$temp_path"; then
         rm -f -- "$temp_path"
         return 1
     fi
@@ -162,11 +186,11 @@ __base_bash_libs_file_section_marker_counts__() {
     printf -v "$end_count_var" '%s' "$section_end_marker_count"
 
     if ((section_beginning_marker_count != section_end_marker_count)); then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Asymmetric markers in '$target_file': $section_beginning_marker_count start, $section_end_marker_count end. Manual repair needed."
+        bl_std_log_error -l base_bash_libs.file "Asymmetric markers in '$target_file': $section_beginning_marker_count start, $section_end_marker_count end. Manual repair needed."
         return 2
     fi
     if ((section_beginning_marker_count > 0)) && ! __base_bash_libs_file_section_markers_ordered__ "$target_file" "$beginning_marker" "$end_marker"; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Misordered markers in '$target_file'. Manual repair needed."
+        bl_std_log_error -l base_bash_libs.file "Misordered markers in '$target_file'. Manual repair needed."
         return 2
     fi
 
@@ -174,16 +198,16 @@ __base_bash_libs_file_section_marker_counts__() {
 }
 
 #
-# base_bash_libs_file_section_exists - Inspect whether a marker-delimited section is present.
+# bl_file_section_exists - Inspect whether a marker-delimited section is present.
 #
 # Returns:
 #   0 when the target file contains at least one valid marker pair.
 #   1 when the target file is missing or the marker pair is absent.
 #   2 when marker pairs are asymmetric or misordered and need manual repair.
 #
-base_bash_libs_file_section_exists() {
+bl_file_section_exists() {
     if [[ $# -ne 3 ]]; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "base_bash_libs_file_section_exists: expected <target_file> <beginning_marker> <end_marker>."
+        bl_std_log_error -l base_bash_libs.file "bl_file_section_exists: expected <target_file> <beginning_marker> <end_marker>."
         return 2
     fi
 
@@ -200,16 +224,16 @@ base_bash_libs_file_section_exists() {
 }
 
 #
-# base_bash_libs_file_section_needs_update - Inspect whether add/update would change a section.
+# bl_file_section_needs_update - Inspect whether add/update would change a section.
 #
 # Returns:
 #   0 when adding or updating the section would change the target file.
 #   1 when the first existing marker-delimited section already matches.
 #   2 when marker pairs are asymmetric or misordered and need manual repair.
 #
-base_bash_libs_file_section_needs_update() {
+bl_file_section_needs_update() {
     if [[ $# -lt 3 ]]; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "base_bash_libs_file_section_needs_update: expected <target_file> <beginning_marker> <end_marker> [content_lines...]."
+        bl_std_log_error -l base_bash_libs.file "bl_file_section_needs_update: expected <target_file> <beginning_marker> <end_marker> [content_lines...]."
         return 2
     fi
 
@@ -225,24 +249,24 @@ base_bash_libs_file_section_needs_update() {
         beginning_marker_count _end_marker_count || return $?
     ((beginning_marker_count > 0)) || return 0
 
-    if ! base_bash_libs_std_make_temp_file new_content_file base-file-section-new; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
+    if ! bl_std_make_temp_file new_content_file base-file-section-new; then
+        bl_std_log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
         return 2
     fi
     if (($# > 0)); then
         if ! printf '%s\n' "$@" > "$new_content_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
+            bl_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
             return 2
         fi
     elif ! : > "$new_content_file"; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
+        bl_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
         return 2
     fi
 
-    if ! base_bash_libs_std_make_temp_file current_content_file base-file-section-current; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
+    if ! bl_std_make_temp_file current_content_file base-file-section-current; then
+        bl_std_log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
         return 2
     fi
@@ -273,7 +297,7 @@ base_bash_libs_file_section_needs_update() {
         }
     }
     ' "$target_file" > "$current_content_file"; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
+        bl_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$current_content_file" "$new_content_file"
         return 2
     fi
@@ -287,7 +311,7 @@ base_bash_libs_file_section_needs_update() {
 }
 
 #
-# base_bash_libs_file_update_file_section - Idempotently manages a block of text within a file,
+# bl_file_update_file_section - Idempotently manages a block of text within a file,
 #                       demarcated by start and end markers.
 #
 # This function can add, update, or remove a section of text in a file.
@@ -297,7 +321,7 @@ base_bash_libs_file_section_needs_update() {
 # returns success without creating the file.
 #
 # Usage:
-#   base_bash_libs_file_update_file_section [options] <target_file> <start_marker> <end_marker> [content_lines...]
+#   bl_file_update_file_section [options] <target_file> <start_marker> <end_marker> [content_lines...]
 #
 # Options:
 #   -r : Remove the section defined by the markers instead of adding/updating it.
@@ -313,12 +337,12 @@ base_bash_libs_file_section_needs_update() {
 #
 #   # Add/update a section in .bash_profile
 #   local commands=("export FOO=bar" "alias myalias='echo hello'")
-#   base_bash_libs_file_update_file_section ~/.bash_profile "# START" "# END" "${commands[@]}"
+#   bl_file_update_file_section ~/.bash_profile "# START" "# END" "${commands[@]}"
 #
 #   # Remove the same section
-#   base_bash_libs_file_update_file_section -r ~/.bash_profile "# START" "# END"
+#   bl_file_update_file_section -r ~/.bash_profile "# START" "# END"
 #
-base_bash_libs_file_update_file_section() {
+bl_file_update_file_section() {
     local remove_section=false
     local new_content_array=()
 
@@ -328,11 +352,11 @@ base_bash_libs_file_update_file_section() {
     fi
 
     if [[ $# -lt 3 ]]; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Insufficient arguments."
+        bl_std_log_error -l base_bash_libs.file "Insufficient arguments."
         if [[ "$remove_section" == true ]]; then
-            base_bash_libs_std_log_info -l base_bash_libs.file "Usage: base_bash_libs_file_update_file_section -r <target_file> <beginning_marker> <end_marker>"
+            bl_std_log_info -l base_bash_libs.file "Usage: bl_file_update_file_section -r <target_file> <beginning_marker> <end_marker>"
         else
-            base_bash_libs_std_log_info -l base_bash_libs.file "Usage: base_bash_libs_file_update_file_section <target_file> <beginning_marker> <end_marker> [new_lines...]"
+            bl_std_log_info -l base_bash_libs.file "Usage: bl_file_update_file_section <target_file> <beginning_marker> <end_marker> [new_lines...]"
         fi
         return 1
     fi
@@ -341,8 +365,8 @@ base_bash_libs_file_update_file_section() {
     shift 3 # consume target_file, beginning_marker, end_marker
     if [[ "$remove_section" == true ]]; then
         if [[ $# -gt 0 ]]; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "When -r flag is used, no content arguments should be provided."
-            base_bash_libs_std_log_info -l base_bash_libs.file "Usage: base_bash_libs_file_update_file_section -r <target_file> <beginning_marker> <end_marker>"
+            bl_std_log_error -l base_bash_libs.file "When -r flag is used, no content arguments should be provided."
+            bl_std_log_info -l base_bash_libs.file "Usage: bl_file_update_file_section -r <target_file> <beginning_marker> <end_marker>"
             return 1
         fi
     else
@@ -352,13 +376,20 @@ base_bash_libs_file_update_file_section() {
     __base_bash_libs_file_literal_path__ target_file "$target_file"
     __base_bash_libs_file_validate_markers__ "$beginning_marker" "$end_marker" || return 1
     if [[ ! -f "$target_file" ]]; then
-        base_bash_libs_std_log_debug -l base_bash_libs.file "Target file '$target_file' does not exist."
+        bl_std_log_debug -l base_bash_libs.file "Target file '$target_file' does not exist."
         return 0
     fi
 
     __base_bash_libs_file_resolve_target_path__ target_file "$target_file" || return 1
+    local original_fingerprint=""
+    if ! __base_bash_libs_file_fingerprint__ original_fingerprint "$target_file"; then
+        bl_std_log_error -l base_bash_libs.file \
+            "Unable to fingerprint '$target_file' before editing."
+        return 1
+    fi
 
     local __base_bash_libs_file_update_beginning_marker_count __base_bash_libs_file_update_end_marker_count
+    local commit_status
     if ! __base_bash_libs_file_section_marker_counts__ "$target_file" "$beginning_marker" "$end_marker" \
         __base_bash_libs_file_update_beginning_marker_count __base_bash_libs_file_update_end_marker_count; then
         return 1
@@ -379,27 +410,27 @@ base_bash_libs_file_update_file_section() {
     fi
 
     if [[ "$section_exists" == false && "$remove_section" == true ]]; then
-        base_bash_libs_std_log_debug -l base_bash_libs.file "Section not present in '$target_file'; nothing to remove."
+        bl_std_log_debug -l base_bash_libs.file "Section not present in '$target_file'; nothing to remove."
         return 0
     fi
 
     local current_content_file="" new_content_file="" temp_file
     if [[ "$remove_section" == false ]]; then
-        if ! base_bash_libs_std_make_temp_file new_content_file base-file-section-new; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
+        if ! bl_std_make_temp_file new_content_file base-file-section-new; then
+            bl_std_log_error -l base_bash_libs.file "Failed to create temporary content file for '$target_file'."
             return 1
         fi
 
         if ! printf '%s' "$new_content_string" > "$new_content_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
+            bl_std_log_error -l base_bash_libs.file "Failed to write replacement content for '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
     fi
 
     if [[ "$section_exists" == true && "$remove_section" == false ]]; then
-        if ! base_bash_libs_std_make_temp_file current_content_file base-file-section-current; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
+        if ! bl_std_make_temp_file current_content_file base-file-section-current; then
+            bl_std_log_error -l base_bash_libs.file "Failed to create temporary current content file for '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
             return 1
         fi
@@ -421,13 +452,13 @@ base_bash_libs_file_update_file_section() {
             print $0
         }
         ' "$target_file" > "$current_content_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
+            bl_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 1
         fi
 
         if cmp -s "$current_content_file" "$new_content_file"; then
-            base_bash_libs_std_log_debug -l base_bash_libs.file "Section already up to date in '$target_file'."
+            bl_std_log_debug -l base_bash_libs.file "Section already up to date in '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 0
         fi
@@ -435,17 +466,17 @@ base_bash_libs_file_update_file_section() {
     fi
 
     if [[ "$section_exists" == true ]]; then
-        base_bash_libs_std_log_info -l base_bash_libs.file "Updating '$target_file'"
+        bl_std_log_info -l base_bash_libs.file "Updating '$target_file'"
     else
-        base_bash_libs_std_log_info -l base_bash_libs.file "Adding section to '$target_file'"
+        bl_std_log_info -l base_bash_libs.file "Adding section to '$target_file'"
     fi
     if ! __base_bash_libs_file_make_target_temp__ temp_file "$target_file"; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to create temporary file for '$target_file'."
+        bl_std_log_error -l base_bash_libs.file "Failed to create temporary file for '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
         return 1
     fi
     if ! __base_bash_libs_file_preserve_file_mode__ "$target_file" "$temp_file"; then
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to preserve permissions for '$target_file'."
+        bl_std_log_error -l base_bash_libs.file "Failed to preserve permissions for '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     fi
@@ -472,10 +503,20 @@ base_bash_libs_file_update_file_section() {
                     print $0
                 }
             }
-            ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
-                base_bash_libs_std_unregister_cleanup_path "$temp_file"
-                __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
-                return 0
+            ' "$target_file" > "$temp_file"; then
+                __base_bash_libs_file_commit_temp__ "$temp_file" "$target_file" "$original_fingerprint"
+                commit_status=$?
+                if ((commit_status == 0)); then
+                    bl_std_unregister_cleanup_path "$temp_file"
+                    __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
+                    return 0
+                fi
+                if ((commit_status == 6)); then
+                    bl_std_log_error -l base_bash_libs.file \
+                        "Concurrent modification detected for '$target_file'; refusing to overwrite it."
+                    __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
+                    return 6
+                fi
             fi
         else
             if BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
@@ -505,27 +546,37 @@ base_bash_libs_file_update_file_section() {
             processed != 1 { # Print the line if we are not inside the section being replaced
                 print $0
             }
-            ' "$target_file" > "$temp_file" && mv -f "$temp_file" "$target_file"; then
-                base_bash_libs_std_unregister_cleanup_path "$temp_file"
-                __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
-                return 0
+            ' "$target_file" > "$temp_file"; then
+                __base_bash_libs_file_commit_temp__ "$temp_file" "$target_file" "$original_fingerprint"
+                commit_status=$?
+                if ((commit_status == 0)); then
+                    bl_std_unregister_cleanup_path "$temp_file"
+                    __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
+                    return 0
+                fi
+                if ((commit_status == 6)); then
+                    bl_std_log_error -l base_bash_libs.file \
+                        "Concurrent modification detected for '$target_file'; refusing to overwrite it."
+                    __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
+                    return 6
+                fi
             fi
         fi
 
-        base_bash_libs_std_log_error -l base_bash_libs.file "Failed to process sections in '$target_file'."
+        bl_std_log_error -l base_bash_libs.file "Failed to process sections in '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
         return 1
     else
         # Markers not found in the file
         if ! cp "$target_file" "$temp_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to copy '$target_file' to '$temp_file'."
+            bl_std_log_error -l base_bash_libs.file "Failed to copy '$target_file' to '$temp_file'."
             __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
         if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
             if ! printf '\n' >> "$temp_file"; then
-                base_bash_libs_std_log_error -l base_bash_libs.file "Failed to add trailing newline to '$temp_file'."
+                bl_std_log_error -l base_bash_libs.file "Failed to add trailing newline to '$temp_file'."
                 __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
                 return 1
             fi
@@ -536,18 +587,26 @@ base_bash_libs_file_update_file_section() {
             printf '%s' "$new_content_string"
             printf '%s\n' "$end_marker"
         } >> "$temp_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to add new section to '$target_file'."
+            bl_std_log_error -l base_bash_libs.file "Failed to add new section to '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
-        if ! mv -f "$temp_file" "$target_file"; then
-            base_bash_libs_std_log_error -l base_bash_libs.file "Failed to replace '$target_file' with '$temp_file'."
+        __base_bash_libs_file_commit_temp__ "$temp_file" "$target_file" "$original_fingerprint"
+        commit_status=$?
+        if ((commit_status != 0)); then
+            if ((commit_status == 6)); then
+                bl_std_log_error -l base_bash_libs.file \
+                    "Concurrent modification detected for '$target_file'; refusing to overwrite it."
+                __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
+                return 6
+            fi
+            bl_std_log_error -l base_bash_libs.file "Failed to replace '$target_file' with '$temp_file'."
             __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
             return 1
         fi
 
-        base_bash_libs_std_unregister_cleanup_path "$temp_file"
+        bl_std_unregister_cleanup_path "$temp_file"
         __base_bash_libs_file_remove_temp_paths__ "$new_content_file"
         return 0
     fi

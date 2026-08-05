@@ -1,8 +1,8 @@
 # Base Bash v2 symbol map
 
-Base Bash v2 has one collision-resistant namespace: `base_bash_libs_` for
-public functions and `BASE_BASH_LIBS_` for public metadata, configuration, and
-runtime state. Implementation-only functions use `__base_bash_libs_...__` and
+Base Bash v2 has one short public function namespace: `bl_`. Public metadata,
+configuration, and runtime state remain under `BASE_BASH_LIBS_`. Implementation-
+only functions use `__base_bash_libs_...__` and
 are intentionally outside the compatibility contract.
 
 The v2 release is a clean break. Generic v1 names are not defined and no
@@ -18,46 +18,46 @@ auditable without requiring a parser.
 
 ### Standard library
 
-`base_bash_libs_init` and `base_bash_libs_require_version` already use the v2
+`bl_init` and `bl_require_version` already use the v2
 package namespace and keep their names. Every other listed stdlib function
-maps to `base_bash_libs_std_` followed by the legacy name with a leading
+maps to `bl_std_` followed by the legacy name with a leading
 `std_` removed when present.
 
 | Legacy names | v2 names |
 | --- | --- |
-| `is_interactive`, `check_bash_version`, `import`, `add_to_path`, `dedupe_path`, `print_path` | `base_bash_libs_std_is_interactive`, `base_bash_libs_std_check_bash_version`, `base_bash_libs_std_import`, `base_bash_libs_std_add_to_path`, `base_bash_libs_std_dedupe_path`, `base_bash_libs_std_print_path` |
-| `set_log_level`, `set_log_category_level`, `log_is_enabled` | `base_bash_libs_std_set_log_level`, `base_bash_libs_std_set_log_category_level`, `base_bash_libs_std_log_is_enabled` |
-| `log_fatal`, `log_error`, `log_warn`, `log_info`, `log_debug`, `log_verbose` | `base_bash_libs_std_log_fatal`, `base_bash_libs_std_log_error`, `base_bash_libs_std_log_warn`, `base_bash_libs_std_log_info`, `base_bash_libs_std_log_debug`, `base_bash_libs_std_log_verbose` |
-| `log_info_file`, `log_debug_file`, `log_verbose_file` | `base_bash_libs_std_log_info_file`, `base_bash_libs_std_log_debug_file`, `base_bash_libs_std_log_verbose_file` |
-| `log_info_enter`, `log_debug_enter`, `log_verbose_enter`, `log_info_leave`, `log_debug_leave`, `log_verbose_leave` | `base_bash_libs_std_log_info_enter`, `base_bash_libs_std_log_debug_enter`, `base_bash_libs_std_log_verbose_enter`, `base_bash_libs_std_log_info_leave`, `base_bash_libs_std_log_debug_leave`, `base_bash_libs_std_log_verbose_leave` |
-| `print_error`, `print_warn`, `print_info`, `print_success`, `print_bold`, `print_message`, `print_tty`, `dump_trace` | `base_bash_libs_std_print_error`, `base_bash_libs_std_print_warn`, `base_bash_libs_std_print_info`, `base_bash_libs_std_print_success`, `base_bash_libs_std_print_bold`, `base_bash_libs_std_print_message`, `base_bash_libs_std_print_tty`, `base_bash_libs_std_dump_trace` |
-| `exit_if_error`, `fatal_error`, `is_dry_run`, `std_run` | `base_bash_libs_std_exit_if_error`, `base_bash_libs_std_fatal_error`, `base_bash_libs_std_is_dry_run`, `base_bash_libs_std_run` |
-| `safe_mkdir`, `safe_touch`, `safe_truncate`, `safe_cd`, `safe_unalias` | `base_bash_libs_std_safe_mkdir`, `base_bash_libs_std_safe_touch`, `base_bash_libs_std_safe_truncate`, `base_bash_libs_std_safe_cd`, `base_bash_libs_std_safe_unalias` |
-| `std_register_cleanup_hook`, `std_unregister_cleanup_hook`, `std_register_cleanup_path`, `std_unregister_cleanup_path` | `base_bash_libs_std_register_cleanup_hook`, `base_bash_libs_std_unregister_cleanup_hook`, `base_bash_libs_std_register_cleanup_path`, `base_bash_libs_std_unregister_cleanup_path` |
-| `std_make_temp_file`, `std_make_temp_dir`, `std_command_path`, `std_function_exists` | `base_bash_libs_std_make_temp_file`, `base_bash_libs_std_make_temp_dir`, `base_bash_libs_std_command_path`, `base_bash_libs_std_function_exists` |
-| `assert_variable_name`, `assert_indexed_array`, `assert_associative_array`, `assert_function_exists`, `assert_not_null` | `base_bash_libs_std_assert_variable_name`, `base_bash_libs_std_assert_indexed_array`, `base_bash_libs_std_assert_associative_array`, `base_bash_libs_std_assert_function_exists`, `base_bash_libs_std_assert_not_null` |
-| `assert_integer`, `assert_integer_range`, `assert_arg_count`, `assert_command_exists`, `assert_file_exists`, `assert_executable`, `assert_dir_exists` | `base_bash_libs_std_assert_integer`, `base_bash_libs_std_assert_integer_range`, `base_bash_libs_std_assert_arg_count`, `base_bash_libs_std_assert_command_exists`, `base_bash_libs_std_assert_file_exists`, `base_bash_libs_std_assert_executable`, `base_bash_libs_std_assert_dir_exists` |
-| `get_my_source_dir`, `ask_yes_no`, `wait_for_enter` | `base_bash_libs_std_get_my_source_dir`, `base_bash_libs_std_ask_yes_no`, `base_bash_libs_std_wait_for_enter` |
+| `is_interactive`, `check_bash_version`, `import`, `add_to_path`, `dedupe_path`, `print_path` | `bl_std_is_interactive`, `bl_std_check_bash_version`, `bl_std_import`, `bl_std_add_to_path`, `bl_std_dedupe_path`, `bl_std_print_path` |
+| `set_log_level`, `set_log_category_level`, `log_is_enabled` | `bl_std_set_log_level`, `bl_std_set_log_category_level`, `bl_std_log_is_enabled` |
+| `log_fatal`, `log_error`, `log_warn`, `log_info`, `log_debug`, `log_verbose` | `bl_std_log_fatal`, `bl_std_log_error`, `bl_std_log_warn`, `bl_std_log_info`, `bl_std_log_debug`, `bl_std_log_verbose` |
+| `log_info_file`, `log_debug_file`, `log_verbose_file` | `bl_std_log_info_file`, `bl_std_log_debug_file`, `bl_std_log_verbose_file` |
+| `log_info_enter`, `log_debug_enter`, `log_verbose_enter`, `log_info_leave`, `log_debug_leave`, `log_verbose_leave` | `bl_std_log_info_enter`, `bl_std_log_debug_enter`, `bl_std_log_verbose_enter`, `bl_std_log_info_leave`, `bl_std_log_debug_leave`, `bl_std_log_verbose_leave` |
+| `print_error`, `print_warn`, `print_info`, `print_success`, `print_bold`, `print_message`, `print_tty`, `dump_trace` | `bl_std_print_error`, `bl_std_print_warn`, `bl_std_print_info`, `bl_std_print_success`, `bl_std_print_bold`, `bl_std_print_message`, `bl_std_print_tty`, `bl_std_dump_trace` |
+| `exit_if_error`, `fatal_error`, `is_dry_run`, `std_run` | `bl_std_exit_if_error`, `bl_std_fatal_error`, `bl_std_is_dry_run`, `bl_std_run` |
+| `safe_mkdir`, `safe_touch`, `safe_truncate`, `safe_cd`, `safe_unalias` | `bl_std_safe_mkdir`, `bl_std_safe_touch`, `bl_std_safe_truncate`, `bl_std_safe_cd`, `bl_std_safe_unalias` |
+| `std_register_cleanup_hook`, `std_unregister_cleanup_hook`, `std_register_cleanup_path`, `std_unregister_cleanup_path` | `bl_std_register_cleanup_hook`, `bl_std_unregister_cleanup_hook`, `bl_std_register_cleanup_path`, `bl_std_unregister_cleanup_path` |
+| `std_make_temp_file`, `std_make_temp_dir`, `std_command_path`, `std_function_exists` | `bl_std_make_temp_file`, `bl_std_make_temp_dir`, `bl_std_command_path`, `bl_std_function_exists` |
+| `assert_variable_name`, `assert_indexed_array`, `assert_associative_array`, `assert_function_exists`, `assert_not_null` | `bl_std_assert_variable_name`, `bl_std_assert_indexed_array`, `bl_std_assert_associative_array`, `bl_std_assert_function_exists`, `bl_std_assert_not_null` |
+| `assert_integer`, `assert_integer_range`, `assert_arg_count`, `assert_command_exists`, `assert_file_exists`, `assert_executable`, `assert_dir_exists` | `bl_std_assert_integer`, `bl_std_assert_integer_range`, `bl_std_assert_arg_count`, `bl_std_assert_command_exists`, `bl_std_assert_file_exists`, `bl_std_assert_executable`, `bl_std_assert_dir_exists` |
+| `get_my_source_dir`, `ask_yes_no`, `wait_for_enter` | `bl_std_get_my_source_dir`, `bl_std_ask_yes_no`, `bl_std_wait_for_enter` |
 
 ### Companion libraries
 
 | Module | Legacy names | v2 names |
 | --- | --- | --- |
-| file | `file_section_exists`, `file_section_needs_update`, `update_file_section` | `base_bash_libs_file_section_exists`, `base_bash_libs_file_section_needs_update`, `base_bash_libs_file_update_file_section` |
-| git | `git_detect_default_branch`, `git_worktree_path_for_branch`, `git_list_worktree_branches`, `git_branch_upstream`, `git_branch_merged_to_ref`, `git_list_remote_branches`, `git_update_repo`, `git_get_current_branch`, `check_script_up_to_date` | `base_bash_libs_git_detect_default_branch`, `base_bash_libs_git_worktree_path_for_branch`, `base_bash_libs_git_list_worktree_branches`, `base_bash_libs_git_branch_upstream`, `base_bash_libs_git_branch_merged_to_ref`, `base_bash_libs_git_list_remote_branches`, `base_bash_libs_git_update_repo`, `base_bash_libs_git_get_current_branch`, `base_bash_libs_git_check_script_up_to_date` |
-| gh | `gh_require_cli`, `gh_auth_status_diagnostics`, `gh_report_command_failure`, `gh_run`, `gh_repo_from_remote_url`, `gh_infer_repo_from_origin`, `gh_repo_default_branch`, `gh_api_with_retry` | `base_bash_libs_gh_require_cli`, `base_bash_libs_gh_auth_status_diagnostics`, `base_bash_libs_gh_report_command_failure`, `base_bash_libs_gh_run`, `base_bash_libs_gh_repo_from_remote_url`, `base_bash_libs_gh_infer_repo_from_origin`, `base_bash_libs_gh_repo_default_branch`, `base_bash_libs_gh_api_with_retry` |
-| str | `str_lower`, `str_upper`, `str_ltrim`, `str_rtrim`, `str_trim`, `str_contains`, `str_starts_with`, `str_ends_with`, `str_split`, `str_join` | `base_bash_libs_str_lower`, `base_bash_libs_str_upper`, `base_bash_libs_str_ltrim`, `base_bash_libs_str_rtrim`, `base_bash_libs_str_trim`, `base_bash_libs_str_contains`, `base_bash_libs_str_starts_with`, `base_bash_libs_str_ends_with`, `base_bash_libs_str_split`, `base_bash_libs_str_join` |
-| arg | `arg_parse` | `base_bash_libs_arg_parse` |
-| list | `list_append`, `list_prepend`, `list_remove`, `list_contains`, `list_unique`, `list_length` | `base_bash_libs_list_append`, `base_bash_libs_list_prepend`, `base_bash_libs_list_remove`, `base_bash_libs_list_contains`, `base_bash_libs_list_unique`, `base_bash_libs_list_length` |
+| file | `file_section_exists`, `file_section_needs_update`, `update_file_section` | `bl_file_section_exists`, `bl_file_section_needs_update`, `bl_file_update_file_section` |
+| git | `git_detect_default_branch`, `git_worktree_path_for_branch`, `git_list_worktree_branches`, `git_branch_upstream`, `git_branch_merged_to_ref`, `git_list_remote_branches`, `git_update_repo`, `git_get_current_branch`, `check_script_up_to_date` | `bl_git_detect_default_branch`, `bl_git_worktree_path_for_branch`, `bl_git_list_worktree_branches`, `bl_git_branch_upstream`, `bl_git_branch_merged_to_ref`, `bl_git_list_remote_branches`, `bl_git_update_repo`, `bl_git_get_current_branch`, `bl_git_check_script_up_to_date` |
+| gh | `gh_require_cli`, `gh_auth_status_diagnostics`, `gh_report_command_failure`, `gh_run`, `gh_repo_from_remote_url`, `gh_infer_repo_from_origin`, `gh_repo_default_branch`, `gh_api_with_retry` | `bl_gh_require_cli`, `bl_gh_auth_status_diagnostics`, `bl_gh_report_command_failure`, `bl_gh_run`, `bl_gh_repo_from_remote_url`, `bl_gh_infer_repo_from_origin`, `bl_gh_repo_default_branch`, `bl_gh_api_with_retry` |
+| str | `str_lower`, `str_upper`, `str_ltrim`, `str_rtrim`, `str_trim`, `str_contains`, `str_starts_with`, `str_ends_with`, `str_split`, `str_join` | `bl_str_lower`, `bl_str_upper`, `bl_str_ltrim`, `bl_str_rtrim`, `bl_str_trim`, `bl_str_contains`, `bl_str_starts_with`, `bl_str_ends_with`, `bl_str_split`, `bl_str_join` |
+| arg | `arg_parse` | `bl_arg_parse` |
+| list | `list_append`, `list_prepend`, `list_remove`, `list_contains`, `list_unique`, `list_length` | `bl_list_append`, `bl_list_prepend`, `bl_list_remove`, `bl_list_contains`, `bl_list_unique`, `bl_list_length` |
 
 The standalone launcher keeps `main` as the application entrypoint. Its helper
-functions use `base_bash_libs_launcher_`:
+functions use `bl_launcher_`:
 
 | Legacy name | v2 name |
 | --- | --- |
-| `base_bash_die`, `base_bash_resolve_path`, `base_bash_package_root`, `base_bash_ensure_supported_bash` | `base_bash_libs_launcher_die`, `base_bash_libs_launcher_resolve_path`, `base_bash_libs_launcher_package_root`, `base_bash_libs_launcher_ensure_supported_bash` |
-| `base_bash_lib_dir_is_usable`, `base_bash_resolve_lib_dir`, `base_bash_source_stdlib` | `base_bash_libs_launcher_lib_dir_is_usable`, `base_bash_libs_launcher_resolve_lib_dir`, `base_bash_libs_launcher_source_stdlib` |
-| `import_base_bash_lib`, `base_bash_run_script`, `base_bash_usage` | `base_bash_libs_launcher_import_base_bash_lib`, `base_bash_libs_launcher_run_script`, `base_bash_libs_launcher_usage` |
+| `base_bash_die`, `base_bash_resolve_path`, `base_bash_package_root`, `base_bash_ensure_supported_bash` | `bl_launcher_die`, `bl_launcher_resolve_path`, `bl_launcher_package_root`, `bl_launcher_ensure_supported_bash` |
+| `base_bash_lib_dir_is_usable`, `base_bash_resolve_lib_dir`, `base_bash_source_stdlib` | `bl_launcher_lib_dir_is_usable`, `bl_launcher_resolve_lib_dir`, `bl_launcher_source_stdlib` |
+| `import_base_bash_lib`, `base_bash_run_script`, `base_bash_usage` | `bl_launcher_import_base_bash_lib`, `bl_launcher_run_script`, `bl_launcher_usage` |
 
 The application-defined `main` function is intentionally not namespaced.
 
