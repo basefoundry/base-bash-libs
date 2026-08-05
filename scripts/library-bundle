@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+# Deterministic validation and directory-bundle tooling for the one-file
+# library boundary. This script never concatenates or rewrites a library.
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+
+usage() {
+    cat >&2 <<'EOF'
+Usage:
+  scripts/library-bundle check
+  scripts/library-bundle bundle DIRECTORY
+  scripts/library-bundle verify DIRECTORY
+EOF
+}
+
+error() {
+    printf 'Library bundle error: %s\n' "$*" >&2
+}
+
+hash_file() {
+    local path="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$path" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$path" | awk '{print $1}'
+    fi
+}
+
+file_list() {
+    {
+        printf '%s\n' VERSION base_api_manifest.yaml
+        scripts/api-manifest artifact-paths
+    } | LC_ALL=C sort -u
+}
+
+check_one_file_boundary() {
+    local source_path directory count
+    while IFS= read -r source_path; do
+        [[ "$source_path" == lib/bash/*/lib_*.sh ]] || continue
+        directory="${source_path%/*}"
+        count="$(find "$repo_root/$directory" -maxdepth 1 -type f -name 'lib_*.sh' -print | wc -l | tr -d '[:space:]')"
+        if [[ "$count" != 1 ]]; then
+            error "public library directory '$directory' has $count canonical lib_*.sh files (expected exactly one)"
+            return 1
+        fi
+        if grep -Eq '^[[:space:]]*(source[[:space:]]+|\.[[:space:]]+[^|])' "$repo_root/$source_path"; then
+            error "public library '$source_path' contains a source-time implementation import"
+            return 1
+        fi
+    done < <(scripts/api-manifest source-paths)
+}
+
+check_repo() {
+    scripts/api-manifest check >/dev/null || return $?
+    check_one_file_boundary || return $?
+    while IFS= read -r path; do
+        [[ -n "$path" && -f "$repo_root/$path" ]] || {
+            error "manifest artifact is missing: $path"
+            return 1
+        }
+    done < <(file_list)
+    printf 'Library bundle contract is valid: one canonical file per public library.\n'
+}
+
+write_hash_manifest() {
+    local root="$1" path
+    : > "$root/MANIFEST.sha256" || return 1
+    while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        printf '%s  %s\n' "$(hash_file "$root/$path")" "$path" >> "$root/MANIFEST.sha256" || return 1
+    done < <(file_list)
+}
+
+bundle_repo() {
+    local destination="${1:-}" temporary path
+
+    [[ -n "$destination" ]] || { usage; return 2; }
+    check_repo || return $?
+    [[ ! -e "$destination" && ! -L "$destination" ]] || {
+        error "refusing to overwrite existing bundle '$destination'"
+        return 2
+    }
+    temporary="${destination}.tmp.$$"
+    rm -rf -- "$temporary" 2>/dev/null || true
+    mkdir -p "$temporary" || return 1
+    while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        mkdir -p "$temporary/$(dirname -- "$path")" || return 1
+        cp -- "$repo_root/$path" "$temporary/$path" || return 1
+    done < <(file_list)
+    mkdir -p "$temporary/lib/bash" || return 1
+    if [[ -r "$repo_root/lib/bash/base-bash-libs.release" ]]; then
+        cp -- "$repo_root/lib/bash/base-bash-libs.release" "$temporary/lib/bash/base-bash-libs.release" || return 1
+    fi
+    printf 'bundle_format=1\nsource_version=%s\nsource_commit=%s\nprovenance=deterministic-directory-bundle\n' \
+        "$(<"$repo_root/VERSION")" \
+        "$(sed -n 's/^commit=//p' "$repo_root/lib/bash/base-bash-libs.release" | sed -n '1p')" \
+        > "$temporary/BUNDLE.release" || return 1
+    write_hash_manifest "$temporary" || return 1
+    mv -- "$temporary" "$destination" || return 1
+    printf 'Created deterministic bundle: %s\n' "$destination"
+}
+
+verify_bundle() {
+    local root="${1:-}" expected actual path
+
+    [[ -n "$root" && -f "$root/MANIFEST.sha256" ]] || {
+        error "bundle is missing MANIFEST.sha256: $root"
+        return 1
+    }
+    while read -r expected path; do
+        [[ -n "$path" ]] || continue
+        [[ -f "$root/$path" ]] || { error "bundle file is missing: $path"; return 1; }
+        actual="$(hash_file "$root/$path")"
+        [[ "$actual" == "$expected" ]] || {
+            error "bundle hash mismatch: $path"
+            return 1
+        }
+    done < "$root/MANIFEST.sha256"
+    printf 'Bundle provenance and hashes are valid: %s\n' "$root"
+}
+
+main() {
+    case "${1:-}" in
+        check)
+            (($# == 1)) || { usage; return 2; }
+            check_repo
+            ;;
+        bundle)
+            (($# == 2)) || { usage; return 2; }
+            bundle_repo "$2"
+            ;;
+        verify)
+            (($# == 2)) || { usage; return 2; }
+            verify_bundle "$2"
+            ;;
+        *)
+            usage
+            return 2
+            ;;
+    esac
+}
+
+main "$@"

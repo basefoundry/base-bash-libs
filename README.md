@@ -50,6 +50,10 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 The reusable consumer conformance helpers and offline fixture are in
 [`tests/consumer-kit`](tests/consumer-kit/README.md).
+Deterministic single-file validation and auditable directory bundles are
+provided by [`scripts/library-bundle`](scripts/library-bundle).
+See [`docs/single-file-distribution.md`](docs/single-file-distribution.md) for
+the contributor and release-artifact workflow.
 The v2 API charter, effect/status contract, and complete public-surface audit
 are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
 mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
