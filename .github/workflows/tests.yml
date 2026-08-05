@@ -95,3 +95,23 @@ jobs:
               bash tests/bash-42-release-smoke.sh 4 2 53
               bash tests/bash-option-contract.sh 4 2 53
             '
+
+  release-gates:
+    name: Release gates (matrix and provenance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install validation tools
+        run: sudo apt-get install -y bats shellcheck
+
+      - name: Run networkless platform matrix
+        run: ./tests/compatibility-matrix.sh --container alpine
+
+      - name: Verify deterministic release invariants
+        run: ./tests/release-invariants.sh

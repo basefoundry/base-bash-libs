@@ -116,14 +116,17 @@ setup() {
         'import "$library_path"' \
         '__std_example__() { :; }' \
         '__str_example__() { :; }' \
-        'DRY_RUN=1' > "$fixture"
+        'DRY_RUN=1' \
+        'dry_run=1' \
+        '__lib_std_sourced__=1' > "$fixture"
 
     run "$BASE_REPO_ROOT/scripts/migrate-v2-symbols" "$fixture"
     [ "$status" -eq 0 ]
     grep -F 'base_std_import "$library_path"' "$fixture"
     grep -F '__base_bash_libs_std_example__()' "$fixture"
     grep -F '__base_bash_libs_str_example__()' "$fixture"
-    grep -F 'BASE_BASH_LIBS_DRY_RUN=1' "$fixture"
+    [ "$(grep -c -F 'BASE_BASH_LIBS_DRY_RUN=1' "$fixture")" -eq 2 ]
+    grep -F 'BASE_BASH_LIBS_STDLIB_LOADED=1' "$fixture"
 
     run "$BASE_REPO_ROOT/scripts/migrate-v2-symbols" --check "$fixture"
     [ "$status" -eq 0 ]
