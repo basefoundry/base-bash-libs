@@ -123,6 +123,35 @@ IFS= read -r version < VERSION || {
   exit 1
 }
 
+if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
+  printf 'VERSION is not a SemVer-compatible version: %s\n' "$version" >&2
+  exit 1
+fi
+
+version_core="${version%%[-+]*}"
+latest_tag_core="0.0.0"
+while IFS= read -r tag; do
+  tag_version="${tag#v}"
+  tag_core="${tag_version%%[-+]*}"
+  [[ "$tag_core" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]] || continue
+  IFS=. read -r tag_major tag_minor tag_patch <<<"$tag_core"
+  IFS=. read -r latest_major latest_minor latest_patch <<<"$latest_tag_core"
+  if ((tag_major > latest_major)) ||
+    ((tag_major == latest_major && tag_minor > latest_minor)) ||
+    ((tag_major == latest_major && tag_minor == latest_minor && tag_patch > latest_patch)); then
+    latest_tag_core="$tag_core"
+  fi
+done < <(git tag --list 'v[0-9]*' 2>/dev/null)
+IFS=. read -r version_major version_minor version_patch <<<"$version_core"
+IFS=. read -r latest_major latest_minor latest_patch <<<"$latest_tag_core"
+if ((version_major < latest_major)) ||
+  ((version_major == latest_major && version_minor < latest_minor)) ||
+  ((version_major == latest_major && version_minor == latest_minor && version_patch < latest_patch)); then
+  printf 'VERSION %s moves behind the highest existing release tag v%s.\n' \
+    "$version" "$latest_tag_core" >&2
+  exit 1
+fi
+
 release_metadata_version="$(sed -n 's/^version=//p' lib/bash/base-bash-libs.release | sed -n '1p')"
 if [[ "$release_metadata_version" != "$version" ]]; then
   printf 'Embedded release metadata version (%s) does not match VERSION (%s).\n' \
@@ -130,11 +159,56 @@ if [[ "$release_metadata_version" != "$version" ]]; then
   exit 1
 fi
 for metadata_key in schema_version version commit dirty_state provenance; do
+  metadata_count="$(grep -c -E "^${metadata_key}=" lib/bash/base-bash-libs.release || true)"
+  [[ "$metadata_count" == 1 ]] || {
+    printf 'Embedded release metadata must contain exactly one %s key (found %s).\n' \
+      "$metadata_key" "$metadata_count" >&2
+    exit 1
+  }
   grep -E "^${metadata_key}=.+$" lib/bash/base-bash-libs.release >/dev/null || {
     printf 'Embedded release metadata is missing key: %s\n' "$metadata_key" >&2
     exit 1
   }
 done
+
+release_metadata_schema="$(sed -n 's/^schema_version=//p' lib/bash/base-bash-libs.release)"
+release_metadata_commit="$(sed -n 's/^commit=//p' lib/bash/base-bash-libs.release)"
+release_metadata_dirty="$(sed -n 's/^dirty_state=//p' lib/bash/base-bash-libs.release)"
+release_metadata_provenance="$(sed -n 's/^provenance=//p' lib/bash/base-bash-libs.release)"
+[[ "$release_metadata_schema" == 1 ]] || {
+  printf 'Embedded release metadata schema_version must be 1.\n' >&2
+  exit 1
+}
+[[ "$release_metadata_commit" == unknown || "$release_metadata_commit" =~ ^[[:xdigit:]]{40}$ ]] || {
+  printf 'Embedded release metadata commit must be a full SHA or unknown.\n' >&2
+  exit 1
+}
+[[ "$release_metadata_dirty" =~ ^(clean|dirty|unknown)$ ]] || {
+  printf 'Embedded release metadata dirty_state must be clean, dirty, or unknown.\n' >&2
+  exit 1
+}
+[[ "$release_metadata_provenance" =~ ^(checkout|release-artifact|source-archive|copy|unknown)$ ]] || {
+  printf 'Embedded release metadata provenance is not recognized: %s\n' \
+    "$release_metadata_provenance" >&2
+  exit 1
+}
+
+release_metadata_unknown_keys="$(grep -v -E '^(schema_version|version|commit|dirty_state|provenance)=' \
+  lib/bash/base-bash-libs.release || true)"
+if [[ -n "$release_metadata_unknown_keys" ]]; then
+  printf 'Embedded release metadata contains unknown keys:\n%s\n' \
+    "$release_metadata_unknown_keys" >&2
+  exit 1
+fi
+
+if [[ "$(grep -c '^## \[Unreleased\]' CHANGELOG.md)" != 1 ]]; then
+  printf 'CHANGELOG.md must contain exactly one [Unreleased] section.\n' >&2
+  exit 1
+fi
+if [[ "$(grep -c -F "## [$version]" CHANGELOG.md)" -gt 1 ]]; then
+  printf 'CHANGELOG.md contains duplicate release sections for %s.\n' "$version" >&2
+  exit 1
+fi
 
 if ! grep -F "| \`$version\` | [Apache-2.0](LICENSE) |" README.md >/dev/null; then
   printf 'README.md top strip does not match VERSION (%s) and Apache-2.0 license metadata.\n' "$version" >&2

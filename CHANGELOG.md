@@ -12,6 +12,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Added a repository-owned v2 release guard that permits only the planned
   alpha, beta, release-candidate, and GA identifiers while locking publication
   until the verified-artifact and pre-GA release-candidate gates are complete.
+- Added a fail-closed release-tag preflight that checks local and remote refs
+  before any future v2 tag can be created.
 - Added the versioned `base_api_manifest.yaml` module/API contract, its
   Bash-native validator and generators, and manifest-driven module/test/artifact
   discovery for repository validation.
@@ -80,6 +82,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Documented the clean-break v2 release line, the withdrawn July 2026 v2 event,
   immutable source pins, publication gates, and the canonical release-asset
   requirement for Homebrew.
+- Documented the mandatory local/remote tag preflight and release metadata
+  validation rules.
 
 ## [1.4.0] - 2026-07-25
 
