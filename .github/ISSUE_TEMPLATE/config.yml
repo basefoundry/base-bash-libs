@@ -9,3 +9,6 @@ contact_links:
   - name: Threat model
     url: https://github.com/basefoundry/base-bash-libs/blob/main/docs/threat-model.md
     about: Understand trust boundaries and caller responsibilities.
+  - name: Community and maintainer model
+    url: https://github.com/basefoundry/base-bash-libs/blob/main/docs/community.md
+    about: Read support channels, review, decisions, and succession guidance.

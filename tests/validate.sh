@@ -73,6 +73,15 @@ required_files=(
   benchmarks/README.md
   benchmarks/reference-apps.sh
   tests/reference-apps.bats
+  CODE_OF_CONDUCT.md
+  ROADMAP.md
+  docs/community.md
+  docs/who-uses-base-bash.md
+  docs/independent-validation.md
+  .github/ISSUE_TEMPLATE/bug.yml
+  .github/ISSUE_TEMPLATE/feature.yml
+  .github/ISSUE_TEMPLATE/documentation.yml
+  tests/community-contract.sh
 )
 
 cd "$repo_root" || exit 1
@@ -359,6 +368,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   examples/reference-apps/verify.sh \
   benchmarks/reference-apps.sh \
   tests/reference-apps.bats
+  tests/community-contract.sh
 
 bats_files=(
   tests/release.bats
@@ -388,5 +398,6 @@ run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh 
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?
 run_stage "Bashly integration example" integrations/bashly/example.sh candidate >/dev/null || exit $?
 run_stage "reference application smoke" examples/reference-apps/verify.sh >/dev/null || exit $?
+run_stage "community contract" tests/community-contract.sh >/dev/null || exit $?
 
 printf 'Bash library validation passed.\n'

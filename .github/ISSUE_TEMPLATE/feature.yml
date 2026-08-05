@@ -1,0 +1,24 @@
+name: Feature or roadmap proposal
+description: Propose a behavior, integration, or documentation improvement.
+title: "enhancement: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who needs this and what is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed contract
+      description: Public API, status/output behavior, compatibility, and security implications.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and alternatives
+      description: Tests, consumer examples, prior art, or an explicitly accepted limitation.

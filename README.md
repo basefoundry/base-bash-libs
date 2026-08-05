@@ -55,6 +55,9 @@ provided by [`scripts/library-bundle`](scripts/library-bundle).
 Production-shaped reference applications and transparent startup benchmarks
 are in [`examples/reference-apps`](examples/reference-apps) and
 [`benchmarks/reference-apps.sh`](benchmarks/reference-apps.sh).
+Community participation, independent validation, and maintainer succession are
+documented in [`docs/community.md`](docs/community.md) and
+[`docs/who-uses-base-bash.md`](docs/who-uses-base-bash.md).
 Optional generator, Bats, formatter, and package-channel recipes are in
 [`docs/integrations.md`](docs/integrations.md); they do not add mandatory Core
 dependencies.

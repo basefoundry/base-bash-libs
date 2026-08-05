@@ -15,10 +15,11 @@ operation must enter through the repository-owned `scripts/release` guard.
 
 ## Workflow
 
-1. Create or choose a GitHub issue before starting implementation work.
+1. Create or choose a GitHub issue for roadmap or multi-step work. A small,
+   self-contained fix may be submitted directly from a public fork.
 2. Use one of the standard issue labels: `bug`, `enhancement`,
    `documentation`, `ci`, or `security`.
-3. Create an issue-backed branch:
+3. For tracked work, create an issue-backed branch:
 
    ```text
    <category>/<issue>-<YYYYMMDD>-<slug>
@@ -32,7 +33,7 @@ operation must enter through the repository-owned `scripts/release` guard.
    git worktree add -b <branch> ../base-bash-libs-worktrees/<slug> origin/<default-branch>
    ```
 
-5. Keep the pull request scoped to the issue and link it with
+5. Keep the pull request scoped to the issue when one exists and link it with
    `Fixes #<issue>` or `Closes #<issue>` when merge should close the issue.
 6. Run the project checks before opening or updating a pull request.
 7. Update `CHANGELOG.md` only for notable user-visible or release-worthy
