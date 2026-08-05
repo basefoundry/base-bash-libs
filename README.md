@@ -40,6 +40,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/list/lib_list.sh`](lib/bash/list/README.md)
   Indexed-array helpers built on the stdlib for in-place mutation,
   membership checks, deduplication, and length results.
+- [`lib/bash/cli/lib_cli.sh`](lib/bash/cli/README.md)
+  Declarative command contracts with nested subcommands, validation, help,
+  completion, and a handler boundary for Bash applications.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 The v2 API charter, effect/status contract, and complete public-surface audit

@@ -21,6 +21,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Added the versioned `base_api_manifest.yaml` module/API contract, its
   Bash-native validator and generators, and manifest-driven module/test/artifact
   discovery for repository validation.
+- Added the single-file declarative CLI module with nested commands, aliases,
+  options, positional validation, deterministic help, Bash completion metadata,
+  and an adapter boundary for Bashly, Argc, and Argbash-generated models.
 
 ### Security
 

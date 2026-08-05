@@ -197,7 +197,26 @@ signature/effects reference; this table makes coverage auditable.
 | str | `base_str_lower`, `base_str_upper`, `base_str_ltrim`, `base_str_rtrim`, `base_str_trim`, `base_str_contains`, `base_str_starts_with`, `base_str_ends_with`, `base_str_split`, `base_str_join` | String transforms/predicates preserve caller values until validation succeeds; split/join use validated named outputs. |
 | arg | `base_arg_parse` | Parses into caller-owned validated arrays/maps and leaves them unchanged on failure. |
 | list | `base_list_append`, `base_list_prepend`, `base_list_remove`, `base_list_contains`, `base_list_unique`, `base_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |
+| cli | `base_cli_model_init`, `base_cli_command`, `base_cli_option`, `base_cli_positional`, `base_cli_help`, `base_cli_parse`, `base_cli_run`, `base_cli_complete`, `base_cli_completion_script`, `base_cli_result_get`, `base_cli_result_get_positional`, `base_cli_result_count` | A single declarative model drives nested parsing, aliases, defaults, required/enum/validator/conflict checks, deterministic help, and completion. Successful parses publish fixed `BASE_BASH_LIBS_CLI_RESULT_*` globals; usage and validation errors return status `2`. |
 | launcher | `base_launcher_die`, `base_launcher_resolve_path`, `base_launcher_package_root`, `base_launcher_ensure_supported_bash`, `base_launcher_lib_dir_is_usable`, `base_launcher_resolve_lib_dir`, `base_launcher_source_stdlib`, `base_launcher_import_base_bash_lib`, `base_launcher_run_script`, `base_launcher_usage` | Entrypoint helpers may terminate only at the executable process boundary; path and usability helpers return status. `main` remains application-defined. |
+
+### Declarative CLI contract
+
+`lib_cli.sh` is the high-level application-facing command contract. The model
+is declared once and is consumed by parsing, validation, help, and completion;
+there is no separate handwritten usage path to drift. Command paths are
+canonical slash-separated names, with aliases accepted at every segment.
+Options support flags, scalar values, repeatable values, defaults, required
+values, enums, Bash-function validators, conflicts, hidden entries, and
+metavars. Positionals preserve boundaries and may be required, defaulted,
+validated, or repeatable (only as the final positional).
+
+`base_arg_parse` remains the low-level array parser for callers that need its
+direct caller-owned output contract. It is not silently replaced. Bashly,
+Argc, Argbash, and similar generators may adapt their build output into the
+native model, but they are optional build-time adapters and never runtime
+dependencies. The runtime stays Bash 4.2-compatible, avoids `eval`, and has no
+mandatory Python, Ruby, Node, or `jq` dependency.
 
 ## 9. v1.4.0 → v2 migration inventory
 
@@ -215,5 +234,5 @@ no inconsistent legacy behavior retained for compatibility.
 
 The symbol-level mapping remains in [`v2-symbol-map.md`](v2-symbol-map.md), and
 the mechanical checker is [`scripts/migrate-v2-symbols`](../scripts/migrate-v2-symbols).
-The next milestone (#225) will derive a machine-readable manifest from this
-audit; any manifest disagreement is a release blocker.
+The machine-readable manifest is the checked-in companion to this audit; any
+manifest disagreement is a release blocker.
