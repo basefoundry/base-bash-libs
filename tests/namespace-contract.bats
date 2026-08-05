@@ -11,7 +11,7 @@ setup() {
         source "$1/std/lib_std.sh"
         declare -a init_args=()
         base_init init_args --source "$1/tests/namespace-contract.bats" --
-        base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh
+        base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh cli/lib_cli.sh
 
         for function_name in $(compgen -A function); do
             case "$function_name" in
@@ -32,6 +32,7 @@ setup() {
         declare -F base_str_trim >/dev/null
         declare -F base_list_append >/dev/null
         declare -F base_arg_parse >/dev/null
+        declare -F base_cli_model_init >/dev/null
         declare -F base_file_update_file_section >/dev/null
         declare -F base_git_update_repo >/dev/null
         declare -F base_gh_run >/dev/null

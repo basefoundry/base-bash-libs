@@ -240,6 +240,35 @@ statuses, and side effects are normative in the linked module README and
 - `base_list_remove` — signature: see [`lib/bash/list/README.md`](../lib/bash/list/README.md).
 - `base_list_unique` — signature: see [`lib/bash/list/README.md`](../lib/bash/list/README.md).
 
+### `cli`
+
+- Kind: `sourceable-library`
+- Source: [`lib/bash/cli/lib_cli.sh`](../lib/bash/cli/lib_cli.sh)
+- Documentation: [`lib/bash/cli/README.md`](../lib/bash/cli/README.md)
+- Tests: [`lib/bash/cli/tests/lib_cli.bats`](../lib/bash/cli/tests/lib_cli.bats)
+- Dependencies: `std`
+- Optional commands: `none`
+- Stability: `stable`; since `2.0.0`; deprecated: `false`
+- Inputs: documented per symbol in the module README and API charter
+- Outputs: documented per symbol; parsed results use BASE_BASH_LIBS_CLI_RESULT_* globals and named result variables
+- Statuses: documented per symbol; usage and validation errors return status 2
+- Side effects: documented per symbol; sourcing is passive and completion/help are non-mutating
+
+#### Public symbols
+
+- `base_cli_command` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_complete` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_completion_script` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_help` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_model_init` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_option` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_parse` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_count` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_get` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_get_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_run` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+
 ### `launcher`
 
 - Kind: `executable-launcher`

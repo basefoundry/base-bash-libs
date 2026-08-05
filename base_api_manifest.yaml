@@ -165,6 +165,23 @@ modules:
     stability: stable
     since: 2.0.0
     deprecated: false
+  - name: cli
+    kind: sourceable-library
+    source: lib/bash/cli/lib_cli.sh
+    documentation: lib/bash/cli/README.md
+    tests: lib/bash/cli/tests/lib_cli.bats
+    dependencies: std
+    optional_commands: none
+    artifacts: lib/bash/cli/lib_cli.sh,lib/bash/cli/README.md,lib/bash/cli/tests/lib_cli.bats
+    public_symbols: base_cli_command,base_cli_complete,base_cli_completion_script,base_cli_help,base_cli_model_init,base_cli_option,base_cli_parse,base_cli_positional,base_cli_result_count,base_cli_result_get,base_cli_result_get_positional,base_cli_run
+    signature_source: lib/bash/cli/README.md
+    inputs: documented per symbol in the module README and API charter
+    outputs: documented per symbol; parsed results use BASE_BASH_LIBS_CLI_RESULT_* globals and named result variables
+    statuses: documented per symbol; usage and validation errors return status 2
+    side_effects: documented per symbol; sourcing is passive and completion/help are non-mutating
+    stability: stable
+    since: 2.0.0
+    deprecated: false
   - name: launcher
     kind: executable-launcher
     source: bin/base-bash

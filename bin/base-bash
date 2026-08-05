@@ -325,7 +325,7 @@ __base_bash_libs_launcher_check__() {
     local module
     local -a required_tools=(bash awk basename cat cp date dirname grep mktemp mv readlink rm sed)
     local -a optional_tools=(git gh timeout gtimeout)
-    local -a modules=(file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh)
+    local -a modules=(file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh cli/lib_cli.sh)
 
     if ! __base_bash_libs_launcher_bash_is_supported__; then
         printf 'ERROR bash: Bash %s is unsupported; Bash 4.2 or newer is required.\n' \
