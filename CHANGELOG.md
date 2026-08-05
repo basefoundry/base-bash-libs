@@ -53,6 +53,9 @@ and versions are tracked in the repo-root `VERSION` file.
   `base_bash_libs_init` lifecycle API. Wrapper flags now return through a
   caller-owned array without hidden positional-parameter mutation; launchers,
   examples, and companion-library tests initialize explicitly.
+- Namespaced the v2 public API, runtime globals, environment controls, load
+  guards, and internal symbols under the `base_bash_libs_` contract. Legacy
+  generic names are removed; see `docs/v2-symbol-map.md` for migration.
 - Made timed foreground-TTY invocations fail closed with a safe diagnostic;
   callers must provide a pipe or explicit non-terminal stdin for the v2 hard
   descendant guarantee.

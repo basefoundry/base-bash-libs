@@ -260,7 +260,7 @@ signal_worker() {
     fi
 }
 
-if __std_run_with_timeout_fallback__ 30 signal_worker; then
+if __base_bash_libs_std_run_with_timeout_fallback__ 30 signal_worker; then
     rc=0
 else
     rc=\$?
@@ -278,7 +278,7 @@ EOF
 setup() {
     setup_test_tmpdir
     PATH="$BASE_TEST_ORIG_PATH"
-    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE BASE_CLI_PRIMARY_LOG
+    unset BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_LOG_DEBUG BASE_BASH_LIBS_LOG_UTC NO_COLOR BASE_BASH_LIBS_BOOTSTRAP_SOURCE BASE_BASH_LIBS_PRIMARY_LOG
     source "$STDLIB_PATH"
     declare -a setup_args=()
     base_bash_libs_init setup_args -- "$@"
@@ -312,8 +312,8 @@ teardown() {
         [[ "$before_traps" == "$(trap -p)" ]]
         [[ "$before_exports" == "$(export -p)" ]]
         [[ "$before_cwd" == "$(pwd -P)" ]]
-        [[ ! -v __SCRIPT_ARGS__ && ! -v __SCRIPT_DIR__ ]]
-        [[ ! -v _log_levels && ! -v __std_cleanup_hooks ]]
+        [[ ! -v BASE_BASH_LIBS_SCRIPT_ARGS && ! -v BASE_BASH_LIBS_SCRIPT_DIR ]]
+        [[ ! -v BASE_BASH_LIBS_STD_LOG_LEVELS && ! -v __base_bash_libs_std_cleanup_hooks ]]
         printf "passive=yes\\nargs=%s\\n" "$#"
     ' bash "$STDLIB_PATH"
 
@@ -337,8 +337,8 @@ declare -a filtered=()
 base_bash_libs_init filtered --source "\$0" -- "\$@"
 [[ "\$*" == "\$before" ]]
 printf 'filtered=%s\n' "\${filtered[*]}"
-printf 'original=%s\n' "\${__SCRIPT_ARGS__[*]}"
-printf 'source-dir=%s\n' "\$__SCRIPT_DIR__"
+printf 'original=%s\n' "\${BASE_BASH_LIBS_SCRIPT_ARGS[*]}"
+printf 'source-dir=%s\n' "\$BASE_BASH_LIBS_SCRIPT_DIR"
 if base_bash_libs_init filtered --source "\$0" -- "\$@"; then
     printf 'repeat=same\n'
 else
@@ -380,13 +380,13 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-printf 'orig=%s\n' "\${__SCRIPT_ARGS__[*]}"
+printf 'orig=%s\n' "\${BASE_BASH_LIBS_SCRIPT_ARGS[*]}"
 printf 'argv=%s\n' "\$*"
-printf 'debug=%s\n' "\${LOG_DEBUG:-}"
-printf 'utc=%s\n' "\${LOG_UTC:-}"
-printf 'color=%s\n' "\${COLOR_RED:-}"
-printf 'terminal-level=%s\n' "\${_loggers_level_map[default]}"
-printf 'library-level=%s\n' "\${_log_category_level_map[base_bash_libs]}"
+printf 'debug=%s\n' "\${BASE_BASH_LIBS_LOG_DEBUG:-}"
+printf 'utc=%s\n' "\${BASE_BASH_LIBS_LOG_UTC:-}"
+printf 'color=%s\n' "\${BASE_BASH_LIBS_STD_COLOR_RED:-}"
+printf 'terminal-level=%s\n' "\${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}"
+printf 'library-level=%s\n' "\${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base_bash_libs]}"
 EOF
 
     bats_run bash "$script" --verbose-wrapper --utc-wrapper --color alpha beta
@@ -409,11 +409,11 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-printf 'orig=%s\n' "\${__SCRIPT_ARGS__[*]}"
+printf 'orig=%s\n' "\${BASE_BASH_LIBS_SCRIPT_ARGS[*]}"
 printf 'argv=%s\n' "\$*"
-printf 'debug=%s\n' "\${LOG_DEBUG:-}"
-printf 'terminal-level=%s\n' "\${_loggers_level_map[default]}"
-printf 'library-level=%s\n' "\${_log_category_level_map[base_bash_libs]}"
+printf 'debug=%s\n' "\${BASE_BASH_LIBS_LOG_DEBUG:-}"
+printf 'terminal-level=%s\n' "\${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}"
+printf 'library-level=%s\n' "\${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base_bash_libs]}"
 EOF
 
     bats_run bash "$script" --debug-wrapper alpha beta
@@ -437,9 +437,9 @@ EOF
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
-export BASE_CLI_PRIMARY_LOG="$primary_log"
+export BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
 source "$STDLIB_PATH"
-log_debug -l base_bash_libs.std "safe explicit diagnostic"
+base_bash_libs_std_log_debug -l base_bash_libs.std "safe explicit diagnostic"
 printf 'argv-count=%s\n' "\$#"
 EOF
 
@@ -484,7 +484,7 @@ EOF
     [[ "$output" == *"argv=alpha -- --color omega"* ]]
 }
 
-@test "bootstrap source override controls __SCRIPT_DIR__" {
+@test "bootstrap source override controls BASE_BASH_LIBS_SCRIPT_DIR" {
     local command_dir="$TEST_TMPDIR/commands/demo"
     local script="$TEST_TMPDIR/bootstrap-dir.sh"
     local expected_dir
@@ -493,9 +493,9 @@ EOF
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
-export BASE_BASH_BOOTSTRAP_SOURCE="$command_dir/demo.sh"
+export BASE_BASH_LIBS_BOOTSTRAP_SOURCE="$command_dir/demo.sh"
 source "$STDLIB_PATH"
-printf 'script_dir=%s\n' "\$__SCRIPT_DIR__"
+printf 'script_dir=%s\n' "\$BASE_BASH_LIBS_SCRIPT_DIR"
 EOF
 
     expected_dir="$(cd "$command_dir" && pwd -P)"
@@ -517,10 +517,10 @@ EOF
         declare -a app_args=()
         base_bash_libs_init app_args -- "$@"
         source_dir=""
-        get_my_source_dir source_dir
+        base_bash_libs_std_get_my_source_dir source_dir
         [[ "$-" == *e* && "$-" == *u* ]]
         shopt -qo pipefail
-        printf "script_dir=%s\nsource_dir=%s\nstrict=preserved\n" "$__SCRIPT_DIR__" "$source_dir"
+        printf "script_dir=%s\nsource_dir=%s\nstrict=preserved\n" "$BASE_BASH_LIBS_SCRIPT_DIR" "$source_dir"
     ' bash "$STDLIB_PATH" "$TEST_TMPDIR"
 
     [ "$status" -eq 0 ]
@@ -538,10 +538,10 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$STDLIB_PATH"
-safe_mkdir "$directory"
+base_bash_libs_std_safe_mkdir "$directory"
 temp_path=""
-TMPDIR="$TEST_TMPDIR" std_make_temp_file temp_path strict-empty
-std_unregister_cleanup_path "\$temp_path"
+TMPDIR="$TEST_TMPDIR" base_bash_libs_std_make_temp_file temp_path strict-empty
+base_bash_libs_std_unregister_cleanup_path "\$temp_path"
 rm -f -- "\$temp_path"
 printf 'args=%s strict=preserved\n' "\$#"
 EOF
@@ -608,13 +608,13 @@ EOF
     readonly -p BASE_BASH_LIBS_STDLIB_LOADED >/dev/null
 }
 
-@test "is_interactive is false in a non-interactive subprocess" {
+@test "base_bash_libs_std_is_interactive is false in a non-interactive subprocess" {
     local script="$TEST_TMPDIR/non-interactive.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if is_interactive; then
+if base_bash_libs_std_is_interactive; then
     echo "interactive=yes"
 else
     echo "interactive=no"
@@ -627,14 +627,14 @@ EOF
     [[ "$output" == *"interactive=no"* ]]
 }
 
-@test "is_interactive is true when run through a tty" {
+@test "base_bash_libs_std_is_interactive is true when run through a tty" {
     local script="$TEST_TMPDIR/tty-interactive.sh"
     local normalized
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if is_interactive; then
+if base_bash_libs_std_is_interactive; then
     echo "interactive=yes"
 else
     echo "interactive=no"
@@ -649,7 +649,7 @@ EOF
 }
 
 @test "stdlib exposes passive bash version check helper" {
-    check_bash_version
+    base_bash_libs_std_check_bash_version
     [ "$?" -eq 0 ]
 }
 
@@ -659,7 +659,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-BASE_TEST_BASH_VERSION=41 check_bash_version
+BASE_TEST_BASH_VERSION=41 base_bash_libs_std_check_bash_version
 EOF
 
     bats_run "$script"
@@ -674,7 +674,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-BASE_TEST_BASH_VERSION=310 check_bash_version
+BASE_TEST_BASH_VERSION=310 base_bash_libs_std_check_bash_version
 EOF
 
     bats_run "$script"
@@ -706,7 +706,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if [[ -n "\${COLOR_RED:-}" ]]; then
+if [[ -n "\${BASE_BASH_LIBS_STD_COLOR_RED:-}" ]]; then
     echo "colors=enabled"
 else
     echo "colors=disabled"
@@ -729,7 +729,7 @@ EOF
 #!/usr/bin/env bash
 exec >"\$1"
 source "$STDLIB_PATH"
-if [[ -n "\${COLOR_RED:-}" ]]; then
+if [[ -n "\${BASE_BASH_LIBS_STD_COLOR_RED:-}" ]]; then
     printf 'colors=enabled\n' >&2
 else
     printf 'colors=disabled\n' >&2
@@ -752,7 +752,7 @@ EOF
 #!/usr/bin/env bash
 export NO_COLOR=1
 source "$STDLIB_PATH"
-if [[ -n "\${COLOR_RED:-}" ]]; then
+if [[ -n "\${BASE_BASH_LIBS_STD_COLOR_RED:-}" ]]; then
     echo "colors=enabled"
 else
     echo "colors=disabled"
@@ -766,10 +766,10 @@ EOF
     [[ "$normalized" == *"colors=disabled"* ]]
 }
 
-@test "import loads relative and absolute libraries" {
+@test "base_bash_libs_std_import loads relative and absolute libraries" {
     local relative_dir="$TEST_TMPDIR/helpers"
     local absolute_lib="$TEST_TMPDIR/absolute.sh"
-    local script="$TEST_TMPDIR/import-driver.sh"
+    local script="$TEST_TMPDIR/base_bash_libs_std_import-driver.sh"
 
     mkdir -p "$relative_dir"
     cat > "$relative_dir/relative.sh" <<'EOF'
@@ -782,7 +782,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-import helpers/relative.sh "$absolute_lib"
+base_bash_libs_std_import helpers/relative.sh "$absolute_lib"
 printf 'rel=%s abs=%s\n' "\$REL_IMPORTED" "\$ABS_IMPORTED"
 EOF
 
@@ -792,13 +792,13 @@ EOF
     [[ "$output" == *"rel=relative abs=absolute"* ]]
 }
 
-@test "import exits when a library is missing" {
-    local script="$TEST_TMPDIR/import-missing.sh"
+@test "base_bash_libs_std_import exits when a library is missing" {
+    local script="$TEST_TMPDIR/base_bash_libs_std_import-missing.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-import missing.sh
+base_bash_libs_std_import missing.sh
 echo "after"
 EOF
 
@@ -809,23 +809,23 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
-@test "import failure does not leave relative import directory on the stack" {
+@test "base_bash_libs_std_import failure does not leave relative base_bash_libs_std_import directory on the stack" {
     local script_dir="$TEST_TMPDIR/driver"
     local helper_dir="$script_dir/helpers"
     local run_dir="$TEST_TMPDIR/run"
-    local script="$script_dir/import-failing-helper.sh"
-    local cwd_file="$TEST_TMPDIR/import-exit-pwd.txt"
-    local dirs_file="$TEST_TMPDIR/import-exit-dirs.txt"
+    local script="$script_dir/base_bash_libs_std_import-failing-helper.sh"
+    local cwd_file="$TEST_TMPDIR/base_bash_libs_std_import-exit-pwd.txt"
+    local dirs_file="$TEST_TMPDIR/base_bash_libs_std_import-exit-dirs.txt"
 
     mkdir -p "$helper_dir" "$run_dir"
     cat > "$helper_dir/failing.sh" <<EOF
 trap 'pwd > "$cwd_file"; dirs -p > "$dirs_file"' EXIT
-exit_if_error 7 "helper failed during import"
+base_bash_libs_std_exit_if_error 7 "helper failed during base_bash_libs_std_import"
 EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-import helpers/failing.sh
+base_bash_libs_std_import helpers/failing.sh
 EOF
 
     bats_run bash -c "cd \"$run_dir\" && \"$script\""
@@ -836,50 +836,50 @@ EOF
     [[ "$(cat "$dirs_file")" != *"$script_dir"* ]]
 }
 
-@test "add_to_path appends an existing directory only once" {
+@test "base_bash_libs_std_add_to_path appends an existing directory only once" {
     mkdir -p "$TEST_TMPDIR/bin"
     PATH="/usr/bin:/bin"
 
-    add_to_path "$TEST_TMPDIR/bin"
-    add_to_path "$TEST_TMPDIR/bin"
+    base_bash_libs_std_add_to_path "$TEST_TMPDIR/bin"
+    base_bash_libs_std_add_to_path "$TEST_TMPDIR/bin"
 
     [ "$PATH" = "/usr/bin:/bin:$TEST_TMPDIR/bin" ]
 }
 
-@test "add_to_path prepends when requested" {
+@test "base_bash_libs_std_add_to_path prepends when requested" {
     mkdir -p "$TEST_TMPDIR/bin"
     PATH="/usr/bin:/bin"
 
-    add_to_path -p "$TEST_TMPDIR/bin"
+    base_bash_libs_std_add_to_path -p "$TEST_TMPDIR/bin"
 
     [ "$PATH" = "$TEST_TMPDIR/bin:/usr/bin:/bin" ]
 }
 
-@test "add_to_path skips missing directories unless -n is used" {
+@test "base_bash_libs_std_add_to_path skips missing directories unless -n is used" {
     PATH="/usr/bin:/bin"
 
-    add_to_path "$TEST_TMPDIR/missing"
+    base_bash_libs_std_add_to_path "$TEST_TMPDIR/missing"
     [ "$PATH" = "/usr/bin:/bin" ]
 
-    add_to_path -n "$TEST_TMPDIR/missing"
+    base_bash_libs_std_add_to_path -n "$TEST_TMPDIR/missing"
     [ "$PATH" = "/usr/bin:/bin:$TEST_TMPDIR/missing" ]
 }
 
-@test "add_to_path rejects invalid options" {
+@test "base_bash_libs_std_add_to_path rejects invalid options" {
     local stderr_file="$TEST_TMPDIR/add-to-path.err"
     local rc
 
-    if add_to_path -z 2>"$stderr_file"; then
+    if base_bash_libs_std_add_to_path -z 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"add_to_path: invalid option"* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_add_to_path: invalid option"* ]]
 }
 
-@test "add_to_path preserves caller OPTIND and batch prepend order" {
+@test "base_bash_libs_std_add_to_path preserves caller OPTIND and batch prepend order" {
     local first="$TEST_TMPDIR/first"
     local second="$TEST_TMPDIR/second"
     local OPTIND=9
@@ -887,56 +887,56 @@ EOF
     mkdir -p "$first" "$second"
     PATH="/base"
 
-    add_to_path -p "$first" "$second"
+    base_bash_libs_std_add_to_path -p "$first" "$second"
 
     [ "$OPTIND" -eq 9 ]
     [ "$PATH" = "$first:$second:/base" ]
 }
 
-@test "dedupe_path removes duplicates and empty entries" {
+@test "base_bash_libs_std_dedupe_path removes duplicates and empty entries" {
     PATH="/one:/two:/one::/three:/two"
 
-    dedupe_path
+    base_bash_libs_std_dedupe_path
 
     [ "$PATH" = "/one:/two:/three" ]
 }
 
-@test "print_path emits one path entry per line" {
+@test "base_bash_libs_std_print_path emits one path entry per line" {
     PATH="/one:/two:/three"
 
-    bats_run print_path
+    bats_run base_bash_libs_std_print_path
 
     [ "$status" -eq 0 ]
     [ "$output" = $'/one\n/two\n/three' ]
 }
 
-@test "__join_message__ joins fragments with single spaces" {
+@test "__base_bash_libs_std_join_message__ joins fragments with single spaces" {
     local joined
 
-    joined="$(__join_message__ alpha beta "gamma delta")"
+    joined="$(__base_bash_libs_std_join_message__ alpha beta "gamma delta")"
 
     [ "$joined" = "alpha beta gamma delta" ]
 }
 
 @test "log initialization defaults reusable-library categories to INFO" {
-    [ "${_log_levels[ERROR]}" -eq 1 ]
-    [ "${_log_levels[VERBOSE]}" -eq 5 ]
-    [ "${_loggers_level_map[default]}" -eq 3 ]
-    [ "${_log_category_level_map[default]}" -eq 5 ]
-    [ "${_log_category_level_map[base_bash_libs]}" -eq 3 ]
-    [ -z "${COLOR_RED:-}" ]
+    [ "${BASE_BASH_LIBS_STD_LOG_LEVELS[ERROR]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_LEVELS[VERBOSE]}" -eq 5 ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 3 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[default]}" -eq 5 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base_bash_libs]}" -eq 3 ]
+    [ -z "${BASE_BASH_LIBS_STD_COLOR_RED:-}" ]
 }
 
-@test "set_log_level updates loggers and rejects invalid input without changing levels" {
+@test "base_bash_libs_std_set_log_level updates loggers and rejects invalid input without changing levels" {
     local stderr_file="$TEST_TMPDIR/set-log-level.err"
     local rc
 
-    set_log_level DEBUG
-    [ "${_loggers_level_map[default]}" -eq 4 ]
-    set_log_level -l custom DEBUG
-    [ "${_loggers_level_map[custom]}" -eq 4 ]
+    base_bash_libs_std_set_log_level DEBUG
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
+    base_bash_libs_std_set_log_level -l custom DEBUG
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[custom]}" -eq 4 ]
 
-    if set_log_level -l 2>"$stderr_file"; then
+    if base_bash_libs_std_set_log_level -l 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -944,65 +944,65 @@ EOF
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"Option '-l' needs an argument"* ]]
 
-    if set_log_level NOPE 2>"$stderr_file"; then
+    if base_bash_libs_std_set_log_level NOPE 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_loggers_level_map[default]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE'"* ]]
 
-    if set_log_level -l custom NOPE 2>"$stderr_file"; then
+    if base_bash_libs_std_set_log_level -l custom NOPE 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_loggers_level_map[custom]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[custom]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE' for logger 'custom'"* ]]
 }
 
-@test "set_log_category_level updates categories and rejects invalid input without changing levels" {
+@test "base_bash_libs_std_set_log_category_level updates categories and rejects invalid input without changing levels" {
     local stderr_file="$TEST_TMPDIR/set-log-category-level.err"
     local rc
 
-    set_log_category_level -l base.library DEBUG
-    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    base_bash_libs_std_set_log_category_level -l base.library DEBUG
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base.library]}" -eq 4 ]
 
-    if set_log_category_level -l base.library 2>"$stderr_file"; then
+    if base_bash_libs_std_set_log_category_level -l base.library 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base.library]}" -eq 4 ]
     [ -s "$stderr_file" ]
 
-    if set_log_category_level -l base.library NOPE 2>"$stderr_file"; then
+    if base_bash_libs_std_set_log_category_level -l base.library NOPE 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_log_category_level_map[base.library]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base.library]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"Unknown log level 'NOPE'"* ]]
 }
 
 @test "log category resolution prefers exact then nearest parent then default" {
     local stderr_file="$TEST_TMPDIR/log-category-hierarchy.err"
 
-    set_log_level DEBUG
-    set_log_category_level -l product INFO
-    set_log_category_level -l product.library DEBUG
-    set_log_category_level -l product.library.exact INFO
+    base_bash_libs_std_set_log_level DEBUG
+    base_bash_libs_std_set_log_category_level -l product INFO
+    base_bash_libs_std_set_log_category_level -l product.library DEBUG
+    base_bash_libs_std_set_log_category_level -l product.library.exact INFO
 
     {
-        log_debug -l product.library.worker "nearest parent enabled"
-        log_debug -l product.library.exact "exact override hidden"
-        log_debug -l product.library.sibling "sibling remains enabled"
-        log_debug -l product.other "broader parent hidden"
-        log_debug -l unrelated "default category enabled"
+        base_bash_libs_std_log_debug -l product.library.worker "nearest parent enabled"
+        base_bash_libs_std_log_debug -l product.library.exact "exact override hidden"
+        base_bash_libs_std_log_debug -l product.library.sibling "sibling remains enabled"
+        base_bash_libs_std_log_debug -l product.other "broader parent hidden"
+        base_bash_libs_std_log_debug -l unrelated "default category enabled"
     } 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"nearest parent enabled"* ]]
@@ -1015,41 +1015,41 @@ EOF
 @test "unconfigured named terminal loggers inherit default and explicit overrides win" {
     local stderr_file="$TEST_TMPDIR/log-terminal-inheritance.err"
 
-    set_log_level DEBUG
-    set_log_level -l explicit INFO
+    base_bash_libs_std_set_log_level DEBUG
+    base_bash_libs_std_set_log_level -l explicit INFO
 
     {
-        log_debug -l inherited "inherited terminal debug"
-        log_debug -l explicit "explicit terminal override"
+        base_bash_libs_std_log_debug -l inherited "inherited terminal debug"
+        base_bash_libs_std_log_debug -l explicit "explicit terminal override"
     } 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"inherited terminal debug"* ]]
     [[ "$(cat "$stderr_file")" != *"explicit terminal override"* ]]
 }
 
-@test "log_is_enabled requires both category acceptance and an accepting sink" {
+@test "base_bash_libs_std_log_is_enabled requires both category acceptance and an accepting sink" {
     local primary_log="$TEST_TMPDIR/log-is-enabled-primary.log"
 
-    log_is_enabled INFO
-    ! log_is_enabled DEBUG
+    base_bash_libs_std_log_is_enabled INFO
+    ! base_bash_libs_std_log_is_enabled DEBUG
 
-    BASE_CLI_PRIMARY_LOG="$primary_log"
-    log_is_enabled DEBUG
-    ! log_is_enabled VERBOSE
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
+    base_bash_libs_std_log_is_enabled DEBUG
+    ! base_bash_libs_std_log_is_enabled VERBOSE
 
-    set_log_category_level -l base.library INFO
-    ! log_is_enabled -l base.library DEBUG
+    base_bash_libs_std_set_log_category_level -l base.library INFO
+    ! base_bash_libs_std_log_is_enabled -l base.library DEBUG
 
-    set_log_category_level -l base.library DEBUG
-    log_is_enabled -l base.library DEBUG
+    base_bash_libs_std_set_log_category_level -l base.library DEBUG
+    base_bash_libs_std_log_is_enabled -l base.library DEBUG
 
-    unset BASE_CLI_PRIMARY_LOG
-    ! log_is_enabled -l base.library DEBUG
-    set_log_level DEBUG
-    log_is_enabled -l base.library DEBUG
+    unset BASE_BASH_LIBS_PRIMARY_LOG
+    ! base_bash_libs_std_log_is_enabled -l base.library DEBUG
+    base_bash_libs_std_set_log_level DEBUG
+    base_bash_libs_std_log_is_enabled -l base.library DEBUG
 }
 
-@test "log_is_enabled validates primary sink paths without modifying them" {
+@test "base_bash_libs_std_log_is_enabled validates primary sink paths without modifying them" {
     local primary_log="$TEST_TMPDIR/eligible-primary.log"
     local existing_log="$TEST_TMPDIR/existing-eligible-primary.log"
     local missing_parent_log="$TEST_TMPDIR/missing/primary.log"
@@ -1059,34 +1059,34 @@ EOF
     local fifo_log="$TEST_TMPDIR/fifo-primary.log"
     local stderr_file="$TEST_TMPDIR/unusable-primary.err"
 
-    BASE_CLI_PRIMARY_LOG="$primary_log"
-    log_is_enabled DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
+    base_bash_libs_std_log_is_enabled DEBUG
     [ ! -e "$primary_log" ]
 
     printf 'existing eligible content\n' >"$existing_log"
     chmod 644 "$existing_log"
-    BASE_CLI_PRIMARY_LOG="$existing_log"
-    log_is_enabled DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$existing_log"
+    base_bash_libs_std_log_is_enabled DEBUG
     [ "$(file_mode "$existing_log")" = "644" ]
 
     mkdir "$directory_log"
-    BASE_CLI_PRIMARY_LOG="$directory_log"
-    ! log_is_enabled DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$directory_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
 
     printf 'symlink target\n' >"$symlink_target"
     ln -s "$symlink_target" "$symlink_log"
-    BASE_CLI_PRIMARY_LOG="$symlink_log"
-    ! log_is_enabled DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$symlink_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
 
     mkfifo "$fifo_log"
-    BASE_CLI_PRIMARY_LOG="$fifo_log"
-    ! log_is_enabled DEBUG
-    log_debug "fifo must not block" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$fifo_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
+    base_bash_libs_std_log_debug "fifo must not block" 2>"$stderr_file"
     [ ! -s "$stderr_file" ]
 
-    BASE_CLI_PRIMARY_LOG="$missing_parent_log"
-    ! log_is_enabled DEBUG
-    log_debug "missing parent must stay silent" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$missing_parent_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
+    base_bash_libs_std_log_debug "missing parent must stay silent" 2>"$stderr_file"
     [ ! -e "$missing_parent_log" ]
     [ ! -s "$stderr_file" ]
     [ "$(cat "$symlink_target")" = "symlink target" ]
@@ -1101,7 +1101,7 @@ EOF
 
     original_umask="$(umask)"
     umask 000
-    BASE_CLI_PRIMARY_LOG="$new_log" log_debug "new private record" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$new_log" base_bash_libs_std_log_debug "new private record" 2>"$stderr_file"
     umask "$original_umask"
 
     [ ! -s "$stderr_file" ]
@@ -1110,8 +1110,8 @@ EOF
 
     printf 'existing sentinel\n' >"$existing_log"
     chmod 666 "$existing_log"
-    BASE_CLI_PRIMARY_LOG="$existing_log" \
-        log_debug "existing private record" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$existing_log" \
+        base_bash_libs_std_log_debug "existing private record" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [ "$(file_mode "$existing_log")" = "600" ]
@@ -1120,8 +1120,8 @@ EOF
 
     original_dir="$PWD"
     cd "$TEST_TMPDIR" || return 1
-    BASE_CLI_PRIMARY_LOG="-option-primary.log" \
-        log_debug "option-like private record" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="-option-primary.log" \
+        base_bash_libs_std_log_debug "option-like private record" 2>"$stderr_file"
     cd "$original_dir" || return 1
 
     [ ! -s "$stderr_file" ]
@@ -1135,15 +1135,15 @@ EOF
 
     mkdir "$directory_log"
 
-    BASE_CLI_PRIMARY_LOG="$directory_log" \
-        log_debug "hidden unusable record" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$directory_log" \
+        base_bash_libs_std_log_debug "hidden unusable record" 2>"$stderr_file"
     [ ! -s "$stderr_file" ]
 
-    BASE_CLI_PRIMARY_LOG="$directory_log"
-    ! log_is_enabled DEBUG
-    set_log_level DEBUG
-    log_is_enabled DEBUG
-    log_debug "terminal-only debug" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$directory_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
+    base_bash_libs_std_set_log_level DEBUG
+    base_bash_libs_std_log_is_enabled DEBUG
+    base_bash_libs_std_log_debug "terminal-only debug" 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"DEBUG"*"terminal-only debug"* ]]
     [[ "$(cat "$stderr_file")" != *"Is a directory"* ]]
@@ -1155,26 +1155,26 @@ EOF
     local second_log="$TEST_TMPDIR/second-raced-primary.log"
     local stderr_file="$TEST_TMPDIR/raced-primary.err"
 
-    __log_primary_sink_is_usable__ "$first_log"
-    __log_primary_sink_is_usable__ "$second_log"
-    __log_primary_sink_prepare__() {
+    __base_bash_libs_std_log_primary_sink_is_usable__ "$first_log"
+    __base_bash_libs_std_log_primary_sink_is_usable__ "$second_log"
+    __base_bash_libs_std_log_primary_sink_prepare__() {
         printf 'synthetic primary sink setup failure\n' >&2
         return 1
     }
 
-    BASE_CLI_PRIMARY_LOG="$first_log" \
-        __log_primary_sink_write__ record "first must not persist" 2>"$stderr_file"
-    BASE_CLI_PRIMARY_LOG="$second_log" \
-        __log_primary_sink_write__ record "second must not persist" 2>>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$first_log" \
+        __base_bash_libs_std_log_primary_sink_write__ record "first must not persist" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$second_log" \
+        __base_bash_libs_std_log_primary_sink_write__ record "second must not persist" 2>>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
-    [ "${_log_primary_sink_failed_paths[$first_log]}" = "1" ]
-    [ "${_log_primary_sink_failed_paths[$second_log]}" = "1" ]
+    [ "${BASE_BASH_LIBS_STD_LOG_FAILED_SINKS[$first_log]}" = "1" ]
+    [ "${BASE_BASH_LIBS_STD_LOG_FAILED_SINKS[$second_log]}" = "1" ]
 
     [ ! -e "$first_log" ]
     [ ! -e "$second_log" ]
-    ! __log_primary_sink_is_usable__ "$first_log"
-    ! __log_primary_sink_is_usable__ "$second_log"
+    ! __base_bash_libs_std_log_primary_sink_is_usable__ "$first_log"
+    ! __base_bash_libs_std_log_primary_sink_is_usable__ "$second_log"
 }
 
 @test "read-only primary sink is ignored when the test identity cannot write it" {
@@ -1185,56 +1185,56 @@ EOF
     chmod 400 "$primary_log"
     [[ ! -w "$primary_log" ]] || skip "The test identity can write mode-0400 files."
 
-    BASE_CLI_PRIMARY_LOG="$primary_log"
-    ! log_is_enabled DEBUG
-    log_debug "must not persist" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
+    ! base_bash_libs_std_log_is_enabled DEBUG
+    base_bash_libs_std_log_debug "must not persist" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [ "$(file_mode "$primary_log")" = "400" ]
     [ "$(cat "$primary_log")" = "read-only sentinel" ]
 }
 
-@test "log_is_enabled rejects malformed and invalid input without changing logging state" {
+@test "base_bash_libs_std_log_is_enabled rejects malformed and invalid input without changing logging state" {
     local stderr_file="$TEST_TMPDIR/log-is-enabled-invalid.err"
     local rc
 
-    set_log_category_level -l base.library DEBUG
-    set_log_level DEBUG
+    base_bash_libs_std_set_log_category_level -l base.library DEBUG
+    base_bash_libs_std_set_log_level DEBUG
 
-    if log_is_enabled -l 2>"$stderr_file"; then
+    if base_bash_libs_std_log_is_enabled -l 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_log_category_level_map[base.library]}" -eq 4 ]
-    [ "${_loggers_level_map[default]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base.library]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
     [ -s "$stderr_file" ]
 
-    if log_is_enabled -l base.library NOPE 2>"$stderr_file"; then
+    if base_bash_libs_std_log_is_enabled -l base.library NOPE 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [ "${_log_category_level_map[base.library]}" -eq 4 ]
-    [ "${_loggers_level_map[default]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOG_CATEGORY_LEVELS[base.library]}" -eq 4 ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
     [[ "$(cat "$stderr_file")" == *"NOPE"* ]]
 }
 
-@test "__print_log__ requires a log level" {
-    ! __print_log__
+@test "__base_bash_libs_std_print_log__ requires a log level" {
+    ! __base_bash_libs_std_print_log__
 }
 
-@test "__print_log__ formats timestamps without command substitution" {
+@test "__base_bash_libs_std_print_log__ formats timestamps without command substitution" {
     bats_run grep -nE 'timestamp="\$\((TZ=UTC0 )?printf' "$STDLIB_PATH"
 
     [ "$status" -eq 1 ]
     [ "$output" = "" ]
 }
 
-@test "__print_log__ emits structured records through one final printf" {
-    bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$__std_log_record_color" "$__std_log_record_line" "$COLOR_OFF"' "$STDLIB_PATH"
+@test "__base_bash_libs_std_print_log__ emits structured records through one final printf" {
+    bats_run grep -nF 'printf '"'"'%b%s%b\n'"'"' "$__base_bash_libs_std_log_record_color" "$__base_bash_libs_std_log_record_line" "$BASE_BASH_LIBS_STD_COLOR_OFF"' "$STDLIB_PATH"
 
     [ "$status" -eq 0 ]
 }
@@ -1243,17 +1243,17 @@ EOF
     local stderr_file="$TEST_TMPDIR/log-wrappers.err"
 
     : > "$stderr_file"
-    log_debug hidden 2>"$stderr_file"
+    base_bash_libs_std_log_debug hidden 2>"$stderr_file"
     [ ! -s "$stderr_file" ]
 
-    set_log_level VERBOSE
+    base_bash_libs_std_set_log_level VERBOSE
     {
-        log_fatal "fatal message"
-        log_error "error message"
-        log_warn "warn message"
-        log_info "info message"
-        log_debug "debug message"
-        log_verbose "verbose message"
+        base_bash_libs_std_log_fatal "fatal message"
+        base_bash_libs_std_log_error "error message"
+        base_bash_libs_std_log_warn "warn message"
+        base_bash_libs_std_log_info "info message"
+        base_bash_libs_std_log_debug "debug message"
+        base_bash_libs_std_log_verbose "verbose message"
     } 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"FATAL"* ]]
@@ -1268,11 +1268,11 @@ EOF
     local stderr_file="$TEST_TMPDIR/log-primary.err"
     local primary_log="$TEST_TMPDIR/primary.log"
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" log_debug "persisted debug" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_log_debug "persisted debug" 2>"$stderr_file"
     [ ! -s "$stderr_file" ]
     [[ "$(cat "$primary_log")" == *"DEBUG"*"persisted debug"* ]]
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" log_info "terminal info" 2>>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_log_info "terminal info" 2>>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"INFO"*"terminal info"* ]]
     [[ "$(cat "$primary_log")" == *"INFO"*"terminal info"* ]]
 }
@@ -1281,28 +1281,28 @@ EOF
     local stderr_file="$TEST_TMPDIR/log-category-sinks.err"
     local primary_log="$TEST_TMPDIR/log-category-sinks.log"
 
-    set_log_category_level -l base.library INFO
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug -l base.library "blocked library debug" 2>"$stderr_file"
+    base_bash_libs_std_set_log_category_level -l base.library INFO
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug -l base.library "blocked library debug" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [ ! -s "$primary_log" ]
 
-    set_log_category_level -l base.library DEBUG
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug -l base.library "persisted library debug" 2>"$stderr_file"
+    base_bash_libs_std_set_log_category_level -l base.library DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug -l base.library "persisted library debug" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [[ "$(cat "$primary_log")" == *"DEBUG"*"persisted library debug"* ]]
     [[ "$(cat "$primary_log")" != *"blocked library debug"* ]]
 }
 
-@test "__print_log__ uses local timestamps by default" {
+@test "__base_bash_libs_std_print_log__ uses local timestamps by default" {
     local stderr_file="$TEST_TMPDIR/log-local-time.err"
     local expected_before expected_after output
 
     expected_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
-    TZ=Pacific/Honolulu log_info "local timestamp" 2>"$stderr_file"
+    TZ=Pacific/Honolulu base_bash_libs_std_log_info "local timestamp" 2>"$stderr_file"
     expected_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     output="$(cat "$stderr_file")"
 
@@ -1310,13 +1310,13 @@ EOF
     [[ "$output" == *"local timestamp"* ]]
 }
 
-@test "__print_log__ honors LOG_UTC for Bash timestamps" {
+@test "__base_bash_libs_std_print_log__ honors BASE_BASH_LIBS_LOG_UTC for Bash timestamps" {
     local stderr_file="$TEST_TMPDIR/log-utc-time.err"
     local expected_before expected_after output local_before local_after
 
     expected_before="$(TZ=UTC printf '%(%Y-%m-%d %H:%M:%S)T UTC' -1)"
     local_before="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
-    TZ=Pacific/Honolulu LOG_UTC=1 log_info "utc timestamp" 2>"$stderr_file"
+    TZ=Pacific/Honolulu BASE_BASH_LIBS_LOG_UTC=1 base_bash_libs_std_log_info "utc timestamp" 2>"$stderr_file"
     expected_after="$(TZ=UTC printf '%(%Y-%m-%d %H:%M:%S)T UTC' -1)"
     local_after="$(TZ=Pacific/Honolulu printf '%(%Y-%m-%d %H:%M:%S %z)T' -1)"
     output="$(cat "$stderr_file")"
@@ -1326,7 +1326,7 @@ EOF
     [[ "$output" == *"utc timestamp"* ]]
 }
 
-@test "__print_log__ bounds stdlib caller stack walking" {
+@test "__base_bash_libs_std_print_log__ bounds stdlib caller stack walking" {
     local script="$TEST_TMPDIR/log-bounded-caller.sh"
     local caller_log="$TEST_TMPDIR/caller-count.log"
 
@@ -1343,7 +1343,7 @@ caller() {
     fi
     printf '%s stdlib_frame %s\n' "\$1" "\$__LIB_STD_PATH__"
 }
-__print_log__ INFO "bounded stack walk" >/dev/null
+__base_bash_libs_std_print_log__ INFO "bounded stack walk" >/dev/null
 printf 'caller_count=%s\n' "\$(( \$(wc -l < "\$caller_log") ))"
 EOF
 
@@ -1359,15 +1359,15 @@ EOF
 
     printf 'hello file\n' > "$target"
 
-    log_debug_file "$target" 2>"$stderr_file"
+    base_bash_libs_std_log_debug_file "$target" 2>"$stderr_file"
     [ ! -s "$stderr_file" ]
 
-    set_log_level DEBUG
-    log_debug_file "$target" 2>"$stderr_file"
+    base_bash_libs_std_set_log_level DEBUG
+    base_bash_libs_std_log_debug_file "$target" 2>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"Contents of file '$target':"* ]]
     [[ "$(cat "$stderr_file")" == *"hello file"* ]]
 
-    __print_log_file__ INFO -l missing "$target" 2>"$stderr_file"
+    __base_bash_libs_std_print_log_file__ INFO -l missing "$target" 2>"$stderr_file"
     [[ "$(cat "$stderr_file")" == *"Contents of file '$target':"* ]]
     [[ "$(cat "$stderr_file")" == *"hello file"* ]]
     [[ "$(cat "$stderr_file")" != *"Unknown logger"* ]]
@@ -1378,9 +1378,9 @@ EOF
     local stderr_file="$TEST_TMPDIR/log-verbose-file.err"
 
     printf 'verbose file contents\n' > "$target"
-    set_log_level VERBOSE
+    base_bash_libs_std_set_log_level VERBOSE
 
-    log_verbose_file "$target" 2>"$stderr_file"
+    base_bash_libs_std_log_verbose_file "$target" 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Contents of file '$target':"* ]]
     [[ "$(cat "$stderr_file")" == *"verbose file contents"* ]]
@@ -1392,17 +1392,17 @@ EOF
     local primary_log="$TEST_TMPDIR/log-category-file.log"
 
     printf 'category file contents\n' > "$target"
-    set_log_category_level -l base.files INFO
+    base_bash_libs_std_set_log_category_level -l base.files INFO
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug_file -l base.files "$target" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug_file -l base.files "$target" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [ ! -s "$primary_log" ]
 
-    set_log_category_level -l base.files DEBUG
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug_file -l base.files "$target" 2>"$stderr_file"
+    base_bash_libs_std_set_log_category_level -l base.files DEBUG
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug_file -l base.files "$target" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [[ "$(cat "$primary_log")" == *"DEBUG"*"Contents of file '$target':"* ]]
@@ -1415,12 +1415,12 @@ EOF
     local primary_log="$TEST_TMPDIR/log-unterminated.log"
 
     printf 'unterminated contents' > "$target"
-    set_log_level DEBUG
+    base_bash_libs_std_set_log_level DEBUG
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug_file "$target" 2>"$stderr_file"
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_info "next structured record" 2>>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug_file "$target" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_info "next structured record" 2>>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *$'unterminated contents\n'*"next structured record"* ]]
     [[ "$(cat "$primary_log")" == *$'unterminated contents\n'*"next structured record"* ]]
@@ -1434,10 +1434,10 @@ EOF
     printf 'existing sink content\n' >"$primary_log"
     chmod 644 "$primary_log"
     printf 'private file contents\n' >"$target"
-    set_log_category_level -l base.files DEBUG
+    base_bash_libs_std_set_log_category_level -l base.files DEBUG
 
-    BASE_CLI_PRIMARY_LOG="$primary_log" \
-        log_debug_file -l base.files "$target" 2>"$stderr_file"
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_log_debug_file -l base.files "$target" 2>"$stderr_file"
 
     [ ! -s "$stderr_file" ]
     [ "$(file_mode "$primary_log")" = "600" ]
@@ -1450,15 +1450,15 @@ EOF
     local stderr_file="$TEST_TMPDIR/enter-leave.err"
 
     trace_me() {
-        log_info_enter
-        log_debug_enter
-        log_verbose_enter
-        log_info_leave
-        log_debug_leave
-        log_verbose_leave
+        base_bash_libs_std_log_info_enter
+        base_bash_libs_std_log_debug_enter
+        base_bash_libs_std_log_verbose_enter
+        base_bash_libs_std_log_info_leave
+        base_bash_libs_std_log_debug_leave
+        base_bash_libs_std_log_verbose_leave
     }
 
-    set_log_level VERBOSE
+    base_bash_libs_std_set_log_level VERBOSE
     trace_me 2>"$stderr_file"
 
     [[ "$(cat "$stderr_file")" == *"VERBOSE"*"Entering function trace_me"* ]]
@@ -1471,8 +1471,8 @@ EOF
         source "$1"
         declare -a app_args=()
         base_bash_libs_init app_args -- "$@"
-        log_info_enter
-        log_info_leave
+        base_bash_libs_std_log_info_enter
+        base_bash_libs_std_log_info_leave
         printf "after-log\n"
     ' bash "$STDLIB_PATH"
 
@@ -1489,7 +1489,7 @@ EOF
         source "$1"
         declare -a app_args=()
         base_bash_libs_init app_args -- "$@"
-        set_log_level NOT_A_LEVEL
+        base_bash_libs_std_set_log_level NOT_A_LEVEL
         printf "after-log-error\n"
     ' bash "$STDLIB_PATH"
 
@@ -1504,15 +1504,15 @@ EOF
     local stdout_file="$TEST_TMPDIR/print.out"
 
     {
-        print_error "bad news"
-        print_warn "careful"
-        print_info "heads up"
-        print_success "all good"
+        base_bash_libs_std_print_error "bad news"
+        base_bash_libs_std_print_warn "careful"
+        base_bash_libs_std_print_info "heads up"
+        base_bash_libs_std_print_success "all good"
     } 2>"$stderr_file"
 
     {
-        print_bold "strong text"
-        print_message "line one" "line two"
+        base_bash_libs_std_print_bold "strong text"
+        base_bash_libs_std_print_message "line one" "line two"
     } >"$stdout_file"
 
     [[ "$(cat "$stderr_file")" == *"ERROR: bad news"* ]]
@@ -1522,22 +1522,22 @@ EOF
     [ "$(cat "$stdout_file")" = $'strong text\nline one\nline two' ]
 }
 
-@test "print_tty is silent without a tty" {
+@test "base_bash_libs_std_print_tty is silent without a tty" {
     local stdout_file="$TEST_TMPDIR/tty.out"
 
-    print_tty "hidden output" >"$stdout_file"
+    base_bash_libs_std_print_tty "hidden output" >"$stdout_file"
 
     [ ! -s "$stdout_file" ]
 }
 
-@test "print_tty emits output when a tty is present" {
+@test "base_bash_libs_std_print_tty emits output when a tty is present" {
     local script="$TEST_TMPDIR/print-tty.sh"
     local normalized
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-print_tty "tty output"
+base_bash_libs_std_print_tty "tty output"
 EOF
 
     run_tty_script "$script"
@@ -1547,14 +1547,14 @@ EOF
     [[ "$normalized" == *"tty output"* ]]
 }
 
-@test "dump_trace prints the active function stack" {
+@test "base_bash_libs_std_dump_trace prints the active function stack" {
     local script="$TEST_TMPDIR/dump-trace.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 inner_trace() {
-    dump_trace
+    base_bash_libs_std_dump_trace
 }
 outer_trace() {
     inner_trace
@@ -1578,8 +1578,8 @@ EOF
 source "$STDLIB_PATH"
 stack_with_custom_ifs() {
     IFS=:
-    log_info "custom IFS log"
-    dump_trace
+    base_bash_libs_std_log_info "custom IFS log"
+    base_bash_libs_std_dump_trace
     printf 'ifs=<%s>\n' "\$IFS"
 }
 stack_with_custom_ifs
@@ -1593,27 +1593,27 @@ EOF
     [[ "$output" == *"ifs=<:>"* ]]
 }
 
-@test "exit_if_error returns success for zero and empty input" {
+@test "base_bash_libs_std_exit_if_error returns success for zero and empty input" {
     local rc
 
-    if exit_if_error; then
+    if base_bash_libs_std_exit_if_error; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    exit_if_error 0 "unused"
+    base_bash_libs_std_exit_if_error 0 "unused"
     [ "$?" -eq 0 ]
 }
 
-@test "exit_if_error exits with the provided code and message" {
+@test "base_bash_libs_std_exit_if_error exits with the provided code and message" {
     local script="$TEST_TMPDIR/exit-if-error.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-exit_if_error 7 "boom"
+base_bash_libs_std_exit_if_error 7 "boom"
 echo "after"
 EOF
 
@@ -1624,14 +1624,14 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
-@test "exit_if_error preserves its requested status with errexit and pipefail" {
+@test "base_bash_libs_std_exit_if_error preserves its requested status with errexit and pipefail" {
     local script="$TEST_TMPDIR/exit-if-error-strict.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$STDLIB_PATH"
-exit_if_error 7 "strict boom"
+base_bash_libs_std_exit_if_error 7 "strict boom"
 printf 'after\n'
 EOF
 
@@ -1643,13 +1643,13 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
-@test "exit_if_error normalizes non-numeric exit codes" {
+@test "base_bash_libs_std_exit_if_error normalizes non-numeric exit codes" {
     local script="$TEST_TMPDIR/exit-if-error-nonnumeric.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-exit_if_error nope "bad code"
+base_bash_libs_std_exit_if_error nope "bad code"
 EOF
 
     bats_run bash "$script"
@@ -1659,14 +1659,14 @@ EOF
     [[ "$output" == *"bad code"* ]]
 }
 
-@test "fatal_error preserves the last non-zero status" {
+@test "base_bash_libs_std_fatal_error preserves the last non-zero status" {
     local script="$TEST_TMPDIR/fatal-error.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 bash -c 'exit 7'
-fatal_error "fatal boom"
+base_bash_libs_std_fatal_error "fatal boom"
 EOF
 
     bats_run bash "$script"
@@ -1675,13 +1675,13 @@ EOF
     [[ "$output" == *"fatal boom"* ]]
 }
 
-@test "stdlib exposes std_run without compatibility aliases" {
+@test "stdlib exposes base_bash_libs_std_run without compatibility aliases" {
     local script="$TEST_TMPDIR/std-run-api.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-printf 'std_run=%s\n' "\$(type -t std_run || true)"
+printf 'base_bash_libs_std_run=%s\n' "\$(type -t base_bash_libs_std_run || true)"
 printf 'run=%s\n' "\$(type -t run || true)"
 printf 'std_run_with_timeout=%s\n' "\$(type -t std_run_with_timeout || true)"
 EOF
@@ -1689,7 +1689,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"std_run=function"* ]]
+    [[ "$output" == *"base_bash_libs_std_run=function"* ]]
     [[ "$output" == *$'run=\n'* ]]
     [[ "$output" == *"std_run_with_timeout="* ]]
     [[ "$output" != *"std_run_with_timeout=function"* ]]
@@ -1699,7 +1699,7 @@ EOF
     local rendered
     local unsafe_display
 
-    __std_is_safe_display__ "upload release asset"
+    __base_bash_libs_std_is_safe_display__ "upload release asset"
     for unsafe_display in \
         "" \
         "-option-like" \
@@ -1711,63 +1711,63 @@ EOF
         $'line-separator-\342\200\250' \
         $'paragraph-separator-\342\200\251' \
         $'bidi-override-\342\200\256'; do
-        if __std_is_safe_display__ "$unsafe_display"; then
+        if __base_bash_libs_std_is_safe_display__ "$unsafe_display"; then
             return 1
         fi
     done
 
-    __std_render_command_display__ rendered 1 "upload release asset" \
+    __base_bash_libs_std_render_command_display__ rendered 1 "upload release asset" \
         '[sensitive command; arguments hidden]' \
         "CANARY spaced value" "--token=CANARY-inline"
     [ "$rendered" = "upload release asset [sensitive command; arguments hidden]" ]
     [[ "$rendered" != *"CANARY"* ]]
 
-    __std_render_command_display__ rendered 1 "" \
+    __base_bash_libs_std_render_command_display__ rendered 1 "" \
         '[sensitive command; arguments hidden]' "CANARY-default"
     [ "$rendered" = "[sensitive command; arguments hidden]" ]
 
-    __std_render_command_display__ rendered 0 "" \
+    __base_bash_libs_std_render_command_display__ rendered 0 "" \
         '[sensitive command; arguments hidden]' printf '%s\n' "value with spaces"
     [ "$rendered" = 'printf %s\\n value\ with\ spaces' ]
 
     local LC_ALL=C
     readonly LC_ALL
-    __std_is_safe_display__ "readonly locale remains supported" \
+    __base_bash_libs_std_is_safe_display__ "readonly locale remains supported" \
         2>"$TEST_TMPDIR/safe-display-readonly-locale.err"
     [ ! -s "$TEST_TMPDIR/safe-display-readonly-locale.err" ]
 }
 
-@test "std_run returns an error when no command is provided" {
+@test "base_bash_libs_std_run returns an error when no command is provided" {
     local stderr_file="$TEST_TMPDIR/run-empty.err"
     local rc
 
-    if std_run 2>"$stderr_file"; then
+    if base_bash_libs_std_run 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: No command provided."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_run: No command provided."* ]]
 }
 
-@test "std_run rejects unknown long options before command execution" {
+@test "base_bash_libs_std_run rejects unknown long options before command execution" {
     local stderr_file="$TEST_TMPDIR/run-unknown-option.err"
     local rc
 
-    if std_run --typo echo "should not run" 2>"$stderr_file"; then
+    if base_bash_libs_std_run --typo echo "should not run" 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: unknown runner option."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_run: unknown runner option."* ]]
     [[ "$(cat "$stderr_file")" != *"--typo"* ]]
     [[ "$(cat "$stderr_file")" == *"Use -- before commands that begin with --."* ]]
 }
 
-@test "std_run allows command names beginning with -- after option terminator" {
+@test "base_bash_libs_std_run allows command names beginning with -- after option terminator" {
     local fake_bin="$TEST_TMPDIR/bin"
     local output_file="$TEST_TMPDIR/option-like-command.out"
 
@@ -1777,12 +1777,12 @@ EOF
 printf '%s\n' "$1" > "$2"
 EOF
 
-    PATH="$fake_bin:$PATH" std_run -- --record-command "ran" "$output_file"
+    PATH="$fake_bin:$PATH" base_bash_libs_std_run -- --record-command "ran" "$output_file"
 
     [ "$(cat "$output_file")" = "ran" ]
 }
 
-@test "std_run rejects malformed sensitive controls without executing or exposing arguments" {
+@test "base_bash_libs_std_run rejects malformed sensitive controls without executing or exposing arguments" {
     local marker="$TEST_TMPDIR/sensitive-invalid.marker"
     local script="$TEST_TMPDIR/sensitive-invalid.sh"
     local stderr_file="$TEST_TMPDIR/sensitive-invalid.err"
@@ -1794,63 +1794,63 @@ EOF
 printf 'executed\n' > "$marker"
 EOF
 
-    if std_run --safe-display "operation" -- "$script" "$canary" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --safe-display "operation" -- "$script" "$canary" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display "" -- "$script" "$canary" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display "" -- "$script" "$canary" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display "unicode-$canary"$'\342\200\250' -- "$script" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display "unicode-$canary"$'\342\200\250' -- "$script" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display $'unsafe\nlabel' -- "$script" "$canary" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display $'unsafe\nlabel' -- "$script" "$canary" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive "$script" "--token=$canary" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive "$script" "--token=$canary" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive "--token=$canary" "$script" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive "--token=$canary" "$script" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display "-H$canary" -- "$script" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display "-H$canary" -- "$script" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display "--token=$canary" -- "$script" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display "--token=$canary" -- "$script" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if std_run --sensitive --safe-display -- "$script" "$canary" 2>>"$stderr_file"; then
+    if base_bash_libs_std_run --sensitive --safe-display -- "$script" "$canary" 2>>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -1864,17 +1864,17 @@ EOF
     [[ "$(cat "$stderr_file")" == *"unknown runner option"* ]]
 }
 
-@test "std_run honors dry-run mode without executing the command" {
+@test "base_bash_libs_std_run honors dry-run mode without executing the command" {
     local target="$TEST_TMPDIR/dry-run.txt"
-    DRY_RUN=true
+    BASE_BASH_LIBS_DRY_RUN=true
 
-    std_run touch "$target"
+    base_bash_libs_std_run touch "$target"
 
     [ "$?" -eq 0 ]
     [ ! -e "$target" ]
 }
 
-@test "std_run sensitive dry-run hides varied canaries from terminal and persistent diagnostics" {
+@test "base_bash_libs_std_run sensitive dry-run hides varied canaries from terminal and persistent diagnostics" {
     local marker="$TEST_TMPDIR/sensitive-dry-run.marker"
     local script="$TEST_TMPDIR/sensitive-dry-run.sh"
     local stderr_file="$TEST_TMPDIR/sensitive-dry-run.err"
@@ -1893,8 +1893,8 @@ EOF
 printf 'executed\n' > "$marker"
 EOF
 
-    DRY_RUN=1
-    BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+    BASE_BASH_LIBS_DRY_RUN=1
+    BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_run \
         --sensitive --safe-display "upload release asset" \
         --timeout 30 --max-attempts 3 --retry-delay 2 -- \
         "$script" \
@@ -1903,7 +1903,7 @@ EOF
         --header "Authorization: Bearer ${canaries[2]}" \
         "https://user:${canaries[3]}@example.test/path" \
         --field "password=${canaries[4]}" 2>"$stderr_file"
-    unset DRY_RUN
+    unset BASE_BASH_LIBS_DRY_RUN
 
     [ ! -e "$marker" ]
     [ -s "$stderr_file" ]
@@ -1917,47 +1917,47 @@ EOF
     done
 }
 
-@test "std_run ordinary dry-run retains copy-pastable argument rendering" {
+@test "base_bash_libs_std_run ordinary dry-run retains copy-pastable argument rendering" {
     local stderr_file="$TEST_TMPDIR/ordinary-dry-run.err"
 
-    DRY_RUN=1
-    std_run printf '%s\n' "value with spaces" "--option=ordinary value" 2>"$stderr_file"
-    unset DRY_RUN
+    BASE_BASH_LIBS_DRY_RUN=1
+    base_bash_libs_std_run printf '%s\n' "value with spaces" "--option=ordinary value" 2>"$stderr_file"
+    unset BASE_BASH_LIBS_DRY_RUN
 
     [[ "$(cat "$stderr_file")" == *'printf %s\\n value\ with\ spaces --option=ordinary\ value'* ]]
     [[ "$(cat "$stderr_file")" != *"arguments hidden"* ]]
 }
 
-@test "std_run treats common truthy dry-run values as dry-run mode" {
+@test "base_bash_libs_std_run treats common truthy dry-run values as dry-run mode" {
     local case_name target value var_name
 
     for case_name in \
-        "DRY_RUN=1" \
-        "DRY_RUN=yes" \
-        "DRY_RUN=on" \
-        "dry_run=true" \
-        "dry_run=1" \
-        "dry_run=yes" \
-        "dry_run=on"; do
-        unset DRY_RUN dry_run
+        "BASE_BASH_LIBS_DRY_RUN=1" \
+        "BASE_BASH_LIBS_DRY_RUN=yes" \
+        "BASE_BASH_LIBS_DRY_RUN=on" \
+        "BASE_BASH_LIBS_DRY_RUN=true" \
+        "BASE_BASH_LIBS_DRY_RUN=1" \
+        "BASE_BASH_LIBS_DRY_RUN=yes" \
+        "BASE_BASH_LIBS_DRY_RUN=on"; do
+        unset BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_DRY_RUN
         var_name="${case_name%%=*}"
         value="${case_name#*=}"
         printf -v "$var_name" '%s' "$value"
         export "$var_name"
         target="$TEST_TMPDIR/dry-run-${var_name}-${value}.txt"
 
-        std_run touch "$target"
+        base_bash_libs_std_run touch "$target"
 
         [ "$?" -eq 0 ]
         [ ! -e "$target" ]
     done
 }
 
-@test "std_run --no-exit returns the underlying failure status" {
+@test "base_bash_libs_std_run --no-exit returns the underlying failure status" {
     local stderr_file="$TEST_TMPDIR/run-no-exit.err"
     local rc
 
-    if std_run --no-exit bash -c 'exit 7' 2>"$stderr_file"; then
+    if base_bash_libs_std_run --no-exit bash -c 'exit 7' 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -1967,11 +1967,11 @@ EOF
     [[ "$(cat "$stderr_file")" == *"continuing"* ]]
 }
 
-@test "std_run --no-exit --quiet suppresses failure warning" {
+@test "base_bash_libs_std_run --no-exit --quiet suppresses failure warning" {
     local stderr_file="$TEST_TMPDIR/run-no-exit-quiet.err"
     local rc
 
-    if std_run --no-exit --quiet bash -c 'exit 7' 2>"$stderr_file"; then
+    if base_bash_libs_std_run --no-exit --quiet bash -c 'exit 7' 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -1981,13 +1981,13 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
-@test "std_run exits the script on failure by default" {
+@test "base_bash_libs_std_run exits the script on failure by default" {
     local script="$TEST_TMPDIR/run-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_run bash -c 'exit 9'
+base_bash_libs_std_run bash -c 'exit 9'
 echo "after"
 EOF
 
@@ -1998,7 +1998,7 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
-@test "std_run --timeout returns 124 when the command times out" {
+@test "base_bash_libs_std_run --timeout returns 124 when the command times out" {
     local script="$TEST_TMPDIR/run-timeout.sh"
     local stderr_file="$TEST_TMPDIR/run-timeout.err"
     local rc_file="$TEST_TMPDIR/run-timeout.rc"
@@ -2006,7 +2006,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if std_run --no-exit --quiet --timeout 1 /bin/sleep 2 2>"$stderr_file"; then
+if base_bash_libs_std_run --no-exit --quiet --timeout 1 /bin/sleep 2 2>"$stderr_file"; then
     printf '0\n' > "$rc_file"
 else
     printf '%s\n' "\$?" > "$rc_file"
@@ -2021,11 +2021,11 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
-@test "std_run preserves a natural 124 status instead of calling it a timeout" {
+@test "base_bash_libs_std_run preserves a natural 124 status instead of calling it a timeout" {
     local stderr_file="$TEST_TMPDIR/natural-124.err"
     local rc
 
-    if std_run --no-exit --timeout 5 /bin/bash -c 'exit 124' 2>"$stderr_file"; then
+    if base_bash_libs_std_run --no-exit --timeout 5 /bin/bash -c 'exit 124' 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -2036,16 +2036,16 @@ EOF
     [[ "$(cat "$stderr_file")" != *"Command timed out"* ]]
 }
 
-@test "std_run fallback preserves Bash function resolution over same-named executables" {
+@test "base_bash_libs_std_run fallback preserves Bash function resolution over same-named executables" {
     local rc
 
     timeout_function_collision() { return 73; }
-    std_command_path() {
+    base_bash_libs_std_command_path() {
         printf -v "$1" '%s' /bin/false
         return 0
     }
 
-    if __std_run_with_timeout_fallback__ 5 timeout_function_collision; then
+    if __base_bash_libs_std_run_with_timeout_fallback__ 5 timeout_function_collision; then
         rc=0
     else
         rc=$?
@@ -2054,7 +2054,7 @@ EOF
     [ "$rc" -eq 73 ]
 }
 
-@test "std_run fallback preserves piped stdin shell functions and exact fast status 127" {
+@test "base_bash_libs_std_run fallback preserves piped stdin shell functions and exact fast status 127" {
     local script="$TEST_TMPDIR/run-timeout-pipe-status.sh"
 
     create_script "$script" <<EOF
@@ -2065,9 +2065,9 @@ fallback_reader() {
     IFS= read -r value
     printf 'read=%s\n' "\$value"
 }
-printf 'pipe-value\n' | __std_run_with_timeout_fallback__ 5 fallback_reader || exit 1
+printf 'pipe-value\n' | __base_bash_libs_std_run_with_timeout_fallback__ 5 fallback_reader || exit 1
 for ((iteration = 0; iteration < 20; iteration++)); do
-    if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 127'; then
+    if __base_bash_libs_std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 127'; then
         rc=0
     else
         rc=\$?
@@ -2083,7 +2083,7 @@ EOF
     [[ "$output" == *"statuses=exact"* ]]
 }
 
-@test "std_run fallback refuses a foreground tty without executing" {
+@test "base_bash_libs_std_run fallback refuses a foreground tty without executing" {
     local script="$TEST_TMPDIR/run-timeout-tty-refused.sh"
     local marker="$TEST_TMPDIR/run-timeout-tty-refused.marker"
     local normalized
@@ -2091,7 +2091,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if __std_run_with_timeout_fallback__ 1 /bin/touch "$marker"; then
+if __base_bash_libs_std_run_with_timeout_fallback__ 1 /bin/touch "$marker"; then
     rc=0
 else
     rc=\$?
@@ -2110,7 +2110,7 @@ EOF
     [ ! -e "$marker" ]
 }
 
-@test "std_run fallback reads from read-only foreground tty and preserves caller state" {
+@test "base_bash_libs_std_run fallback reads from read-only foreground tty and preserves caller state" {
     skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
@@ -2132,7 +2132,7 @@ tty_reader() {
     IFS= read -r value
     printf 'read=%s\n' "\$value"
 }
-if __std_run_with_timeout_fallback__ 20 tty_reader; then
+if __base_bash_libs_std_run_with_timeout_fallback__ 20 tty_reader; then
     rc=0
 else
     rc=\$?
@@ -2159,7 +2159,7 @@ EOF
     [[ "$normalized" != *"Killed:"* ]]
 }
 
-@test "std_run fallback keeps foreground and background tty fast paths quiet" {
+@test "base_bash_libs_std_run fallback keeps foreground and background tty fast paths quiet" {
     skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
@@ -2173,7 +2173,7 @@ mode="\${1-}"
 [[ "\$mode" != on ]] || set -m
 failures=0
 for ((iteration = 0; iteration < 20; iteration++)); do
-    if __std_run_with_timeout_fallback__ 5 true; then
+    if __base_bash_libs_std_run_with_timeout_fallback__ 5 true; then
         rc=0
     else
         rc=\$?
@@ -2183,7 +2183,7 @@ done
 if [[ "\$mode" == on ]]; then
     exec {tty_input}<&0
     (
-        __std_run_with_timeout_fallback__ 5 true <&"\$tty_input"
+        __base_bash_libs_std_run_with_timeout_fallback__ 5 true <&"\$tty_input"
     ) &
     background_pid=\$!
     if wait "\$background_pid"; then
@@ -2215,7 +2215,7 @@ EOF
     done
 }
 
-@test "std_run fallback directly cancels a resistant foreground tty tree" {
+@test "base_bash_libs_std_run fallback directly cancels a resistant foreground tty tree" {
     skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
@@ -2241,7 +2241,7 @@ resistant_reader() {
     IFS= read -r value
     while :; do /bin/sleep 1; done
 }
-if __std_run_with_timeout_fallback__ 30 resistant_reader; then
+if __base_bash_libs_std_run_with_timeout_fallback__ 30 resistant_reader; then
     rc=0
 else
     rc=\$?
@@ -2288,7 +2288,7 @@ EOF
     done
 }
 
-@test "std_run fallback composes custom and ignored TERM dispositions without a tty" {
+@test "base_bash_libs_std_run fallback composes custom and ignored TERM dispositions without a tty" {
     local script="$TEST_TMPDIR/run-timeout-signal-disposition.sh"
     local disposition main_pid_file ready_file marker_file child_pid_file
     local stdout_file stderr_file target_pid main_pid target_status actual_output
@@ -2348,7 +2348,7 @@ EOF
     done
 }
 
-@test "std_run fallback composes custom and ignored TERM dispositions on an active tty" {
+@test "base_bash_libs_std_run fallback composes custom and ignored TERM dispositions on an active tty" {
     skip "Foreground-tty hard timeout supervision is intentionally fail-closed in v2."
     ps -eo pid=,ppid= >/dev/null 2>&1 ||
         skip "The process-listing command is unavailable in this environment."
@@ -2394,14 +2394,14 @@ EOF
     done
 }
 
-@test "std_run fallback preserves caller traps monitor state and unrelated readonly names" {
+@test "base_bash_libs_std_run fallback preserves caller traps monitor state and unrelated readonly names" {
     local before_trap after_trap before_monitor after_monitor rc
     readonly command_status=99 timeout_status_file=/dev/null
     trap ':' HUP
     before_trap="$(trap -p HUP)"
     [[ $- == *m* ]] && before_monitor=1 || before_monitor=0
 
-    if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
+    if __base_bash_libs_std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
         rc=0
     else
         rc=$?
@@ -2415,7 +2415,7 @@ EOF
     [ "$after_monitor" -eq "$before_monitor" ]
 }
 
-@test "std_run fallback supports noclobber and preserves its caller state" {
+@test "base_bash_libs_std_run fallback supports noclobber and preserves its caller state" {
     local script="$TEST_TMPDIR/run-timeout-noclobber.sh"
 
     create_script "$script" <<EOF
@@ -2423,12 +2423,12 @@ EOF
 source "$STDLIB_PATH"
 set -C
 [[ -o noclobber ]] && before=on || before=off
-if __std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
+if __base_bash_libs_std_run_with_timeout_fallback__ 5 /bin/bash -c 'exit 42'; then
     fast_rc=0
 else
     fast_rc=\$?
 fi
-if __std_run_with_timeout_fallback__ 1 /bin/bash -c \
+if __base_bash_libs_std_run_with_timeout_fallback__ 1 /bin/bash -c \
     'trap "" TERM; /bin/sleep 3'; then
     timeout_rc=0
 else
@@ -2445,7 +2445,7 @@ EOF
     [ "$output" = "fast=42 timeout=124 before=on after=on" ]
 }
 
-@test "std_run fallback timeout kills commands that ignore TERM" {
+@test "base_bash_libs_std_run fallback timeout kills commands that ignore TERM" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local marker_file="$TEST_TMPDIR/term-ignored.marker"
     local rc_file="$TEST_TMPDIR/term-ignored.rc"
@@ -2460,7 +2460,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 PATH="$fake_bin"
-if std_run --no-exit --quiet --timeout 1 /bin/bash -c 'trap "" TERM; sleep 3; printf completed > "\$1"' _ "$marker_file"; then
+if base_bash_libs_std_run --no-exit --quiet --timeout 1 /bin/bash -c 'trap "" TERM; sleep 3; printf completed > "\$1"' _ "$marker_file"; then
     printf '0\n' > "$rc_file"
 else
     printf '%s\n' "\$?" > "$rc_file"
@@ -2475,7 +2475,7 @@ EOF
     [ ! -e "$marker_file" ]
 }
 
-@test "std_run fallback sidecars preserve an inherited EXIT trap in command substitution" {
+@test "base_bash_libs_std_run fallback sidecars preserve an inherited EXIT trap in command substitution" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local caller_dir="$TEST_TMPDIR/caller-owned"
     local script="$TEST_TMPDIR/timeout-command-substitution.sh"
@@ -2492,7 +2492,7 @@ source "$STDLIB_PATH"
 export TMPDIR="$TEST_TMPDIR"
 caller_dir="$caller_dir"
 trap 'rm -rf -- "\$caller_dir"' EXIT
-value="\$(PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback)" || exit \$?
+value="\$(PATH="$fake_bin" base_bash_libs_std_run --no-exit --quiet --timeout 5 /bin/echo fallback)" || exit \$?
 [[ -d "\$caller_dir" ]] || exit 91
 printf 'value=%s\ncaller-dir=present\n' "\$value"
 trap - EXIT
@@ -2507,14 +2507,14 @@ EOF
     ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout-status.*" >/dev/null
 }
 
-@test "std_run fallback fast success leaves no watchdog sleep descendants" {
+@test "base_bash_libs_std_run fallback fast success leaves no watchdog sleep descendants" {
     local before_file="$TEST_TMPDIR/watchdog-before.txt"
     local after_file="$TEST_TMPDIR/watchdog-after.txt"
     local iteration pid
 
     pgrep -f '^/bin/sleep 29$' > "$before_file" 2>/dev/null || true
     for ((iteration = 0; iteration < 40; iteration++)); do
-        __std_run_with_timeout_fallback__ 29 true
+        __base_bash_libs_std_run_with_timeout_fallback__ 29 true
     done
     /bin/sleep 0.1
     pgrep -f '^/bin/sleep 29$' > "$after_file" 2>/dev/null || true
@@ -2525,7 +2525,7 @@ EOF
     done < "$after_file"
 }
 
-@test "std_run fallback timeout terminates descendants" {
+@test "base_bash_libs_std_run fallback timeout terminates descendants" {
     ps -eo pid=,ppid= >/dev/null 2>&1 || skip "The process-listing command is unavailable in this environment."
 
     local fake_bin="$TEST_TMPDIR/no-timeout-process-group-bin"
@@ -2549,7 +2549,7 @@ printf '%s\n' "$child_pid" > "$1"
 wait "$child_pid"
 EOF
 
-    if PATH="$fake_bin" std_run --no-exit --quiet --timeout 1 /bin/bash "$script" "$child_pid_file"; then
+    if PATH="$fake_bin" base_bash_libs_std_run --no-exit --quiet --timeout 1 /bin/bash "$script" "$child_pid_file"; then
         rc=0
     else
         rc=$?
@@ -2565,7 +2565,7 @@ EOF
     fi
 }
 
-@test "std_run --max-attempts retries until the command succeeds" {
+@test "base_bash_libs_std_run --max-attempts retries until the command succeeds" {
     local counter_file="$TEST_TMPDIR/retry-count.txt"
     local script="$TEST_TMPDIR/retry-eventual-success.sh"
 
@@ -2578,13 +2578,13 @@ printf '%s\n' "$count" > "$1"
 ((count >= 3))
 EOF
 
-    std_run --no-exit --quiet --max-attempts 3 bash "$script" "$counter_file"
+    base_bash_libs_std_run --no-exit --quiet --max-attempts 3 bash "$script" "$counter_file"
 
     [ "$?" -eq 0 ]
     [ "$(cat "$counter_file")" = "3" ]
 }
 
-@test "std_run sensitive retries and final failure keep terminal and persistent diagnostics secret-safe" {
+@test "base_bash_libs_std_run sensitive retries and final failure keep terminal and persistent diagnostics secret-safe" {
     local counter_file="$TEST_TMPDIR/sensitive-retry-count.txt"
     local script="$TEST_TMPDIR/sensitive-retry.sh"
     local stderr_file="$TEST_TMPDIR/sensitive-retry.err"
@@ -2601,7 +2601,7 @@ printf '%s\n' "$count" > "$1"
 exit 73
 EOF
 
-    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+    if BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_run \
         --no-exit --max-attempts 2 \
         --sensitive --safe-display "publish release metadata" -- \
         "$script" "$counter_file" "value with $canary" "--token=$canary" 2>"$stderr_file"; then
@@ -2620,7 +2620,7 @@ EOF
     done
 }
 
-@test "std_run immutable display survives hostile shell-function variable collisions" {
+@test "base_bash_libs_std_run immutable display survives hostile shell-function variable collisions" {
     local stderr_file="$TEST_TMPDIR/sensitive-function-collision.err"
     local primary_log="$TEST_TMPDIR/sensitive-function-collision.log"
     local canary="CANARY-dynamic-scope-display-secret"
@@ -2630,27 +2630,27 @@ EOF
         collision_invocations=$((collision_invocations + 1))
         printable_command="$canary"
         command_display="$canary"
-        __std_run_command_display="$canary"
+        __base_bash_libs_std_run_command_display="$canary"
         timeout_seconds="$canary"
         timeout_path="$canary"
         max_attempts=99
         retry_delay=99
         quiet=1
         exit_on_failure=1
-        __std_run_immutable_command_display="$canary"
-        __std_run_policy_exit_on_failure=1
-        __std_run_policy_quiet=1
-        __std_run_policy_timeout_seconds="$canary"
-        __std_run_policy_timeout_path="$canary"
-        __std_run_policy_max_attempts=99
-        __std_run_policy_retry_delay=99
-        __std_run_attempt_number=99
-        __std_run_exit_code="$canary"
-        __std_run_message="$canary"
+        __base_bash_libs_std_run_immutable_command_display="$canary"
+        __base_bash_libs_std_run_policy_exit_on_failure=1
+        __base_bash_libs_std_run_policy_quiet=1
+        __base_bash_libs_std_run_policy_timeout_seconds="$canary"
+        __base_bash_libs_std_run_policy_timeout_path="$canary"
+        __base_bash_libs_std_run_policy_max_attempts=99
+        __base_bash_libs_std_run_policy_retry_delay=99
+        __base_bash_libs_std_run_attempt_number=99
+        __base_bash_libs_std_run_exit_code="$canary"
+        __base_bash_libs_std_run_message="$canary"
         return 124
     }
 
-    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+    if BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_run \
         --no-exit --max-attempts 2 \
         --sensitive --safe-display "run protected shell function" -- \
         hostile_display_command "--token=$canary" 2>"$stderr_file"; then
@@ -2671,7 +2671,7 @@ EOF
     done
 }
 
-@test "std_run protected default fatal path preserves status and hides argv" {
+@test "base_bash_libs_std_run protected default fatal path preserves status and hides argv" {
     local command_script="$TEST_TMPDIR/sensitive-fatal-command.sh"
     local runner_script="$TEST_TMPDIR/sensitive-fatal-runner.sh"
     local primary_log="$TEST_TMPDIR/sensitive-fatal.log"
@@ -2689,9 +2689,9 @@ base_bash_libs_init runner_args --
 primary_log="$2"
 command_script="$3"
 canary="$4"
-BASE_CLI_PRIMARY_LOG="$primary_log"
-export BASE_CLI_PRIMARY_LOG
-std_run --sensitive --safe-display "publish protected release" -- \
+BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
+export BASE_BASH_LIBS_PRIMARY_LOG
+base_bash_libs_std_run --sensitive --safe-display "publish protected release" -- \
     "$command_script" "value with $canary" "--token=$canary"
 printf 'after\n'
 EOF
@@ -2709,7 +2709,7 @@ EOF
     ! grep -Fq -- "$canary" "$primary_log"
 }
 
-@test "std_run sensitive timeout retains status and timing without exposing arguments" {
+@test "base_bash_libs_std_run sensitive timeout retains status and timing without exposing arguments" {
     local script="$TEST_TMPDIR/sensitive-timeout.sh"
     local stderr_file="$TEST_TMPDIR/sensitive-timeout.err"
     local primary_log="$TEST_TMPDIR/sensitive-timeout.log"
@@ -2721,7 +2721,7 @@ EOF
 sleep 3
 EOF
 
-    if BASE_CLI_PRIMARY_LOG="$primary_log" std_run \
+    if BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" base_bash_libs_std_run \
         --no-exit --timeout 1 \
         --sensitive --safe-display "wait for protected service" -- \
         "$script" "value with $canary" "https://user:$canary@example.test" 2>"$stderr_file"; then
@@ -2738,7 +2738,7 @@ EOF
     done
 }
 
-@test "std_run combines per-attempt timeout with retry" {
+@test "base_bash_libs_std_run combines per-attempt timeout with retry" {
     local counter_file="$TEST_TMPDIR/timeout-retry-count.txt"
     local output_file="$TEST_TMPDIR/timeout-retry-output.txt"
     local script="$TEST_TMPDIR/timeout-retry.sh"
@@ -2756,14 +2756,14 @@ else
 fi
 EOF
 
-    std_run --no-exit --quiet --timeout 1 --max-attempts 2 bash "$script" "$counter_file" "$output_file"
+    base_bash_libs_std_run --no-exit --quiet --timeout 1 --max-attempts 2 bash "$script" "$counter_file" "$output_file"
 
     [ "$?" -eq 0 ]
     [ "$(cat "$counter_file")" = "2" ]
     [ "$(cat "$output_file")" = "ok" ]
 }
 
-@test "std_run discovers timeout binary once across retries" {
+@test "base_bash_libs_std_run discovers timeout binary once across retries" {
     local fake_bin="$TEST_TMPDIR/timeout-bin"
     local lookup_file="$TEST_TMPDIR/timeout-lookups.txt"
     local counter_file="$TEST_TMPDIR/timeout-discovery-count.txt"
@@ -2791,17 +2791,17 @@ printf '%s\n' "$count" > "$1"
 ((count >= 3))
 EOF
 
-    eval "$(declare -f std_command_path | sed '1s/std_command_path/__orig_std_command_path/')"
-    std_command_path() {
+    eval "$(declare -f base_bash_libs_std_command_path | sed '1s/base_bash_libs_std_command_path/__orig_std_command_path/')"
+    base_bash_libs_std_command_path() {
         if [[ "${2-}" == "timeout" || "${2-}" == "gtimeout" ]]; then
             printf '%s\n' "$2" >> "$lookup_file"
         fi
         __orig_std_command_path "$@"
     }
 
-    PATH="$fake_bin:$PATH" std_run --no-exit --quiet --timeout 5 --max-attempts 3 /bin/bash "$script" "$counter_file"
+    PATH="$fake_bin:$PATH" base_bash_libs_std_run --no-exit --quiet --timeout 5 --max-attempts 3 /bin/bash "$script" "$counter_file"
     rc=$?
-    unset -f std_command_path __orig_std_command_path
+    unset -f base_bash_libs_std_command_path __orig_std_command_path
 
     [ "$rc" -eq 0 ]
     mapfile -t lookups < "$lookup_file"
@@ -2810,7 +2810,7 @@ EOF
     [ "$(cat "$counter_file")" = "3" ]
 }
 
-@test "std_run capability detection prefers verified GNU gtimeout after rejecting another timeout" {
+@test "base_bash_libs_std_run capability detection prefers verified GNU gtimeout after rejecting another timeout" {
     local fake_bin="$TEST_TMPDIR/timeout-capability-bin"
     local detected=""
 
@@ -2828,22 +2828,22 @@ fi
 exit 125
 EOF
 
-    PATH="$fake_bin" __std_timeout_backend_detect__ detected
+    PATH="$fake_bin" __base_bash_libs_std_timeout_backend_detect__ detected
 
     [ "$detected" = "$fake_bin/gtimeout" ]
 }
 
-@test "std_run capability detection falls back to Bash when timeout tools are unavailable" {
+@test "base_bash_libs_std_run capability detection falls back to Bash when timeout tools are unavailable" {
     local fake_bin="$TEST_TMPDIR/no-timeout-tools"
     local detected="sentinel"
 
     mkdir -p "$fake_bin"
-    PATH="$fake_bin" __std_timeout_backend_detect__ detected
+    PATH="$fake_bin" __base_bash_libs_std_timeout_backend_detect__ detected
 
     [ -z "$detected" ]
 }
 
-@test "std_run reports external timeout-clock failures as infrastructure without retrying" {
+@test "base_bash_libs_std_run reports external timeout-clock failures as infrastructure without retrying" {
     local fake_bin="$TEST_TMPDIR/broken-timeout-clock"
     local counter_file="$TEST_TMPDIR/broken-timeout-counter"
     local stderr_file="$TEST_TMPDIR/broken-timeout.err"
@@ -2868,7 +2868,7 @@ EOF
     ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
     ln -s "$(command -v rm)" "$fake_bin/rm"
 
-    if PATH="$fake_bin" std_run --no-exit --max-attempts 3 --timeout 1 \
+    if PATH="$fake_bin" base_bash_libs_std_run --no-exit --max-attempts 3 --timeout 1 \
         /bin/bash "$TEST_TMPDIR/should-not-run.sh" "$counter_file" \
         2>"$stderr_file"; then
         rc=0
@@ -2882,7 +2882,7 @@ EOF
     [[ "$(cat "$stderr_file")" != *"attempt 1 of 3; retrying"* ]]
 }
 
-@test "std_run external GNU clock still keeps TERM-KILL ownership in the framework" {
+@test "base_bash_libs_std_run external GNU clock still keeps TERM-KILL ownership in the framework" {
     local fake_bin="$TEST_TMPDIR/working-timeout-clock"
     local marker_file="$TEST_TMPDIR/external-clock.marker"
     local observation_file="$TEST_TMPDIR/external-clock.argv"
@@ -2915,7 +2915,7 @@ EOF
 
     if BASE_TEST_TIMEOUT_CLOCK_ARGS="$observation_file" \
         PATH="$fake_bin:$BASE_TEST_ORIG_PATH" \
-        std_run --no-exit --quiet --timeout 1 \
+        base_bash_libs_std_run --no-exit --quiet --timeout 1 \
         /bin/bash "$TEST_TMPDIR/external-clock-command.sh" \
         2>"$stderr_file"; then
         rc=0
@@ -2930,29 +2930,29 @@ EOF
     ! grep -Fq 'external-clock-command' "$observation_file"
 }
 
-@test "std_run timeout returns infrastructure status when control-channel setup fails" {
+@test "base_bash_libs_std_run timeout returns infrastructure status when control-channel setup fails" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local stderr_file="$TEST_TMPDIR/timeout-marker-failure.err"
     local rc
 
     mkdir -p "$fake_bin"
 
-    eval "$(declare -f __std_make_internal_temp_file__ | sed '1s/__std_make_internal_temp_file__/__orig_std_make_internal_temp_file__/')"
-    __std_make_internal_temp_file__() {
+    eval "$(declare -f __base_bash_libs_std_make_internal_temp_file__ | sed '1s/__base_bash_libs_std_make_internal_temp_file__/__orig_std_make_internal_temp_file__/')"
+    __base_bash_libs_std_make_internal_temp_file__() {
         return 1
     }
 
-    if PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback 2>"$stderr_file"; then
+    if PATH="$fake_bin" base_bash_libs_std_run --no-exit --quiet --timeout 5 /bin/echo fallback 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
-    unset -f __std_make_internal_temp_file__ __orig_std_make_internal_temp_file__
+    unset -f __base_bash_libs_std_make_internal_temp_file__ __orig_std_make_internal_temp_file__
 
     [ "$rc" -eq 125 ]
 }
 
-@test "std_run timeout control channels are canceled after fast completion" {
+@test "base_bash_libs_std_run timeout control channels are canceled after fast completion" {
     local fake_bin="$TEST_TMPDIR/no-timeout-bin"
     local output_file="$TEST_TMPDIR/timeout-kill-output.txt"
     local rc
@@ -2962,7 +2962,7 @@ EOF
     ln -s "$(command -v rm)" "$fake_bin/rm"
     ln -s "$(command -v sleep)" "$fake_bin/sleep"
 
-    PATH="$fake_bin" std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
+    PATH="$fake_bin" base_bash_libs_std_run --no-exit --quiet --timeout 5 /bin/echo fallback > "$output_file"
     rc=$?
 
     [ "$rc" -eq 0 ]
@@ -2971,44 +2971,44 @@ EOF
     ! compgen -G "$TEST_TMPDIR/base-bash-libs-timeout-status.*" >/dev/null
 }
 
-@test "std_run rejects invalid execution policy options" {
+@test "base_bash_libs_std_run rejects invalid execution policy options" {
     local stderr_file="$TEST_TMPDIR/run-policy-invalid.err"
     local rc
 
-    if std_run --timeout 0 true 2>"$stderr_file"; then
+    if base_bash_libs_std_run --timeout 0 true 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: timeout seconds must be a positive integer."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_run: timeout seconds must be a positive integer."* ]]
 
     : > "$stderr_file"
-    if std_run --max-attempts 0 true 2>"$stderr_file"; then
+    if base_bash_libs_std_run --max-attempts 0 true 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: max attempts must be a positive integer."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_run: max attempts must be a positive integer."* ]]
 
     : > "$stderr_file"
-    if std_run --retry-delay nope true 2>"$stderr_file"; then
+    if base_bash_libs_std_run --retry-delay nope true 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_run: retry delay seconds must be a non-negative integer."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_run: retry delay seconds must be a non-negative integer."* ]]
 }
 
-@test "std_run dry-run reports timeout and retry policy without executing" {
+@test "base_bash_libs_std_run dry-run reports timeout and retry policy without executing" {
     local target="$TEST_TMPDIR/dry-run-policy.txt"
     local stderr_file="$TEST_TMPDIR/dry-run-policy.err"
 
-    DRY_RUN=true
+    BASE_BASH_LIBS_DRY_RUN=true
 
-    std_run --timeout 30 --max-attempts 3 --retry-delay 2 touch "$target" 2>"$stderr_file"
+    base_bash_libs_std_run --timeout 30 --max-attempts 3 --retry-delay 2 touch "$target" 2>"$stderr_file"
 
     [ "$?" -eq 0 ]
     [ ! -e "$target" ]
@@ -3017,15 +3017,15 @@ EOF
     [[ "$(cat "$stderr_file")" == *"2s retry delay"* ]]
 }
 
-@test "std_run dry-run stays visible with quiet and disabled INFO while stdout stays clean" {
+@test "base_bash_libs_std_run dry-run stays visible with quiet and disabled INFO while stdout stays clean" {
     local stdout_file="$TEST_TMPDIR/dry-run-always-visible.out"
     local stderr_file="$TEST_TMPDIR/dry-run-always-visible.err"
     local primary_log="$TEST_TMPDIR/dry-run-always-visible.log"
 
-    set_log_level FATAL
-    set_log_category_level -l base_bash_libs FATAL
-    DRY_RUN=1 BASE_CLI_PRIMARY_LOG="$primary_log" \
-        std_run --no-exit --quiet --timeout 5 printf '%s\n' 'planned value' \
+    base_bash_libs_std_set_log_level FATAL
+    base_bash_libs_std_set_log_category_level -l base_bash_libs FATAL
+    BASE_BASH_LIBS_DRY_RUN=1 BASE_BASH_LIBS_PRIMARY_LOG="$primary_log" \
+        base_bash_libs_std_run --no-exit --quiet --timeout 5 printf '%s\n' 'planned value' \
         >"$stdout_file" 2>"$stderr_file"
 
     [ ! -s "$stdout_file" ]
@@ -3035,58 +3035,58 @@ EOF
     [ "$(grep -c 'DRY-RUN' "$primary_log")" -eq 1 ]
 }
 
-@test "safe_mkdir creates directories and tolerates existing paths with -p" {
+@test "base_bash_libs_std_safe_mkdir creates directories and tolerates existing paths with -p" {
     local first="$TEST_TMPDIR/a"
     local second="$TEST_TMPDIR/b/c"
 
-    safe_mkdir "$first"
-    safe_mkdir -p "$second"
-    safe_mkdir -p "$second"
+    base_bash_libs_std_safe_mkdir "$first"
+    base_bash_libs_std_safe_mkdir -p "$second"
+    base_bash_libs_std_safe_mkdir -p "$second"
 
     [ -d "$first" ]
     [ -d "$second" ]
 }
 
-@test "safe_mkdir preserves caller OPTIND" {
+@test "base_bash_libs_std_safe_mkdir preserves caller OPTIND" {
     local directory="$TEST_TMPDIR/optind-directory"
     local OPTIND=11
 
-    safe_mkdir "$directory"
+    base_bash_libs_std_safe_mkdir "$directory"
 
     [ "$OPTIND" -eq 11 ]
     [ -d "$directory" ]
 }
 
-@test "safe_mkdir warns when no directories are provided" {
+@test "base_bash_libs_std_safe_mkdir warns when no directories are provided" {
     local stderr_file="$TEST_TMPDIR/safe-mkdir-empty.err"
 
-    safe_mkdir 2>"$stderr_file"
+    base_bash_libs_std_safe_mkdir 2>"$stderr_file"
 
-    [[ "$(cat "$stderr_file")" == *"safe_mkdir: No directories provided to create."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_safe_mkdir: No directories provided to create."* ]]
 }
 
-@test "safe_mkdir rejects invalid options" {
+@test "base_bash_libs_std_safe_mkdir rejects invalid options" {
     local stderr_file="$TEST_TMPDIR/safe-mkdir-option.err"
     local rc
 
-    if (cd "$TEST_TMPDIR" && safe_mkdir -z 2>"$stderr_file"); then
+    if (cd "$TEST_TMPDIR" && base_bash_libs_std_safe_mkdir -z 2>"$stderr_file"); then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"safe_mkdir: invalid option '-z'"* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_safe_mkdir: invalid option '-z'"* ]]
     [ ! -e "$TEST_TMPDIR/-z" ]
 }
 
-@test "safe_mkdir exits when directory creation fails" {
+@test "base_bash_libs_std_safe_mkdir exits when directory creation fails" {
     local script="$TEST_TMPDIR/safe-mkdir-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-safe_mkdir /dev/null/blocked
+base_bash_libs_std_safe_mkdir /dev/null/blocked
 EOF
 
     bats_run bash "$script"
@@ -3095,38 +3095,38 @@ EOF
     [[ "$output" == *"Failed to create directories"* ]]
 }
 
-@test "safe_touch creates files" {
+@test "base_bash_libs_std_safe_touch creates files" {
     local target="$TEST_TMPDIR/touched.txt"
 
-    safe_touch "$target"
+    base_bash_libs_std_safe_touch "$target"
 
     [ -f "$target" ]
 }
 
-@test "safe_touch treats option-like paths literally" {
+@test "base_bash_libs_std_safe_touch treats option-like paths literally" {
     local target="$TEST_TMPDIR/-r"
 
-    (cd "$TEST_TMPDIR" && safe_touch "-r")
+    (cd "$TEST_TMPDIR" && base_bash_libs_std_safe_touch "-r")
 
     [ -f "$target" ]
 }
 
-@test "safe_touch warns when no files are provided" {
+@test "base_bash_libs_std_safe_touch warns when no files are provided" {
     local stderr_file="$TEST_TMPDIR/safe-touch.err"
 
-    safe_touch 2>"$stderr_file"
+    base_bash_libs_std_safe_touch 2>"$stderr_file"
 
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"safe_touch: No files provided to touch."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_safe_touch: No files provided to touch."* ]]
 }
 
-@test "safe_touch exits when a file cannot be touched" {
+@test "base_bash_libs_std_safe_touch exits when a file cannot be touched" {
     local script="$TEST_TMPDIR/safe-touch-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-safe_touch /dev/null/blocked
+base_bash_libs_std_safe_touch /dev/null/blocked
 EOF
 
     bats_run bash "$script"
@@ -3135,31 +3135,31 @@ EOF
     [[ "$output" == *"Failed to touch the following files"* ]]
 }
 
-@test "safe_truncate truncates files to zero bytes" {
+@test "base_bash_libs_std_safe_truncate truncates files to zero bytes" {
     local target="$TEST_TMPDIR/truncate.txt"
 
     printf 'content\n' > "$target"
-    safe_truncate "$target"
+    base_bash_libs_std_safe_truncate "$target"
 
     [ ! -s "$target" ]
 }
 
-@test "safe_truncate warns when no files are provided" {
+@test "base_bash_libs_std_safe_truncate warns when no files are provided" {
     local stderr_file="$TEST_TMPDIR/safe-truncate.err"
 
-    safe_truncate 2>"$stderr_file"
+    base_bash_libs_std_safe_truncate 2>"$stderr_file"
 
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"safe_truncate: No files provided to truncate."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_safe_truncate: No files provided to truncate."* ]]
 }
 
-@test "safe_truncate exits when a file cannot be truncated" {
+@test "base_bash_libs_std_safe_truncate exits when a file cannot be truncated" {
     local script="$TEST_TMPDIR/safe-truncate-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-safe_truncate /dev/null/blocked
+base_bash_libs_std_safe_truncate /dev/null/blocked
 EOF
 
     bats_run bash "$script"
@@ -3178,8 +3178,8 @@ source "$STDLIB_PATH"
 trap 'printf "existing\n" >> "$log_file"' EXIT
 cleanup_one() { printf "cleanup-one\n" >> "$log_file"; }
 cleanup_two() { printf "cleanup-two\n" >> "$log_file"; }
-std_register_cleanup_hook cleanup_one
-std_register_cleanup_hook cleanup_two
+base_bash_libs_std_register_cleanup_hook cleanup_one
+base_bash_libs_std_register_cleanup_hook cleanup_two
 EOF
 
     bats_run bash "$script"
@@ -3200,7 +3200,7 @@ printf "existing-one\n" >> "$log_file"
 printf "existing-two\n" >> "$log_file"
 ' EXIT
 cleanup_one() { printf "cleanup-one\n" >> "$log_file"; }
-std_register_cleanup_hook cleanup_one
+base_bash_libs_std_register_cleanup_hook cleanup_one
 EOF
 
     bats_run bash "$script"
@@ -3218,7 +3218,7 @@ EOF
 source "$STDLIB_PATH"
 trap 'exit 9' EXIT
 cleanup_one() { printf "cleanup-one\\n" >> "$log_file"; }
-std_register_cleanup_hook cleanup_one
+base_bash_libs_std_register_cleanup_hook cleanup_one
 EOF
 
     bats_run bash "$script"
@@ -3236,7 +3236,7 @@ EOF
 source "$STDLIB_PATH"
 trap 'return 9' EXIT
 cleanup_one() { printf "cleanup-one\\n" >> "$log_file"; }
-std_register_cleanup_hook cleanup_one
+base_bash_libs_std_register_cleanup_hook cleanup_one
 EOF
 
     bats_run bash "$script"
@@ -3254,10 +3254,10 @@ EOF
 source "$STDLIB_PATH"
 cleanup_keep() { printf "keep\n" >> "$log_file"; }
 cleanup_drop() { printf "drop\n" >> "$log_file"; }
-std_register_cleanup_hook cleanup_keep
-std_register_cleanup_hook cleanup_keep
-std_register_cleanup_hook cleanup_drop
-std_unregister_cleanup_hook cleanup_drop
+base_bash_libs_std_register_cleanup_hook cleanup_keep
+base_bash_libs_std_register_cleanup_hook cleanup_keep
+base_bash_libs_std_register_cleanup_hook cleanup_drop
+base_bash_libs_std_unregister_cleanup_hook cleanup_drop
 EOF
 
     bats_run bash "$script"
@@ -3276,10 +3276,10 @@ source "$STDLIB_PATH"
 trap 'printf "caller\n" >> "$log_file"' EXIT
 before_trap="\$(trap -p EXIT)"
 cleanup_transient() { printf 'unexpected\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_transient
+base_bash_libs_std_register_cleanup_hook cleanup_transient
 dispatcher_trap="\$(trap -p EXIT)"
 [[ "\$dispatcher_trap" != "\$before_trap" ]]
-std_unregister_cleanup_hook cleanup_transient
+base_bash_libs_std_unregister_cleanup_hook cleanup_transient
 after_trap="\$(trap -p EXIT)"
 [[ "\$after_trap" == "\$before_trap" ]]
 EOF
@@ -3299,9 +3299,9 @@ EOF
 source "$STDLIB_PATH"
 trap 'printf "original\n" >> "$log_file"' EXIT
 cleanup_transient() { printf 'unexpected\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_transient
+base_bash_libs_std_register_cleanup_hook cleanup_transient
 trap 'printf "replacement\n" >> "$log_file"' EXIT
-    std_unregister_cleanup_hook cleanup_transient
+    base_bash_libs_std_unregister_cleanup_hook cleanup_transient
     after_trap="\$(trap -p EXIT)"
     [[ "\$after_trap" == *"replacement"* ]]
 EOF
@@ -3323,7 +3323,7 @@ source "$STDLIB_PATH"
 mkdir -p "$target_dir"
 printf 'sample\n' > "$target_file"
 printf 'nested\n' > "$target_dir/nested.txt"
-std_register_cleanup_path "$target_file" "$target_dir"
+base_bash_libs_std_register_cleanup_path "$target_file" "$target_dir"
 EOF
 
     bats_run bash "$script"
@@ -3341,10 +3341,10 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$target"
-std_register_cleanup_path "$target"
-[[ \${#__std_cleanup_paths[@]} -eq 1 ]] || exit 44
-[[ \${#__std_cleanup_entries[@]} -eq 1 ]] || exit 45
+base_bash_libs_std_register_cleanup_path "$target"
+base_bash_libs_std_register_cleanup_path "$target"
+[[ \${#__base_bash_libs_std_cleanup_paths[@]} -eq 1 ]] || exit 44
+[[ \${#__base_bash_libs_std_cleanup_entries[@]} -eq 1 ]] || exit 45
 EOF
 
     bats_run bash "$script"
@@ -3357,14 +3357,14 @@ EOF
     local stderr_file="$TEST_TMPDIR/cleanup-path.err"
     local rc
 
-    if std_register_cleanup_path "" "/" 2>"$stderr_file"; then
+    if base_bash_libs_std_register_cleanup_path "" "/" 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_register_cleanup_path: refusing to register unsafe cleanup path"* ]]
 }
 
 @test "cleanup path registration rejects relative paths" {
@@ -3374,13 +3374,13 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "relative-path" 2>"$stderr_file"
+base_bash_libs_std_register_cleanup_path "relative-path" 2>"$stderr_file"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path 'relative-path'."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_register_cleanup_path: refusing to register unsafe cleanup path 'relative-path'."* ]]
 }
 
 @test "cleanup path registration keeps valid paths from mixed batches" {
@@ -3392,13 +3392,13 @@ EOF
     printf 'sample\n' > "$target_file"
     mkdir -p "$target_dir"
 
-    std_register_cleanup_path "$target_file" "/" "$target_dir" 2>"$stderr_file" || rc=$?
+    base_bash_libs_std_register_cleanup_path "$target_file" "/" "$target_dir" 2>"$stderr_file" || rc=$?
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_register_cleanup_path: refusing to register unsafe cleanup path '/'"* ]]
-    [[ " ${__std_cleanup_paths[*]} " == *" $target_file "* ]]
-    [[ " ${__std_cleanup_paths[*]} " == *" $target_dir "* ]]
-    [[ " ${__std_cleanup_paths[*]} " != *" / "* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_register_cleanup_path: refusing to register unsafe cleanup path '/'"* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " == *" $target_file "* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " == *" $target_dir "* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " != *" / "* ]]
 }
 
 @test "cleanup path registration supports unregistering eager cleanup paths" {
@@ -3408,12 +3408,12 @@ EOF
     printf 'keep\n' > "$keep_file"
     printf 'drop\n' > "$drop_file"
 
-    std_register_cleanup_path "$keep_file" "$drop_file"
+    base_bash_libs_std_register_cleanup_path "$keep_file" "$drop_file"
     rm -f -- "$drop_file"
-    std_unregister_cleanup_path "$drop_file"
+    base_bash_libs_std_unregister_cleanup_path "$drop_file"
 
-    [[ " ${__std_cleanup_paths[*]} " == *" $keep_file "* ]]
-    [[ " ${__std_cleanup_paths[*]} " != *" $drop_file "* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " == *" $keep_file "* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " != *" $drop_file "* ]]
 }
 
 @test "cleanup path unregister rejects dangerous paths without clearing valid registrations" {
@@ -3422,13 +3422,13 @@ EOF
     local rc=0
 
     printf 'sample\n' > "$target_file"
-    std_register_cleanup_path "$target_file"
+    base_bash_libs_std_register_cleanup_path "$target_file"
 
-    std_unregister_cleanup_path "/" 2>"$stderr_file" || rc=$?
+    base_bash_libs_std_unregister_cleanup_path "/" 2>"$stderr_file" || rc=$?
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '/'"* ]]
-    [[ " ${__std_cleanup_paths[*]} " == *" $target_file "* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '/'"* ]]
+    [[ " ${__base_bash_libs_std_cleanup_paths[*]} " == *" $target_file "* ]]
 }
 
 @test "cleanup registrations run hooks in LIFO order" {
@@ -3440,8 +3440,8 @@ EOF
 source "$STDLIB_PATH"
 cleanup_outer() { printf 'outer\\n' >> "$log_file"; }
 cleanup_inner() { printf 'inner\\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_outer
-std_register_cleanup_hook cleanup_inner
+base_bash_libs_std_register_cleanup_hook cleanup_outer
+base_bash_libs_std_register_cleanup_hook cleanup_inner
 EOF
 
     bats_run bash "$script"
@@ -3458,9 +3458,9 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$resource"
+base_bash_libs_std_register_cleanup_path "$resource"
 cleanup_child() { printf 'child\\n' > "$resource/child-marker"; }
-std_register_cleanup_hook cleanup_child
+base_bash_libs_std_register_cleanup_hook cleanup_child
 EOF
 
     bats_run bash "$script"
@@ -3481,7 +3481,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$registered"
+base_bash_libs_std_register_cleanup_path "$registered"
 mv "$registered" "$moved"
 ln -s "$victim" "$registered"
 EOF
@@ -3508,7 +3508,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$target"
+base_bash_libs_std_register_cleanup_path "$target"
 mv "$parent" "$moved_parent"
 mkdir -p "$parent"
 mv "$replacement/target" "$parent/target"
@@ -3531,7 +3531,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$target"
+base_bash_libs_std_register_cleanup_path "$target"
 trap 'printf "caller\\n" >> "$log_file"' EXIT
 exit 23
 EOF
@@ -3552,7 +3552,7 @@ EOF
 source "$STDLIB_PATH"
 trap 'printf "before-debug\\n" >> "$log_file"' DEBUG
 cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_once
+base_bash_libs_std_register_cleanup_hook cleanup_once
 trap 'printf "after-debug\\n" >> "$log_file"' DEBUG
 :
 EOF
@@ -3576,8 +3576,8 @@ EOF
 source "$STDLIB_PATH"
 trap 'printf "caller-term\\n" >> "$log_file"' TERM
 cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
-std_register_cleanup_path "$target"
-std_register_cleanup_hook cleanup_once
+base_bash_libs_std_register_cleanup_path "$target"
+base_bash_libs_std_register_cleanup_hook cleanup_once
 kill -TERM "\$\$"
 EOF
 
@@ -3597,7 +3597,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path "$target"
+base_bash_libs_std_register_cleanup_path "$target"
 trap 'printf "later-term\\n" >> "$log_file"' TERM
 kill -TERM "\$\$"
 EOF
@@ -3624,8 +3624,8 @@ cleanup_first() {
     printf 'first\\n' >> "$log_file"
 }
 cleanup_second() { printf 'second\\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_first
-std_register_cleanup_hook cleanup_second
+base_bash_libs_std_register_cleanup_hook cleanup_first
+base_bash_libs_std_register_cleanup_hook cleanup_second
 EOF
 
     bats_run bash "$script"
@@ -3643,8 +3643,8 @@ EOF
 source "$STDLIB_PATH"
 cleanup_fails() { printf 'failed-hook\\n' >> "$log_file"; return 9; }
 cleanup_runs() { printf 'next-hook\\n' >> "$log_file"; }
-std_register_cleanup_hook cleanup_fails
-std_register_cleanup_hook cleanup_runs
+base_bash_libs_std_register_cleanup_hook cleanup_fails
+base_bash_libs_std_register_cleanup_hook cleanup_runs
 exit 37
 EOF
 
@@ -3666,7 +3666,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-std_register_cleanup_path --unsafe "$link"
+base_bash_libs_std_register_cleanup_path --unsafe "$link"
 EOF
 
     bats_run bash "$script"
@@ -3675,16 +3675,16 @@ EOF
     [ ! -e "$link" ]
     [ -d "$target" ]
 
-    std_register_cleanup_path --unsafe /tmp 2>"$stderr_file" || rc=$?
+    base_bash_libs_std_register_cleanup_path --unsafe /tmp 2>"$stderr_file" || rc=$?
     [ "$rc" -eq 1 ]
     [[ "$(cat "$stderr_file")" == *"broad or protected path"* ]]
 
     rc=0
-    std_register_cleanup_path --unsafe "$HOME" /usr 2>"$stderr_file" || rc=$?
+    base_bash_libs_std_register_cleanup_path --unsafe "$HOME" /usr 2>"$stderr_file" || rc=$?
     [ "$rc" -eq 1 ]
 }
 
-@test "std_make_temp_file creates a file under TMPDIR and cleans it up" {
+@test "base_bash_libs_std_make_temp_file creates a file under TMPDIR and cleans it up" {
     local script="$TEST_TMPDIR/temp-file.sh"
     local temp_root="$TEST_TMPDIR/temp-root"
     local path_file="$TEST_TMPDIR/temp-file.path"
@@ -3695,7 +3695,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 TMPDIR="$temp_root"
-std_make_temp_file temp_file sample
+base_bash_libs_std_make_temp_file temp_file sample
 [[ -f "\$temp_file" ]] || exit 44
 printf '%s\n' "\$temp_file" > "$path_file"
 EOF
@@ -3708,7 +3708,7 @@ EOF
     [ ! -e "$created_path" ]
 }
 
-@test "std_make_temp_file accepts TMPDIR=/" {
+@test "base_bash_libs_std_make_temp_file accepts TMPDIR=/" {
     local script="$TEST_TMPDIR/temp-file-root.sh"
     local path_file="$TEST_TMPDIR/temp-file-root.path"
     local created_path
@@ -3722,7 +3722,7 @@ mktemp() {
     : > "$TEST_TMPDIR/root-temp-file"
     printf '%s\n' "$TEST_TMPDIR/root-temp-file"
 }
-std_make_temp_file temp_file root-temp
+base_bash_libs_std_make_temp_file temp_file root-temp
 [[ -f "\$temp_file" ]] || exit 44
 printf '%s\n' "\$temp_file" > "$path_file"
 EOF
@@ -3735,7 +3735,7 @@ EOF
     [ ! -e "$created_path" ]
 }
 
-@test "std_make_temp_file resolves relative and trailing-slash TMPDIR values" {
+@test "base_bash_libs_std_make_temp_file resolves relative and trailing-slash TMPDIR values" {
     local script="$TEST_TMPDIR/temp-file-relative.sh"
     local temp_root="$TEST_TMPDIR/temp-relative-root"
     local path_file="$TEST_TMPDIR/temp-file-relative.path"
@@ -3747,7 +3747,7 @@ EOF
 source "$STDLIB_PATH"
 cd "$TEST_TMPDIR"
 TMPDIR="$(basename "$temp_root")///"
-std_make_temp_file temp_file relative-temp
+base_bash_libs_std_make_temp_file temp_file relative-temp
 [[ -f "\$temp_file" ]] || exit 44
 printf '%s\n' "\$temp_file" > "$path_file"
 EOF
@@ -3761,7 +3761,7 @@ EOF
     [ ! -e "$created_path" ]
 }
 
-@test "std_make_temp_dir creates a directory under TMPDIR and cleans it up" {
+@test "base_bash_libs_std_make_temp_dir creates a directory under TMPDIR and cleans it up" {
     local script="$TEST_TMPDIR/temp-dir.sh"
     local temp_root="$TEST_TMPDIR/temp-dir-root"
     local path_file="$TEST_TMPDIR/temp-dir.path"
@@ -3772,7 +3772,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 TMPDIR="$temp_root"
-std_make_temp_dir temp_dir workspace
+base_bash_libs_std_make_temp_dir temp_dir workspace
 [[ -d "\$temp_dir" ]] || exit 44
 printf '%s\n' "\$temp_dir" > "$path_file"
 EOF
@@ -3788,19 +3788,19 @@ EOF
 @test "private temp dir helper supports reserved output without public-name collision" {
     local temp_root="$TEST_TMPDIR/private-temp-dir-root"
     local -r gh_api_capture_workspace="caller-owned-readonly"
-    local __gh_api_capture_workspace=""
+    local __base_bash_libs_gh_api_capture_workspace=""
 
     mkdir -p "$temp_root"
-    TMPDIR="$temp_root" __std_make_internal_temp_dir__ --keep \
-        __gh_api_capture_workspace private-workspace
+    TMPDIR="$temp_root" __base_bash_libs_std_make_internal_temp_dir__ --keep \
+        __base_bash_libs_gh_api_capture_workspace private-workspace
 
     [ "$gh_api_capture_workspace" = "caller-owned-readonly" ]
-    [[ "$__gh_api_capture_workspace" == "$temp_root"/private-workspace.* ]]
-    [ -d "$__gh_api_capture_workspace" ]
-    rmdir -- "$__gh_api_capture_workspace"
+    [[ "$__base_bash_libs_gh_api_capture_workspace" == "$temp_root"/private-workspace.* ]]
+    [ -d "$__base_bash_libs_gh_api_capture_workspace" ]
+    rmdir -- "$__base_bash_libs_gh_api_capture_workspace"
 }
 
-@test "std_make_temp_file --keep leaves the created file in place" {
+@test "base_bash_libs_std_make_temp_file --keep leaves the created file in place" {
     local script="$TEST_TMPDIR/temp-file-keep.sh"
     local temp_root="$TEST_TMPDIR/temp-keep-root"
     local path_file="$TEST_TMPDIR/temp-file-keep.path"
@@ -3811,7 +3811,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 TMPDIR="$temp_root"
-std_make_temp_file --keep temp_file kept
+base_bash_libs_std_make_temp_file --keep temp_file kept
 printf '%s\n' "\$temp_file" > "$path_file"
 EOF
 
@@ -3829,8 +3829,8 @@ EOF
     local result_name=""
 
     mkdir -p "$temp_root"
-    TMPDIR="$temp_root" std_make_temp_file --keep temp_path shadow-file
-    TMPDIR="$temp_root" std_make_temp_dir --keep result_name shadow-dir
+    TMPDIR="$temp_root" base_bash_libs_std_make_temp_file --keep temp_path shadow-file
+    TMPDIR="$temp_root" base_bash_libs_std_make_temp_dir --keep result_name shadow-dir
 
     [[ "$temp_path" == "$temp_root"/shadow-file.* ]]
     [ -f "$temp_path" ]
@@ -3842,23 +3842,23 @@ EOF
     local stderr_file="$TEST_TMPDIR/temp-invalid.err"
     local rc
 
-    if std_make_temp_file "not-valid" 2>"$stderr_file"; then
+    if base_bash_libs_std_make_temp_file "not-valid" 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_make_temp_file: result variable name must be a valid Bash variable name."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_make_temp_file: result variable name must be a valid Bash variable name."* ]]
 
-    if std_make_temp_dir "also-not-valid" 2>"$stderr_file"; then
+    if base_bash_libs_std_make_temp_dir "also-not-valid" 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
 }
 
 @test "named output helpers reject readonly variables before side effects" {
@@ -3870,7 +3870,7 @@ EOF
     mkdir -p "$temp_root"
     readonly output
 
-    if std_command_path output bash 2>"$stderr_file"; then
+    if base_bash_libs_std_command_path output bash 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3880,7 +3880,7 @@ EOF
     [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
 
     : > "$stderr_file"
-    if TMPDIR="$temp_root" std_make_temp_file output readonly-temp 2>"$stderr_file"; then
+    if TMPDIR="$temp_root" base_bash_libs_std_make_temp_file output readonly-temp 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3898,7 +3898,7 @@ EOF
     local -r source_path="caller-source"
 
     readonly output
-    if std_command_path output bash 2>"$stderr_file"; then
+    if base_bash_libs_std_command_path output bash 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3910,22 +3910,22 @@ EOF
     [ "$color" = "caller-color" ]
     [ "$message" = "caller-message" ]
     [ "$source_path" = "caller-source" ]
-    [[ "$(cat "$stderr_file")" == *"std_command_path: result variable 'output' is readonly."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_command_path: result variable 'output' is readonly."* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
     [[ "$(cat "$stderr_file")" != *"local:"* ]]
 }
 
 @test "named std helpers reject exact internal holder names before locals or side effects" {
-    local -r __std_command_result_name=command_target
-    local -r __std_temp_result_name=temp_target
-    local -r __std_source_result_name=source_target
+    local -r __base_bash_libs_std_command_result_name=command_target
+    local -r __base_bash_libs_std_temp_result_name=temp_target
+    local -r __base_bash_libs_std_source_result_name=source_target
     local command_target="keep-command" temp_target="keep-temp" source_target="keep-source"
     local temp_root="$TEST_TMPDIR/std-internal-holder"
     local stderr_file="$TEST_TMPDIR/std-internal-holder.err"
     local rc
 
     mkdir -p "$temp_root"
-    if std_command_path __std_command_result_name bash 2>"$stderr_file"; then
+    if base_bash_libs_std_command_path __base_bash_libs_std_command_result_name bash 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3933,7 +3933,7 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$command_target" = "keep-command" ]
 
-    if TMPDIR="$temp_root" std_make_temp_file --keep __std_temp_result_name reserved 2>"$stderr_file"; then
+    if TMPDIR="$temp_root" base_bash_libs_std_make_temp_file --keep __base_bash_libs_std_temp_result_name reserved 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3942,7 +3942,7 @@ EOF
     [ "$temp_target" = "keep-temp" ]
     [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
 
-    if get_my_source_dir __std_source_result_name 2>"$stderr_file"; then
+    if base_bash_libs_std_get_my_source_dir __base_bash_libs_std_source_result_name 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -3964,7 +3964,7 @@ EOF
             base_bash_libs_init app_args --
             printf -v "$2" %s unchanged
             readonly "$2"
-            std_command_path "$2" bash
+            base_bash_libs_std_command_path "$2" bash
             case $? in
                 1) ;;
                 *) exit 99 ;;
@@ -3981,71 +3981,71 @@ EOF
     done
 }
 
-@test "std_command_path stores executable paths and returns nonzero for missing commands" {
+@test "base_bash_libs_std_command_path stores executable paths and returns nonzero for missing commands" {
     local command_path=""
 
-    std_command_path command_path bash
+    base_bash_libs_std_command_path command_path bash
 
     [ -n "$command_path" ]
     [ -x "$command_path" ]
 
-    if std_command_path command_path "__base_missing_command__$RANDOM"; then
+    if base_bash_libs_std_command_path command_path "__base_missing_command__$RANDOM"; then
         return 1
     fi
 
     [ "$command_path" = "" ]
 }
 
-@test "std_command_path supports shadowing-prone output variable names" {
+@test "base_bash_libs_std_command_path supports shadowing-prone output variable names" {
     local result_name=""
     local command_name=""
     local resolved_path=""
 
-    std_command_path result_name bash
-    std_command_path command_name bash
-    std_command_path resolved_path bash
+    base_bash_libs_std_command_path result_name bash
+    base_bash_libs_std_command_path command_name bash
+    base_bash_libs_std_command_path resolved_path bash
 
     [ -x "$result_name" ]
     [ -x "$command_name" ]
     [ -x "$resolved_path" ]
 }
 
-@test "std_command_path rejects invalid result variable names" {
+@test "base_bash_libs_std_command_path rejects invalid result variable names" {
     local stderr_file="$TEST_TMPDIR/command-path.err"
     local rc
 
-    if std_command_path "not-valid" bash 2>"$stderr_file"; then
+    if base_bash_libs_std_command_path "not-valid" bash 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"std_command_path: result variable name must be a valid Bash variable name."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_command_path: result variable name must be a valid Bash variable name."* ]]
 }
 
-@test "std_function_exists checks defined Bash functions" {
+@test "base_bash_libs_std_function_exists checks defined Bash functions" {
     local missing_name="__missing_function__$RANDOM"
 
     sample_introspection_function() { return 0; }
 
-    std_function_exists sample_introspection_function
-    if std_function_exists "$missing_name"; then
+    base_bash_libs_std_function_exists sample_introspection_function
+    if base_bash_libs_std_function_exists "$missing_name"; then
         return 1
     fi
-    if std_function_exists "not-valid"; then
+    if base_bash_libs_std_function_exists "not-valid"; then
         return 1
     fi
 }
 
-@test "assert_function_exists accepts defined functions and exits for missing ones" {
+@test "base_bash_libs_std_assert_function_exists accepts defined functions and exits for missing ones" {
     local script="$TEST_TMPDIR/assert-function-exists.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 defined_function() { return 0; }
-assert_function_exists defined_function missing_function
+base_bash_libs_std_assert_function_exists defined_function missing_function
 EOF
 
     bats_run bash "$script"
@@ -4054,33 +4054,33 @@ EOF
     [[ "$output" == *"Required functions are not defined: missing_function"* ]]
 }
 
-@test "assert_function_exists rejects invalid names without echoing values" {
+@test "base_bash_libs_std_assert_function_exists rejects invalid names without echoing values" {
     local script="$TEST_TMPDIR/assert-function-invalid.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 secret="not-valid"
-assert_function_exists "\$secret"
+base_bash_libs_std_assert_function_exists "\$secret"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_function_exists expects function names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_function_exists expects function names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "assert_variable_name accepts valid Bash variable names" {
-    assert_variable_name value_name _value_name VALUE_NAME value_name_2 __internal_syntax_name
+@test "base_bash_libs_std_assert_variable_name accepts valid Bash variable names" {
+    base_bash_libs_std_assert_variable_name value_name _value_name VALUE_NAME value_name_2 __internal_syntax_name
 }
 
 @test "named assertions reject reserved caller sources before local declarations" {
-    local -ar __std_assert_indexed_name=(alpha)
-    local -Ar __std_assert_associative_name=([alpha]=one)
-    local -r __std_assert_not_null_name=present
-    local -r __std_assert_integer_name=7
-    local -r __std_range_name=5
+    local -ar __base_bash_libs_std_assert_indexed_name=(alpha)
+    local -Ar __base_bash_libs_std_assert_associative_name=([alpha]=one)
+    local -r __base_bash_libs_std_assert_not_null_name=present
+    local -r __base_bash_libs_std_assert_integer_name=7
+    local -r __base_bash_libs_std_range_name=5
     local stderr_file="$TEST_TMPDIR/assert-reserved-names.err"
     assert_reserved_name_rejected() {
         local assertion_status
@@ -4095,11 +4095,11 @@ EOF
         [[ "$(cat "$stderr_file")" != *"local:"* ]]
     }
 
-    assert_reserved_name_rejected assert_indexed_array __std_assert_indexed_name
-    assert_reserved_name_rejected assert_associative_array __std_assert_associative_name
-    assert_reserved_name_rejected assert_not_null __std_assert_not_null_name
-    assert_reserved_name_rejected assert_integer __std_assert_integer_name
-    assert_reserved_name_rejected assert_integer_range __std_range_name 1 10
+    assert_reserved_name_rejected base_bash_libs_std_assert_indexed_array __base_bash_libs_std_assert_indexed_name
+    assert_reserved_name_rejected base_bash_libs_std_assert_associative_array __base_bash_libs_std_assert_associative_name
+    assert_reserved_name_rejected base_bash_libs_std_assert_not_null __base_bash_libs_std_assert_not_null_name
+    assert_reserved_name_rejected base_bash_libs_std_assert_integer __base_bash_libs_std_assert_integer_name
+    assert_reserved_name_rejected base_bash_libs_std_assert_integer_range __base_bash_libs_std_range_name 1 10
 }
 
 @test "named assertions support historically shadowing-prone caller names" {
@@ -4107,46 +4107,46 @@ EOF
     local unset_vars=present
     local value=7
 
-    assert_indexed_array var_name
+    base_bash_libs_std_assert_indexed_array var_name
     unset var_name
     local -A var_name=([alpha]=one)
-    assert_associative_array var_name
-    assert_not_null unset_vars
-    assert_integer value
-    assert_integer_range value 1 10
+    base_bash_libs_std_assert_associative_array var_name
+    base_bash_libs_std_assert_not_null unset_vars
+    base_bash_libs_std_assert_integer value
+    base_bash_libs_std_assert_integer_range value 1 10
 }
 
-@test "assert_variable_name exits for invalid variable names without echoing values" {
+@test "base_bash_libs_std_assert_variable_name exits for invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/assert-variable-name-invalid.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 secret="not-valid"
-assert_variable_name value_name "\$secret"
+base_bash_libs_std_assert_variable_name value_name "\$secret"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "assert_indexed_array accepts declared indexed arrays" {
+@test "base_bash_libs_std_assert_indexed_array accepts declared indexed arrays" {
     local -a values=("alpha")
 
-    assert_indexed_array values
+    base_bash_libs_std_assert_indexed_array values
 }
 
-@test "assert_indexed_array rejects scalar and associative variables" {
+@test "base_bash_libs_std_assert_indexed_array rejects scalar and associative variables" {
     local script="$TEST_TMPDIR/assert-indexed-array-invalid.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 values="alpha"
-assert_indexed_array values
+base_bash_libs_std_assert_indexed_array values
 EOF
 
     bats_run bash "$script"
@@ -4158,7 +4158,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 declare -A values=([alpha]="one")
-assert_indexed_array values
+base_bash_libs_std_assert_indexed_array values
 EOF
 
     bats_run bash "$script"
@@ -4167,20 +4167,20 @@ EOF
     [[ "$output" == *"Variable 'values' must be an indexed array declared by the caller."* ]]
 }
 
-@test "assert_associative_array accepts declared associative arrays" {
+@test "base_bash_libs_std_assert_associative_array accepts declared associative arrays" {
     local -A values=([alpha]="one")
 
-    assert_associative_array values
+    base_bash_libs_std_assert_associative_array values
 }
 
-@test "assert_associative_array rejects scalar and indexed variables" {
+@test "base_bash_libs_std_assert_associative_array rejects scalar and indexed variables" {
     local script="$TEST_TMPDIR/assert-associative-array-invalid.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 values="alpha"
-assert_associative_array values
+base_bash_libs_std_assert_associative_array values
 EOF
 
     bats_run bash "$script"
@@ -4192,7 +4192,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 declare -a values=("alpha")
-assert_associative_array values
+base_bash_libs_std_assert_associative_array values
 EOF
 
     bats_run bash "$script"
@@ -4201,14 +4201,14 @@ EOF
     [[ "$output" == *"Variable 'values' must be an associative array declared by the caller."* ]]
 }
 
-@test "assert_not_null accepts populated variables" {
+@test "base_bash_libs_std_assert_not_null accepts populated variables" {
     local user_name="admin"
     local token="secret"
 
-    assert_not_null user_name token
+    base_bash_libs_std_assert_not_null user_name token
 }
 
-@test "assert_not_null exits for unset or empty variables" {
+@test "base_bash_libs_std_assert_not_null exits for unset or empty variables" {
     local script="$TEST_TMPDIR/assert-not-null.sh"
 
     create_script "$script" <<EOF
@@ -4216,7 +4216,7 @@ EOF
 source "$STDLIB_PATH"
 user_name="admin"
 token=""
-assert_not_null user_name token missing_var
+base_bash_libs_std_assert_not_null user_name token missing_var
 EOF
 
     bats_run bash "$script"
@@ -4225,35 +4225,35 @@ EOF
     [[ "$output" == *"These required variables are not set or are empty"* ]]
 }
 
-@test "assert_not_null rejects value-like arguments without echoing them" {
+@test "base_bash_libs_std_assert_not_null rejects value-like arguments without echoing them" {
     local script="$TEST_TMPDIR/assert-not-null-value.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 token="secret token with spaces"
-assert_not_null "\$token"
+base_bash_libs_std_assert_not_null "\$token"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_not_null expects variable names, not values"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_not_null expects variable names, not values"* ]]
     [[ "$output" != *"secret token with spaces"* ]]
 }
 
-@test "assert_integer accepts integers and rejects invalid values" {
+@test "base_bash_libs_std_assert_integer accepts integers and rejects invalid values" {
     local count=42
     local signed=-3
     local script="$TEST_TMPDIR/assert-integer.sh"
 
-    assert_integer count signed
+    base_bash_libs_std_assert_integer count signed
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 count="not-an-int"
-assert_integer count
+base_bash_libs_std_assert_integer count
 EOF
 
     bats_run bash "$script"
@@ -4262,35 +4262,35 @@ EOF
     [[ "$output" == *"is not a valid integer"* ]]
 }
 
-@test "assert_integer rejects invalid variable names without echoing values" {
+@test "base_bash_libs_std_assert_integer rejects invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/assert-integer-name.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 secret="not-a-var-name"
-assert_integer "\$secret"
+base_bash_libs_std_assert_integer "\$secret"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_integer expects variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_integer expects variable names"* ]]
     [[ "$output" != *"not-a-var-name"* ]]
     [[ "$output" != *"invalid variable name"* ]]
 }
 
-@test "assert_integer_range enforces range bounds" {
+@test "base_bash_libs_std_assert_integer_range enforces range bounds" {
     local count=5
     local script="$TEST_TMPDIR/assert-range.sh"
 
-    assert_integer_range count 1 10
+    base_bash_libs_std_assert_integer_range count 1 10
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 count=11
-assert_integer_range count 1 10
+base_bash_libs_std_assert_integer_range count 1 10
 EOF
 
     bats_run bash "$script"
@@ -4299,57 +4299,57 @@ EOF
     [[ "$output" == *"is out of range [1, 10]"* ]]
 }
 
-@test "assert_integer_range rejects invalid variable names without echoing values" {
+@test "base_bash_libs_std_assert_integer_range rejects invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/assert-range-name.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 secret="bad-range-name"
-assert_integer_range "\$secret" 1 10
+base_bash_libs_std_assert_integer_range "\$secret" 1 10
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_integer_range expects a variable name"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_integer_range expects a variable name"* ]]
     [[ "$output" != *"bad-range-name"* ]]
     [[ "$output" != *"invalid variable name"* ]]
 }
 
-@test "assert_integer_range rejects non-integer bounds directly" {
+@test "base_bash_libs_std_assert_integer_range rejects non-integer bounds directly" {
     local script="$TEST_TMPDIR/assert-range-bounds.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 count=5
-assert_integer_range count low 10
+base_bash_libs_std_assert_integer_range count low 10
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_integer_range minimum bound 'low' is not a valid integer."* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_integer_range minimum bound 'low' is not a valid integer."* ]]
     [[ "$output" != *"Variable 'min'"* ]]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 count=5
-assert_integer_range count 1 high
+base_bash_libs_std_assert_integer_range count 1 high
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_integer_range maximum bound 'high' is not a valid integer."* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_integer_range maximum bound 'high' is not a valid integer."* ]]
     [[ "$output" != *"Variable 'max'"* ]]
 }
 
-@test "assert_arg_count accepts exact and ranged matches" {
-    assert_arg_count 2 2
-    assert_arg_count 2 1 3
+@test "base_bash_libs_std_assert_arg_count accepts exact and ranged matches" {
+    base_bash_libs_std_assert_arg_count 2 2
+    base_bash_libs_std_assert_arg_count 2 1 3
 }
 
 @test "integer validation uses decimal semantics for leading zeroes" {
@@ -4359,9 +4359,9 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 value=08
-assert_integer_range value 0 10
-assert_arg_count 08 8
-exit_if_error 08 "decimal exit code"
+base_bash_libs_std_assert_integer_range value 0 10
+base_bash_libs_std_assert_arg_count 08 8
+base_bash_libs_std_exit_if_error 08 "decimal exit code"
 EOF
 
     bats_run bash "$script"
@@ -4378,7 +4378,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 value=5
-assert_integer_range value 10 1
+base_bash_libs_std_assert_integer_range value 10 1
 EOF
 
     bats_run bash "$script"
@@ -4387,37 +4387,37 @@ EOF
     [[ "$output" == *"cannot exceed maximum"* ]]
 }
 
-@test "assert_arg_count exits when the count is out of range" {
-    bats_run assert_arg_count 4 1 3
+@test "base_bash_libs_std_assert_arg_count exits when the count is out of range" {
+    bats_run base_bash_libs_std_assert_arg_count 4 1 3
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Argument count mismatch"* ]]
 }
 
-@test "assert_arg_count exits on incorrect usage" {
-    bats_run assert_arg_count 1
+@test "base_bash_libs_std_assert_arg_count exits on incorrect usage" {
+    bats_run base_bash_libs_std_assert_arg_count 1
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Incorrect usage"* ]]
 }
 
-@test "assert_command_exists validates commands and warns on empty input" {
+@test "base_bash_libs_std_assert_command_exists validates commands and warns on empty input" {
     local stderr_file="$TEST_TMPDIR/assert-command.err"
 
-    assert_command_exists bash mkdir
+    base_bash_libs_std_assert_command_exists bash mkdir
 
-    assert_command_exists 2>"$stderr_file"
+    base_bash_libs_std_assert_command_exists 2>"$stderr_file"
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"assert_command_exists: No commands provided to check."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_assert_command_exists: No commands provided to check."* ]]
 }
 
-@test "assert_command_exists exits for missing commands" {
+@test "base_bash_libs_std_assert_command_exists exits for missing commands" {
     local script="$TEST_TMPDIR/assert-command-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-assert_command_exists definitely_missing_command_name
+base_bash_libs_std_assert_command_exists definitely_missing_command_name
 EOF
 
     bats_run bash "$script"
@@ -4426,25 +4426,25 @@ EOF
     [[ "$output" == *"were not found in your PATH"* ]]
 }
 
-@test "assert_file_exists validates files and warns on empty input" {
+@test "base_bash_libs_std_assert_file_exists validates files and warns on empty input" {
     local target="$TEST_TMPDIR/file.txt"
     local stderr_file="$TEST_TMPDIR/assert-file.err"
 
     touch "$target"
-    assert_file_exists "$target"
+    base_bash_libs_std_assert_file_exists "$target"
 
-    assert_file_exists 2>"$stderr_file"
+    base_bash_libs_std_assert_file_exists 2>"$stderr_file"
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"assert_file_exists: No files provided to check."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_assert_file_exists: No files provided to check."* ]]
 }
 
-@test "assert_file_exists exits for missing files" {
+@test "base_bash_libs_std_assert_file_exists exits for missing files" {
     local script="$TEST_TMPDIR/assert-file-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-assert_file_exists "$TEST_TMPDIR/missing.txt"
+base_bash_libs_std_assert_file_exists "$TEST_TMPDIR/missing.txt"
 EOF
 
     bats_run bash "$script"
@@ -4453,7 +4453,7 @@ EOF
     [[ "$output" == *"do not exist or are not regular files"* ]]
 }
 
-@test "assert_executable validates executable paths and warns on empty input" {
+@test "base_bash_libs_std_assert_executable validates executable paths and warns on empty input" {
     local target="$TEST_TMPDIR/tool.sh"
     local stderr_file="$TEST_TMPDIR/assert-executable.err"
 
@@ -4462,14 +4462,14 @@ EOF
 exit 0
 EOF
 
-    assert_executable "$target"
+    base_bash_libs_std_assert_executable "$target"
 
-    assert_executable 2>"$stderr_file"
+    base_bash_libs_std_assert_executable 2>"$stderr_file"
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"assert_executable: No executable paths provided to check."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_assert_executable: No executable paths provided to check."* ]]
 }
 
-@test "assert_executable exits for missing or non-executable paths" {
+@test "base_bash_libs_std_assert_executable exits for missing or non-executable paths" {
     local script="$TEST_TMPDIR/assert-executable-fail.sh"
     local target="$TEST_TMPDIR/not-executable.sh"
 
@@ -4478,7 +4478,7 @@ EOF
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-assert_executable "$TEST_TMPDIR/missing-tool" "$target"
+base_bash_libs_std_assert_executable "$TEST_TMPDIR/missing-tool" "$target"
 EOF
 
     bats_run bash "$script"
@@ -4489,25 +4489,25 @@ EOF
     [[ "$output" == *"$target"* ]]
 }
 
-@test "assert_dir_exists validates directories and warns on empty input" {
+@test "base_bash_libs_std_assert_dir_exists validates directories and warns on empty input" {
     local target="$TEST_TMPDIR/dir"
     local stderr_file="$TEST_TMPDIR/assert-dir.err"
 
     mkdir -p "$target"
-    assert_dir_exists "$target"
+    base_bash_libs_std_assert_dir_exists "$target"
 
-    assert_dir_exists 2>"$stderr_file"
+    base_bash_libs_std_assert_dir_exists 2>"$stderr_file"
     [ "$?" -eq 0 ]
-    [[ "$(cat "$stderr_file")" == *"assert_dir_exists: No directories provided to check."* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_assert_dir_exists: No directories provided to check."* ]]
 }
 
-@test "assert_dir_exists exits for missing directories" {
+@test "base_bash_libs_std_assert_dir_exists exits for missing directories" {
     local script="$TEST_TMPDIR/assert-dir-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-assert_dir_exists "$TEST_TMPDIR/missing-dir"
+base_bash_libs_std_assert_dir_exists "$TEST_TMPDIR/missing-dir"
 EOF
 
     bats_run bash "$script"
@@ -4516,18 +4516,18 @@ EOF
     [[ "$output" == *"These required directories do not exist"* ]]
 }
 
-@test "safe_cd changes directories and exits on failure" {
+@test "base_bash_libs_std_safe_cd changes directories and exits on failure" {
     local target="$TEST_TMPDIR/go-here"
     local script="$TEST_TMPDIR/safe-cd-fail.sh"
 
     mkdir -p "$target"
-    safe_cd "$target"
+    base_bash_libs_std_safe_cd "$target"
     [ "$PWD" = "$target" ]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-safe_cd "$TEST_TMPDIR/missing-dir"
+base_bash_libs_std_safe_cd "$TEST_TMPDIR/missing-dir"
 echo "after"
 EOF
 
@@ -4538,15 +4538,15 @@ EOF
     [[ "$output" != *"after"* ]]
 }
 
-@test "safe_unalias removes aliases and ignores missing ones" {
+@test "base_bash_libs_std_safe_unalias removes aliases and ignores missing ones" {
     alias ll='ls -l'
 
-    safe_unalias ll missing_alias
+    base_bash_libs_std_safe_unalias ll missing_alias
 
     ! alias ll >/dev/null 2>&1
 }
 
-@test "get_my_source_dir returns the caller script directory" {
+@test "base_bash_libs_std_get_my_source_dir returns the caller script directory" {
     local script="$TEST_TMPDIR/get-source-dir.sh"
     local expected_dir
 
@@ -4554,7 +4554,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 caller_dir=""
-get_my_source_dir caller_dir
+base_bash_libs_std_get_my_source_dir caller_dir
 printf 'dir=%s\n' "\$caller_dir"
 EOF
 
@@ -4566,7 +4566,7 @@ EOF
     [[ "$output" == *"dir=$expected_dir"* ]]
 }
 
-@test "get_my_source_dir supports shadowing-prone output variable names" {
+@test "base_bash_libs_std_get_my_source_dir supports shadowing-prone output variable names" {
     local script="$TEST_TMPDIR/get-source-dir-shadow.sh"
     local expected_dir
 
@@ -4575,8 +4575,8 @@ EOF
 source "$STDLIB_PATH"
 source_dir=""
 result_name=""
-get_my_source_dir source_dir
-get_my_source_dir result_name
+base_bash_libs_std_get_my_source_dir source_dir
+base_bash_libs_std_get_my_source_dir result_name
 printf 'source_dir=%s\n' "\$source_dir"
 printf 'result_name=%s\n' "\$result_name"
 EOF
@@ -4590,31 +4590,31 @@ EOF
     [[ "$output" == *"result_name=$expected_dir"* ]]
 }
 
-@test "get_my_source_dir rejects invalid result variable names" {
+@test "base_bash_libs_std_get_my_source_dir rejects invalid result variable names" {
     local script="$TEST_TMPDIR/get-source-dir-invalid.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-get_my_source_dir "bad-name"
+base_bash_libs_std_get_my_source_dir "bad-name"
 echo "after"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"get_my_source_dir: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" == *"base_bash_libs_std_get_my_source_dir: result variable name must be a valid Bash variable name"* ]]
     [[ "$output" != *"invalid variable name"* ]]
     [[ "$output" != *"after"* ]]
 }
 
-@test "ask_yes_no accepts yes input" {
+@test "base_bash_libs_std_ask_yes_no accepts yes input" {
     local script="$TEST_TMPDIR/ask-yes.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if ask_yes_no "Proceed"; then
+if base_bash_libs_std_ask_yes_no "Proceed"; then
     echo "answer=yes"
 else
     echo "answer=no"
@@ -4627,13 +4627,13 @@ EOF
     [[ "$output" == *"answer=yes"* ]]
 }
 
-@test "ask_yes_no accepts no input" {
+@test "base_bash_libs_std_ask_yes_no accepts no input" {
     local script="$TEST_TMPDIR/ask-no.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if ask_yes_no "Proceed"; then
+if base_bash_libs_std_ask_yes_no "Proceed"; then
     echo "answer=yes"
 else
     echo "answer=no"
@@ -4646,14 +4646,14 @@ EOF
     [[ "$output" == *"answer=no"* ]]
 }
 
-@test "ask_yes_no reads from terminal when stdin is redirected" {
+@test "base_bash_libs_std_ask_yes_no reads from terminal when stdin is redirected" {
     local script="$TEST_TMPDIR/ask-tty.sh"
     local normalized
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-if ask_yes_no "Proceed"; then
+if base_bash_libs_std_ask_yes_no "Proceed"; then
     echo "answer=yes"
 else
     echo "answer=no"
@@ -4671,28 +4671,28 @@ EOF
     [[ "$normalized" == *"payload"* ]]
 }
 
-@test "ask_yes_no validates argument count" {
+@test "base_bash_libs_std_ask_yes_no validates argument count" {
     local stderr_file="$TEST_TMPDIR/ask-yes-no.err"
     local rc
 
-    if ask_yes_no 2>"$stderr_file"; then
+    if base_bash_libs_std_ask_yes_no 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"ask_yes_no: invalid arguments"* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_ask_yes_no: invalid arguments"* ]]
 }
 
-@test "wait_for_enter returns after receiving a newline on a tty" {
+@test "base_bash_libs_std_wait_for_enter returns after receiving a newline on a tty" {
     local normalized
     local script="$TEST_TMPDIR/wait-enter.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-wait_for_enter "Continue" || exit \$?
+base_bash_libs_std_wait_for_enter "Continue" || exit \$?
 printf 'after-wait\n'
 EOF
 
@@ -4703,24 +4703,24 @@ EOF
     [[ "$normalized" == *"after-wait"* ]]
 }
 
-@test "wait_for_enter validates argument count" {
+@test "base_bash_libs_std_wait_for_enter validates argument count" {
     local stderr_file="$TEST_TMPDIR/wait-for-enter.err"
     local rc
 
-    if wait_for_enter "one" "two" 2>"$stderr_file"; then
+    if base_bash_libs_std_wait_for_enter "one" "two" 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"wait_for_enter: invalid arguments"* ]]
-    [[ "$(cat "$stderr_file")" == *"Usage: wait_for_enter [prompt_message]"* ]]
+    [[ "$(cat "$stderr_file")" == *"base_bash_libs_std_wait_for_enter: invalid arguments"* ]]
+    [[ "$(cat "$stderr_file")" == *"Usage: base_bash_libs_std_wait_for_enter [prompt_message]"* ]]
 }
 
-@test "wait_for_enter fails clearly when terminal is unavailable" {
-    bats_run wait_for_enter "Continue"
+@test "base_bash_libs_std_wait_for_enter fails clearly when terminal is unavailable" {
+    bats_run base_bash_libs_std_wait_for_enter "Continue"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"wait_for_enter: /dev/tty is not available"* ]]
+    [[ "$output" == *"base_bash_libs_std_wait_for_enter: /dev/tty is not available"* ]]
 }

@@ -8,24 +8,24 @@ source "$repo_root/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 
-import "$repo_root/lib/bash/arg/lib_arg.sh"
-import "$repo_root/lib/bash/list/lib_list.sh"
-import "$repo_root/lib/bash/str/lib_str.sh"
+base_bash_libs_std_import "$repo_root/lib/bash/arg/lib_arg.sh"
+base_bash_libs_std_import "$repo_root/lib/bash/list/lib_list.sh"
+base_bash_libs_std_import "$repo_root/lib/bash/str/lib_str.sh"
 
 declare -A options=()
 declare -a positionals=()
-# Passed by name to arg_parse.
+# Passed by name to base_bash_libs_arg_parse.
 # shellcheck disable=SC2034
 declare -a specs=(
     "verbose|flag|--verbose|-v"
     "tag|value|--tag|-t"
 )
 
-arg_parse options positionals specs -- --tag "  Release Candidate  " --verbose alpha beta
+base_bash_libs_arg_parse options positionals specs -- --tag "  Release Candidate  " --verbose alpha beta
 
 tag="${options[tag]-default}"
-str_trim tag
-str_lower tag
+base_bash_libs_str_trim tag
+base_bash_libs_str_lower tag
 
 # Mutated by name through list helpers.
 # shellcheck disable=SC2034
@@ -36,13 +36,13 @@ declare -a unique_values=()
 summary=""
 count=""
 
-list_append values "$tag" "${positionals[@]}" "$tag"
-list_unique unique_values values
-list_length count unique_values
-str_join summary "," unique_values
+base_bash_libs_list_append values "$tag" "${positionals[@]}" "$tag"
+base_bash_libs_list_unique unique_values values
+base_bash_libs_list_length count unique_values
+base_bash_libs_str_join summary "," unique_values
 
 if [[ "${options[verbose]-}" == "1" ]]; then
-    log_info "Cookbook parsed $count unique values."
+    base_bash_libs_std_log_info "Cookbook parsed $count unique values."
 fi
 
-print_message "summary=$summary"
+base_bash_libs_std_print_message "summary=$summary"

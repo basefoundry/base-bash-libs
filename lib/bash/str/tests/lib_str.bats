@@ -26,7 +26,7 @@ create_script() {
 @test "lib_str can be sourced more than once" {
     source "$BASE_BASH_DIR/str/lib_str.sh"
 
-    [ "$(type -t str_trim)" = "function" ]
+    [ "$(type -t base_bash_libs_str_trim)" = "function" ]
 }
 
 @test "lib_str fails clearly when sourced without stdlib" {
@@ -39,7 +39,7 @@ create_script() {
 }
 
 @test "lib_str requires the stdlib loaded marker" {
-    bats_run bash -c 'log_error() { :; }; log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/str/lib_str.sh"
+    bats_run bash -c 'base_bash_libs_std_log_error() { :; }; base_bash_libs_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/str/lib_str.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_str.sh requires lib_std.sh to be sourced first"* ]]
@@ -51,16 +51,16 @@ create_script() {
 
     for mode in off e u p eu ep up eup; do
         for function_name in \
-            str_lower \
-            str_upper \
-            str_ltrim \
-            str_rtrim \
-            str_trim \
-            str_contains \
-            str_starts_with \
-            str_ends_with \
-            str_split \
-            str_join; do
+            base_bash_libs_str_lower \
+            base_bash_libs_str_upper \
+            base_bash_libs_str_ltrim \
+            base_bash_libs_str_rtrim \
+            base_bash_libs_str_trim \
+            base_bash_libs_str_contains \
+            base_bash_libs_str_starts_with \
+            base_bash_libs_str_ends_with \
+            base_bash_libs_str_split \
+            base_bash_libs_str_join; do
             bats_run "$BASH" -c '
                 mode="$1"
                 case "$mode" in *e*) set -e ;; esac
@@ -84,12 +84,12 @@ create_script() {
     local value="Alpha BETA 123!?"
     local stdout_file="$TEST_TMPDIR/case.stdout"
 
-    str_lower value >"$stdout_file"
+    base_bash_libs_str_lower value >"$stdout_file"
 
     [ "$value" = "alpha beta 123!?" ]
     [ ! -s "$stdout_file" ]
 
-    str_upper value >"$stdout_file"
+    base_bash_libs_str_upper value >"$stdout_file"
 
     [ "$value" = "ALPHA BETA 123!?" ]
     [ ! -s "$stdout_file" ]
@@ -101,9 +101,9 @@ create_script() {
     local right=$' \t  hello world  \t '
     local stdout_file="$TEST_TMPDIR/trim.stdout"
 
-    str_trim value >"$stdout_file"
-    str_ltrim left >"$stdout_file"
-    str_rtrim right >"$stdout_file"
+    base_bash_libs_str_trim value >"$stdout_file"
+    base_bash_libs_str_ltrim left >"$stdout_file"
+    base_bash_libs_str_rtrim right >"$stdout_file"
 
     [ "$value" = "hello world" ]
     [ "$left" = $'hello world  \t ' ]
@@ -117,7 +117,7 @@ create_script() {
     local rc
 
     readonly value
-    if str_lower value 2>"$stderr_file"; then
+    if base_bash_libs_str_lower value 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -139,7 +139,7 @@ create_script() {
             source "$2"
             printf -v "$3" %s MiXeD
             readonly "$3"
-            str_lower "$3"
+            base_bash_libs_str_lower "$3"
             case $? in
                 1) ;;
                 *) exit 99 ;;
@@ -164,28 +164,28 @@ create_script() {
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 secret="not-valid"
-str_trim "\$secret"
+base_bash_libs_str_trim "\$secret"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
 @test "string predicate helpers check contains prefix and suffix" {
-    str_contains "release-v1.2.3.tar.gz" "v1.2"
-    str_starts_with "release-v1.2.3.tar.gz" "release-"
-    str_ends_with "release-v1.2.3.tar.gz" ".tar.gz"
+    base_bash_libs_str_contains "release-v1.2.3.tar.gz" "v1.2"
+    base_bash_libs_str_starts_with "release-v1.2.3.tar.gz" "release-"
+    base_bash_libs_str_ends_with "release-v1.2.3.tar.gz" ".tar.gz"
 
-    if str_contains "release-v1.2.3.tar.gz" "v2"; then
+    if base_bash_libs_str_contains "release-v1.2.3.tar.gz" "v2"; then
         return 1
     fi
-    if str_starts_with "release-v1.2.3.tar.gz" "debug-"; then
+    if base_bash_libs_str_starts_with "release-v1.2.3.tar.gz" "debug-"; then
         return 1
     fi
-    if str_ends_with "release-v1.2.3.tar.gz" ".zip"; then
+    if base_bash_libs_str_ends_with "release-v1.2.3.tar.gz" ".zip"; then
         return 1
     fi
 }
@@ -200,23 +200,23 @@ source "$BASE_BASH_DIR/str/lib_str.sh"
 "\$@"
 EOF
 
-    bats_run bash "$script" str_contains "needle-only"
+    bats_run bash "$script" base_bash_libs_str_contains "needle-only"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Argument count mismatch: expected 2 but got 1 arguments"* ]]
 
-    bats_run bash "$script" str_starts_with "value" "prefix" "extra"
+    bats_run bash "$script" base_bash_libs_str_starts_with "value" "prefix" "extra"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Argument count mismatch: expected 2 but got 3 arguments"* ]]
 
-    bats_run bash "$script" str_ends_with
+    bats_run bash "$script" base_bash_libs_str_ends_with
     [ "$status" -eq 1 ]
     [[ "$output" == *"Argument count mismatch: expected 2 but got 0 arguments"* ]]
 }
 
-@test "str_split stores delimited fields in a named array" {
+@test "base_bash_libs_str_split stores delimited fields in a named array" {
     local -a parts=()
 
-    str_split parts "alpha,beta,,gamma" ","
+    base_bash_libs_str_split parts "alpha,beta,,gamma" ","
 
     [ "${#parts[@]}" -eq 4 ]
     [ "${parts[0]}" = "alpha" ]
@@ -225,10 +225,10 @@ EOF
     [ "${parts[3]}" = "gamma" ]
 }
 
-@test "str_split preserves a trailing empty field after a trailing separator" {
+@test "base_bash_libs_str_split preserves a trailing empty field after a trailing separator" {
     local -a parts=()
 
-    str_split parts "alpha,beta," ","
+    base_bash_libs_str_split parts "alpha,beta," ","
 
     [ "${#parts[@]}" -eq 3 ]
     [ "${parts[0]}" = "alpha" ]
@@ -236,10 +236,10 @@ EOF
     [ "${parts[2]}" = "" ]
 }
 
-@test "str_split can store results in an array named fields" {
+@test "base_bash_libs_str_split can store results in an array named fields" {
     local -a fields=()
 
-    str_split fields "alpha:beta:gamma" ":"
+    base_bash_libs_str_split fields "alpha:beta:gamma" ":"
 
     [ "${#fields[@]}" -eq 3 ]
     [ "${fields[0]}" = "alpha" ]
@@ -247,7 +247,7 @@ EOF
     [ "${fields[2]}" = "gamma" ]
 }
 
-@test "str_split rejects invalid result variable names" {
+@test "base_bash_libs_str_split rejects invalid result variable names" {
     local script="$TEST_TMPDIR/str-split-invalid.sh"
 
     create_script "$script" <<EOF
@@ -255,43 +255,43 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 secret="not-valid"
-str_split "\$secret" "alpha,beta" ","
+base_bash_libs_str_split "\$secret" "alpha,beta" ","
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "str_join writes joined array values to a named result variable" {
+@test "base_bash_libs_str_join writes joined array values to a named result variable" {
     local -a values=("alpha" "beta gamma" "")
     local joined=""
 
-    str_join joined "|" values
+    base_bash_libs_str_join joined "|" values
 
     [ "$joined" = "alpha|beta gamma|" ]
 }
 
-@test "str_join supports shadowing-prone result and source array names" {
+@test "base_bash_libs_str_join supports shadowing-prone result and source array names" {
     local -a values=("alpha" "beta")
     local -a array_name=("left" "right")
     local result_name=""
     local joined=""
 
-    str_join result_name "," values
-    str_join joined "|" array_name
+    base_bash_libs_str_join result_name "," values
+    base_bash_libs_str_join joined "|" array_name
 
     [ "$result_name" = "alpha,beta" ]
     [ "$joined" = "left|right" ]
 }
 
-@test "str_join rejects a source alias before mutation" {
+@test "base_bash_libs_str_join rejects a source alias before mutation" {
     local -a values=("alpha" "beta")
     local rc
 
-    if str_join values "," values 2>/dev/null; then
+    if base_bash_libs_str_join values "," values 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -303,7 +303,7 @@ EOF
     [ "${values[1]}" = "beta" ]
 }
 
-@test "str_join handles a declared-empty array under nounset" {
+@test "base_bash_libs_str_join handles a declared-empty array under nounset" {
     local script="$TEST_TMPDIR/str-join-empty-nounset.sh"
 
     create_script "$script" <<EOF
@@ -313,7 +313,7 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 declare -a values=()
 joined=invalid
-str_join joined "," values
+base_bash_libs_str_join joined "," values
 [[ -z "\$joined" ]]
 EOF
 
@@ -322,33 +322,33 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-@test "str_lower rejects reserved internal output names" {
-    local __str_var_name="Mixed Case"
+@test "base_bash_libs_str_lower rejects reserved internal output names" {
+    local __base_bash_libs_str_var_name="Mixed Case"
     local stderr_file="$TEST_TMPDIR/str-reserved-output.err"
     local rc
 
-    if str_lower __str_var_name 2>"$stderr_file"; then
+    if base_bash_libs_str_lower __base_bash_libs_str_var_name 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
 
     [ "$rc" -eq 1 ]
-    [ "$__str_var_name" = "Mixed Case" ]
+    [ "$__base_bash_libs_str_var_name" = "Mixed Case" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
 }
 
 @test "string helpers reject exact internal holder names before locals or mutation" {
-    local -r __str_var_name=actual
+    local -r __base_bash_libs_str_var_name=actual
     local actual="Mixed Case"
-    local -r __str_join_result_name=joined
+    local -r __base_bash_libs_str_join_result_name=joined
     local joined="keep"
     local -a values=(alpha beta)
-    local -ar __str_join_values=(alpha beta)
+    local -ar __base_bash_libs_str_join_values=(alpha beta)
     local stderr_file="$TEST_TMPDIR/str-internal-holder.err"
     local rc
 
-    if str_lower __str_var_name 2>"$stderr_file"; then
+    if base_bash_libs_str_lower __base_bash_libs_str_var_name 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -356,7 +356,7 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$actual" = "Mixed Case" ]
 
-    if str_join __str_join_result_name , values 2>"$stderr_file"; then
+    if base_bash_libs_str_join __base_bash_libs_str_join_result_name , values 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -364,19 +364,19 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$joined" = "keep" ]
 
-    if str_join joined , __str_join_values 2>"$stderr_file"; then
+    if base_bash_libs_str_join joined , __base_bash_libs_str_join_values 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
     [ "$joined" = "keep" ]
-    [ "${__str_join_values[*]}" = "alpha beta" ]
+    [ "${__base_bash_libs_str_join_values[*]}" = "alpha beta" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
-@test "str_join rejects invalid variable names" {
+@test "base_bash_libs_str_join rejects invalid variable names" {
     local script="$TEST_TMPDIR/str-join-invalid-array.sh"
 
     create_script "$script" <<EOF
@@ -384,13 +384,13 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 secret="not-valid"
-str_join joined " " "\$secret"
+base_bash_libs_str_join joined " " "\$secret"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 
     script="$TEST_TMPDIR/str-join-invalid-result.sh"
@@ -400,13 +400,13 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 declare -a values=("alpha")
 secret="not-valid"
-str_join "\$secret" " " values
+base_bash_libs_str_join "\$secret" " " values
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -422,7 +422,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 parts=""
-str_split parts "alpha,beta" ","
+base_bash_libs_str_split parts "alpha,beta" ","
 EOF
 
     bats_run bash "$script"
@@ -436,7 +436,7 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/str/lib_str.sh"
 declare -A values=([alpha]="one")
 joined=""
-str_join joined "," values
+base_bash_libs_str_join joined "," values
 EOF
 
     bats_run bash "$script"

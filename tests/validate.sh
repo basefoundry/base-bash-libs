@@ -13,10 +13,12 @@ required_files=(
   NOTICE
   base_manifest.yaml
   docs/versioning-policy.md
+  docs/v2-symbol-map.md
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   bin/base-bash
   scripts/release
+  scripts/migrate-v2-symbols
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
@@ -46,6 +48,7 @@ required_files=(
   lib/bash/tests/test_helper.sh
   tests/launcher.bats
   tests/release.bats
+  tests/namespace-contract.bats
   tests/lint-warnings.sh
 )
 
@@ -77,6 +80,7 @@ check_no_strict_mode() {
     tests/bash-option-contract.sh
     tests/validate.sh
     tests/lint-warnings.sh
+    scripts/migrate-v2-symbols
     examples/*.sh
     lib/bash/*/lib_*.sh
   )
@@ -204,6 +208,7 @@ done
 run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
   scripts/release \
+  scripts/migrate-v2-symbols \
   tests/fixtures/basectl-release-stub \
   tests/bash-42-release-smoke.sh \
   tests/bash-42-logging-smoke.sh \
@@ -222,11 +227,13 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   lib/bash/list/lib_list.sh \
   lib/bash/tests/test_helper.sh \
   tests/launcher.bats \
-  tests/release.bats
+  tests/release.bats \
+  tests/namespace-contract.bats
 
 bats_files=(
   tests/launcher.bats
   tests/release.bats
+  tests/namespace-contract.bats
   lib/bash/std/tests/lib_std.bats
   lib/bash/file/tests/lib_file.bats
   lib/bash/git/tests/lib_git.bats

@@ -13,23 +13,23 @@ base_bash_libs_require_version 1.0.0
 workspace_dir=""
 report_file=""
 
-std_make_temp_dir workspace_dir "base-cookbook"
-std_make_temp_file report_file "base-cookbook"
+base_bash_libs_std_make_temp_dir workspace_dir "base-cookbook"
+base_bash_libs_std_make_temp_file report_file "base-cookbook"
 
 cleanup_marker() {
-    log_debug "cleaning cookbook workspace: $workspace_dir"
+    base_bash_libs_std_log_debug "cleaning cookbook workspace: $workspace_dir"
 }
 
-std_register_cleanup_hook cleanup_marker
+base_bash_libs_std_register_cleanup_hook cleanup_marker
 
 printf 'workspace=%s\n' "$workspace_dir" >"$report_file"
-std_run --no-exit --quiet --timeout 5 test -s "$report_file"
+base_bash_libs_std_run --no-exit --quiet --timeout 5 test -s "$report_file"
 
 printf_path=""
-if std_command_path printf_path printf; then
-    std_run --no-exit --quiet "$printf_path" 'report_file=%s\n' "$report_file"
+if base_bash_libs_std_command_path printf_path printf; then
+    base_bash_libs_std_run --no-exit --quiet "$printf_path" 'report_file=%s\n' "$report_file"
 fi
 
-if std_function_exists cleanup_marker; then
-    log_info "Registered cleanup hook for cookbook example."
+if base_bash_libs_std_function_exists cleanup_marker; then
+    base_bash_libs_std_log_info "Registered cleanup hook for cookbook example."
 fi
