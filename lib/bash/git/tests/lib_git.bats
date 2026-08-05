@@ -6,14 +6,14 @@ setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
     declare -a setup_args=()
-    bl_init setup_args --source "$BASE_BASH_DIR/git/tests/lib_git.bats" --
+    base_init setup_args --source "$BASE_BASH_DIR/git/tests/lib_git.bats" --
     source "$BASE_BASH_DIR/git/lib_git.sh"
 }
 
 @test "lib_git can be sourced more than once" {
     source "$BASE_BASH_DIR/git/lib_git.sh"
 
-    [ "$(type -t bl_git_update_repo)" = "function" ]
+    [ "$(type -t base_git_update_repo)" = "function" ]
 }
 
 @test "lib_git fails clearly when sourced without stdlib" {
@@ -26,7 +26,7 @@ setup() {
 }
 
 @test "lib_git requires the stdlib loaded marker" {
-    bats_run bash -c 'bl_std_log_error() { :; }; bl_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/git/lib_git.sh"
+    bats_run bash -c 'base_std_log_error() { :; }; base_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/git/lib_git.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_git.sh requires lib_std.sh to be sourced first"* ]]
@@ -38,13 +38,13 @@ setup() {
 
     for mode in off e u p eu ep up eup; do
         for function_name in \
-            bl_git_detect_default_branch \
-            bl_git_worktree_path_for_branch \
-            bl_git_branch_upstream \
-            bl_git_branch_merged_to_ref \
-            bl_git_update_repo \
-            bl_git_get_current_branch \
-            bl_git_check_script_up_to_date; do
+            base_git_detect_default_branch \
+            base_git_worktree_path_for_branch \
+            base_git_branch_upstream \
+            base_git_branch_merged_to_ref \
+            base_git_update_repo \
+            base_git_get_current_branch \
+            base_git_check_script_up_to_date; do
             bats_run "$BASH" -c '
                 mode="$1"
                 case "$mode" in *e*) set -e ;; esac
@@ -52,7 +52,7 @@ setup() {
                 case "$mode" in *p*) set -o pipefail ;; esac
                 source "$2"
                 declare -a app_args=()
-                bl_init app_args --source "$0" --
+                base_init app_args --source "$0" --
                 source "$3"
                 "$4"
                 rc=$?
@@ -67,25 +67,25 @@ setup() {
 }
 
 @test "git optional forms reject excess arguments and unsupported option placement" {
-    capture_command bl_git_list_worktree_branches one two
+    capture_command base_git_list_worktree_branches one two
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_list_worktree_branches [repo_dir]"* ]]
+    [[ "$output" == *"Usage: base_git_list_worktree_branches [repo_dir]"* ]]
 
-    capture_command bl_git_list_remote_branches one two
+    capture_command base_git_list_remote_branches one two
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_list_remote_branches [repo_dir]"* ]]
+    [[ "$output" == *"Usage: base_git_list_remote_branches [repo_dir]"* ]]
 
-    capture_command bl_git_worktree_path_for_branch branch repo extra
+    capture_command base_git_worktree_path_for_branch branch repo extra
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_worktree_path_for_branch <branch> [repo_dir]"* ]]
+    [[ "$output" == *"Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"* ]]
 
-    capture_command bl_git_check_script_up_to_date --refresh script.sh
+    capture_command base_git_check_script_up_to_date --refresh script.sh
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_check_script_up_to_date [--fetch] <script_path>"* ]]
+    [[ "$output" == *"Usage: base_git_check_script_up_to_date [--fetch] <script_path>"* ]]
 
-    capture_command bl_git_check_script_up_to_date --fetch
+    capture_command base_git_check_script_up_to_date --fetch
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_check_script_up_to_date [--fetch] <script_path>"* ]]
+    [[ "$output" == *"Usage: base_git_check_script_up_to_date [--fetch] <script_path>"* ]]
 }
 
 @test "git remote parsing is independent of and preserves caller IFS" {
@@ -102,7 +102,7 @@ setup() {
     }
 
     IFS=:
-    if bl_git_list_remote_branches "$TEST_TMPDIR" >"$output_file"; then
+    if base_git_list_remote_branches "$TEST_TMPDIR" >"$output_file"; then
         rc=0
     else
         rc=$?
@@ -134,9 +134,9 @@ setup() {
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
             declare -a app_args=()
-            bl_init app_args --
+            base_init app_args --
             source "$3"
-            bl_git_branch_merged_to_ref "$4" feature main
+            base_git_branch_merged_to_ref "$4" feature main
             rc=$?
             exit "$rc"
         ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$repo"
@@ -146,7 +146,7 @@ setup() {
     done
 }
 
-@test "bl_git_detect_default_branch resolves origin HEAD and fallback branches" {
+@test "base_git_detect_default_branch resolves origin HEAD and fallback branches" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
 
@@ -156,11 +156,11 @@ setup() {
     git -C "$repo" update-ref refs/remotes/origin/trunk HEAD
     git -C "$repo" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk
 
-    bl_git_detect_default_branch "$repo" branch
+    base_git_detect_default_branch "$repo" branch
     [ "$branch" = "trunk" ]
 
     git -C "$repo" symbolic-ref -d refs/remotes/origin/HEAD
-    bl_git_detect_default_branch "$repo" branch
+    base_git_detect_default_branch "$repo" branch
     [ "$branch" = "main" ]
 }
 
@@ -170,11 +170,11 @@ setup() {
         return 7
     }
 
-    capture_command bl_git_worktree_path_for_branch feature
+    capture_command base_git_worktree_path_for_branch feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Unable to list Git worktrees."* ]]
 
-    capture_command bl_git_list_worktree_branches
+    capture_command base_git_list_worktree_branches
     [ "$status" -eq 1 ]
     [[ "$output" == *"Unable to list Git worktrees."* ]]
     unset -f git
@@ -197,11 +197,11 @@ EOF
         command git "$@"
     }
 
-    capture_command bl_git_worktree_path_for_branch feature/test
+    capture_command base_git_worktree_path_for_branch feature/test
     [ "$status" -eq 0 ]
     [ "$output" = "/tmp/feature" ]
 
-    capture_command bl_git_list_worktree_branches
+    capture_command base_git_list_worktree_branches
     [ "$status" -eq 0 ]
     [[ "$output" == *$'/tmp/main\tmain'* ]]
     [[ "$output" == *$'/tmp/feature\tfeature/test'* ]]
@@ -213,7 +213,7 @@ EOF
         set -u
         source "$1"
         declare -a app_args=()
-        bl_init app_args --
+        base_init app_args --
         source "$2"
         git() {
             printf "%s\n" \
@@ -225,8 +225,8 @@ EOF
                 "HEAD def456" \
                 "branch refs/heads/feature/test"
         }
-        bl_git_worktree_path_for_branch feature/test
-        bl_git_list_worktree_branches /tmp/repo
+        base_git_worktree_path_for_branch feature/test
+        base_git_list_worktree_branches /tmp/repo
     ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh"
 
     [ "$status" -eq 0 ]
@@ -245,9 +245,9 @@ EOF
     commit_all "$repo" "Initial commit"
     git -C "$repo" branch feature
 
-    branch_output="$(bl_git_branch_upstream "$repo" main)"
+    branch_output="$(base_git_branch_upstream "$repo" main)"
     [ -z "$branch_output" ]
-    bl_git_branch_merged_to_ref "$repo" feature main
+    base_git_branch_merged_to_ref "$repo" feature main
 
     git() {
         if [[ "${1:-}" == "-C" && "${3:-}" == "ls-remote" ]]; then
@@ -257,22 +257,22 @@ EOF
         fi
         command git "$@"
     }
-    remote_output="$(bl_git_list_remote_branches "$repo")"
+    remote_output="$(base_git_list_remote_branches "$repo")"
     unset -f git
     [ "$remote_output" = "main" ]
 }
 
-@test "bl_git_get_current_branch returns the current branch name" {
+@test "base_git_get_current_branch returns the current branch name" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
 
     init_git_repo "$repo"
-    bl_git_get_current_branch "$repo" branch
+    base_git_get_current_branch "$repo" branch
 
     [ "$branch" = "main" ]
 }
 
-@test "bl_git_get_current_branch rejects readonly result variables" {
+@test "base_git_get_current_branch rejects readonly result variables" {
     local repo="$TEST_TMPDIR/repo"
     local branch="sentinel"
     local stderr_file="$TEST_TMPDIR/git-readonly-output.err"
@@ -280,7 +280,7 @@ EOF
 
     init_git_repo "$repo"
     readonly branch
-    if bl_git_get_current_branch "$repo" branch 2>"$stderr_file"; then
+    if base_git_get_current_branch "$repo" branch 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -299,7 +299,7 @@ EOF
     local stderr_file="$TEST_TMPDIR/git-internal-holder.err"
     local rc
 
-    if bl_git_detect_default_branch . __base_bash_libs_git_detect_result_name 2>"$stderr_file"; then
+    if base_git_detect_default_branch . __base_bash_libs_git_detect_result_name 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -307,7 +307,7 @@ EOF
     [ "$rc" -eq 1 ]
     [ "$detected" = "keep-detected" ]
 
-    if bl_git_get_current_branch . __base_bash_libs_git_branch_result_name 2>"$stderr_file"; then
+    if base_git_get_current_branch . __base_bash_libs_git_branch_result_name 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -318,21 +318,21 @@ EOF
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
-@test "bl_git_get_current_branch supports shadowing-prone output variable names" {
+@test "base_git_get_current_branch supports shadowing-prone output variable names" {
     local repo="$TEST_TMPDIR/repo"
     local result_var_name=""
     local branch_name=""
 
     init_git_repo "$repo"
 
-    bl_git_get_current_branch "$repo" result_var_name
-    bl_git_get_current_branch "$repo" branch_name
+    base_git_get_current_branch "$repo" result_var_name
+    base_git_get_current_branch "$repo" branch_name
 
     [ "$result_var_name" = "main" ]
     [ "$branch_name" = "main" ]
 }
 
-@test "bl_git_get_current_branch reports detached head" {
+@test "base_git_get_current_branch reports detached head" {
     local repo="$TEST_TMPDIR/repo"
     local branch=""
 
@@ -341,16 +341,16 @@ EOF
     commit_all "$repo" "Initial commit"
     git -C "$repo" checkout --detach >/dev/null 2>&1
 
-    bl_git_get_current_branch "$repo" branch
+    base_git_get_current_branch "$repo" branch
 
     [ "$branch" = "detached head" ]
 }
 
-@test "bl_git_get_current_branch leaves missing directories as empty success" {
+@test "base_git_get_current_branch leaves missing directories as empty success" {
     local branch="sentinel"
     local rc
 
-    if bl_git_get_current_branch "$TEST_TMPDIR/missing" branch; then
+    if base_git_get_current_branch "$TEST_TMPDIR/missing" branch; then
         rc=0
     else
         rc=$?
@@ -360,7 +360,7 @@ EOF
     [ "$branch" = "" ]
 }
 
-@test "bl_git_get_current_branch does not use pushd or popd" {
+@test "base_git_get_current_branch does not use pushd or popd" {
     local repo="$TEST_TMPDIR/repo"
     local branch="" rc
 
@@ -374,7 +374,7 @@ EOF
         return 99
     }
 
-    if bl_git_get_current_branch "$repo" branch; then
+    if base_git_get_current_branch "$repo" branch; then
         rc=0
     else
         rc=$?
@@ -385,45 +385,45 @@ EOF
     [ "$branch" = "main" ]
 }
 
-@test "bl_git_get_current_branch usage names the current function" {
-    bats_run bl_git_get_current_branch
+@test "base_git_get_current_branch usage names the current function" {
+    bats_run base_git_get_current_branch
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_get_current_branch <directory> <result_variable_name>"* ]]
+    [[ "$output" == *"Usage: base_git_get_current_branch <directory> <result_variable_name>"* ]]
     [[ "$output" != *"Usage: get_git_branch"* ]]
 }
 
-@test "bl_git_get_current_branch rejects invalid result variable names" {
+@test "base_git_get_current_branch rejects invalid result variable names" {
     local repo="$TEST_TMPDIR/repo"
 
     init_git_repo "$repo"
 
-    bats_run bl_git_get_current_branch "$repo" "bad-name"
+    bats_run base_git_get_current_branch "$repo" "bad-name"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"bl_git_get_current_branch: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" == *"base_git_get_current_branch: result variable name must be a valid Bash variable name"* ]]
     [[ "$output" != *"invalid variable name"* ]]
 }
 
-@test "bl_git_update_repo usage names the current function" {
-    capture_command bl_git_update_repo
+@test "base_git_update_repo usage names the current function" {
+    capture_command base_git_update_repo
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage: bl_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
+    [[ "$output" == *"Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
     [[ "$output" != *"Usage: update_repo"* ]]
 }
 
-@test "bl_git_update_repo skips dirty repositories when no dirty path is allowed" {
+@test "base_git_update_repo skips dirty repositories when no dirty path is allowed" {
     local repo="$TEST_TMPDIR/repo"
 
     init_git_repo "$repo"
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
     printf 'local change\n' > "$repo/data.txt"
-    bl_std_set_log_level DEBUG
-    bl_std_set_log_category_level -l base_bash_libs.git DEBUG
+    base_std_set_log_level DEBUG
+    base_std_set_log_category_level -l base_bash_libs.git DEBUG
 
-    capture_command bl_git_update_repo "$repo"
+    capture_command base_git_update_repo "$repo"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
@@ -435,9 +435,9 @@ EOF
     init_git_repo "$repo"
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
-    bl_std_set_log_level DEBUG
+    base_std_set_log_level DEBUG
 
-    capture_command bl_git_update_repo "$repo" "" release
+    capture_command base_git_update_repo "$repo" "" release
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"not 'release'. Skipping update"* ]]
@@ -449,10 +449,10 @@ EOF
     init_git_repo "$repo"
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
-    bl_std_set_log_level DEBUG
-    bl_std_set_log_category_level -l base_bash_libs.git DEBUG
+    base_std_set_log_level DEBUG
+    base_std_set_log_category_level -l base_bash_libs.git DEBUG
 
-    capture_command bl_git_update_repo "$repo" "" release
+    capture_command base_git_update_repo "$repo" "" release
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"not 'release'. Skipping update"* ]]
@@ -464,16 +464,16 @@ EOF
     init_git_repo "$repo"
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
-    bl_std_set_log_level DEBUG
-    bl_std_set_log_category_level -l base_bash_libs DEBUG
+    base_std_set_log_level DEBUG
+    base_std_set_log_category_level -l base_bash_libs DEBUG
 
-    capture_command bl_git_update_repo "$repo" "" release
+    capture_command base_git_update_repo "$repo" "" release
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"not 'release'. Skipping update"* ]]
 }
 
-@test "bl_git_update_repo fails clearly when origin remote is missing" {
+@test "base_git_update_repo fails clearly when origin remote is missing" {
     local before_head
     local repo="$TEST_TMPDIR/repo"
 
@@ -482,7 +482,7 @@ EOF
     commit_all "$repo" "Initial commit"
     before_head="$(git -C "$repo" rev-parse HEAD)"
 
-    capture_command bl_git_update_repo "$repo" "" main
+    capture_command base_git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -491,7 +491,7 @@ EOF
     [ -z "$(git -C "$repo" status --porcelain)" ]
 }
 
-@test "bl_git_update_repo fails clearly when origin remote is unreachable" {
+@test "base_git_update_repo fails clearly when origin remote is unreachable" {
     local before_head
     local remote="$TEST_TMPDIR/remote.git"
     local repo="$TEST_TMPDIR/repo"
@@ -500,7 +500,7 @@ EOF
     before_head="$(git -C "$repo" rev-parse HEAD)"
     git -C "$repo" remote set-url origin "$TEST_TMPDIR/missing-remote.git"
 
-    capture_command bl_git_update_repo "$repo" "" main
+    capture_command base_git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -509,7 +509,7 @@ EOF
     [ -z "$(git -C "$repo" status --porcelain)" ]
 }
 
-@test "bl_git_update_repo fails on non-fast-forward updates without changing HEAD" {
+@test "base_git_update_repo fails on non-fast-forward updates without changing HEAD" {
     local before_head
     local other="$TEST_TMPDIR/other"
     local remote="$TEST_TMPDIR/remote.git"
@@ -526,7 +526,7 @@ EOF
     git -C "$other" commit --amend -m "Rewrite remote history" >/dev/null 2>&1
     git -C "$other" push --force origin main >/dev/null 2>&1
 
-    capture_command bl_git_update_repo "$repo" "" main
+    capture_command base_git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -535,7 +535,7 @@ EOF
     [ -z "$(git -C "$repo" status --porcelain)" ]
 }
 
-@test "bl_git_update_repo lets git protect untracked files from incoming tracked paths" {
+@test "base_git_update_repo lets git protect untracked files from incoming tracked paths" {
     local before_head
     local other="$TEST_TMPDIR/other"
     local remote="$TEST_TMPDIR/remote.git"
@@ -552,7 +552,7 @@ EOF
     git -C "$other" push origin main >/dev/null 2>&1
     printf 'local untracked\n' > "$repo/local-notes.md"
 
-    capture_command bl_git_update_repo "$repo" "" main
+    capture_command base_git_update_repo "$repo" "" main
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull failed on repo '$repo'"* ]]
@@ -561,7 +561,7 @@ EOF
     ! git -C "$repo" ls-files --error-unmatch local-notes.md >/dev/null 2>&1
 }
 
-@test "bl_git_update_repo accepts main as the detected update branch" {
+@test "base_git_update_repo accepts main as the detected update branch" {
     local repo="$TEST_TMPDIR/repo"
 
     init_git_repo "$repo"
@@ -569,10 +569,10 @@ EOF
     printf 'base\n' > "$repo/data.txt"
     commit_all "$repo" "Initial commit"
     printf 'local change\n' > "$repo/data.txt"
-    bl_std_set_log_level DEBUG
-    bl_std_set_log_category_level -l base_bash_libs.git DEBUG
+    base_std_set_log_level DEBUG
+    base_std_set_log_category_level -l base_bash_libs.git DEBUG
 
-    capture_command bl_git_update_repo "$repo"
+    capture_command base_git_update_repo "$repo"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
@@ -726,7 +726,7 @@ EOF
     [ "$rc" -eq 0 ]
 }
 
-@test "bl_git_update_repo cleans up temp log without changing RETURN trap" {
+@test "base_git_update_repo cleans up temp log without changing RETURN trap" {
     local repo="$TEST_TMPDIR/repo"
     local temp_dir="$TEST_TMPDIR/git-temp"
     local return_trap
@@ -738,7 +738,7 @@ EOF
     printf 'local change\n' > "$repo/data.txt"
 
     trap 'printf "outer return trap\n"' RETURN
-    TMPDIR="$temp_dir" capture_command bl_git_update_repo "$repo"
+    TMPDIR="$temp_dir" capture_command base_git_update_repo "$repo"
     return_trap="$(trap -p RETURN)"
     trap - RETURN
 
@@ -747,7 +747,7 @@ EOF
     ! compgen -G "$temp_dir/git_log.*" >/dev/null
 }
 
-@test "bl_git_update_repo registers temp log for cleanup" {
+@test "base_git_update_repo registers temp log for cleanup" {
     local repo="$TEST_TMPDIR/repo"
     local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
 
@@ -756,14 +756,14 @@ EOF
     commit_all "$repo" "Initial commit"
     printf 'local change\n' > "$repo/data.txt"
 
-    eval "$(declare -f bl_std_register_cleanup_path | sed '1s/bl_std_register_cleanup_path/__orig_std_register_cleanup_path/')"
-    bl_std_register_cleanup_path() {
+    eval "$(declare -f base_std_register_cleanup_path | sed '1s/base_std_register_cleanup_path/__orig_std_register_cleanup_path/')"
+    base_std_register_cleanup_path() {
         printf '%s\n' "$@" >> "$registration_file"
         __orig_std_register_cleanup_path "$@"
     }
 
-    capture_command bl_git_update_repo "$repo"
-    unset -f bl_std_register_cleanup_path __orig_std_register_cleanup_path
+    capture_command base_git_update_repo "$repo"
+    unset -f base_std_register_cleanup_path __orig_std_register_cleanup_path
 
     [ "$status" -eq 0 ]
     [[ "$(cat "$registration_file")" == *"git_log."* ]]
@@ -801,20 +801,20 @@ EOF
     local unregister_file="$TEST_TMPDIR/unregistered-paths.txt"
 
     printf 'pull output\n' > "$git_log"
-    eval "$(declare -f bl_std_unregister_cleanup_path | sed '1s/bl_std_unregister_cleanup_path/__orig_std_unregister_cleanup_path/')"
-    bl_std_unregister_cleanup_path() {
+    eval "$(declare -f base_std_unregister_cleanup_path | sed '1s/base_std_unregister_cleanup_path/__orig_std_unregister_cleanup_path/')"
+    base_std_unregister_cleanup_path() {
         printf '%s\n' "$@" >> "$unregister_file"
         __orig_std_unregister_cleanup_path "$@"
     }
 
     __base_bash_libs_git_update_repo_finish__ "$git_log" false 0
-    unset -f bl_std_unregister_cleanup_path __orig_std_unregister_cleanup_path
+    unset -f base_std_unregister_cleanup_path __orig_std_unregister_cleanup_path
 
     [ "$(cat "$unregister_file")" = "$git_log" ]
     [ ! -e "$git_log" ]
 }
 
-@test "bl_git_update_repo reports captured submodule diagnostics" {
+@test "base_git_update_repo reports captured submodule diagnostics" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
 
@@ -827,7 +827,7 @@ EOF
         command git "$@"
     }
 
-    capture_command bl_git_update_repo "$repo"
+    capture_command base_git_update_repo "$repo"
     unset -f git
 
     [ "$status" -eq 1 ]
@@ -953,20 +953,20 @@ EOF
     [ "$(cat "$git_log")" = "pull attempt 2" ]
 }
 
-@test "bl_git_check_script_up_to_date reports success for an up-to-date tracked script" {
+@test "base_git_check_script_up_to_date reports success for an up-to-date tracked script" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
 
     create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
-@test "bl_git_check_script_up_to_date uses local remote-tracking refs by default" {
+@test "base_git_check_script_up_to_date uses local remote-tracking refs by default" {
     local other="$TEST_TMPDIR/other"
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
@@ -981,30 +981,30 @@ EOF
     git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
     git -C "$other" push origin main >/dev/null 2>&1
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"Using local remote-tracking refs"* ]]
     [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports local remote-tracking refs at debug level" {
+@test "base_git_check_script_up_to_date reports local remote-tracking refs at debug level" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
 
     create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
-    bl_std_set_log_level DEBUG
-    bl_std_set_log_category_level -l base_bash_libs.git DEBUG
+    base_std_set_log_level DEBUG
+    base_std_set_log_category_level -l base_bash_libs.git DEBUG
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Using local remote-tracking refs; pass --fetch for a live remote check."* ]]
     [[ "$output" == *"Repository is up to date with origin/main."* ]]
 }
 
-@test "bl_git_check_script_up_to_date fetches before comparing when requested" {
+@test "base_git_check_script_up_to_date fetches before comparing when requested" {
     local other="$TEST_TMPDIR/other"
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
@@ -1019,14 +1019,14 @@ EOF
     git -C "$other" commit -m "Update remote script" >/dev/null 2>&1
     git -C "$other" push origin main >/dev/null 2>&1
 
-    bats_run bl_git_check_script_up_to_date --fetch "$script_path"
+    bats_run base_git_check_script_up_to_date --fetch "$script_path"
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"Fetched upstream state before latest-version check."* ]]
     [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
 
-@test "bl_git_check_script_up_to_date returns 3 for a dirty tracked script" {
+@test "base_git_check_script_up_to_date returns 3 for a dirty tracked script" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1034,13 +1034,13 @@ EOF
     create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
     printf 'echo dirty\n' >> "$script_path"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 3 ]
     [[ "$output" == *"has local modifications"* ]]
 }
 
-@test "bl_git_check_script_up_to_date returns 3 when a script is both behind and dirty" {
+@test "base_git_check_script_up_to_date returns 3 when a script is both behind and dirty" {
     local other="$TEST_TMPDIR/other"
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
@@ -1056,14 +1056,14 @@ EOF
     git -C "$other" push origin main >/dev/null 2>&1
     printf 'echo dirty\n' >> "$script_path"
 
-    bats_run bl_git_check_script_up_to_date --fetch "$script_path"
+    bats_run base_git_check_script_up_to_date --fetch "$script_path"
 
     [ "$status" -eq 3 ]
     [[ "$output" == *"has local modifications"* ]]
     [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
 
-@test "bl_git_check_script_up_to_date preserves dirty status when no upstream exists" {
+@test "base_git_check_script_up_to_date preserves dirty status when no upstream exists" {
     local repo="$TEST_TMPDIR/repo"
     local script_path="$repo/scripts/tool.sh"
 
@@ -1073,7 +1073,7 @@ EOF
     commit_all "$repo" "Initial script"
     printf 'echo dirty\n' >> "$script_path"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 3 ]
     [[ "$output" == *"has local modifications"* ]]
@@ -1081,7 +1081,7 @@ EOF
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports a clean missing-upstream skip explicitly" {
+@test "base_git_check_script_up_to_date reports a clean missing-upstream skip explicitly" {
     local repo="$TEST_TMPDIR/repo"
     local script_path="$repo/scripts/tool.sh"
 
@@ -1090,14 +1090,14 @@ EOF
     printf '#!/usr/bin/env bash\n' > "$script_path"
     commit_all "$repo" "Initial script"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"No upstream branch configured"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports detached HEAD without claiming freshness" {
+@test "base_git_check_script_up_to_date reports detached HEAD without claiming freshness" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1105,14 +1105,14 @@ EOF
     create_tracked_repo_with_upstream "$repo" "$remote" "scripts/tool.sh" "#!/usr/bin/env bash"
     git -C "$repo" checkout --detach HEAD >/dev/null 2>&1
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"detached HEAD state"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date preserves dirty status in detached HEAD" {
+@test "base_git_check_script_up_to_date preserves dirty status in detached HEAD" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1121,14 +1121,14 @@ EOF
     git -C "$repo" checkout --detach HEAD >/dev/null 2>&1
     printf 'echo dirty\n' >> "$script_path"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 3 ]
     [[ "$output" == *"has local modifications"* ]]
     [[ "$output" == *"detached HEAD state"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports untracked scripts as an explicit skip" {
+@test "base_git_check_script_up_to_date reports untracked scripts as an explicit skip" {
     local repo="$TEST_TMPDIR/repo"
     local script_path="$repo/scripts/tool.sh"
 
@@ -1138,28 +1138,28 @@ EOF
     commit_all "$repo" "Initial file"
     printf '#!/usr/bin/env bash\n' > "$script_path"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"is not tracked in git"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports non-repository paths as an explicit skip" {
+@test "base_git_check_script_up_to_date reports non-repository paths as an explicit skip" {
     local repo="$TEST_TMPDIR/not-a-repo"
     local script_path="$repo/scripts/tool.sh"
 
     mkdir -p "$(dirname "$script_path")"
     printf '#!/usr/bin/env bash\n' > "$script_path"
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Not in a Git repo"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date distinguishes a repository ahead of upstream" {
+@test "base_git_check_script_up_to_date distinguishes a repository ahead of upstream" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1169,14 +1169,14 @@ EOF
     git -C "$repo" add scripts/tool.sh
     git -C "$repo" commit -m "Local update" >/dev/null 2>&1
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"ahead of origin/main"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date returns a distinct status for divergence" {
+@test "base_git_check_script_up_to_date returns a distinct status for divergence" {
     local other="$TEST_TMPDIR/other"
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
@@ -1195,14 +1195,14 @@ EOF
     git -C "$repo" add scripts/tool.sh
     git -C "$repo" commit -m "Local update" >/dev/null 2>&1
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
 
     [ "$status" -eq 4 ]
     [[ "$output" == *"has diverged from origin/main"* ]]
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date fails closed when fetch fails" {
+@test "base_git_check_script_up_to_date fails closed when fetch fails" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1216,7 +1216,7 @@ EOF
         command git "$@"
     }
 
-    bats_run bl_git_check_script_up_to_date --fetch "$script_path"
+    bats_run base_git_check_script_up_to_date --fetch "$script_path"
     unset -f git
 
     [ "$status" -eq 5 ]
@@ -1224,7 +1224,7 @@ EOF
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date fails closed when rev-list fails" {
+@test "base_git_check_script_up_to_date fails closed when rev-list fails" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1238,7 +1238,7 @@ EOF
         command git "$@"
     }
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
     [ "$status" -eq 5 ]
@@ -1246,7 +1246,7 @@ EOF
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports repository discovery failures" {
+@test "base_git_check_script_up_to_date reports repository discovery failures" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1261,7 +1261,7 @@ EOF
         command git "$@"
     }
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
     [ "$status" -eq 5 ]
@@ -1269,7 +1269,7 @@ EOF
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date reports diff inspection failures" {
+@test "base_git_check_script_up_to_date reports diff inspection failures" {
     local repo="$TEST_TMPDIR/repo"
     local remote="$TEST_TMPDIR/remote.git"
     local script_path="$repo/scripts/tool.sh"
@@ -1283,7 +1283,7 @@ EOF
         command git "$@"
     }
 
-    bats_run bl_git_check_script_up_to_date "$script_path"
+    bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
     [ "$status" -eq 5 ]
@@ -1291,7 +1291,7 @@ EOF
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "bl_git_check_script_up_to_date preserves statuses under caller shell options" {
+@test "base_git_check_script_up_to_date preserves statuses under caller shell options" {
     local mode
     local repo="$TEST_TMPDIR/repo"
     local script_path="$repo/scripts/tool.sh"
@@ -1310,9 +1310,9 @@ EOF
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
             declare -a app_args=()
-            bl_init app_args --
+            base_init app_args --
             source "$3"
-            bl_git_check_script_up_to_date "$4"
+            base_git_check_script_up_to_date "$4"
         ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$script_path"
 
         [ "$status" -eq 3 ]

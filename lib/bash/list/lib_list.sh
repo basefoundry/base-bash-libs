@@ -14,44 +14,44 @@ __base_bash_libs_list_assert_distinct_names__() {
     local __base_bash_libs_list_operation="${1-}" __base_bash_libs_list_result_name="${2-}" __base_bash_libs_list_source_name="${3-}"
 
     if [[ "$__base_bash_libs_list_result_name" == "$__base_bash_libs_list_source_name" ]]; then
-        bl_std_log_error -l base_bash_libs.list \
+        base_std_log_error -l base_bash_libs.list \
             "$__base_bash_libs_list_operation: result and source variables must be distinct; '$__base_bash_libs_list_result_name' was provided for both."
         return 1
     fi
     return 0
 }
 
-bl_list_append() {
+base_list_append() {
     if (($# < 2)); then
-        bl_std_log_error -l base_bash_libs.list \
-            "bl_list_append: usage: bl_list_append <array_name> <value> [value...]"
+        base_std_log_error -l base_bash_libs.list \
+            "base_list_append: usage: base_list_append <array_name> <value> [value...]"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_append "${1-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_list_append "${1-}" || return 1
     local __base_bash_libs_list_array_name="$1"
     local -a __base_bash_libs_list_values=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_array_name"
-    bl_std_assert_indexed_array "$__base_bash_libs_list_array_name"
-    __base_bash_libs_std_assert_writable_output__ bl_list_append "$__base_bash_libs_list_array_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_list_array_name"
+    base_std_assert_indexed_array "$__base_bash_libs_list_array_name"
+    __base_bash_libs_std_assert_writable_output__ base_list_append "$__base_bash_libs_list_array_name" || return 1
     shift
     __base_bash_libs_list_values=("$@")
     eval "$__base_bash_libs_list_array_name+=(\"\${__base_bash_libs_list_values[@]}\")"
 }
 
-bl_list_prepend() {
+base_list_prepend() {
     if (($# < 2)); then
-        bl_std_log_error -l base_bash_libs.list \
-            "bl_list_prepend: usage: bl_list_prepend <array_name> <value> [value...]"
+        base_std_log_error -l base_bash_libs.list \
+            "base_list_prepend: usage: base_list_prepend <array_name> <value> [value...]"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_prepend "${1-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_list_prepend "${1-}" || return 1
     local __base_bash_libs_list_array_name="$1" __base_bash_libs_list_item
     local -a __base_bash_libs_list_values=() __base_bash_libs_list_current=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_array_name"
-    bl_std_assert_indexed_array "$__base_bash_libs_list_array_name"
-    __base_bash_libs_std_assert_writable_output__ bl_list_prepend "$__base_bash_libs_list_array_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_list_array_name"
+    base_std_assert_indexed_array "$__base_bash_libs_list_array_name"
+    __base_bash_libs_std_assert_writable_output__ base_list_prepend "$__base_bash_libs_list_array_name" || return 1
     shift
     __base_bash_libs_list_values=("$@")
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
@@ -67,15 +67,15 @@ bl_list_prepend() {
 #
 # Removes every exact match from a caller-owned indexed array in place.
 #
-bl_list_remove() {
-    bl_std_assert_arg_count "$#" 2
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_remove "${1-}" || return 1
+base_list_remove() {
+    base_std_assert_arg_count "$#" 2
+    __base_bash_libs_std_assert_public_variable_names__ base_list_remove "${1-}" || return 1
     local __base_bash_libs_list_array_name="$1" __base_bash_libs_list_needle="$2" __base_bash_libs_list_item
     local -a __base_bash_libs_list_current=() __base_bash_libs_list_filtered=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_array_name"
-    bl_std_assert_indexed_array "$__base_bash_libs_list_array_name"
-    __base_bash_libs_std_assert_writable_output__ bl_list_remove "$__base_bash_libs_list_array_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_list_array_name"
+    base_std_assert_indexed_array "$__base_bash_libs_list_array_name"
+    __base_bash_libs_std_assert_writable_output__ base_list_remove "$__base_bash_libs_list_array_name" || return 1
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     for __base_bash_libs_list_item in "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}"; do
@@ -89,14 +89,14 @@ bl_list_remove() {
     done
 }
 
-bl_list_contains() {
-    bl_std_assert_arg_count "$#" 2
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_contains "${2-}" || return 1
+base_list_contains() {
+    base_std_assert_arg_count "$#" 2
+    __base_bash_libs_std_assert_public_variable_names__ base_list_contains "${2-}" || return 1
     local __base_bash_libs_list_needle="$1" __base_bash_libs_list_array_name="$2" __base_bash_libs_list_item
     local -a __base_bash_libs_list_current=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_array_name"
-    bl_std_assert_indexed_array "$__base_bash_libs_list_array_name"
+    base_std_assert_variable_name "$__base_bash_libs_list_array_name"
+    base_std_assert_indexed_array "$__base_bash_libs_list_array_name"
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     for __base_bash_libs_list_item in "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}"; do
@@ -106,17 +106,17 @@ bl_list_contains() {
     return 1
 }
 
-bl_list_unique() {
-    bl_std_assert_arg_count "$#" 2
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_unique "${1-}" "${2-}" || return 1
+base_list_unique() {
+    base_std_assert_arg_count "$#" 2
+    __base_bash_libs_std_assert_public_variable_names__ base_list_unique "${1-}" "${2-}" || return 1
     local __base_bash_libs_list_result_name="$1" __base_bash_libs_list_array_name="$2" __base_bash_libs_list_item __base_bash_libs_list_key
     local -a __base_bash_libs_list_current=() __base_bash_libs_list_unique=()
     local -A __base_bash_libs_list_seen=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
-    __base_bash_libs_list_assert_distinct_names__ bl_list_unique "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ bl_list_unique "$__base_bash_libs_list_result_name" || return 1
-    bl_std_assert_indexed_array "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
+    base_std_assert_variable_name "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
+    __base_bash_libs_list_assert_distinct_names__ base_list_unique "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_list_unique "$__base_bash_libs_list_result_name" || return 1
+    base_std_assert_indexed_array "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     for __base_bash_libs_list_item in "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}"; do
@@ -132,17 +132,17 @@ bl_list_unique() {
     done
 }
 
-bl_list_length() {
-    bl_std_assert_arg_count "$#" 2
-    __base_bash_libs_std_assert_public_variable_names__ bl_list_length "${1-}" "${2-}" || return 1
+base_list_length() {
+    base_std_assert_arg_count "$#" 2
+    __base_bash_libs_std_assert_public_variable_names__ base_list_length "${1-}" "${2-}" || return 1
     local __base_bash_libs_list_result_name="$1" __base_bash_libs_list_array_name="$2"
     local __base_bash_libs_list_count=0
     local -a __base_bash_libs_list_current=()
 
-    bl_std_assert_variable_name "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
-    __base_bash_libs_list_assert_distinct_names__ bl_list_length "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ bl_list_length "$__base_bash_libs_list_result_name" || return 1
-    bl_std_assert_indexed_array "$__base_bash_libs_list_array_name"
+    base_std_assert_variable_name "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name"
+    __base_bash_libs_list_assert_distinct_names__ base_list_length "$__base_bash_libs_list_result_name" "$__base_bash_libs_list_array_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_list_length "$__base_bash_libs_list_result_name" || return 1
+    base_std_assert_indexed_array "$__base_bash_libs_list_array_name"
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     # shellcheck disable=SC2199 # The + expansion safely detects Bash 4.2 empty arrays under nounset.

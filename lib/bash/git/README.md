@@ -8,29 +8,29 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
 
 ## Public API
 
-- `bl_git_update_repo <repo> [allowed_dirty_path] [expected_branch]`
+- `base_git_update_repo <repo> [allowed_dirty_path] [expected_branch]`
   Update a repository on its detected default branch, optionally allowing tracked changes in one specific path.
-- `bl_git_get_current_branch <directory> <result_var>`
+- `base_git_get_current_branch <directory> <result_var>`
   Return the current branch name through a caller-provided variable, or `detached head`.
-- `bl_git_detect_default_branch <repo> <result_var>`
+- `base_git_detect_default_branch <repo> <result_var>`
   Detect a repository's default branch from its remote HEAD and standard local
   fallbacks.
-- `bl_git_worktree_path_for_branch <branch> [repo]`
+- `base_git_worktree_path_for_branch <branch> [repo]`
   Print the worktree path attached to a local branch.
-- `bl_git_list_worktree_branches [repo]`
+- `base_git_list_worktree_branches [repo]`
   Print tab-separated worktree path and branch rows.
-- `bl_git_branch_upstream <repo> <branch>`
+- `base_git_branch_upstream <repo> <branch>`
   Print the configured upstream ref for a local branch.
-- `bl_git_branch_merged_to_ref <repo> <branch> <ref>`
+- `base_git_branch_merged_to_ref <repo> <branch> <ref>`
   Check whether a local branch is an ancestor of a ref.
-- `bl_git_list_remote_branches [repo]`
+- `base_git_list_remote_branches [repo]`
   Print branch names from the `origin` remote.
-- `bl_git_check_script_up_to_date [--fetch] <script>`
+- `base_git_check_script_up_to_date [--fetch] <script>`
   Check whether a tracked script appears current relative to its configured upstream.
 
 ## Internal Helpers
 
-The `__base_bash_libs_git_*__` functions used by `bl_git_update_repo` are implementation details
+The `__base_bash_libs_git_*__` functions used by `base_git_update_repo` are implementation details
 and are not part of the public API. In particular, the path-dirty predicate
 checks whether tracked changes stay within an allowed path, while the update
 helpers manage branch selection, retries, and cleanup.
@@ -40,12 +40,12 @@ helpers manage branch selection, retries, and cleanup.
 ```bash
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" --
+base_init app_args --source "${BASH_SOURCE[0]}" --
 source "/absolute/path/to/lib/bash/git/lib_git.sh"
 
 branch=""
-bl_git_get_current_branch "$PWD" branch
-bl_std_log_info "Current branch: $branch"
+base_git_get_current_branch "$PWD" branch
+base_std_log_info "Current branch: $branch"
 ```
 
 ## Behavior Notes
@@ -58,27 +58,27 @@ bl_std_log_info "Current branch: $branch"
   `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters.
   Parsing that requires field splitting uses a command-scoped `IFS`, so a
   caller-defined value is preserved.
-- `bl_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
-- `bl_git_update_repo` retries `git pull --ff-only` twice by default. Set
+- `base_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
+- `base_git_update_repo` retries `git pull --ff-only` twice by default. Set
   `BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS` to a positive integer to change the retry count.
-- `bl_git_get_current_branch` uses `git -C` so it does not change the caller's
+- `base_git_get_current_branch` uses `git -C` so it does not change the caller's
   working directory or directory stack. Missing directories and non-Git
   directories return success with an empty result variable.
-- `bl_git_update_repo` changes into the target repository while it runs because
+- `base_git_update_repo` changes into the target repository while it runs because
   its submodule update sequence depends on repository-relative execution.
-- `bl_git_update_repo` only treats an allowed dirty path as safe when every tracked
+- `base_git_update_repo` only treats an allowed dirty path as safe when every tracked
   change stays within that path. Rename records must have both source and
   destination inside the allowed path.
-- `bl_git_check_script_up_to_date` treats a missing file, unavailable Git executable,
+- `base_git_check_script_up_to_date` treats a missing file, unavailable Git executable,
   non-repository path, untracked script, detached HEAD, and missing upstream as
   explicit skip states rather than hard failures. A dirty tracked script still
   returns status `3` when one of those skip states prevents comparison.
-- `bl_git_check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
-- `bl_git_check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first,
+- `base_git_check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
+- `base_git_check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first,
   then compares against the refreshed upstream ref. If fetch fails, the helper
   returns status `5`; it never reports freshness from an unverified comparison.
 
-### `bl_git_check_script_up_to_date` statuses
+### `base_git_check_script_up_to_date` statuses
 
 | Status | Meaning |
 | ---: | --- |

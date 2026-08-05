@@ -6,7 +6,7 @@ setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
     declare -a setup_args=()
-    bl_init setup_args --source "$BASE_BASH_DIR/arg/tests/lib_arg.bats" --
+    base_init setup_args --source "$BASE_BASH_DIR/arg/tests/lib_arg.bats" --
     source "$BASE_BASH_DIR/arg/lib_arg.sh"
 }
 
@@ -16,7 +16,7 @@ create_script() {
     content="$(cat)"
     source_line="source \"$BASE_BASH_DIR/std/lib_std.sh\""
     if [[ "$content" == *"$source_line"* ]]; then
-        init_lines=$'declare -a base_bash_libs_test_args=()\nbl_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
+        init_lines=$'declare -a base_bash_libs_test_args=()\nbase_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
         content="${content/"$source_line"/"$source_line"$'\n'"$init_lines"}"
     fi
     printf '%s\n' "$content" > "$script_path"
@@ -26,7 +26,7 @@ create_script() {
 @test "lib_arg can be sourced more than once" {
     source "$BASE_BASH_DIR/arg/lib_arg.sh"
 
-    [ "$(type -t bl_arg_parse)" = "function" ]
+    [ "$(type -t base_arg_parse)" = "function" ]
 }
 
 @test "lib_arg fails clearly when sourced without stdlib" {
@@ -39,14 +39,14 @@ create_script() {
 }
 
 @test "lib_arg requires the stdlib loaded marker" {
-    bats_run bash -c 'bl_std_log_error() { :; }; bl_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/arg/lib_arg.sh"
+    bats_run bash -c 'base_std_log_error() { :; }; base_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/arg/lib_arg.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_arg.sh requires lib_std.sh to be sourced first"* ]]
     [[ "$output" == *"source-rc=1"* ]]
 }
 
-@test "bl_arg_parse returns usage without nounset aborts under every caller option combination" {
+@test "base_arg_parse returns usage without nounset aborts under every caller option combination" {
     local mode
 
     for mode in off e u p eu ep up eup; do
@@ -57,19 +57,19 @@ create_script() {
             case "$mode" in *p*) set -o pipefail ;; esac
             source "$2"
             declare -a app_args=()
-            bl_init app_args --
+            base_init app_args --
             source "$3"
-            bl_arg_parse
+            base_arg_parse
             exit $?
         ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/arg/lib_arg.sh"
 
         [ "$status" -eq 2 ]
-        [[ "$output" == *"bl_arg_parse: usage:"* ]]
+        [[ "$output" == *"base_arg_parse: usage:"* ]]
         [[ "$output" != *"unbound variable"* ]]
     done
 }
 
-@test "bl_arg_parse stores flags values and positionals" {
+@test "base_arg_parse stores flags values and positionals" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
         "output|value|--output|-o"
@@ -77,7 +77,7 @@ create_script() {
     local -A options=()
     local -a positionals=()
 
-    bl_arg_parse options positionals specs -- --verbose -o "build result.txt" alpha -- beta gamma
+    base_arg_parse options positionals specs -- --verbose -o "build result.txt" alpha -- beta gamma
 
     [ "${options[verbose]}" = "1" ]
     [ "${options[output]}" = "build result.txt" ]
@@ -87,7 +87,7 @@ create_script() {
     [ "${positionals[2]}" = "gamma" ]
 }
 
-@test "bl_arg_parse rejects readonly output arrays before parsing" {
+@test "base_arg_parse rejects readonly output arrays before parsing" {
     local script="$TEST_TMPDIR/arg-readonly-output.sh"
 
     create_script "$script" <<EOF
@@ -97,7 +97,7 @@ source "$BASE_BASH_DIR/arg/lib_arg.sh"
 declare -Ar options=()
 declare -a positionals=()
 declare -a specs=("verbose|flag|--verbose")
-bl_arg_parse options positionals specs -- --verbose
+base_arg_parse options positionals specs -- --verbose
 EOF
 
     bats_run bash "$script"
@@ -106,7 +106,7 @@ EOF
     [[ "$output" == *"result variable 'options' is readonly"* ]]
 }
 
-@test "bl_arg_parse supports shadowing-prone caller array names" {
+@test "base_arg_parse supports shadowing-prone caller array names" {
     local -a specs_name=(
         "verbose|flag|--verbose|-v"
         "output|value|--output|-o"
@@ -114,7 +114,7 @@ EOF
     local -A options_name=()
     local -a positionals_name=()
 
-    bl_arg_parse options_name positionals_name specs_name -- -v --output result.txt item
+    base_arg_parse options_name positionals_name specs_name -- -v --output result.txt item
 
     [ "${options_name[verbose]}" = "1" ]
     [ "${options_name[output]}" = "result.txt" ]
@@ -122,14 +122,14 @@ EOF
     [ "${positionals_name[0]}" = "item" ]
 }
 
-@test "bl_arg_parse rejects reserved internal output names" {
+@test "base_arg_parse rejects reserved internal output names" {
     local -A __base_bash_libs_arg_options=([sentinel]="keep")
     local -a __base_bash_libs_arg_positionals=(sentinel)
     local -a specs_name=("verbose|flag|--verbose|-v")
     local stderr_file="$TEST_TMPDIR/arg-reserved-output.err"
     local rc
 
-    if bl_arg_parse __base_bash_libs_arg_options __base_bash_libs_arg_positionals specs_name -- -v 2>"$stderr_file"; then
+    if base_arg_parse __base_bash_libs_arg_options __base_bash_libs_arg_positionals specs_name -- -v 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -141,7 +141,7 @@ EOF
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
 }
 
-@test "bl_arg_parse rejects exact internal holder and repeatable names before locals or mutation" {
+@test "base_arg_parse rejects exact internal holder and repeatable names before locals or mutation" {
     local -r __base_bash_libs_arg_options_name=actual_options
     local -A actual_options=([sentinel]="keep")
     local -a positionals=(old)
@@ -151,7 +151,7 @@ EOF
     local stderr_file="$TEST_TMPDIR/arg-internal-holder.err"
     local rc
 
-    if bl_arg_parse __base_bash_libs_arg_options_name positionals specs -- --verbose 2>"$stderr_file"; then
+    if base_arg_parse __base_bash_libs_arg_options_name positionals specs -- --verbose 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -162,7 +162,7 @@ EOF
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 
-    if bl_arg_parse actual_options positionals repeatable_specs -- --include new 2>"$stderr_file"; then
+    if base_arg_parse actual_options positionals repeatable_specs -- --include new 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -175,13 +175,13 @@ EOF
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
-@test "bl_arg_parse rejects aliases among its primary caller-owned arrays before mutation" {
+@test "base_arg_parse rejects aliases among its primary caller-owned arrays before mutation" {
     local -A options=([existing]="keep")
     local -a positionals=(old)
     local -a specs=("verbose|flag|--verbose|-v")
     local rc
 
-    if bl_arg_parse options options specs -- --verbose 2>/dev/null; then
+    if base_arg_parse options options specs -- --verbose 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -189,7 +189,7 @@ EOF
     [ "$rc" -eq 1 ]
     [ "${options[existing]}" = "keep" ]
 
-    if bl_arg_parse options positionals options -- --verbose 2>/dev/null; then
+    if base_arg_parse options positionals options -- --verbose 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -198,7 +198,7 @@ EOF
     [ "${options[existing]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
 
-    if bl_arg_parse options positionals positionals -- --verbose 2>/dev/null; then
+    if base_arg_parse options positionals positionals -- --verbose 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -209,14 +209,14 @@ EOF
     [ "${specs[0]}" = "verbose|flag|--verbose|-v" ]
 }
 
-@test "bl_arg_parse rejects repeatable-output aliases before mutation" {
+@test "base_arg_parse rejects repeatable-output aliases before mutation" {
     local -A options=([existing]="keep")
     local -a positionals=(old)
     local -a specs=("include|repeatable|--include")
     local -a include=(saved)
     local rc
 
-    if bl_arg_parse options include specs -- --include new 2>/dev/null; then
+    if base_arg_parse options include specs -- --include new 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -226,7 +226,7 @@ EOF
     [ "${include[0]}" = "saved" ]
 
     include=("include|repeatable|--include")
-    if bl_arg_parse options positionals include -- --include new 2>/dev/null; then
+    if base_arg_parse options positionals include -- --include new 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -237,7 +237,7 @@ EOF
     [ "${include[0]}" = "include|repeatable|--include" ]
 }
 
-@test "bl_arg_parse accepts long option equals values and repeated options" {
+@test "base_arg_parse accepts long option equals values and repeated options" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
         "output|value|--output|-o"
@@ -245,7 +245,7 @@ EOF
     local -A options=()
     local -a positionals=()
 
-    bl_arg_parse options positionals specs -- --output=first.txt --output second.txt -v -v item
+    base_arg_parse options positionals specs -- --output=first.txt --output second.txt -v -v item
 
     [ "${options[verbose]}" = "1" ]
     [ "${options[output]}" = "second.txt" ]
@@ -253,25 +253,25 @@ EOF
     [ "${positionals[0]}" = "item" ]
 }
 
-@test "bl_arg_parse accepts -- as a value option value" {
+@test "base_arg_parse accepts -- as a value option value" {
     local -a specs=("output|value|--output|-o")
     local -A options=()
     local -a positionals=()
 
-    bl_arg_parse options positionals specs -- --output -- item
+    base_arg_parse options positionals specs -- --output -- item
 
     [ "${options[output]}" = "--" ]
     [ "${#positionals[@]}" -eq 1 ]
     [ "${positionals[0]}" = "item" ]
 }
 
-@test "bl_arg_parse preserves repeatable values in caller-owned arrays" {
+@test "base_arg_parse preserves repeatable values in caller-owned arrays" {
     local -a specs=("include|repeatable|--include|-I")
     local -a include=()
     local -A options=()
     local -a positionals=()
 
-    bl_arg_parse options positionals specs -- --include first --include=second -I "" item
+    base_arg_parse options positionals specs -- --include first --include=second -I "" item
 
     [ "${options[include]}" = "1" ]
     [ "${#include[@]}" -eq 3 ]
@@ -281,19 +281,19 @@ EOF
     [ "${positionals[0]}" = "item" ]
 }
 
-@test "bl_arg_parse clears repeatable arrays when a successful parse has no values" {
+@test "base_arg_parse clears repeatable arrays when a successful parse has no values" {
     local -a specs=("include|repeatable|--include")
     local -a include=(old)
     local -A options=([include]=old)
     local -a positionals=()
 
-    bl_arg_parse options positionals specs -- item
+    base_arg_parse options positionals specs -- item
 
     [ "${#include[@]}" -eq 0 ]
     [ -z "${options[include]+set}" ]
 }
 
-@test "bl_arg_parse handles declared-empty arrays under nounset" {
+@test "base_arg_parse handles declared-empty arrays under nounset" {
     local script="$TEST_TMPDIR/arg-empty-nounset.sh"
 
     create_script "$script" <<EOF
@@ -304,7 +304,7 @@ source "$BASE_BASH_DIR/arg/lib_arg.sh"
 declare -A options=()
 declare -a positionals=()
 declare -a specs=()
-bl_arg_parse options positionals specs --
+base_arg_parse options positionals specs --
 [[ -z "\${options[*]-}" ]]
 [[ -z "\${positionals[*]-}" ]]
 EOF
@@ -314,24 +314,24 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-@test "bl_arg_parse returns usage status for unknown options" {
+@test "base_arg_parse returns usage status for unknown options" {
     local -a specs=("verbose|flag|--verbose|-v")
     local -A options=()
     local -a positionals=()
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --unknown || parse_status=$?
+    base_arg_parse options positionals specs -- --unknown || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 }
 
-@test "bl_arg_parse preserves caller outputs when an unknown option follows accepted args" {
+@test "base_arg_parse preserves caller outputs when an unknown option follows accepted args" {
     local -a specs=("verbose|flag|--verbose|-v")
     local -A options=([existing]="keep")
     local -a positionals=("old")
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --verbose item --unknown || parse_status=$?
+    base_arg_parse options positionals specs -- --verbose item --unknown || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
@@ -340,18 +340,18 @@ EOF
     [ "${positionals[0]}" = "old" ]
 }
 
-@test "bl_arg_parse returns usage status when option values are missing" {
+@test "base_arg_parse returns usage status when option values are missing" {
     local -a specs=("output|value|--output|-o")
     local -A options=()
     local -a positionals=()
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --output || parse_status=$?
+    base_arg_parse options positionals specs -- --output || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 }
 
-@test "bl_arg_parse preserves caller outputs when a value option fails late" {
+@test "base_arg_parse preserves caller outputs when a value option fails late" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
         "output|value|--output|-o"
@@ -360,7 +360,7 @@ EOF
     local -a positionals=("old")
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --verbose --output || parse_status=$?
+    base_arg_parse options positionals specs -- --verbose --output || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
@@ -370,7 +370,7 @@ EOF
     [ "${positionals[0]}" = "old" ]
 }
 
-@test "bl_arg_parse rejects registered options as missing option values" {
+@test "base_arg_parse rejects registered options as missing option values" {
     local -a specs=(
         "verbose|flag|--verbose|-v"
         "output|value|--output|-o"
@@ -379,14 +379,14 @@ EOF
     local -a positionals=()
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --output --verbose || parse_status=$?
+    base_arg_parse options positionals specs -- --output --verbose || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
     [ -z "${options[output]+set}" ]
     [ -z "${options[verbose]+set}" ]
 }
 
-@test "bl_arg_parse rejects invalid variable names without echoing values" {
+@test "base_arg_parse rejects invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/arg-invalid-vars.sh"
 
     create_script "$script" <<EOF
@@ -395,17 +395,17 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/arg/lib_arg.sh"
 secret="not-valid"
 declare -a specs=("verbose|flag|--verbose")
-bl_arg_parse "\$secret" positionals specs -- --verbose
+base_arg_parse "\$secret" positionals specs -- --verbose
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"bl_std_assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "bl_arg_parse asserts caller-owned array declarations" {
+@test "base_arg_parse asserts caller-owned array declarations" {
     local script="$TEST_TMPDIR/arg-invalid-array-vars.sh"
 
     create_script "$script" <<EOF
@@ -415,7 +415,7 @@ source "$BASE_BASH_DIR/arg/lib_arg.sh"
 declare -a options=()
 declare -a positionals=()
 declare -a specs=("verbose|flag|--verbose")
-bl_arg_parse options positionals specs -- --verbose
+base_arg_parse options positionals specs -- --verbose
 EOF
 
     bats_run bash "$script"
@@ -430,7 +430,7 @@ source "$BASE_BASH_DIR/arg/lib_arg.sh"
 declare -A options=()
 positionals=""
 declare -a specs=("verbose|flag|--verbose")
-bl_arg_parse options positionals specs -- --verbose
+base_arg_parse options positionals specs -- --verbose
 EOF
 
     bats_run bash "$script"
@@ -439,24 +439,24 @@ EOF
     [[ "$output" == *"Variable 'positionals' must be an indexed array declared by the caller."* ]]
 }
 
-@test "bl_arg_parse rejects malformed specs" {
+@test "base_arg_parse rejects malformed specs" {
     local -a specs=("verbose|maybe|--verbose")
     local -A options=()
     local -a positionals=()
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --verbose || parse_status=$?
+    base_arg_parse options positionals specs -- --verbose || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 }
 
-@test "bl_arg_parse rejects duplicate names and tokens without changing outputs" {
+@test "base_arg_parse rejects duplicate names and tokens without changing outputs" {
     local -a specs=("first|flag|--first" "second|value|--first")
     local -A options=([existing]=keep)
     local -a positionals=(old)
     local parse_status=0
 
-    bl_arg_parse options positionals specs -- --first || parse_status=$?
+    base_arg_parse options positionals specs -- --first || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
@@ -464,19 +464,19 @@ EOF
     [ "${positionals[0]}" = "old" ]
 }
 
-@test "bl_arg_parse rejects unreachable and empty option tokens" {
+@test "base_arg_parse rejects unreachable and empty option tokens" {
     local -A options=()
     local -a positionals=()
     local parse_status=0
     local -a specs=("value|value|--value|--")
 
-    bl_arg_parse options positionals specs -- --value x || parse_status=$?
+    base_arg_parse options positionals specs -- --value x || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 
     parse_status=0
     specs=("value|value|--value|")
-    bl_arg_parse options positionals specs -- --value x || parse_status=$?
+    base_arg_parse options positionals specs -- --value x || parse_status=$?
 
     [ "$parse_status" -eq 2 ]
 }

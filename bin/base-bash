@@ -10,12 +10,12 @@
 #     - provide package-relative imports without establishing Base runtime state
 #
 
-bl_launcher_die() {
+base_launcher_die() {
     printf 'ERROR: %s\n' "$*" >&2
     exit 1
 }
 
-bl_launcher_resolve_path() {
+base_launcher_resolve_path() {
     local source_path="${1:-}"
     local link_dir
     local target
@@ -51,16 +51,16 @@ bl_launcher_resolve_path() {
     printf '%s/%s\n' "$link_dir" "$(basename -- "$source_path")"
 }
 
-bl_launcher_package_root() {
+base_launcher_package_root() {
     local source_path
     local bin_dir
 
-    source_path="$(bl_launcher_resolve_path "$0")" || return 1
+    source_path="$(base_launcher_resolve_path "$0")" || return 1
     bin_dir="$(cd -- "$(dirname -- "$source_path")" && pwd -P)" || return 1
     cd -- "$bin_dir/.." && pwd -P
 }
 
-bl_launcher_ensure_supported_bash() {
+base_launcher_ensure_supported_bash() {
     local candidate
     local candidates=()
     local current_version
@@ -96,75 +96,75 @@ bl_launcher_ensure_supported_bash() {
     exit 1
 }
 
-bl_launcher_lib_dir_is_usable() {
+base_launcher_lib_dir_is_usable() {
     local candidate="${1:-}"
 
     [[ -n "$candidate" ]] || return 1
     [[ -f "$candidate/std/lib_std.sh" ]]
 }
 
-bl_launcher_resolve_lib_dir() {
+base_launcher_resolve_lib_dir() {
     local package_root="$1"
     local explicit_dir="${BASE_BASH_LIBS_DIR:-}"
     local candidate
 
     if [[ -n "$explicit_dir" ]]; then
-        bl_launcher_lib_dir_is_usable "$explicit_dir" || {
-            bl_launcher_die "BASE_BASH_LIBS_DIR '$explicit_dir' does not contain std/lib_std.sh."
+        base_launcher_lib_dir_is_usable "$explicit_dir" || {
+            base_launcher_die "BASE_BASH_LIBS_DIR '$explicit_dir' does not contain std/lib_std.sh."
         }
         cd -L -- "$explicit_dir" && pwd -L
         return $?
     fi
 
     for candidate in "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
-        if bl_launcher_lib_dir_is_usable "$candidate"; then
+        if base_launcher_lib_dir_is_usable "$candidate"; then
             cd -L -- "$candidate" && pwd -L
             return $?
         fi
     done
 
-    bl_launcher_die "Unable to find base-bash-libs under '$package_root'. Set BASE_BASH_LIBS_DIR to a compatible lib/bash directory."
+    base_launcher_die "Unable to find base-bash-libs under '$package_root'. Set BASE_BASH_LIBS_DIR to a compatible lib/bash directory."
 }
 
-bl_launcher_source_stdlib() {
+base_launcher_source_stdlib() {
     local stdlib_path="$BASE_BASH_LIBS_DIR/std/lib_std.sh"
     # shellcheck source=/dev/null
     source "$stdlib_path" || exit $?
 }
 
-bl_launcher_import_base_bash_lib() {
+base_launcher_import_base_bash_lib() {
     local relative_path="${1:-}"
     local lib_path
 
-    [[ -n "$relative_path" ]] || bl_std_fatal_error "bl_launcher_import_base_bash_lib: no library path provided."
-    [[ "$relative_path" != /* ]] || bl_std_fatal_error "bl_launcher_import_base_bash_lib: expected a path relative to '$BASE_BASH_LIBS_DIR', got '$relative_path'."
+    [[ -n "$relative_path" ]] || base_std_fatal_error "base_launcher_import_base_bash_lib: no library path provided."
+    [[ "$relative_path" != /* ]] || base_std_fatal_error "base_launcher_import_base_bash_lib: expected a path relative to '$BASE_BASH_LIBS_DIR', got '$relative_path'."
 
     case "$relative_path" in
         ..|../*|*/..|*/../*)
-            bl_std_fatal_error "bl_launcher_import_base_bash_lib: refusing path outside base-bash-libs root: '$relative_path'."
+            base_std_fatal_error "base_launcher_import_base_bash_lib: refusing path outside base-bash-libs root: '$relative_path'."
             ;;
     esac
 
     lib_path="$BASE_BASH_LIBS_DIR/$relative_path"
-    [[ -f "$lib_path" ]] || bl_std_fatal_error "base-bash-libs library '$relative_path' was not found at '$lib_path'."
+    [[ -f "$lib_path" ]] || base_std_fatal_error "base-bash-libs library '$relative_path' was not found at '$lib_path'."
 
     # shellcheck source=/dev/null
-    source "$lib_path" || bl_std_fatal_error "Failed to load base-bash-libs library '$lib_path'."
+    source "$lib_path" || base_std_fatal_error "Failed to load base-bash-libs library '$lib_path'."
 }
 
-bl_launcher_run_script() {
+base_launcher_run_script() {
     local script_path="$1"
     local package_root="$2"
     local -a runtime_args=()
     shift 2
 
-    [[ -f "$script_path" ]] || bl_launcher_die "Script '$script_path' was not found."
+    [[ -f "$script_path" ]] || base_launcher_die "Script '$script_path' was not found."
 
-    BASE_BASH_LIBS_DIR="$(bl_launcher_resolve_lib_dir "$package_root")" || exit $?
+    BASE_BASH_LIBS_DIR="$(base_launcher_resolve_lib_dir "$package_root")" || exit $?
     export BASE_BASH_LIBS_DIR
 
-    bl_launcher_source_stdlib
-    bl_init runtime_args --source "$script_path" -- "$@" || exit $?
+    base_launcher_source_stdlib
+    base_init runtime_args --source "$script_path" -- "$@" || exit $?
 
     unset -f main
 
@@ -172,13 +172,13 @@ bl_launcher_run_script() {
     source "$script_path" "${runtime_args[@]}" || exit $?
 
     if ! declare -F main >/dev/null 2>&1; then
-        bl_std_fatal_error "Script '$script_path' did not define main()."
+        base_std_fatal_error "Script '$script_path' did not define main()."
     fi
 
     main "${runtime_args[@]}"
 }
 
-bl_launcher_usage() {
+base_launcher_usage() {
     cat >&2 <<'EOF'
 Usage:
   base-bash <script> [args...]
@@ -191,20 +191,20 @@ main() {
     local package_root
     local script_path
 
-    bl_launcher_ensure_supported_bash "$@"
-    package_root="$(bl_launcher_package_root)" || bl_launcher_die "Unable to resolve base-bash-libs package root."
+    base_launcher_ensure_supported_bash "$@"
+    package_root="$(base_launcher_package_root)" || base_launcher_die "Unable to resolve base-bash-libs package root."
 
     case "${1:-}" in
         ""|-h|--help|help)
-            bl_launcher_usage
+            base_launcher_usage
             return 2
             ;;
     esac
 
-    script_path="$(bl_launcher_resolve_path "$1")" || bl_launcher_die "Script '$1' was not found."
+    script_path="$(base_launcher_resolve_path "$1")" || base_launcher_die "Script '$1' was not found."
     shift
 
-    bl_launcher_run_script "$script_path" "$package_root" "$@"
+    base_launcher_run_script "$script_path" "$package_root" "$@"
 }
 
 main "$@"

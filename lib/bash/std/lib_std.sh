@@ -26,48 +26,48 @@
 #                    Set to 1 after lib_std.sh has been loaded successfully.
 #
 # Runtime globals such as BASE_BASH_LIBS_SCRIPT_ARGS and BASE_BASH_LIBS_SCRIPT_DIR are published only
-# by bl_init. Sourcing this file never consumes or rewrites "$@".
+# by base_init. Sourcing this file never consumes or rewrites "$@".
 #
 # Core helpers:
-#   bl_std_run [opts] cmd ...
+#   base_std_run [opts] cmd ...
 #                                # Safe command runner with dry-run, timeout, retry & failure handling.
-#   bl_std_exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
-#   bl_std_fatal_error msg...           # Convenience wrapper: exit with last status or 1.
-#   bl_std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
-#   bl_std_register_cleanup_path p  # Remove owned files/directories from EXIT cleanup.
-#   bl_std_register_cleanup_path --unsafe p
+#   base_std_exit_if_error rc msg...      # Log + exit when rc != 0 (preserves original status).
+#   base_std_fatal_error msg...           # Convenience wrapper: exit with last status or 1.
+#   base_std_register_cleanup_hook fn # Run a cleanup function from the shared EXIT trap.
+#   base_std_register_cleanup_path p  # Remove owned files/directories from EXIT cleanup.
+#   base_std_register_cleanup_path --unsafe p
 #                                # Explicitly opt out of path-identity proof.
-#   bl_std_unregister_cleanup_path p
+#   base_std_unregister_cleanup_path p
 #                                # Drop files/directories from the shared EXIT cleanup list.
-#   bl_std_make_temp_file var [pfx] # Create a temp file and store its path in var.
-#   bl_std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
-#   bl_std_command_path var cmd     # Resolve an external command path without exiting.
-#   bl_std_function_exists fn       # Predicate for defined Bash functions.
-#   bl_std_assert_variable_name name    # Validate Bash variable-name arguments.
-#   bl_std_assert_associative_array map # Validate caller-declared associative arrays.
-#   bl_require_version min_version
+#   base_std_make_temp_file var [pfx] # Create a temp file and store its path in var.
+#   base_std_make_temp_dir var [pfx]  # Create a temp directory and store its path in var.
+#   base_std_command_path var cmd     # Resolve an external command path without exiting.
+#   base_std_function_exists fn       # Predicate for defined Bash functions.
+#   base_std_assert_variable_name name    # Validate Bash variable-name arguments.
+#   base_std_assert_associative_array map # Validate caller-declared associative arrays.
+#   base_require_version min_version
 #                                # Exit clearly if the loaded library is too old.
-#   bl_std_add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
-#   bl_std_set_log_level [LEVEL]        # Adjust terminal verbosity (FATAL..VERBOSE).
-#   bl_std_set_log_category_level -l category LEVEL
+#   base_std_add_to_path [-n] [-p] dir    # Append/prepend unique PATH entries.
+#   base_std_set_log_level [LEVEL]        # Adjust terminal verbosity (FATAL..VERBOSE).
+#   base_std_set_log_category_level -l category LEVEL
 #                                # Gate a category independently of its sinks.
-#   bl_std_log_is_enabled [-l category] LEVEL
+#   base_std_log_is_enabled [-l category] LEVEL
 #                                # Test whether any configured sink accepts a level.
-#   bl_std_log_info/debug/... msgs      # Structured logging (color in interactive shells).
-#   bl_std_safe_touch file [...]        # touch wrapper that returns on failure (same for bl_std_safe_truncate).
-#   assert_* utilities           # Validation helpers (bl_std_assert_not_null / bl_std_assert_integer / ...).
+#   base_std_log_info/debug/... msgs      # Structured logging (color in interactive shells).
+#   base_std_safe_touch file [...]        # touch wrapper that returns on failure (same for base_std_safe_truncate).
+#   assert_* utilities           # Validation helpers (base_std_assert_not_null / base_std_assert_integer / ...).
 #
 # Patterns:
-#   bl_std_run some_cmd             # exits on failure; BASE_BASH_LIBS_DRY_RUN=true/1/yes/on prints instead.
-#   bl_std_run --timeout 30 some_cmd
+#   base_std_run some_cmd             # exits on failure; BASE_BASH_LIBS_DRY_RUN=true/1/yes/on prints instead.
+#   base_std_run --timeout 30 some_cmd
 #                                # bounds the command attempt to 30 seconds.
-#   bl_std_run --max-attempts 3 --retry-delay 2 some_cmd
+#   base_std_run --max-attempts 3 --retry-delay 2 some_cmd
 #                                # retries transient failures.
-#   some_cmd || bl_std_fatal_error ...  # preserves failing exit code before terminating.
-#   bl_std_add_to_path -p "/opt/tools"  # inject directories without duplicates.
+#   some_cmd || base_std_fatal_error ...  # preserves failing exit code before terminating.
+#   base_std_add_to_path -p "/opt/tools"  # inject directories without duplicates.
 #
 # Notes:
-#   - Call bl_init <result_array> [--source <script>] [--] [argv...]
+#   - Call base_init <result_array> [--source <script>] [--] [argv...]
 #     before using stateful helpers. It strips --debug-wrapper,
 #     --verbose-wrapper, --utc-wrapper, and --color into the result array.
 #   - --verbose-wrapper is deprecated compatibility surface; prefer --debug-wrapper.
@@ -188,28 +188,28 @@ __base_bash_libs_std_version_at_least__() {
 }
 
 #
-# bl_require_version - Requires a minimum base-bash-libs version.
+# base_require_version - Requires a minimum base-bash-libs version.
 #
 # Usage:
-#   bl_require_version 1.1.0
+#   base_require_version 1.1.0
 #
-bl_require_version() {
+base_require_version() {
     local minimum_version="${1-}"
 
     if (($# != 1)); then
-        bl_std_log_error -l base_bash_libs.std \
-            "bl_require_version: expected exactly one minimum version."
+        base_std_log_error -l base_bash_libs.std \
+            "base_require_version: expected exactly one minimum version."
         return 2
     fi
 
     if ! __base_bash_libs_std_is_dotted_numeric_version__ "$minimum_version" ||
         ! __base_bash_libs_std_is_dotted_numeric_version__ "$BASE_BASH_LIBS_VERSION"; then
-        bl_std_log_error -l base_bash_libs.std "bl_require_version expects dotted numeric versions."
+        base_std_log_error -l base_bash_libs.std "base_require_version expects dotted numeric versions."
         return 2
     fi
 
     if ! __base_bash_libs_std_version_at_least__ "$BASE_BASH_LIBS_VERSION" "$minimum_version"; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "base-bash-libs $minimum_version or newer is required; loaded version is $BASE_BASH_LIBS_VERSION."
         return 1
     fi
@@ -220,7 +220,7 @@ bl_require_version() {
 ############################################ BASH VERSION CHECKER #######################################################
 
 #
-# bl_std_is_interactive - Checks if the current shell is interactive.
+# base_std_is_interactive - Checks if the current shell is interactive.
 #
 # An interactive shell is one where the user is typing commands directly.
 # This is used to determine if we can safely prompt the user for input.
@@ -229,12 +229,12 @@ bl_require_version() {
 #   0 (true) if the shell is interactive.
 #   1 (false) if the shell is not interactive (e.g., running in a cron job).
 #
-bl_std_is_interactive() {
+base_std_is_interactive() {
     [[ -t 0 ]]
 }
 
 #
-# bl_std_check_bash_version - Verifies the Bash version without prompting or installing anything.
+# base_std_check_bash_version - Verifies the Bash version without prompting or installing anything.
 #
 # This function checks if the running Bash interpreter is version 4.2 or higher and returns
 # non-zero when it is not. Base entrypoints should enforce the supported runtime before
@@ -243,7 +243,7 @@ bl_std_is_interactive() {
 #
 # Note: This function is called before logging is initialized, so it uses `echo` to stderr.
 #
-bl_std_check_bash_version() {
+base_std_check_bash_version() {
     local bash_major bash_minor test_version
 
     if [[ -n "${BASE_TEST_BASH_VERSION:-}" ]]; then
@@ -274,16 +274,16 @@ __base_bash_libs_std_init_validate_result_array__() {
     local result_name="${1-}" declaration attributes nocasematch_enabled=0 attributes_ok=0
 
     [[ "$result_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
-        printf '%s\n' "bl_init: result name must be a valid Bash variable name." >&2
+        printf '%s\n' "base_init: result name must be a valid Bash variable name." >&2
         return 1
     }
     [[ "$result_name" != __* ]] || {
-        printf '%s\n' "bl_init: result name '$result_name' uses the reserved internal namespace." >&2
+        printf '%s\n' "base_init: result name '$result_name' uses the reserved internal namespace." >&2
         return 1
     }
     declaration="$(declare -p "$result_name" 2>/dev/null || true)"
     [[ -n "$declaration" ]] || {
-        printf '%s\n' "bl_init: result '$result_name' must be a caller-declared indexed array." >&2
+        printf '%s\n' "base_init: result '$result_name' must be a caller-declared indexed array." >&2
         return 1
     }
     attributes="${declaration#declare -}"
@@ -301,7 +301,7 @@ __base_bash_libs_std_init_validate_result_array__() {
         shopt -s nocasematch
     fi
     ((attributes_ok)) || {
-        printf '%s\n' "bl_init: result '$result_name' must be a caller-declared indexed array." >&2
+        printf '%s\n' "base_init: result '$result_name' must be a caller-declared indexed array." >&2
         return 1
     }
 }
@@ -330,14 +330,14 @@ __base_bash_libs_std_initialize_runtime_state__() {
 
     if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
         [[ "${BASE_BASH_LIBS_STD_INITIALIZED}" == 1 ]] || {
-            printf '%s\n' "bl_init: runtime state marker is owned by the caller." >&2
+            printf '%s\n' "base_init: runtime state marker is owned by the caller." >&2
             return 1
         }
         return 0
     fi
 
     if [[ -n "${BASE_BASH_LIBS_STD_INIT_SOURCE+x}" || -n "${BASE_BASH_LIBS_SCRIPT_ARGS+x}" || -n "${BASE_BASH_LIBS_SCRIPT_DIR+x}" ]]; then
-        printf '%s\n' "bl_init: initialization names are already owned by the caller." >&2
+        printf '%s\n' "base_init: initialization names are already owned by the caller." >&2
         return 1
     fi
 
@@ -374,21 +374,21 @@ __base_bash_libs_std_initialize_runtime_state__() {
 }
 
 #
-# bl_init - Explicitly initializes runtime state and filters wrapper
+# base_init - Explicitly initializes runtime state and filters wrapper
 # flags into a caller-owned indexed array. Sourcing the library never invokes
 # this function and never mutates positional parameters.
 #
 # Usage:
 #   declare -a app_args=()
-#   bl_init app_args --source "$script" -- "$@"
+#   base_init app_args --source "$script" -- "$@"
 #
-bl_init() {
+base_init() {
     local result_name="${1-}" source_path="" script_dir="" arg
     local parse_config=1 color_requested=0 configure_runtime=0
     local -a input_args=() filtered_args=()
 
     (($# >= 1)) || {
-        printf '%s\n' "bl_init: expected a result array name." >&2
+        printf '%s\n' "base_init: expected a result array name." >&2
         return 1
     }
     __base_bash_libs_std_init_validate_result_array__ "$result_name" || return 1
@@ -397,7 +397,7 @@ bl_init() {
     while (($#)); do
         if ((parse_config)) && [[ "$1" == "--source" ]]; then
             (($# >= 2)) || {
-                printf '%s\n' "bl_init: --source requires a script path." >&2
+                printf '%s\n' "base_init: --source requires a script path." >&2
                 return 1
             }
             source_path="$2"
@@ -417,23 +417,23 @@ bl_init() {
     source_path="${source_path:-${BASE_BASH_LIBS_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}}"
     if [[ -n "$source_path" ]]; then
         script_dir="$(cd -- "$(dirname -- "$source_path")" &>/dev/null && pwd -P)" || {
-            printf '%s\n' "bl_init: unable to resolve source directory from '$source_path'." >&2
+            printf '%s\n' "base_init: unable to resolve source directory from '$source_path'." >&2
             return 1
         }
     else
         script_dir="$(pwd -P)" || {
-            printf '%s\n' "bl_init: unable to resolve the current caller directory." >&2
+            printf '%s\n' "base_init: unable to resolve the current caller directory." >&2
             return 1
         }
     fi
 
     if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
         [[ "${BASE_BASH_LIBS_STD_INIT_SOURCE:-}" == "$script_dir" ]] || {
-            printf '%s\n' "bl_init: already initialized for '$BASE_BASH_LIBS_STD_INIT_SOURCE'; requested '$script_dir'." >&2
+            printf '%s\n' "base_init: already initialized for '$BASE_BASH_LIBS_STD_INIT_SOURCE'; requested '$script_dir'." >&2
             return 1
         }
         __base_bash_libs_std_init_args_match__ "${input_args[@]+${input_args[@]}}" || {
-            printf '%s\n' "bl_init: repeated initialization received different argv; refusing to hide the mismatch." >&2
+            printf '%s\n' "base_init: repeated initialization received different argv; refusing to hide the mismatch." >&2
             return 1
         }
     else
@@ -452,15 +452,15 @@ bl_init() {
             case "$arg" in
                 --debug-wrapper)
                     if ((configure_runtime)); then
-                        bl_std_set_log_level DEBUG
-                        bl_std_set_log_category_level -l base_bash_libs DEBUG
+                        base_std_set_log_level DEBUG
+                        base_std_set_log_category_level -l base_bash_libs DEBUG
                         export BASE_BASH_LIBS_LOG_DEBUG=1
                     fi
                     ;;
                 --verbose-wrapper)
                     if ((configure_runtime)); then
-                        bl_std_set_log_level VERBOSE
-                        bl_std_set_log_category_level -l base_bash_libs VERBOSE
+                        base_std_set_log_level VERBOSE
+                        base_std_set_log_category_level -l base_bash_libs VERBOSE
                         export BASE_BASH_LIBS_LOG_DEBUG=1
                     fi
                     ;;
@@ -484,13 +484,13 @@ bl_init() {
     if ((configure_runtime)); then
         BASE_BASH_LIBS_STD_COLOR_ENABLED="$color_requested"
         __base_bash_libs_std_init_colors__
-        bl_std_set_log_category_level -l base_bash_libs INFO
+        base_std_set_log_category_level -l base_bash_libs INFO
         # Re-apply explicit debug levels after the default category gate.
         for arg in "${input_args[@]+${input_args[@]}}"; do
             if [[ "$arg" == "--debug-wrapper" ]]; then
-                bl_std_set_log_category_level -l base_bash_libs DEBUG
+                base_std_set_log_category_level -l base_bash_libs DEBUG
             elif [[ "$arg" == "--verbose-wrapper" ]]; then
-                bl_std_set_log_category_level -l base_bash_libs VERBOSE
+                base_std_set_log_category_level -l base_bash_libs VERBOSE
             fi
         done
     fi
@@ -502,29 +502,29 @@ bl_init() {
 ################################################# LIBRARY IMPORTER #####################################################
 
 #
-# bl_std_import - Sources one or more other library files.
+# base_std_import - Sources one or more other library files.
 #
 # This function provides a robust way to include other shell libraries. It handles
 # both absolute and relative paths. Relative paths are resolved from the directory
 # of the main script that sourced this library.
 #
 # Usage:
-#   bl_std_import /path/to/absolute/lib.sh
-#   bl_std_import relative/path/to/lib2.sh
+#   base_std_import /path/to/absolute/lib.sh
+#   base_std_import relative/path/to/lib2.sh
 #
 # IMPORTANT NOTE: If your library has global variables declared with 'declare',
 # you must add the -g flag (e.g., `declare -gA my_map`). Since the library is
 # sourced inside this function, globals declared without -g would become local
 # to the function and be unavailable to other functions.
 #
-bl_std_import() {
+base_std_import() {
     local lib import_path source_status
     for lib; do
         import_path="$lib"
         if [[ "$lib" != /* ]]; then
            [[ -n "${BASE_BASH_LIBS_SCRIPT_DIR-}" ]] || {
-               bl_std_log_error -l base_bash_libs.std \
-                   "bl_std_import: bl_init must run before relative imports."
+               base_std_log_error -l base_bash_libs.std \
+                   "base_std_import: base_init must run before relative imports."
                return 2
            }
            import_path="$BASE_BASH_LIBS_SCRIPT_DIR/$lib"
@@ -535,12 +535,12 @@ bl_std_import() {
                 :
             else
                 source_status=$?
-                bl_std_log_error -l base_bash_libs.std \
+                base_std_log_error -l base_bash_libs.std \
                     "Import of library '$lib' failed (status $source_status)."
                 return "$source_status"
             fi
         else
-            bl_std_log_error -l base_bash_libs.std "Library '$lib' does not exist."
+            base_std_log_error -l base_bash_libs.std "Library '$lib' does not exist."
             return 1
         fi
     done
@@ -550,18 +550,18 @@ bl_std_import() {
 ################################################# PATH MANIPULATION ####################################################
 
 #
-# bl_std_add_to_path - Adds one or more directories to the system PATH.
+# base_std_add_to_path - Adds one or more directories to the system PATH.
 #
 # This function safely adds directories to the PATH, avoiding duplicates.
 #
 # Usage:
-#   bl_std_add_to_path [options] /path/to/dir1 /path/to/dir2 ...
+#   base_std_add_to_path [options] /path/to/dir1 /path/to/dir2 ...
 #
 # Options:
 #   -p : Prepend the directory to the PATH instead of appending.
 #   -n : Do not check if the directory exists before adding it.
 #
-bl_std_add_to_path() {
+base_std_add_to_path() {
     local dir path_dir prepend=0 opt strict=1 index in_path directory_count
     local -a path_dirs directories=()
     local OPTIND=1
@@ -569,7 +569,7 @@ bl_std_add_to_path() {
         case "$opt" in
             n)  strict=0  ;;  # don't care if directory exists or not before adding it to PATH
             p)  prepend=1 ;;  # prepend the directory to PATH instead of appending
-            *)  bl_std_log_error -l base_bash_libs.std "bl_std_add_to_path: invalid option '$opt'"
+            *)  base_std_log_error -l base_bash_libs.std "base_std_add_to_path: invalid option '$opt'"
                 return 1
                 ;;
         esac
@@ -613,14 +613,14 @@ bl_std_add_to_path() {
     fi
 
     # It's good practice to de-duplicate the path after adding to it
-    bl_std_dedupe_path
+    base_std_dedupe_path
     return 0
 }
 
 #
-# bl_std_dedupe_path - Removes duplicate entries from the PATH variable.
+# base_std_dedupe_path - Removes duplicate entries from the PATH variable.
 #
-bl_std_dedupe_path() {
+base_std_dedupe_path() {
     local -A seen
     local IFS=':' new_path dir
     for dir in $PATH; do
@@ -633,9 +633,9 @@ bl_std_dedupe_path() {
 }
 
 #
-# bl_std_print_path - Prints each directory in the PATH on a new line.
+# base_std_print_path - Prints each directory in the PATH on a new line.
 #
-bl_std_print_path() {
+base_std_print_path() {
     local IFS=':' dirs dir
     IFS=: read -ra dirs <<< "$PATH"
     for dir in "${dirs[@]+"${dirs[@]}"}"; do printf '%s\n' "$dir"; done
@@ -647,7 +647,7 @@ bl_std_print_path() {
 # __base_bash_libs_std_log_init__ - Initializes the logging system.
 #
 # Sets up colors for interactive terminals and defines the log level hierarchy.
-# This is called by bl_init.
+# This is called by base_init.
 #
 __base_bash_libs_std_log_init__() {
     # Map log level strings (FATAL, ERROR, etc.) to numeric values.
@@ -848,7 +848,7 @@ __base_bash_libs_std_print_log_record__() {
 
 #
 # __base_bash_libs_std_init_colors__ - Initialize colors used for logging
-# This is called from bl_init.
+# This is called from base_init.
 #
 __base_bash_libs_std_init_colors__() {
     # If --color was not passed, NO_COLOR is set, or the log stream is not a terminal, disable colors.
@@ -872,18 +872,18 @@ __base_bash_libs_std_init_colors__() {
 }
 
 #
-# bl_std_set_log_level - Sets the logging verbosity for a given logger.
+# base_std_set_log_level - Sets the logging verbosity for a given logger.
 #
 # Usage:
-#   bl_std_set_log_level [level]
-#   bl_std_set_log_level -l [logger_name] [level]
+#   base_std_set_log_level [level]
+#   base_std_set_log_level -l [logger_name] [level]
 #
 # Arguments:
 #   level: One of FATAL, ERROR, WARN, INFO, DEBUG, VERBOSE. Default is INFO.
 #   -l logger_name: (Optional) Specify a named logger. Default is 'default'.
 # Invalid levels return 1 and leave the existing logger level unchanged.
 #
-bl_std_set_log_level() {
+base_std_set_log_level() {
     local __base_bash_libs_std_set_log_logger=default __base_bash_libs_std_set_log_level __base_bash_libs_std_set_log_level_value
     local __base_bash_libs_std_set_log_source_location
     if [[ "${1-}" == "-l" ]]; then
@@ -920,16 +920,16 @@ bl_std_set_log_level() {
 }
 
 #
-# bl_std_set_log_category_level - Sets the gate for a hierarchical log category.
+# base_std_set_log_category_level - Sets the gate for a hierarchical log category.
 #
 # Usage:
-#   bl_std_set_log_category_level -l [category] [level]
+#   base_std_set_log_category_level -l [category] [level]
 #
 # Categories inherit by dotted parent name. For example, base.git.fetch first
 # checks base.git.fetch, then base.git, then base, and finally default.
 # Invalid arguments return 1 without changing the existing category level.
 #
-bl_std_set_log_category_level() {
+base_std_set_log_category_level() {
     local __base_bash_libs_std_set_category_name __base_bash_libs_std_set_category_level __base_bash_libs_std_set_category_level_value
     local __base_bash_libs_std_set_category_source_location
 
@@ -937,7 +937,7 @@ bl_std_set_log_category_level() {
         __base_bash_libs_std_log_source_location__ __base_bash_libs_std_set_category_source_location \
             "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "$__base_bash_libs_std_set_category_source_location Usage: bl_std_set_log_category_level -l <category> <level>" >&2
+            "$__base_bash_libs_std_set_category_source_location Usage: base_std_set_log_category_level -l <category> <level>" >&2
         return 1
     fi
 
@@ -1004,12 +1004,12 @@ __base_bash_libs_std_log_sink_state__() {
 }
 
 #
-# bl_std_log_is_enabled - Return success when any configured sink accepts a level.
+# base_std_log_is_enabled - Return success when any configured sink accepts a level.
 #
 # Usage:
-#   bl_std_log_is_enabled [-l category] level
+#   base_std_log_is_enabled [-l category] level
 #
-bl_std_log_is_enabled() {
+base_std_log_is_enabled() {
     local __base_bash_libs_std_log_enabled_category=default __base_bash_libs_std_log_enabled_level
     local __base_bash_libs_std_log_enabled_terminal __base_bash_libs_std_log_enabled_persist __base_bash_libs_std_log_enabled_source_location
 
@@ -1028,7 +1028,7 @@ bl_std_log_is_enabled() {
         __base_bash_libs_std_log_source_location__ __base_bash_libs_std_log_enabled_source_location \
             "${BASH_SOURCE[1]:-${0:-unknown}}" "${BASH_LINENO[0]:-0}"
         printf '%(%Y-%m-%d:%H:%M:%S)T %-7s %s\n' -1 WARN \
-            "$__base_bash_libs_std_log_enabled_source_location Usage: bl_std_log_is_enabled [-l <category>] <level>" >&2
+            "$__base_bash_libs_std_log_enabled_source_location Usage: base_std_log_is_enabled [-l <category>] <level>" >&2
         return 1
     fi
     __base_bash_libs_std_log_enabled_level=$1
@@ -1093,7 +1093,7 @@ __base_bash_libs_std_print_log__() {
 #
 # __base_bash_libs_std_print_log_file__ - Core function for logging the contents of a file.
 #
-# Internal helper to be called by `bl_std_log_info_file`, etc.
+# Internal helper to be called by `base_std_log_info_file`, etc.
 #
 __base_bash_libs_std_print_log_file__()   {
     local __base_bash_libs_std_print_file_level="${1-}"
@@ -1135,48 +1135,48 @@ __base_bash_libs_std_print_log_file__()   {
 # Public logging functions.
 # These are the primary functions scripts should use for logging.
 #
-bl_std_log_fatal()   { __base_bash_libs_std_print_log__ FATAL   "$@"; }
-bl_std_log_error()   { __base_bash_libs_std_print_log__ ERROR   "$@"; }
-bl_std_log_warn()    { __base_bash_libs_std_print_log__ WARN    "$@"; }
-bl_std_log_info()    { __base_bash_libs_std_print_log__ INFO    "$@"; }
-bl_std_log_debug()   { __base_bash_libs_std_print_log__ DEBUG   "$@"; }
-# Deprecated compatibility helper; prefer bl_std_log_debug.
-bl_std_log_verbose() { __base_bash_libs_std_print_log__ VERBOSE "$@"; }
+base_std_log_fatal()   { __base_bash_libs_std_print_log__ FATAL   "$@"; }
+base_std_log_error()   { __base_bash_libs_std_print_log__ ERROR   "$@"; }
+base_std_log_warn()    { __base_bash_libs_std_print_log__ WARN    "$@"; }
+base_std_log_info()    { __base_bash_libs_std_print_log__ INFO    "$@"; }
+base_std_log_debug()   { __base_bash_libs_std_print_log__ DEBUG   "$@"; }
+# Deprecated compatibility helper; prefer base_std_log_debug.
+base_std_log_verbose() { __base_bash_libs_std_print_log__ VERBOSE "$@"; }
 
 #
 # Public functions for logging the content of a file.
 #
-bl_std_log_info_file()    { __base_bash_libs_std_print_log_file__ INFO    "$@"; }
-bl_std_log_debug_file()   { __base_bash_libs_std_print_log_file__ DEBUG   "$@"; }
-# Deprecated compatibility helper; prefer bl_std_log_debug_file.
-bl_std_log_verbose_file() { __base_bash_libs_std_print_log_file__ VERBOSE "$@"; }
+base_std_log_info_file()    { __base_bash_libs_std_print_log_file__ INFO    "$@"; }
+base_std_log_debug_file()   { __base_bash_libs_std_print_log_file__ DEBUG   "$@"; }
+# Deprecated compatibility helper; prefer base_std_log_debug_file.
+base_std_log_verbose_file() { __base_bash_libs_std_print_log_file__ VERBOSE "$@"; }
 
 #
 # Public functions for logging function entry and exit points.
 #
-bl_std_log_info_enter()    { __base_bash_libs_std_print_log__ INFO    "Entering function ${FUNCNAME[1]:-main}"; }
-bl_std_log_debug_enter()   { __base_bash_libs_std_print_log__ DEBUG   "Entering function ${FUNCNAME[1]:-main}"; }
-# Deprecated compatibility helper; prefer bl_std_log_debug_enter.
-bl_std_log_verbose_enter() { __base_bash_libs_std_print_log__ VERBOSE "Entering function ${FUNCNAME[1]:-main}"; }
-bl_std_log_info_leave()    { __base_bash_libs_std_print_log__ INFO    "Leaving function ${FUNCNAME[1]:-main}";  }
-bl_std_log_debug_leave()   { __base_bash_libs_std_print_log__ DEBUG   "Leaving function ${FUNCNAME[1]:-main}";  }
-# Deprecated compatibility helper; prefer bl_std_log_debug_leave.
-bl_std_log_verbose_leave() { __base_bash_libs_std_print_log__ VERBOSE "Leaving function ${FUNCNAME[1]:-main}";  }
+base_std_log_info_enter()    { __base_bash_libs_std_print_log__ INFO    "Entering function ${FUNCNAME[1]:-main}"; }
+base_std_log_debug_enter()   { __base_bash_libs_std_print_log__ DEBUG   "Entering function ${FUNCNAME[1]:-main}"; }
+# Deprecated compatibility helper; prefer base_std_log_debug_enter.
+base_std_log_verbose_enter() { __base_bash_libs_std_print_log__ VERBOSE "Entering function ${FUNCNAME[1]:-main}"; }
+base_std_log_info_leave()    { __base_bash_libs_std_print_log__ INFO    "Leaving function ${FUNCNAME[1]:-main}";  }
+base_std_log_debug_leave()   { __base_bash_libs_std_print_log__ DEBUG   "Leaving function ${FUNCNAME[1]:-main}";  }
+# Deprecated compatibility helper; prefer base_std_log_debug_leave.
+base_std_log_verbose_leave() { __base_bash_libs_std_print_log__ VERBOSE "Leaving function ${FUNCNAME[1]:-main}";  }
 
 #
 # Simple print routines that do not prefix messages with timestamps or levels.
 #
-bl_std_print_error()   { local __base_bash_libs_std_print_error_message; __base_bash_libs_std_print_error_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bERROR: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_RED" "$__base_bash_libs_std_print_error_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-bl_std_print_warn()    { local __base_bash_libs_std_print_warn_message; __base_bash_libs_std_print_warn_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bWARN: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_YELLOW" "$__base_bash_libs_std_print_warn_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-bl_std_print_info()    { local __base_bash_libs_std_print_info_message; __base_bash_libs_std_print_info_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_info_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-bl_std_print_success() { local __base_bash_libs_std_print_success_message; __base_bash_libs_std_print_success_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bSUCCESS: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_success_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-bl_std_print_bold()    { local __base_bash_libs_std_print_bold_message; __base_bash_libs_std_print_bold_message="$(__base_bash_libs_std_join_message__ "$@")"; printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_BOLD" "$__base_bash_libs_std_print_bold_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; }
-bl_std_print_message() { printf '%s\n' "$@"; }
+base_std_print_error()   { local __base_bash_libs_std_print_error_message; __base_bash_libs_std_print_error_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bERROR: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_RED" "$__base_bash_libs_std_print_error_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
+base_std_print_warn()    { local __base_bash_libs_std_print_warn_message; __base_bash_libs_std_print_warn_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bWARN: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_YELLOW" "$__base_bash_libs_std_print_warn_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
+base_std_print_info()    { local __base_bash_libs_std_print_info_message; __base_bash_libs_std_print_info_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_info_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
+base_std_print_success() { local __base_bash_libs_std_print_success_message; __base_bash_libs_std_print_success_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bSUCCESS: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_success_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
+base_std_print_bold()    { local __base_bash_libs_std_print_bold_message; __base_bash_libs_std_print_bold_message="$(__base_bash_libs_std_join_message__ "$@")"; printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_BOLD" "$__base_bash_libs_std_print_bold_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; }
+base_std_print_message() { printf '%s\n' "$@"; }
 
 #
-# bl_std_print_tty - Prints a message only if the output is going to a terminal.
+# base_std_print_tty - Prints a message only if the output is going to a terminal.
 #
-bl_std_print_tty() {
+base_std_print_tty() {
     if [[ -t 1 ]]; then
         printf '%s\n' "$(__base_bash_libs_std_join_message__ "$@")"
     fi
@@ -1185,12 +1185,12 @@ bl_std_print_tty() {
 ################################################## ERROR HANDLING ######################################################
 
 #
-# bl_std_dump_trace - Prints a stack trace of the Bash function calls.
+# base_std_dump_trace - Prints a stack trace of the Bash function calls.
 #
 # This is useful for debugging to see the sequence of function calls
 # that led to an error.
 #
-bl_std_dump_trace() {
+base_std_dump_trace() {
     local __base_bash_libs_std_trace_frame=0 __base_bash_libs_std_trace_line __base_bash_libs_std_trace_func __base_bash_libs_std_trace_source __base_bash_libs_std_trace_caller_info
     while __base_bash_libs_std_trace_caller_info="$(caller "$__base_bash_libs_std_trace_frame")"; do
         IFS=' ' read -r __base_bash_libs_std_trace_line __base_bash_libs_std_trace_func __base_bash_libs_std_trace_source <<<"$__base_bash_libs_std_trace_caller_info"
@@ -1204,7 +1204,7 @@ bl_std_dump_trace() {
 }
 
 #
-# bl_std_exit_if_error - Exits the script if the provided exit code is non-zero.
+# base_std_exit_if_error - Exits the script if the provided exit code is non-zero.
 #
 # This is the primary error handling function. It checks a command's exit
 # code and, if it indicates failure, logs a fatal message, dumps a stack
@@ -1212,13 +1212,13 @@ bl_std_dump_trace() {
 #
 # Usage:
 #   command_that_might_fail
-#   bl_std_exit_if_error $? "A descriptive error message."
+#   base_std_exit_if_error $? "A descriptive error message."
 #
 # Arguments:
 #   $1: The exit code to check (typically $?).
 #   $@: The error message to log if the exit code is non-zero.
 #
-bl_std_exit_if_error() {
+base_std_exit_if_error() {
     (($#)) || return
     local __base_bash_libs_std_exit_number_re='^[0-9]+$'
     local __base_bash_libs_std_exit_status=$1 __base_bash_libs_std_exit_normalized_status
@@ -1230,46 +1230,46 @@ bl_std_exit_if_error() {
         __base_bash_libs_std_exit_message="No message specified"
     fi
     if ! [[ $__base_bash_libs_std_exit_status =~ $__base_bash_libs_std_exit_number_re ]]; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "'$__base_bash_libs_std_exit_status' is not a valid exit code; it needs to be a number greater than zero. Treating it as 1."
         __base_bash_libs_std_exit_status=1
     elif ! __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_exit_normalized_status "$__base_bash_libs_std_exit_status"; then
-        bl_std_log_error -l base_bash_libs.std "'$__base_bash_libs_std_exit_status' is not a valid decimal exit code. Treating it as 1."
+        base_std_log_error -l base_bash_libs.std "'$__base_bash_libs_std_exit_status' is not a valid decimal exit code. Treating it as 1."
         __base_bash_libs_std_exit_status=1
     else
         __base_bash_libs_std_exit_status="$__base_bash_libs_std_exit_normalized_status"
     fi
     ((__base_bash_libs_std_exit_status)) && {
-        bl_std_log_fatal -l base_bash_libs.std "$__base_bash_libs_std_exit_message"
-        bl_std_dump_trace
+        base_std_log_fatal -l base_bash_libs.std "$__base_bash_libs_std_exit_message"
+        base_std_dump_trace
         exit "$__base_bash_libs_std_exit_status"
     }
     return 0
 }
 
 #
-# bl_std_fatal_error - A convenience wrapper around bl_std_exit_if_error.
+# base_std_fatal_error - A convenience wrapper around base_std_exit_if_error.
 #
 # This function immediately triggers a fatal error, using the exit code
 # of the last command if it was non-zero, or 1 otherwise.
 #
 # Usage:
-#   [[ -f "$my_file" ]] || bl_std_fatal_error "Required file '$my_file' not found."
+#   [[ -f "$my_file" ]] || base_std_fatal_error "Required file '$my_file' not found."
 #
-bl_std_fatal_error() {
+base_std_fatal_error() {
     local __base_bash_libs_std_fatal_status=$?                         # grab the current exit code
     ((__base_bash_libs_std_fatal_status == 0)) && __base_bash_libs_std_fatal_status=1 # if it is zero, set exit code to 1
-    bl_std_exit_if_error "$__base_bash_libs_std_fatal_status" "$@"
+    base_std_exit_if_error "$__base_bash_libs_std_fatal_status" "$@"
 }
 
 #################################################### COMMAND EXECUTION #################################################
 
 #
-# bl_std_is_dry_run - Returns true when dry-run mode is enabled.
+# base_std_is_dry_run - Returns true when dry-run mode is enabled.
 #
 # Dry-run mode accepts common truthy values in BASE_BASH_LIBS_DRY_RUN.
 #
-bl_std_is_dry_run() {
+base_std_is_dry_run() {
     local __base_bash_libs_std_dry_run_value
 
     __base_bash_libs_std_dry_run_value="${BASE_BASH_LIBS_DRY_RUN-}"
@@ -1472,7 +1472,7 @@ __base_bash_libs_std_run_status_message__() {
 }
 
 #
-# bl_std_run - Safely executes a simple command with its arguments.
+# base_std_run - Safely executes a simple command with its arguments.
 #
 # This function is designed to be a secure and robust replacement for using
 # `eval` or simple command execution. It correctly handles arguments with
@@ -1498,8 +1498,8 @@ __base_bash_libs_std_run_status_message__() {
 #     supplies an optional caller-vetted, single-line operation label.
 #
 # Usage:
-#   bl_std_run [options] command [arg1] [arg2] ...
-#   bl_std_run --sensitive [--safe-display label] [options] -- command [arg1] ...
+#   base_std_run [options] command [arg1] [arg2] ...
+#   base_std_run --sensitive [--safe-display label] [options] -- command [arg1] ...
 #
 # Options:
 #   --no-exit   If provided as an initial argument, the script will not
@@ -1524,22 +1524,22 @@ __base_bash_libs_std_run_status_message__() {
 #
 # Examples:
 #   # Run a simple command. Exits if `ls` fails.
-#   bl_std_run ls -l /tmp
+#   base_std_run ls -l /tmp
 #
 #   # Run a command with spaces in an argument.
-#   bl_std_run touch "a file with spaces.txt"
+#   base_std_run touch "a file with spaces.txt"
 #
 #   # Run a command but don't exit the script on failure.
-#   if ! bl_std_run --no-exit grep "not_found" /etc/hosts; then
+#   if ! base_std_run --no-exit grep "not_found" /etc/hosts; then
 #       log "INFO" "The text was not found, but we are continuing."
 #   fi
 #
 #   # In a script where BASE_BASH_LIBS_DRY_RUN=true, this will only print the command.
 #   BASE_BASH_LIBS_DRY_RUN=true
-#   bl_std_run rm -rf /some/important/path
+#   base_std_run rm -rf /some/important/path
 #
 #   # Protect credentials in framework-generated diagnostics.
-#   bl_std_run --sensitive --safe-display "upload release asset" -- \
+#   base_std_run --sensitive --safe-display "upload release asset" -- \
 #       curl -H "Authorization: Bearer $token" "$upload_url"
 #
 ################################################################################
@@ -1563,7 +1563,7 @@ __base_bash_libs_std_run_impl__() {
             --timeout)
                 shift
                 if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
-                    bl_std_log_error -l base_bash_libs.std "$helper_name: timeout seconds must be a positive integer."
+                    base_std_log_error -l base_bash_libs.std "$helper_name: timeout seconds must be a positive integer."
                     return 1
                 fi
                 __base_bash_libs_std_decimal_integer_value__ timeout_seconds "$1"
@@ -1572,7 +1572,7 @@ __base_bash_libs_std_run_impl__() {
             --max-attempts | --retry-attempts)
                 shift
                 if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
-                    bl_std_log_error -l base_bash_libs.std "$helper_name: max attempts must be a positive integer."
+                    base_std_log_error -l base_bash_libs.std "$helper_name: max attempts must be a positive integer."
                     return 1
                 fi
                 __base_bash_libs_std_decimal_integer_value__ max_attempts "$1"
@@ -1581,7 +1581,7 @@ __base_bash_libs_std_run_impl__() {
             --retry-delay)
                 shift
                 if (($# == 0)) || ! __base_bash_libs_std_is_non_negative_integer__ "${1-}"; then
-                    bl_std_log_error -l base_bash_libs.std "$helper_name: retry delay seconds must be a non-negative integer."
+                    base_std_log_error -l base_bash_libs.std "$helper_name: retry delay seconds must be a non-negative integer."
                     return 1
                 fi
                 __base_bash_libs_std_decimal_integer_value__ retry_delay "$1"
@@ -1595,7 +1595,7 @@ __base_bash_libs_std_run_impl__() {
                 safe_display_set=1
                 shift
                 if (($# == 0)) || [[ "${1-}" == -* ]]; then
-                    bl_std_log_error -l base_bash_libs.std \
+                    base_std_log_error -l base_bash_libs.std \
                         "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
                     return 1
                 fi
@@ -1609,7 +1609,7 @@ __base_bash_libs_std_run_impl__() {
                 ;;
             *)
                 if [[ "${1-}" == --* ]]; then
-                    bl_std_log_error -l base_bash_libs.std \
+                    base_std_log_error -l base_bash_libs.std \
                         "$helper_name: unknown runner option. Use -- before commands that begin with --."
                     return 1
                 fi
@@ -1619,30 +1619,30 @@ __base_bash_libs_std_run_impl__() {
     done
 
     if ((safe_display_set && ! sensitive)); then
-        bl_std_log_error -l base_bash_libs.std "$helper_name: --safe-display is valid only with --sensitive."
+        base_std_log_error -l base_bash_libs.std "$helper_name: --safe-display is valid only with --sensitive."
         return 1
     fi
     if ((safe_display_set)) && ! __base_bash_libs_std_is_safe_display__ "$safe_display"; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
         return 1
     fi
     if ((sensitive && ! option_terminator_seen)); then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "$helper_name: --sensitive requires -- before the command."
         return 1
     fi
 
     # Check if the command is empty.
     if [[ $# -eq 0 ]]; then
-        bl_std_log_error -l base_bash_libs.std "$helper_name: No command provided."
+        base_std_log_error -l base_bash_libs.std "$helper_name: No command provided."
         return 1
     fi
 
     local __base_bash_libs_std_run_immutable_command_display
     __base_bash_libs_std_render_command_display__ __base_bash_libs_std_run_immutable_command_display "$sensitive" "$safe_display" \
         '[sensitive command; arguments hidden]' "$@" || {
-        bl_std_log_error -l base_bash_libs.std "$helper_name: could not render a safe command diagnostic."
+        base_std_log_error -l base_bash_libs.std "$helper_name: could not render a safe command diagnostic."
         return 1
     }
     readonly __base_bash_libs_std_run_immutable_command_display
@@ -1659,7 +1659,7 @@ __base_bash_libs_std_run_impl__() {
     local -r __base_bash_libs_std_run_policy_retry_delay="$retry_delay"
 
     # --- Dry-Run Handling ---
-    if bl_std_is_dry_run; then
+    if base_std_is_dry_run; then
         local policy_description __base_bash_libs_std_dry_run_message
         __base_bash_libs_std_join_run_policy__ policy_description \
             "$__base_bash_libs_std_run_policy_timeout_seconds" \
@@ -1712,7 +1712,7 @@ __base_bash_libs_std_run_impl__() {
                     "$__base_bash_libs_std_run_exit_code" "$__base_bash_libs_std_run_policy_timeout_seconds" \
                     "$__base_bash_libs_std_run_outcome" \
                     "$__base_bash_libs_std_run_immutable_command_display"
-                bl_std_log_warn -l base_bash_libs.std \
+                base_std_log_warn -l base_bash_libs.std \
                     "${__base_bash_libs_std_run_message} (attempt ${__base_bash_libs_std_run_attempt_number} of ${__base_bash_libs_std_run_policy_max_attempts}; retrying)."
             fi
             if ((__base_bash_libs_std_run_policy_retry_delay > 0)); then
@@ -1737,10 +1737,10 @@ __base_bash_libs_std_run_impl__() {
                 "$__base_bash_libs_std_run_immutable_command_display"
         fi
         if ((__base_bash_libs_std_run_policy_exit_on_failure)); then
-            bl_std_exit_if_error "$__base_bash_libs_std_run_exit_code" "$__base_bash_libs_std_run_message"
+            base_std_exit_if_error "$__base_bash_libs_std_run_exit_code" "$__base_bash_libs_std_run_message"
         else
             if ((! __base_bash_libs_std_run_policy_quiet)); then
-                bl_std_log_warn -l base_bash_libs.std "$__base_bash_libs_std_run_message (continuing)."
+                base_std_log_warn -l base_bash_libs.std "$__base_bash_libs_std_run_message (continuing)."
             fi
             return "$__base_bash_libs_std_run_exit_code"
         fi
@@ -1749,8 +1749,8 @@ __base_bash_libs_std_run_impl__() {
     return 0
 }
 
-bl_std_run() {
-    __base_bash_libs_std_run_impl__ bl_std_run "$@"
+base_std_run() {
+    __base_bash_libs_std_run_impl__ base_std_run "$@"
 }
 
 __base_bash_libs_std_sleep_interval__() {
@@ -1784,7 +1784,7 @@ __base_bash_libs_std_timeout_backend_detect__() {
     printf -v "$__base_bash_libs_std_timeout_backend_result_name" '%s' ""
     for __base_bash_libs_std_timeout_backend_name in timeout gtimeout; do
         timeout_backend_candidate=""
-        if bl_std_command_path timeout_backend_candidate \
+        if base_std_command_path timeout_backend_candidate \
             "$__base_bash_libs_std_timeout_backend_name" &&
             __base_bash_libs_std_timeout_candidate_is_gnu__ \
                 "$timeout_backend_candidate"; then
@@ -2339,12 +2339,12 @@ __base_bash_libs_std_run_with_timeout_fallback__() {
 ############################################## FILE AND DIRECTORY HANDLING ############################################
 
 #
-# bl_std_safe_mkdir: Attempt to create directories and return on failure.
+# base_std_safe_mkdir: Attempt to create directories and return on failure.
 #             Creates as many directories as possible.
 #
-# Usage: bl_std_safe_mkdir [-p] dir1 dir2 ...
+# Usage: base_std_safe_mkdir [-p] dir1 dir2 ...
 #
-bl_std_safe_mkdir() {
+base_std_safe_mkdir() {
     local dir opt failed_dirs=() mkdir_args=()
     local OPTIND=1
 
@@ -2352,7 +2352,7 @@ bl_std_safe_mkdir() {
         case "$opt" in
             p) mkdir_args=(-p) ;;
             \?)
-                bl_std_log_error -l base_bash_libs.std "bl_std_safe_mkdir: invalid option '-$OPTARG'"
+                base_std_log_error -l base_bash_libs.std "base_std_safe_mkdir: invalid option '-$OPTARG'"
                 return 1
                 ;;
         esac
@@ -2360,7 +2360,7 @@ bl_std_safe_mkdir() {
     shift $((OPTIND - 1))
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_safe_mkdir: No directories provided to create."
+        base_std_log_warn -l base_bash_libs.std "base_std_safe_mkdir: No directories provided to create."
         return 0
     fi
 
@@ -2371,31 +2371,31 @@ bl_std_safe_mkdir() {
         fi
     done
     if [[ -n "${failed_dirs[0]+set}" ]]; then
-        bl_std_log_error -l base_bash_libs.std "Failed to create directories: ${failed_dirs[*]}"
+        base_std_log_error -l base_bash_libs.std "Failed to create directories: ${failed_dirs[*]}"
         return 1
     fi
     return 0
 }
 
 #
-# bl_std_safe_touch - Creates or updates the timestamp of one or more files.
+# base_std_safe_touch - Creates or updates the timestamp of one or more files.
 #
 # This function iterates through all provided file paths. It attempts to
 # 'touch' each file. If any operation fails (e.g., due to permissions),
 # it collects the names of the failed files and reports them all before returning.
 #
 # Usage:
-#   bl_std_safe_touch "/tmp/file1.log" "/var/run/app.pid"
+#   base_std_safe_touch "/tmp/file1.log" "/var/run/app.pid"
 #
 # Arguments:
 #   $@: One or more file paths to touch.
 #
-bl_std_safe_touch() {
+base_std_safe_touch() {
     local failed_files=()
     local file touch_path
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_safe_touch: No files provided to touch."
+        base_std_log_warn -l base_bash_libs.std "base_std_safe_touch: No files provided to touch."
         return 0
     fi
 
@@ -2408,7 +2408,7 @@ bl_std_safe_touch() {
     done
 
     if [[ -n "${failed_files[0]+set}" ]]; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "Failed to touch the following files: ${failed_files[*]}"
         return 1
     fi
@@ -2417,24 +2417,24 @@ bl_std_safe_touch() {
 }
 
 #
-# bl_std_safe_truncate - Truncates one or more files to zero bytes.
+# base_std_safe_truncate - Truncates one or more files to zero bytes.
 #
 # This function iterates through all provided file paths. It attempts to
 # truncate each file. If any operation fails (e.g., due to permissions),
 # it collects the names of the failed files and reports them all before returning.
 #
 # Usage:
-#   bl_std_safe_truncate "/var/log/app.log" "/tmp/data.tmp"
+#   base_std_safe_truncate "/var/log/app.log" "/tmp/data.tmp"
 #
 # Arguments:
 #   $@: One or more file paths to truncate.
 #
-bl_std_safe_truncate() {
+base_std_safe_truncate() {
     local failed_files=()
     local file
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_safe_truncate: No files provided to truncate."
+        base_std_log_warn -l base_bash_libs.std "base_std_safe_truncate: No files provided to truncate."
         return 0
     fi
 
@@ -2448,7 +2448,7 @@ bl_std_safe_truncate() {
     done
 
     if [[ -n "${failed_files[0]+set}" ]]; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "Failed to truncate the following files: ${failed_files[*]}"
         return 1
     fi
@@ -2561,14 +2561,14 @@ __base_bash_libs_std_cleanup_delete_path__() {
     [[ -e "$cleanup_path" || -L "$cleanup_path" ]] || return 0
     if [[ "$fingerprint" != UNSAFE ]] &&
         ! __base_bash_libs_std_cleanup_path_fingerprint_matches__ "$cleanup_path"; then
-        bl_std_log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' changed identity; refusing to remove it."
+        base_std_log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' changed identity; refusing to remove it."
         return 1
     fi
     if [[ "$fingerprint" == UNSAFE ]]; then
-        bl_std_log_warn -l base_bash_libs.std "Removing explicitly unsafe cleanup path '$cleanup_path'."
+        base_std_log_warn -l base_bash_libs.std "Removing explicitly unsafe cleanup path '$cleanup_path'."
     fi
     if ! rm -rf -- "$cleanup_path"; then
-        bl_std_log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
+        base_std_log_warn -l base_bash_libs.std "Cleanup path '$cleanup_path' could not be removed."
         return 1
     fi
     return 0
@@ -2670,7 +2670,7 @@ __base_bash_libs_std_run_cleanup_hooks__() {
         case "$entry_type" in
             hook)
                 if ! "$entry_value"; then
-                    bl_std_log_warn -l base_bash_libs.std "Cleanup hook '$entry_value' failed."
+                    base_std_log_warn -l base_bash_libs.std "Cleanup hook '$entry_value' failed."
                 fi
                 ;;
             path)
@@ -2765,24 +2765,24 @@ __base_bash_libs_std_maybe_uninstall_cleanup_dispatcher__() {
 }
 
 #
-# bl_std_register_cleanup_hook - Registers a function to run from the shared EXIT trap.
+# base_std_register_cleanup_hook - Registers a function to run from the shared EXIT trap.
 #
 # Cleanup hooks run after any EXIT trap that existed before the first cleanup hook
 # registration. Hooks are function names, not shell command strings.
 #
 # Usage:
 #   cleanup_workspace() { rm -rf -- "$workspace"; }
-#   bl_std_register_cleanup_hook cleanup_workspace
+#   base_std_register_cleanup_hook cleanup_workspace
 #
-bl_std_register_cleanup_hook() {
+base_std_register_cleanup_hook() {
     local hook="${1-}" existing_hook
 
     if (($# != 1)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_hook: expected exactly one function name."
+        base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_hook: expected exactly one function name."
         return 1
     fi
     if ! __base_bash_libs_std_is_valid_variable_name__ "$hook" || ! declare -F "$hook" >/dev/null; then
-        bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_hook: '$hook' is not a defined cleanup function."
+        base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_hook: '$hook' is not a defined cleanup function."
         return 1
     fi
 
@@ -2797,17 +2797,17 @@ bl_std_register_cleanup_hook() {
 }
 
 #
-# bl_std_unregister_cleanup_hook - Removes a function from the shared EXIT cleanup hook list.
+# base_std_unregister_cleanup_hook - Removes a function from the shared EXIT cleanup hook list.
 #
 # Usage:
-#   bl_std_unregister_cleanup_hook cleanup_workspace
+#   base_std_unregister_cleanup_hook cleanup_workspace
 #
-bl_std_unregister_cleanup_hook() {
+base_std_unregister_cleanup_hook() {
     local hook="${1-}" existing_hook entry entry_type entry_value
     local -a remaining_hooks=() remaining_entries=()
 
     if (($# != 1)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_unregister_cleanup_hook: expected exactly one function name."
+        base_std_log_error -l base_bash_libs.std "base_std_unregister_cleanup_hook: expected exactly one function name."
         return 1
     fi
 
@@ -2862,7 +2862,7 @@ __base_bash_libs_std_is_broad_cleanup_path__() {
 }
 
 #
-# bl_std_register_cleanup_path - Registers files or directories for removal at shell exit.
+# base_std_register_cleanup_path - Registers files or directories for removal at shell exit.
 #
 # Paths are removed with `rm -rf --` from the shared EXIT trap. Paths must be
 # absolute so cleanup cannot drift when a script changes directory after
@@ -2873,15 +2873,15 @@ __base_bash_libs_std_is_broad_cleanup_path__() {
 #
 # Usage:
 #   workspace="$(mktemp -d)"
-#   bl_std_register_cleanup_path "$workspace"
-#   bl_std_register_cleanup_path --unsafe "$legacy_path"
+#   base_std_register_cleanup_path "$workspace"
+#   base_std_register_cleanup_path --unsafe "$legacy_path"
 #
-bl_std_register_cleanup_path() {
+base_std_register_cleanup_path() {
     local path existing_path fingerprint
     local unsafe=0 already_registered had_valid_path=0 status=0
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_register_cleanup_path: No paths provided."
+        base_std_log_warn -l base_bash_libs.std "base_std_register_cleanup_path: No paths provided."
         return 0
     fi
 
@@ -2893,28 +2893,28 @@ bl_std_register_cleanup_path() {
         shift
     fi
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_register_cleanup_path: No paths provided."
+        base_std_log_warn -l base_bash_libs.std "base_std_register_cleanup_path: No paths provided."
         return 0
     fi
 
     for path; do
         if ! __base_bash_libs_std_is_safe_cleanup_path__ "$path"; then
-            bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
+            base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: refusing to register unsafe cleanup path '$path'."
             status=1
             continue
         fi
         if __base_bash_libs_std_is_broad_cleanup_path__ "$path"; then
-            bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_path: refusing to register broad or protected path '$path'."
+            base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: refusing to register broad or protected path '$path'."
             status=1
             continue
         fi
         if (( ! unsafe )) && [[ -L "$path" ]]; then
-            bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_path: refusing to register symlink '$path' without --unsafe."
+            base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: refusing to register symlink '$path' without --unsafe."
             status=1
             continue
         fi
         if (( ! unsafe )) && ! [[ -e "$path" ]]; then
-            bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_path: path '$path' does not exist for ownership proof."
+            base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: path '$path' does not exist for ownership proof."
             status=1
             continue
         fi
@@ -2931,7 +2931,7 @@ bl_std_register_cleanup_path() {
             if (( unsafe )); then
                 fingerprint=UNSAFE
             elif ! __base_bash_libs_std_capture_cleanup_path_fingerprint__ fingerprint "$path"; then
-                bl_std_log_error -l base_bash_libs.std "bl_std_register_cleanup_path: unable to snapshot ownership for '$path'."
+                base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: unable to snapshot ownership for '$path'."
                 status=1
                 continue
             fi
@@ -2948,7 +2948,7 @@ bl_std_register_cleanup_path() {
 }
 
 #
-# bl_std_unregister_cleanup_path - Removes files or directories from the shared EXIT cleanup path list.
+# base_std_unregister_cleanup_path - Removes files or directories from the shared EXIT cleanup path list.
 #
 # This is useful after eager cleanup removes or moves a path that was previously
 # registered for fallback cleanup. Paths use the same safety checks as
@@ -2957,21 +2957,21 @@ bl_std_register_cleanup_path() {
 #
 # Usage:
 #   rm -rf -- "$workspace"
-#   bl_std_unregister_cleanup_path "$workspace"
+#   base_std_unregister_cleanup_path "$workspace"
 #
-bl_std_unregister_cleanup_path() {
+base_std_unregister_cleanup_path() {
     local path existing_path entry entry_type entry_value
     local should_remove had_valid_path=0 status=0
     local -a paths_to_remove=() remaining_paths=() remaining_entries=()
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_unregister_cleanup_path: No paths provided."
+        base_std_log_warn -l base_bash_libs.std "base_std_unregister_cleanup_path: No paths provided."
         return 0
     fi
 
     for path; do
         if ! __base_bash_libs_std_is_safe_cleanup_path__ "$path"; then
-            bl_std_log_error -l base_bash_libs.std "bl_std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '$path'."
+            base_std_log_error -l base_bash_libs.std "base_std_unregister_cleanup_path: refusing to unregister unsafe cleanup path '$path'."
             status=1
             continue
         fi
@@ -3040,7 +3040,7 @@ __base_bash_libs_std_make_temp_path__() {
     done
 
     if (($# < 1 || $# > 2)); then
-        bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: usage: $__base_bash_libs_std_temp_helper_name [--keep] <result_variable_name> [prefix]"
+        base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: usage: $__base_bash_libs_std_temp_helper_name [--keep] <result_variable_name> [prefix]"
         return 1
     fi
 
@@ -3048,19 +3048,19 @@ __base_bash_libs_std_make_temp_path__() {
     __base_bash_libs_std_temp_prefix="${2:-base-bash-libs}"
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_temp_result_name"; then
-        bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: result variable name must be a valid Bash variable name."
+        base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: result variable name must be a valid Bash variable name."
         return 1
     fi
     __base_bash_libs_std_assert_writable_output__ "$__base_bash_libs_std_temp_helper_name" "$__base_bash_libs_std_temp_result_name" || return 1
     if [[ -z "$__base_bash_libs_std_temp_prefix" || "$__base_bash_libs_std_temp_prefix" == */* ]]; then
-        bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
+        base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
         return 1
     fi
 
     __base_bash_libs_std_temp_root="${TMPDIR:-/tmp}"
     if [[ "$__base_bash_libs_std_temp_root" != /* ]]; then
         if ! __base_bash_libs_std_temp_root="$(cd -- "$__base_bash_libs_std_temp_root" 2>/dev/null && pwd -P)"; then
-            bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+            base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
             return 1
         fi
     fi
@@ -3068,7 +3068,7 @@ __base_bash_libs_std_make_temp_path__() {
         __base_bash_libs_std_temp_root="${__base_bash_libs_std_temp_root%/}"
     done
     if [[ -z "$__base_bash_libs_std_temp_root" || ! -d "$__base_bash_libs_std_temp_root" ]]; then
-        bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
+        base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
         return 1
     fi
 
@@ -3079,18 +3079,18 @@ __base_bash_libs_std_make_temp_path__() {
     fi
     if [[ "$__base_bash_libs_std_temp_path_kind" == "dir" ]]; then
         __base_bash_libs_std_temp_path="$(mktemp -d "$__base_bash_libs_std_temp_template" 2>/dev/null)" || {
-            bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary directory."
+            base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary directory."
             return 1
         }
     else
         __base_bash_libs_std_temp_path="$(mktemp "$__base_bash_libs_std_temp_template" 2>/dev/null)" || {
-            bl_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary file."
+            base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary file."
             return 1
         }
     fi
 
     if ((! __base_bash_libs_std_temp_keep)); then
-        if ! bl_std_register_cleanup_path "$__base_bash_libs_std_temp_path"; then
+        if ! base_std_register_cleanup_path "$__base_bash_libs_std_temp_path"; then
             rm -rf -- "$__base_bash_libs_std_temp_path"
             return 1
         fi
@@ -3101,16 +3101,16 @@ __base_bash_libs_std_make_temp_path__() {
 }
 
 #
-# bl_std_make_temp_file - Creates a temporary file and stores its path in a named variable.
+# base_std_make_temp_file - Creates a temporary file and stores its path in a named variable.
 #
 # The created file is registered for exit cleanup unless `--keep` is provided.
 #
 # Usage:
-#   bl_std_make_temp_file [--keep] <result_variable_name> [prefix]
+#   base_std_make_temp_file [--keep] <result_variable_name> [prefix]
 #
-bl_std_make_temp_file() {
-    __base_bash_libs_std_preflight_temp_result_name__ bl_std_make_temp_file "$@" || return 1
-    __base_bash_libs_std_make_temp_path__ bl_std_make_temp_file file "$@"
+base_std_make_temp_file() {
+    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_file "$@" || return 1
+    __base_bash_libs_std_make_temp_path__ base_std_make_temp_file file "$@"
 }
 
 # Private counterpart for reserved implementation-local result variables.
@@ -3120,16 +3120,16 @@ __base_bash_libs_std_make_internal_temp_file__() {
 }
 
 #
-# bl_std_make_temp_dir - Creates a temporary directory and stores its path in a named variable.
+# base_std_make_temp_dir - Creates a temporary directory and stores its path in a named variable.
 #
 # The created directory is registered for exit cleanup unless `--keep` is provided.
 #
 # Usage:
-#   bl_std_make_temp_dir [--keep] <result_variable_name> [prefix]
+#   base_std_make_temp_dir [--keep] <result_variable_name> [prefix]
 #
-bl_std_make_temp_dir() {
-    __base_bash_libs_std_preflight_temp_result_name__ bl_std_make_temp_dir "$@" || return 1
-    __base_bash_libs_std_make_temp_path__ bl_std_make_temp_dir dir "$@"
+base_std_make_temp_dir() {
+    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_dir "$@" || return 1
+    __base_bash_libs_std_make_temp_path__ base_std_make_temp_dir dir "$@"
 }
 
 # Private counterpart for reserved implementation-local result variables.
@@ -3154,7 +3154,7 @@ __base_bash_libs_std_assert_writable_output__() {
         case "$__base_bash_libs_std_output_function_name" in
             __base_bash_libs_std_make_internal_temp_file__ | __base_bash_libs_std_make_internal_temp_dir__) ;;
             *)
-                bl_std_log_error -l base_bash_libs.std \
+                base_std_log_error -l base_bash_libs.std \
                     "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' uses the reserved '__' internal namespace."
                 return 1
                 ;;
@@ -3166,7 +3166,7 @@ __base_bash_libs_std_assert_writable_output__() {
     __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_declaration#declare -}"
     __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_attributes%% *}"
     if [[ "$__base_bash_libs_std_output_attributes" == *r* ]]; then
-        bl_std_log_error -l base_bash_libs.std \
+        base_std_log_error -l base_bash_libs.std \
             "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' is readonly."
         return 1
     fi
@@ -3179,7 +3179,7 @@ __base_bash_libs_std_assert_public_variable_names__() {
 
     while (($# > 1)); do
         if [[ "${1-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${1-}" == __* ]]; then
-            bl_std_log_error -l base_bash_libs.std \
+            base_std_log_error -l base_bash_libs.std \
                 "${!#}: variable '${1-}' uses the reserved '__' internal namespace."
             return 1
         fi
@@ -3210,24 +3210,24 @@ __base_bash_libs_std_preflight_temp_result_name__() {
 }
 
 #
-# bl_std_assert_variable_name - Verifies that one or more arguments are valid Bash variable names.
+# base_std_assert_variable_name - Verifies that one or more arguments are valid Bash variable names.
 #
 # This validates the names themselves. It does not require the named variables to
 # exist or have non-empty values.
 #
 # Usage:
-#   bl_std_assert_variable_name result_name array_name
+#   base_std_assert_variable_name result_name array_name
 #
-bl_std_assert_variable_name() {
+base_std_assert_variable_name() {
     local __base_bash_libs_std_assert_variable_name
 
     if (($# == 0)); then
-        bl_std_fatal_error "bl_std_assert_variable_name: No variable names provided for validation."
+        base_std_fatal_error "base_std_assert_variable_name: No variable names provided for validation."
     fi
 
     for __base_bash_libs_std_assert_variable_name in "$@"; do
         if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_assert_variable_name"; then
-            bl_std_fatal_error "bl_std_assert_variable_name expects valid Bash variable names; one or more arguments are invalid."
+            base_std_fatal_error "base_std_assert_variable_name expects valid Bash variable names; one or more arguments are invalid."
         fi
     done
 
@@ -3245,26 +3245,26 @@ __base_bash_libs_std_declares_array_kind__() {
 }
 
 #
-# bl_std_assert_indexed_array - Verifies that one or more variables are declared indexed arrays.
+# base_std_assert_indexed_array - Verifies that one or more variables are declared indexed arrays.
 #
 # This validates that callers declared the named variables with indexed-array
 # semantics before passing them to helpers that mutate or read arrays in place.
 #
 # Usage:
 #   declare -a values=()
-#   bl_std_assert_indexed_array values
+#   base_std_assert_indexed_array values
 #
-bl_std_assert_indexed_array() {
+base_std_assert_indexed_array() {
     if (($# == 0)); then
-        bl_std_fatal_error "bl_std_assert_indexed_array: No variable names provided for validation."
+        base_std_fatal_error "base_std_assert_indexed_array: No variable names provided for validation."
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_assert_indexed_array "$@" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_std_assert_indexed_array "$@" || return 1
     local __base_bash_libs_std_assert_indexed_name
 
     for __base_bash_libs_std_assert_indexed_name in "$@"; do
-        bl_std_assert_variable_name "$__base_bash_libs_std_assert_indexed_name"
+        base_std_assert_variable_name "$__base_bash_libs_std_assert_indexed_name"
         if ! __base_bash_libs_std_declares_array_kind__ "$__base_bash_libs_std_assert_indexed_name" "a"; then
-            bl_std_fatal_error "Variable '$__base_bash_libs_std_assert_indexed_name' must be an indexed array declared by the caller."
+            base_std_fatal_error "Variable '$__base_bash_libs_std_assert_indexed_name' must be an indexed array declared by the caller."
         fi
     done
 
@@ -3272,26 +3272,26 @@ bl_std_assert_indexed_array() {
 }
 
 #
-# bl_std_assert_associative_array - Verifies that one or more variables are declared associative arrays.
+# base_std_assert_associative_array - Verifies that one or more variables are declared associative arrays.
 #
 # This validates that callers declared the named variables with associative-array
 # semantics before passing them to helpers that mutate or read maps in place.
 #
 # Usage:
 #   declare -A options=()
-#   bl_std_assert_associative_array options
+#   base_std_assert_associative_array options
 #
-bl_std_assert_associative_array() {
+base_std_assert_associative_array() {
     if (($# == 0)); then
-        bl_std_fatal_error "bl_std_assert_associative_array: No variable names provided for validation."
+        base_std_fatal_error "base_std_assert_associative_array: No variable names provided for validation."
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_assert_associative_array "$@" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_std_assert_associative_array "$@" || return 1
     local __base_bash_libs_std_assert_associative_name
 
     for __base_bash_libs_std_assert_associative_name in "$@"; do
-        bl_std_assert_variable_name "$__base_bash_libs_std_assert_associative_name"
+        base_std_assert_variable_name "$__base_bash_libs_std_assert_associative_name"
         if ! __base_bash_libs_std_declares_array_kind__ "$__base_bash_libs_std_assert_associative_name" "A"; then
-            bl_std_fatal_error "Variable '$__base_bash_libs_std_assert_associative_name' must be an associative array declared by the caller."
+            base_std_fatal_error "Variable '$__base_bash_libs_std_assert_associative_name' must be an associative array declared by the caller."
         fi
     done
 
@@ -3301,26 +3301,26 @@ bl_std_assert_associative_array() {
 ##################################################### INTROSPECTION ###################################################
 
 #
-# bl_std_command_path - Resolves an external command path without exiting the caller.
+# base_std_command_path - Resolves an external command path without exiting the caller.
 #
 # Usage:
-#   if bl_std_command_path git_path git; then
-#       bl_std_run "$git_path" status --short
+#   if base_std_command_path git_path git; then
+#       base_std_run "$git_path" status --short
 #   fi
 #
-bl_std_command_path() {
+base_std_command_path() {
     if (($# != 2)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_command_path: usage: bl_std_command_path <result_variable_name> <command_name>"
+        base_std_log_error -l base_bash_libs.std "base_std_command_path: usage: base_std_command_path <result_variable_name> <command_name>"
         return 1
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_command_path "${1-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_std_command_path "${1-}" || return 1
     local __base_bash_libs_std_command_result_name="$1" __base_bash_libs_std_command_name="$2" __base_bash_libs_std_command_resolved_path=""
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_command_result_name"; then
-        bl_std_log_error -l base_bash_libs.std "bl_std_command_path: result variable name must be a valid Bash variable name."
+        base_std_log_error -l base_bash_libs.std "base_std_command_path: result variable name must be a valid Bash variable name."
         return 1
     fi
-    __base_bash_libs_std_assert_writable_output__ bl_std_command_path "$__base_bash_libs_std_command_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" || return 1
 
     if [[ -n "$__base_bash_libs_std_command_name" ]]; then
         __base_bash_libs_std_command_resolved_path="$(type -P "$__base_bash_libs_std_command_name" 2>/dev/null || true)"
@@ -3330,9 +3330,9 @@ bl_std_command_path() {
 }
 
 #
-# bl_std_function_exists - Checks whether a Bash function is currently defined.
+# base_std_function_exists - Checks whether a Bash function is currently defined.
 #
-bl_std_function_exists() {
+base_std_function_exists() {
     local function_name="${1-}"
 
     (($# == 1)) || return 1
@@ -3341,36 +3341,36 @@ bl_std_function_exists() {
 }
 
 #
-# bl_std_assert_function_exists - Verifies that one or more Bash functions are defined.
+# base_std_assert_function_exists - Verifies that one or more Bash functions are defined.
 #
 # Usage:
-#   bl_std_assert_function_exists main cleanup_workspace
+#   base_std_assert_function_exists main cleanup_workspace
 #
-bl_std_assert_function_exists() {
+base_std_assert_function_exists() {
     local missing_functions=() function_name
 
     if (($# == 0)); then
-        bl_std_fatal_error "bl_std_assert_function_exists: No function names provided for validation."
+        base_std_fatal_error "base_std_assert_function_exists: No function names provided for validation."
     fi
 
     for function_name in "$@"; do
         if ! __base_bash_libs_std_is_valid_variable_name__ "$function_name"; then
-            bl_std_fatal_error "bl_std_assert_function_exists expects function names; one or more arguments are not valid Bash function names."
+            base_std_fatal_error "base_std_assert_function_exists expects function names; one or more arguments are not valid Bash function names."
         fi
-        if ! bl_std_function_exists "$function_name"; then
+        if ! base_std_function_exists "$function_name"; then
             missing_functions+=("$function_name")
         fi
     done
 
     if [[ -n "${missing_functions[0]+set}" ]]; then
-        bl_std_fatal_error "Required functions are not defined: ${missing_functions[*]}"
+        base_std_fatal_error "Required functions are not defined: ${missing_functions[*]}"
     fi
 
     return 0
 }
 
 #
-# bl_std_assert_not_null - Checks that one or more variables are not empty.
+# base_std_assert_not_null - Checks that one or more variables are not empty.
 #
 # This function takes the *name* of one or more variables and checks that
 # each one has a non-empty value. It is useful for validating required
@@ -3380,24 +3380,24 @@ bl_std_assert_function_exists() {
 # Usage:
 #   USER="admin"
 #   TOKEN=""
-#   bl_std_assert_not_null USER       # This will succeed.
-#   bl_std_assert_not_null USER TOKEN # This will fail, listing TOKEN as empty.
-#   bl_std_assert_not_null "$TOKEN"   # Wrong: pass variable names, not values.
+#   base_std_assert_not_null USER       # This will succeed.
+#   base_std_assert_not_null USER TOKEN # This will fail, listing TOKEN as empty.
+#   base_std_assert_not_null "$TOKEN"   # Wrong: pass variable names, not values.
 #
 # Arguments:
 #   $@: One or more variable names to check.
 #
-bl_std_assert_not_null() {
+base_std_assert_not_null() {
     if (($# == 0)); then
-        bl_std_fatal_error "bl_std_assert_not_null: No variable names provided for validation."
+        base_std_fatal_error "base_std_assert_not_null: No variable names provided for validation."
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_assert_not_null "$@" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_std_assert_not_null "$@" || return 1
     local -a __base_bash_libs_std_assert_not_null_unset_names=()
     local __base_bash_libs_std_assert_not_null_name
 
     for __base_bash_libs_std_assert_not_null_name in "$@"; do
         if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_assert_not_null_name"; then
-            bl_std_fatal_error "bl_std_assert_not_null expects variable names, not values; one or more arguments are not valid Bash variable names."
+            base_std_fatal_error "base_std_assert_not_null expects variable names, not values; one or more arguments are not valid Bash variable names."
         fi
         # Use indirection to get the value of the variable whose name is stored in var_name.
         # The -v check is for unset variables, -z is for empty strings.
@@ -3408,56 +3408,56 @@ bl_std_assert_not_null() {
     done
 
     if [[ -n "${__base_bash_libs_std_assert_not_null_unset_names[0]+set}" ]]; then
-        bl_std_fatal_error "These required variables are not set or are empty: ${__base_bash_libs_std_assert_not_null_unset_names[*]}"
+        base_std_fatal_error "These required variables are not set or are empty: ${__base_bash_libs_std_assert_not_null_unset_names[*]}"
     fi
 
     return 0
 }
 
 #
-# bl_std_assert_integer - Checks if the values of one or more variables are valid integers.
+# base_std_assert_integer - Checks if the values of one or more variables are valid integers.
 #
 __base_bash_libs_std_assert_integer_names__() {
     local __base_bash_libs_std_assert_integer_name __base_bash_libs_std_assert_integer_value
     local __base_bash_libs_std_assert_integer_re='^[-+]?[0-9]+$'
     for __base_bash_libs_std_assert_integer_name in "$@"; do
         if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_assert_integer_name"; then
-            bl_std_fatal_error "bl_std_assert_integer expects variable names, not values; one or more arguments are not valid Bash variable names."
+            base_std_fatal_error "base_std_assert_integer expects variable names, not values; one or more arguments are not valid Bash variable names."
         fi
         __base_bash_libs_std_assert_integer_value="${!__base_bash_libs_std_assert_integer_name-}"
         ! [[ "$__base_bash_libs_std_assert_integer_value" =~ $__base_bash_libs_std_assert_integer_re ]] &&
-            bl_std_fatal_error "Variable '$__base_bash_libs_std_assert_integer_name' with value '$__base_bash_libs_std_assert_integer_value' is not a valid integer."
+            base_std_fatal_error "Variable '$__base_bash_libs_std_assert_integer_name' with value '$__base_bash_libs_std_assert_integer_value' is not a valid integer."
     done
     return 0
 }
 
-bl_std_assert_integer() {
-    (($# == 0)) && bl_std_fatal_error "bl_std_assert_integer: No variable names provided."
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_assert_integer "$@" || return 1
+base_std_assert_integer() {
+    (($# == 0)) && base_std_fatal_error "base_std_assert_integer: No variable names provided."
+    __base_bash_libs_std_assert_public_variable_names__ base_std_assert_integer "$@" || return 1
     __base_bash_libs_std_assert_integer_names__ "$@"
 }
 
 #
-# bl_std_assert_integer_range - Checks if a variable's value is an integer within a specified range.
+# base_std_assert_integer_range - Checks if a variable's value is an integer within a specified range.
 #
 # Arguments:
 #   $1: The NAME of the variable to check.
 #   $2: The minimum value.
 #   $3: The maximum value.
 #
-bl_std_assert_integer_range() {
-    (($# != 3)) && bl_std_fatal_error "bl_std_assert_integer_range: Expected 3 arguments, got $#."
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_assert_integer_range "${1-}" || return 1
+base_std_assert_integer_range() {
+    (($# != 3)) && base_std_fatal_error "base_std_assert_integer_range: Expected 3 arguments, got $#."
+    __base_bash_libs_std_assert_public_variable_names__ base_std_assert_integer_range "${1-}" || return 1
     local __base_bash_libs_std_range_name="$1" __base_bash_libs_std_range_min="$2" __base_bash_libs_std_range_max="$3"
     local __base_bash_libs_std_range_value __base_bash_libs_std_range_value_number __base_bash_libs_std_range_min_number __base_bash_libs_std_range_max_number
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_range_name"; then
-        bl_std_fatal_error "bl_std_assert_integer_range expects a variable name as its first argument."
+        base_std_fatal_error "base_std_assert_integer_range expects a variable name as its first argument."
     fi
     if ! [[ "$__base_bash_libs_std_range_min" =~ ^[-+]?[0-9]+$ ]]; then
-        bl_std_fatal_error "bl_std_assert_integer_range minimum bound '$__base_bash_libs_std_range_min' is not a valid integer."
+        base_std_fatal_error "base_std_assert_integer_range minimum bound '$__base_bash_libs_std_range_min' is not a valid integer."
     fi
     if ! [[ "$__base_bash_libs_std_range_max" =~ ^[-+]?[0-9]+$ ]]; then
-        bl_std_fatal_error "bl_std_assert_integer_range maximum bound '$__base_bash_libs_std_range_max' is not a valid integer."
+        base_std_fatal_error "base_std_assert_integer_range maximum bound '$__base_bash_libs_std_range_max' is not a valid integer."
     fi
     __base_bash_libs_std_range_value="${!__base_bash_libs_std_range_name-}"
     __base_bash_libs_std_assert_integer_names__ "$__base_bash_libs_std_range_name"
@@ -3465,34 +3465,34 @@ bl_std_assert_integer_range() {
     __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_min_number "$__base_bash_libs_std_range_min"
     __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_max_number "$__base_bash_libs_std_range_max"
     ((__base_bash_libs_std_range_min_number > __base_bash_libs_std_range_max_number)) &&
-        bl_std_fatal_error "bl_std_assert_integer_range minimum '$__base_bash_libs_std_range_min' cannot exceed maximum '$__base_bash_libs_std_range_max'."
+        base_std_fatal_error "base_std_assert_integer_range minimum '$__base_bash_libs_std_range_min' cannot exceed maximum '$__base_bash_libs_std_range_max'."
     ((__base_bash_libs_std_range_value_number < __base_bash_libs_std_range_min_number || __base_bash_libs_std_range_value_number > __base_bash_libs_std_range_max_number)) &&
-        bl_std_fatal_error "Variable '$__base_bash_libs_std_range_name' ($__base_bash_libs_std_range_value) is out of range [$__base_bash_libs_std_range_min, $__base_bash_libs_std_range_max]."
+        base_std_fatal_error "Variable '$__base_bash_libs_std_range_name' ($__base_bash_libs_std_range_value) is out of range [$__base_bash_libs_std_range_min, $__base_bash_libs_std_range_max]."
     return 0
 }
 
 #
-# bl_std_assert_arg_count - Checks that the number of arguments falls within a given range.
+# base_std_assert_arg_count - Checks that the number of arguments falls within a given range.
 #
 # Usage:
-#   bl_std_assert_arg_count $# 2      # Fails if arg count is not exactly 2
-#   bl_std_assert_arg_count $# 1 3    # Fails if arg count is not between 1 and 3 (inclusive)
+#   base_std_assert_arg_count $# 2      # Fails if arg count is not exactly 2
+#   base_std_assert_arg_count $# 1 3    # Fails if arg count is not between 1 and 3 (inclusive)
 #
 # Arguments:
 #   $1: The actual number of arguments (typically $#).
 #   $2: The exact expected count, or the minimum count for a range.
 #   $3: (Optional) The maximum count for a range.
 #
-bl_std_assert_arg_count() {
+base_std_assert_arg_count() {
     local __base_bash_libs_std_arg_count_actual="${1-}" __base_bash_libs_std_arg_count_first="${2-}" __base_bash_libs_std_arg_count_second="${3-}"
     local __base_bash_libs_std_arg_count_arity=$#
 
     # Check the number of arguments passed to this function itself.
     if ((__base_bash_libs_std_arg_count_arity < 2 || __base_bash_libs_std_arg_count_arity > 3)); then
-        bl_std_fatal_error "bl_std_assert_arg_count: Incorrect usage. Expected 2 or 3 arguments, but got $__base_bash_libs_std_arg_count_arity."
+        base_std_fatal_error "base_std_assert_arg_count: Incorrect usage. Expected 2 or 3 arguments, but got $__base_bash_libs_std_arg_count_arity."
     fi
 
-    # Create temporary named variables for bl_std_assert_integer to check
+    # Create temporary named variables for base_std_assert_integer to check
     local __base_bash_libs_std_arg_count_actual_value="$__base_bash_libs_std_arg_count_actual" __base_bash_libs_std_arg_count_first_value="$__base_bash_libs_std_arg_count_first"
     local __base_bash_libs_std_arg_count_actual_number __base_bash_libs_std_arg_count_first_number __base_bash_libs_std_arg_count_second_number
     __base_bash_libs_std_assert_integer_names__ __base_bash_libs_std_arg_count_actual_value __base_bash_libs_std_arg_count_first_value
@@ -3507,43 +3507,43 @@ bl_std_assert_arg_count() {
     if [[ -n "$__base_bash_libs_std_arg_count_second" ]]; then
         __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_arg_count_second_number "$__base_bash_libs_std_arg_count_second"
         ((__base_bash_libs_std_arg_count_first_number > __base_bash_libs_std_arg_count_second_number)) &&
-            bl_std_fatal_error "bl_std_assert_arg_count minimum '$__base_bash_libs_std_arg_count_first' cannot exceed maximum '$__base_bash_libs_std_arg_count_second'."
+            base_std_fatal_error "base_std_assert_arg_count minimum '$__base_bash_libs_std_arg_count_first' cannot exceed maximum '$__base_bash_libs_std_arg_count_second'."
     fi
 
     if [[ -z "$__base_bash_libs_std_arg_count_second" ]]; then
         # Exact match case
         if ((__base_bash_libs_std_arg_count_actual_number != __base_bash_libs_std_arg_count_first_number)); then
-            bl_std_fatal_error "Argument count mismatch: expected $__base_bash_libs_std_arg_count_first but got $__base_bash_libs_std_arg_count_actual arguments"
+            base_std_fatal_error "Argument count mismatch: expected $__base_bash_libs_std_arg_count_first but got $__base_bash_libs_std_arg_count_actual arguments"
         fi
     else
         # Range match case
         if ((__base_bash_libs_std_arg_count_actual_number < __base_bash_libs_std_arg_count_first_number ||
             __base_bash_libs_std_arg_count_actual_number > __base_bash_libs_std_arg_count_second_number)); then
-            bl_std_fatal_error "Argument count mismatch: expected between $__base_bash_libs_std_arg_count_first and $__base_bash_libs_std_arg_count_second arguments, but got $__base_bash_libs_std_arg_count_actual"
+            base_std_fatal_error "Argument count mismatch: expected between $__base_bash_libs_std_arg_count_first and $__base_bash_libs_std_arg_count_second arguments, but got $__base_bash_libs_std_arg_count_actual"
         fi
     fi
     return 0
 }
 
 #
-# bl_std_assert_command_exists - Checks that one or more commands are available in the system's PATH.
+# base_std_assert_command_exists - Checks that one or more commands are available in the system's PATH.
 #
 # This function iterates through all provided command names and uses 'command -v'
 # to verify their existence. If any command is not found, it collects the names
 # and reports them all in a single fatal error.
 #
 # Usage:
-#   bl_std_assert_command_exists git curl jq
+#   base_std_assert_command_exists git curl jq
 #
 # Arguments:
 #   $@: One or more command names to check.
 #
-bl_std_assert_command_exists() {
+base_std_assert_command_exists() {
     local missing_commands=()
     local cmd
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_assert_command_exists: No commands provided to check."
+        base_std_log_warn -l base_bash_libs.std "base_std_assert_command_exists: No commands provided to check."
         return 0
     fi
 
@@ -3554,31 +3554,31 @@ bl_std_assert_command_exists() {
     done
 
     if [[ -n "${missing_commands[0]+set}" ]]; then
-        bl_std_fatal_error "These required commands were not found in your PATH: ${missing_commands[*]}"
+        base_std_fatal_error "These required commands were not found in your PATH: ${missing_commands[*]}"
     fi
 
     return 0
 }
 
 #
-# bl_std_assert_file_exists - Checks that one or more paths exist and are regular files.
+# base_std_assert_file_exists - Checks that one or more paths exist and are regular files.
 #
 # This function iterates through all provided paths. If any path does not
 # exist or is not a regular file (e.g., it's a directory or a symlink to
 # a non-file), it collects the names and reports them all in a single fatal error.
 #
 # Usage:
-#   bl_std_assert_file_exists "/etc/hosts" "./my_script.sh"
+#   base_std_assert_file_exists "/etc/hosts" "./my_script.sh"
 #
 # Arguments:
 #   $@: One or more file paths to check.
 #
-bl_std_assert_file_exists() {
+base_std_assert_file_exists() {
     local missing_files=()
     local file
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_assert_file_exists: No files provided to check."
+        base_std_log_warn -l base_bash_libs.std "base_std_assert_file_exists: No files provided to check."
         return 0
     fi
 
@@ -3589,35 +3589,35 @@ bl_std_assert_file_exists() {
     done
 
     if [[ -n "${missing_files[0]+set}" ]]; then
-        bl_std_fatal_error "These required files do not exist or are not regular files: ${missing_files[*]}"
+        base_std_fatal_error "These required files do not exist or are not regular files: ${missing_files[*]}"
     fi
 
     return 0
 }
 
 #
-# bl_std_assert_executable - Checks that one or more paths exist and are executable files.
+# base_std_assert_executable - Checks that one or more paths exist and are executable files.
 #
 # This function iterates through all provided paths. If any path does not
 # exist, is not a regular file, or is not executable, it collects the names
 # and reports them all in a single fatal error.
 #
 # Use this for explicit paths such as project-local scripts. Use
-# `bl_std_assert_command_exists` when checking whether a command is discoverable
+# `base_std_assert_command_exists` when checking whether a command is discoverable
 # through PATH.
 #
 # Usage:
-#   bl_std_assert_executable "./bin/tool" "/opt/vendor/bin/tool"
+#   base_std_assert_executable "./bin/tool" "/opt/vendor/bin/tool"
 #
 # Arguments:
 #   $@: One or more executable file paths to check.
 #
-bl_std_assert_executable() {
+base_std_assert_executable() {
     local missing_executables=()
     local executable
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_assert_executable: No executable paths provided to check."
+        base_std_log_warn -l base_bash_libs.std "base_std_assert_executable: No executable paths provided to check."
         return 0
     fi
 
@@ -3628,31 +3628,31 @@ bl_std_assert_executable() {
     done
 
     if [[ -n "${missing_executables[0]+set}" ]]; then
-        bl_std_fatal_error "These required executable paths do not exist, are not regular files, or are not executable: ${missing_executables[*]}"
+        base_std_fatal_error "These required executable paths do not exist, are not regular files, or are not executable: ${missing_executables[*]}"
     fi
 
     return 0
 }
 
 #
-# bl_std_assert_dir_exists - Checks that one or more paths exist and are directories.
+# base_std_assert_dir_exists - Checks that one or more paths exist and are directories.
 #
 # This function iterates through all provided paths. If any path does not
 # exist or is not a directory, it collects the names and reports them all
 # in a single fatal error.
 #
 # Usage:
-#   bl_std_assert_dir_exists "/tmp" "/var/log"
+#   base_std_assert_dir_exists "/tmp" "/var/log"
 #
 # Arguments:
 #   $@: One or more directory paths to check.
 #
-bl_std_assert_dir_exists() {
+base_std_assert_dir_exists() {
     local missing_dirs=()
     local dir
 
     if (($# == 0)); then
-        bl_std_log_warn -l base_bash_libs.std "bl_std_assert_dir_exists: No directories provided to check."
+        base_std_log_warn -l base_bash_libs.std "base_std_assert_dir_exists: No directories provided to check."
         return 0
     fi
 
@@ -3663,7 +3663,7 @@ bl_std_assert_dir_exists() {
     done
 
     if [[ -n "${missing_dirs[0]+set}" ]]; then
-        bl_std_fatal_error "These required directories do not exist: ${missing_dirs[*]}"
+        base_std_fatal_error "These required directories do not exist: ${missing_dirs[*]}"
     fi
 
     return 0
@@ -3672,25 +3672,25 @@ bl_std_assert_dir_exists() {
 ################################################# MISC FUNCTIONS #######################################################
 
 #
-# bl_std_safe_cd - A safe version of the 'cd' command that returns on failure.
+# base_std_safe_cd - A safe version of the 'cd' command that returns on failure.
 #
-bl_std_safe_cd() {
+base_std_safe_cd() {
     local dir="${1-}"
     if [[ -z "$dir" || $# -ne 1 ]]; then
-        bl_std_log_error -l base_bash_libs.std \
-            "bl_std_safe_cd: expected exactly one non-empty directory path."
+        base_std_log_error -l base_bash_libs.std \
+            "base_std_safe_cd: expected exactly one non-empty directory path."
         return 2
     fi
     if ! cd -- "$dir"; then
-        bl_std_log_error -l base_bash_libs.std "Can't cd to '$dir'."
+        base_std_log_error -l base_bash_libs.std "Can't cd to '$dir'."
         return 1
     fi
 }
 
 #
-# bl_std_safe_unalias - Safely unaliases a command, without erroring if it doesn't exist.
+# base_std_safe_unalias - Safely unaliases a command, without erroring if it doesn't exist.
 #
-bl_std_safe_unalias() {
+base_std_safe_unalias() {
     # Ref: https://stackoverflow.com/a/61471333/6862601
     local alias_name
     for alias_name; do
@@ -3700,38 +3700,38 @@ bl_std_safe_unalias() {
 }
 
 #
-# bl_std_get_my_source_dir - Returns the absolute path to the directory of the calling script through the passed variable name.
+# base_std_get_my_source_dir - Returns the absolute path to the directory of the calling script through the passed variable name.
 #
 # Usage:
-#   bl_std_get_my_source_dir var_name
+#   base_std_get_my_source_dir var_name
 #
-bl_std_get_my_source_dir() {
+base_std_get_my_source_dir() {
     if [[ -z "${1-}" ]]; then
-        bl_std_log_error -l base_bash_libs.std \
-            "bl_std_get_my_source_dir: no result variable name provided."
+        base_std_log_error -l base_bash_libs.std \
+            "base_std_get_my_source_dir: no result variable name provided."
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_std_get_my_source_dir "${1-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_std_get_my_source_dir "${1-}" || return 1
     local __base_bash_libs_std_source_result_name="$1"
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_source_result_name"; then
-        bl_std_log_error -l base_bash_libs.std \
-            "bl_std_get_my_source_dir: result variable name must be a valid Bash variable name."
+        base_std_log_error -l base_bash_libs.std \
+            "base_std_get_my_source_dir: result variable name must be a valid Bash variable name."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ bl_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" || return 1
     local __base_bash_libs_std_source_dir __base_bash_libs_std_source_path="${BASH_SOURCE[1]-}"
     # Reference: https://stackoverflow.com/a/246128/6862601
     if [[ -n "$__base_bash_libs_std_source_path" ]]; then
         if ! __base_bash_libs_std_source_dir="$(cd "$(dirname -- "$__base_bash_libs_std_source_path")" >/dev/null 2>&1 && pwd -P)"; then
-            bl_std_log_error -l base_bash_libs.std \
-                "bl_std_get_my_source_dir: unable to resolve source directory."
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_get_my_source_dir: unable to resolve source directory."
             return 1
         fi
     else
         if ! __base_bash_libs_std_source_dir="$(pwd -P)"; then
-            bl_std_log_error -l base_bash_libs.std \
-                "bl_std_get_my_source_dir: unable to resolve source directory."
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_get_my_source_dir: unable to resolve source directory."
             return 1
         fi
     fi
@@ -3739,7 +3739,7 @@ bl_std_get_my_source_dir() {
 }
 
 #
-# bl_std_ask_yes_no - Get user's confirmation
+# base_std_ask_yes_no - Get user's confirmation
 #
 # Prompts the user with a given message for a yes/no answer and returns 0 or 1
 # based on user's choice of yes or no. It reads a single character without
@@ -3751,16 +3751,16 @@ bl_std_get_my_source_dir() {
 #
 # Usage:
 #
-#   if bl_std_ask_yes_no "Do you want to continue?"; then
+#   if base_std_ask_yes_no "Do you want to continue?"; then
 #       echo "User chose to continue."
 #   else
 #       echo "User chose not to continue."
 #   fi
 #
-bl_std_ask_yes_no() {
+base_std_ask_yes_no() {
     if (("$#" < 1 || "$#" > 2)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_ask_yes_no: invalid arguments"
-        bl_std_log_info -l base_bash_libs.std "Usage: bl_std_ask_yes_no <prompt_message> [yes|no]"
+        base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: invalid arguments"
+        base_std_log_info -l base_bash_libs.std "Usage: base_std_ask_yes_no <prompt_message> [yes|no]"
         return 2
     fi
 
@@ -3770,8 +3770,8 @@ bl_std_ask_yes_no() {
             yes) default="yes" ;;
             no) default="no" ;;
             *)
-                bl_std_log_error -l base_bash_libs.std \
-                    "bl_std_ask_yes_no: default must be 'yes' or 'no'."
+                base_std_log_error -l base_bash_libs.std \
+                    "base_std_ask_yes_no: default must be 'yes' or 'no'."
                 return 2
                 ;;
         esac
@@ -3782,7 +3782,7 @@ bl_std_ask_yes_no() {
         prompt_suffix='[y/N]'
     fi
     if ! exec {tty_fd}</dev/tty 2>/dev/null; then
-        bl_std_log_error -l base_bash_libs.std "bl_std_ask_yes_no: /dev/tty is not available"
+        base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: /dev/tty is not available"
         return 1
     fi
 
@@ -3821,21 +3821,21 @@ bl_std_ask_yes_no() {
 }
 
 #
-# bl_std_wait_for_enter - Pauses the script and waits for the user to press the Enter key.
+# base_std_wait_for_enter - Pauses the script and waits for the user to press the Enter key.
 #
 # Arguments:
 #   $1: (Optional) The prompt to display. Defaults to "Press Enter to continue".
 #
-bl_std_wait_for_enter() {
+base_std_wait_for_enter() {
     if (("$#" > 1)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_wait_for_enter: invalid arguments"
-        bl_std_log_info -l base_bash_libs.std "Usage: bl_std_wait_for_enter [prompt_message]"
+        base_std_log_error -l base_bash_libs.std "base_std_wait_for_enter: invalid arguments"
+        base_std_log_info -l base_bash_libs.std "Usage: base_std_wait_for_enter [prompt_message]"
         return 1
     fi
 
     local prompt=${1:-"Press Enter to continue"} tty_fd read_status
     if ! exec {tty_fd}</dev/tty 2>/dev/null; then
-        bl_std_log_error -l base_bash_libs.std "bl_std_wait_for_enter: /dev/tty is not available"
+        base_std_log_error -l base_bash_libs.std "base_std_wait_for_enter: /dev/tty is not available"
         return 1
     fi
 
@@ -3847,7 +3847,7 @@ bl_std_wait_for_enter() {
     exec {tty_fd}<&-
 
     if ((read_status != 0)); then
-        bl_std_log_error -l base_bash_libs.std "bl_std_wait_for_enter: failed to read from /dev/tty"
+        base_std_log_error -l base_bash_libs.std "base_std_wait_for_enter: failed to read from /dev/tty"
         return "$read_status"
     fi
 

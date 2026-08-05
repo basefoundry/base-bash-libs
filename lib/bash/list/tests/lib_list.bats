@@ -6,7 +6,7 @@ setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
     declare -a setup_args=()
-    bl_init setup_args --source "$BASE_BASH_DIR/list/tests/lib_list.bats" --
+    base_init setup_args --source "$BASE_BASH_DIR/list/tests/lib_list.bats" --
     source "$BASE_BASH_DIR/list/lib_list.sh"
 }
 
@@ -16,7 +16,7 @@ create_script() {
     content="$(cat)"
     source_line="source \"$BASE_BASH_DIR/std/lib_std.sh\""
     if [[ "$content" == *"$source_line"* ]]; then
-        init_lines=$'declare -a base_bash_libs_test_args=()\nbl_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
+        init_lines=$'declare -a base_bash_libs_test_args=()\nbase_init base_bash_libs_test_args -- "$@"\nset -- "${base_bash_libs_test_args[@]}"'
         content="${content/"$source_line"/"$source_line"$'\n'"$init_lines"}"
     fi
     printf '%s\n' "$content" > "$script_path"
@@ -26,7 +26,7 @@ create_script() {
 @test "lib_list can be sourced more than once" {
     source "$BASE_BASH_DIR/list/lib_list.sh"
 
-    [ "$(type -t bl_list_append)" = "function" ]
+    [ "$(type -t base_list_append)" = "function" ]
 }
 
 @test "lib_list fails clearly when sourced without stdlib" {
@@ -39,7 +39,7 @@ create_script() {
 }
 
 @test "lib_list requires the stdlib loaded marker" {
-    bats_run bash -c 'bl_std_log_error() { :; }; bl_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/list/lib_list.sh"
+    bats_run bash -c 'base_std_log_error() { :; }; base_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/list/lib_list.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_list.sh requires lib_std.sh to be sourced first"* ]]
@@ -51,12 +51,12 @@ create_script() {
 
     for mode in off e u p eu ep up eup; do
         for function_name in \
-            bl_list_append \
-            bl_list_prepend \
-            bl_list_remove \
-            bl_list_contains \
-            bl_list_unique \
-            bl_list_length; do
+            base_list_append \
+            base_list_prepend \
+            base_list_remove \
+            base_list_contains \
+            base_list_unique \
+            base_list_length; do
             bats_run "$BASH" -c '
                 mode="$1"
                 case "$mode" in *e*) set -e ;; esac
@@ -64,13 +64,13 @@ create_script() {
                 case "$mode" in *p*) set -o pipefail ;; esac
                 source "$2"
                 declare -a app_args=()
-                bl_init app_args --
+                base_init app_args --
                 source "$3"
                 "$4"
                 exit $?
             ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/list/lib_list.sh" "$function_name"
 
-            if [[ "$function_name" == bl_list_append || "$function_name" == bl_list_prepend ]]; then
+            if [[ "$function_name" == base_list_append || "$function_name" == base_list_prepend ]]; then
                 [ "$status" -eq 2 ]
             else
                 [ "$status" -eq 1 ]
@@ -80,11 +80,11 @@ create_script() {
     done
 }
 
-@test "bl_list_append and bl_list_prepend mutate caller arrays in place" {
+@test "base_list_append and base_list_prepend mutate caller arrays in place" {
     local -a values=("middle")
 
-    bl_list_append values "tail one" ""
-    bl_list_prepend values "head"
+    base_list_append values "tail one" ""
+    base_list_prepend values "head"
 
     [ "${#values[@]}" -eq 4 ]
     [ "${values[0]}" = "head" ]
@@ -93,41 +93,41 @@ create_script() {
     [ "${values[3]}" = "" ]
 }
 
-@test "bl_list_remove deletes all matching values and preserves order" {
+@test "base_list_remove deletes all matching values and preserves order" {
     local -a values=("alpha" "beta" "alpha" "" "gamma")
 
-    bl_list_remove values "alpha"
+    base_list_remove values "alpha"
 
     [ "${#values[@]}" -eq 3 ]
     [ "${values[0]}" = "beta" ]
     [ "${values[1]}" = "" ]
     [ "${values[2]}" = "gamma" ]
 
-    bl_list_remove values ""
+    base_list_remove values ""
 
     [ "${#values[@]}" -eq 2 ]
     [ "${values[0]}" = "beta" ]
     [ "${values[1]}" = "gamma" ]
 }
 
-@test "bl_list_contains checks membership without printing" {
+@test "base_list_contains checks membership without printing" {
     local -a values=("alpha" "beta gamma" "")
     local stdout_file="$TEST_TMPDIR/list-contains.out"
 
-    bl_list_contains "beta gamma" values >"$stdout_file"
-    bl_list_contains "" values >>"$stdout_file"
+    base_list_contains "beta gamma" values >"$stdout_file"
+    base_list_contains "" values >>"$stdout_file"
 
-    if bl_list_contains "delta" values; then
+    if base_list_contains "delta" values; then
         return 1
     fi
     [ ! -s "$stdout_file" ]
 }
 
-@test "bl_list_unique stores deduplicated values in a named result array" {
+@test "base_list_unique stores deduplicated values in a named result array" {
     local -a values=("alpha" "beta" "alpha" "" "beta" "")
     local -a unique=()
 
-    bl_list_unique unique values
+    base_list_unique unique values
 
     [ "${#unique[@]}" -eq 3 ]
     [ "${unique[0]}" = "alpha" ]
@@ -139,7 +139,7 @@ create_script() {
     local -a values=("alpha" "alpha" "beta")
     local rc
 
-    if bl_list_unique values values 2>/dev/null; then
+    if base_list_unique values values 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -150,7 +150,7 @@ create_script() {
     [ "${values[1]}" = "alpha" ]
     [ "${values[2]}" = "beta" ]
 
-    if bl_list_length values values 2>/dev/null; then
+    if base_list_length values values 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -171,7 +171,7 @@ create_script() {
     local stderr_file="$TEST_TMPDIR/list-internal-holder.err"
     local rc
 
-    if bl_list_append __base_bash_libs_list_array_name new 2>"$stderr_file"; then
+    if base_list_append __base_bash_libs_list_array_name new 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -179,14 +179,14 @@ create_script() {
     [ "$rc" -eq 1 ]
     [ "${actual[*]}" = "keep" ]
 
-    if bl_list_contains alpha __base_bash_libs_list_current 2>"$stderr_file"; then
+    if base_list_contains alpha __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if bl_list_unique result __base_bash_libs_list_current 2>"$stderr_file"; then
+    if base_list_unique result __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -194,7 +194,7 @@ create_script() {
     [ "$rc" -eq 1 ]
     [ "${result[*]}" = "saved" ]
 
-    if bl_list_length count __base_bash_libs_list_current 2>"$stderr_file"; then
+    if base_list_length count __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -206,11 +206,11 @@ create_script() {
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
-@test "bl_list_length stores the array length in a named variable" {
+@test "base_list_length stores the array length in a named variable" {
     local -a values=("alpha" "beta gamma" "")
     local count=""
 
-    bl_list_length count values
+    base_list_length count values
 
     [ "$count" = "3" ]
 }
@@ -225,12 +225,12 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -a values=()
 declare -a unique=(old)
-bl_list_prepend values head
-bl_list_remove values head
-bl_list_contains missing values && exit 10
-bl_list_unique unique values
+base_list_prepend values head
+base_list_remove values head
+base_list_contains missing values && exit 10
+base_list_unique unique values
 count=invalid
-bl_list_length count values
+base_list_length count values
 [[ -z "\${values[*]-}" ]]
 [[ -z "\${unique[*]-}" ]]
 [[ "\$count" == 0 ]]
@@ -247,7 +247,7 @@ EOF
     local rc
 
     readonly values
-    if bl_list_append values beta 2>"$stderr_file"; then
+    if base_list_append values beta 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -266,13 +266,13 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 secret="not-valid"
-bl_list_append "\$secret" "value"
+base_list_append "\$secret" "value"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"bl_std_assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -284,7 +284,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 values="alpha"
-bl_list_append values "beta"
+base_list_append values "beta"
 EOF
 
     bats_run bash "$script"
@@ -297,7 +297,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -A values=([alpha]="one")
-bl_list_contains "one" values
+base_list_contains "one" values
 EOF
 
     bats_run bash "$script"
@@ -310,7 +310,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -a values=("alpha")
-bl_list_unique unique values
+base_list_unique unique values
 EOF
 
     bats_run bash "$script"

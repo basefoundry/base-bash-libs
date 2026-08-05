@@ -27,8 +27,8 @@ __base_bash_libs_arg_assert_distinct_names__() {
             __base_bash_libs_arg_right_index < ${#__base_bash_libs_arg_distinct_names[@]};
             __base_bash_libs_arg_right_index++)); do
             if [[ "${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_left_index]}" == "${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_right_index]}" ]]; then
-                bl_std_log_error -l base_bash_libs.arg \
-                    "bl_arg_parse: caller-owned variables must be distinct; '${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_left_index]}' was provided more than once."
+                base_std_log_error -l base_bash_libs.arg \
+                    "base_arg_parse: caller-owned variables must be distinct; '${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_left_index]}' was provided more than once."
                 return 1
             fi
         done
@@ -43,7 +43,7 @@ __base_bash_libs_arg_preflight_repeatable_names__() {
 
     while (($#)); do
         if [[ "${1#*|}" == repeatable\|* ]]; then
-            __base_bash_libs_std_assert_public_variable_names__ bl_arg_parse "${1%%|*}" || return 1
+            __base_bash_libs_std_assert_public_variable_names__ base_arg_parse "${1%%|*}" || return 1
         fi
         shift
     done
@@ -71,54 +71,54 @@ __base_bash_libs_arg_parse_specs__() {
 
         if [[ "$__base_bash_libs_arg_spec" == "$__base_bash_libs_arg_remainder" || "$__base_bash_libs_arg_remainder" == "$__base_bash_libs_arg_tokens_part" ||
             -z "$__base_bash_libs_arg_name" || -z "$__base_bash_libs_arg_kind" || -z "$__base_bash_libs_arg_tokens_part" ]]; then
-            bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: malformed option spec '$__base_bash_libs_arg_spec'."
+            base_std_log_error -l base_bash_libs.arg "base_arg_parse: malformed option spec '$__base_bash_libs_arg_spec'."
             return 2
         fi
         if ! [[ "$__base_bash_libs_arg_name" =~ $__base_bash_libs_arg_name_re ]]; then
-            bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option spec '$__base_bash_libs_arg_spec' name must be a valid Bash identifier."
+            base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_spec' name must be a valid Bash identifier."
             return 2
         fi
         if [[ -n "${__base_bash_libs_arg_seen_names[$__base_bash_libs_arg_name]+set}" ]]; then
-            bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option spec name '$__base_bash_libs_arg_name' is duplicated."
+            base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec name '$__base_bash_libs_arg_name' is duplicated."
             return 2
         fi
         __base_bash_libs_arg_seen_names["$__base_bash_libs_arg_name"]=1
 
         if [[ "$__base_bash_libs_arg_kind" != "flag" && "$__base_bash_libs_arg_kind" != "value" &&
             "$__base_bash_libs_arg_kind" != "repeatable" ]]; then
-            bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option spec '$__base_bash_libs_arg_name' must use kind 'flag', 'value', or 'repeatable'."
+            base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_name' must use kind 'flag', 'value', or 'repeatable'."
             return 2
         fi
 
         if [[ "$__base_bash_libs_arg_kind" == "repeatable" ]]; then
             if [[ -z "$__base_bash_libs_arg_repeatable_names_name" ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: repeatable option spec '$__base_bash_libs_arg_name' requires an output array contract."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: repeatable option spec '$__base_bash_libs_arg_name' requires an output array contract."
                 return 2
             fi
-            __base_bash_libs_std_assert_public_variable_names__ bl_arg_parse "$__base_bash_libs_arg_name" || return 1
+            __base_bash_libs_std_assert_public_variable_names__ base_arg_parse "$__base_bash_libs_arg_name" || return 1
             __base_bash_libs_arg_assert_distinct_names__ \
                 "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_caller_specs_name" "$__base_bash_libs_arg_name" || return 1
             if ! __base_bash_libs_std_declares_array_kind__ "$__base_bash_libs_arg_name" "a"; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: repeatable option '$__base_bash_libs_arg_name' requires a caller-declared indexed array."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: repeatable option '$__base_bash_libs_arg_name' requires a caller-declared indexed array."
                 return 2
             fi
-            __base_bash_libs_std_assert_writable_output__ bl_arg_parse "$__base_bash_libs_arg_name" || return 1
+            __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_name" || return 1
             eval "$__base_bash_libs_arg_repeatable_names_name+=(\"\$__base_bash_libs_arg_name\")"
         fi
 
         if [[ "$__base_bash_libs_arg_tokens_part" == "|"* || "$__base_bash_libs_arg_tokens_part" == *"|" ||
             "$__base_bash_libs_arg_tokens_part" == *"||"* ]]; then
-            bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option spec '$__base_bash_libs_arg_spec' contains an empty option token."
+            base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_spec' contains an empty option token."
             return 2
         fi
         IFS='|' read -r -a __base_bash_libs_arg_tokens <<<"$__base_bash_libs_arg_tokens_part"
         for __base_bash_libs_arg_token in "${__base_bash_libs_arg_tokens[@]+"${__base_bash_libs_arg_tokens[@]}"}"; do
             if ! [[ "$__base_bash_libs_arg_token" =~ $__base_bash_libs_arg_token_re ]] || [[ "$__base_bash_libs_arg_token" == *"="* ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option spec '$__base_bash_libs_arg_spec' has invalid option token '$__base_bash_libs_arg_token'."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_spec' has invalid option token '$__base_bash_libs_arg_token'."
                 return 2
             fi
             if [[ -n "${__base_bash_libs_arg_seen_tokens[$__base_bash_libs_arg_token]+set}" ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option token '$__base_bash_libs_arg_token' is duplicated."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: option token '$__base_bash_libs_arg_token' is duplicated."
                 return 2
             fi
             __base_bash_libs_arg_seen_tokens["$__base_bash_libs_arg_token"]=1
@@ -131,7 +131,7 @@ __base_bash_libs_arg_parse_specs__() {
 }
 
 #
-# bl_arg_parse - Parses simple flags and value options into caller-owned variables.
+# base_arg_parse - Parses simple flags and value options into caller-owned variables.
 #
 # Spec entries use: name|kind|token[|token...]
 #   - name: valid Bash identifier used as the associative-array key
@@ -146,14 +146,14 @@ __base_bash_libs_arg_parse_specs__() {
 #   declare -A options=()
 #   declare -a positionals=()
 #   specs=("verbose|flag|--verbose|-v" "output|value|--output|-o")
-#   bl_arg_parse options positionals specs -- "$@"
+#   base_arg_parse options positionals specs -- "$@"
 #
-bl_arg_parse() {
+base_arg_parse() {
     if (($# < 4)) || [[ "${4-}" != "--" ]]; then
-        bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: usage: bl_arg_parse <options_assoc> <positionals_array> <specs_array> -- [args...]"
+        base_std_log_error -l base_bash_libs.arg "base_arg_parse: usage: base_arg_parse <options_assoc> <positionals_array> <specs_array> -- [args...]"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ bl_arg_parse "${1-}" "${2-}" "${3-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_arg_parse "${1-}" "${2-}" "${3-}" || return 1
     __base_bash_libs_arg_preflight_repeatable_names__ "$3" || return 1
 
     local __base_bash_libs_arg_options_name="$1" __base_bash_libs_arg_positionals_name="$2" __base_bash_libs_arg_specs_name="$3"
@@ -164,12 +164,12 @@ bl_arg_parse() {
     local -A __base_bash_libs_arg_options=() __base_bash_libs_arg_token_kind=() __base_bash_libs_arg_token_name=()
     local __base_bash_libs_arg_parse_options=1
 
-    bl_std_assert_variable_name "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name"
+    base_std_assert_variable_name "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name"
     __base_bash_libs_arg_assert_distinct_names__ "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name" || return 1
-    bl_std_assert_associative_array "$__base_bash_libs_arg_options_name"
-    bl_std_assert_indexed_array "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name"
-    __base_bash_libs_std_assert_writable_output__ bl_arg_parse "$__base_bash_libs_arg_options_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ bl_arg_parse "$__base_bash_libs_arg_positionals_name" || return 1
+    base_std_assert_associative_array "$__base_bash_libs_arg_options_name"
+    base_std_assert_indexed_array "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name"
+    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_options_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_positionals_name" || return 1
 
     __base_bash_libs_arg_parse_specs__ "$__base_bash_libs_arg_specs_name" __base_bash_libs_arg_token_kind __base_bash_libs_arg_token_name __base_bash_libs_arg_repeatable_names \
         "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name" || return $?
@@ -192,11 +192,11 @@ bl_arg_parse() {
             __base_bash_libs_arg_option_name="${__base_bash_libs_arg_token_name[$__base_bash_libs_arg_option_token]-}"
 
             if [[ -z "$__base_bash_libs_arg_option_kind" ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: unknown option '$__base_bash_libs_arg_option_token'."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: unknown option '$__base_bash_libs_arg_option_token'."
                 return 2
             fi
             if [[ "$__base_bash_libs_arg_option_kind" != "value" && "$__base_bash_libs_arg_option_kind" != "repeatable" ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option '$__base_bash_libs_arg_option_token' does not accept a value."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: option '$__base_bash_libs_arg_option_token' does not accept a value."
                 return 2
             fi
 
@@ -215,7 +215,7 @@ bl_arg_parse() {
             __base_bash_libs_arg_option_name="${__base_bash_libs_arg_token_name[$__base_bash_libs_arg_option_token]-}"
 
             if [[ -z "$__base_bash_libs_arg_option_kind" ]]; then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: unknown option '$__base_bash_libs_arg_option_token'."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: unknown option '$__base_bash_libs_arg_option_token'."
                 return 2
             fi
 
@@ -225,12 +225,12 @@ bl_arg_parse() {
             fi
 
             if (($# == 0)); then
-                bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option '$__base_bash_libs_arg_option_token' requires a value."
+                base_std_log_error -l base_bash_libs.arg "base_arg_parse: option '$__base_bash_libs_arg_option_token' requires a value."
                 return 2
             fi
             if [[ -n "${1-}" ]]; then
                 if [[ -n "${__base_bash_libs_arg_token_kind[$1]+set}" ]]; then
-                    bl_std_log_error -l base_bash_libs.arg "bl_arg_parse: option '$__base_bash_libs_arg_option_token' requires a value before option '$1'."
+                    base_std_log_error -l base_bash_libs.arg "base_arg_parse: option '$__base_bash_libs_arg_option_token' requires a value before option '$1'."
                     return 2
                 fi
             fi

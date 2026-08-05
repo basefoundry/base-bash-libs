@@ -11,13 +11,13 @@ Library functions are callable components, not miniature applications. They
 return to their caller and never terminate the caller's shell unless the name
 explicitly says that it is fatal or exits:
 
-- `bl_std_exit_if_error` and `bl_std_fatal_error` are the intentional
+- `base_std_exit_if_error` and `base_std_fatal_error` are the intentional
   fail-fast escape hatches. They log, dump a trace where appropriate, and
   terminate the process.
-- `bl_launcher_*` is an executable entrypoint implementation. Its `die`,
+- `base_launcher_*` is an executable entrypoint implementation. Its `die`,
   re-exec, and script-run paths may terminate because the launcher owns the
   process boundary.
-- `bl_std_assert_*` functions are explicit precondition assertions. They are
+- `base_std_assert_*` functions are explicit precondition assertions. They are
   fail-fast by design; callers that need recoverable validation should use a
   predicate or validate inputs before calling an assertion.
 
@@ -76,16 +76,16 @@ Each public function documents the following dimensions in its module README:
 
 ## 4. Interactive behavior
 
-`bl_std_ask_yes_no MESSAGE [yes|no]` defaults to `no` and displays `[y/N]`;
+`base_std_ask_yes_no MESSAGE [yes|no]` defaults to `no` and displays `[y/N]`;
 passing `yes` displays `[Y/n]`. `y`/`n` are accepted case-insensitively, and
 Enter accepts the displayed default. Invalid input is reprompted. Missing
 `/dev/tty`, EOF, and non-interactive use return `1` without terminating.
-`bl_std_wait_for_enter` has the same non-TTY/EOF rule. Neither API reads from
+`base_std_wait_for_enter` has the same non-TTY/EOF rule. Neither API reads from
 or mutates the caller's ordinary stdin stream.
 
 ## 5. File mutation guarantees
 
-`bl_file_update_file_section` is idempotent and uses a temporary file followed
+`base_file_update_file_section` is idempotent and uses a temporary file followed
 by an atomic replacement. It resolves symlinks to edit the referent while
 leaving the symlink in place, preserves the target mode, and cleans temporary
 paths on every failure. Before committing, it compares device, inode, size,
@@ -101,20 +101,20 @@ signature/effects reference; this table makes coverage auditable.
 
 | Module | Public functions | Default result/effect contract |
 | --- | --- | --- |
-| lifecycle | `bl_init`, `bl_require_version` | Return recoverable setup/version statuses; initialize caller-owned state only once. |
-| std predicates and setup | `bl_std_is_interactive`, `bl_std_check_bash_version`, `bl_std_import`, `bl_std_add_to_path`, `bl_std_dedupe_path`, `bl_std_print_path`, `bl_std_set_log_level`, `bl_std_set_log_category_level`, `bl_std_log_is_enabled` | Predicates return `0/1`; import and configuration return `0/1/2`; PATH and log settings intentionally mutate their documented state. |
-| std logging and display | `bl_std_log_fatal`, `bl_std_log_error`, `bl_std_log_warn`, `bl_std_log_info`, `bl_std_log_debug`, `bl_std_log_verbose`, `bl_std_log_info_file`, `bl_std_log_debug_file`, `bl_std_log_verbose_file`, `bl_std_log_info_enter`, `bl_std_log_debug_enter`, `bl_std_log_verbose_enter`, `bl_std_log_info_leave`, `bl_std_log_debug_leave`, `bl_std_log_verbose_leave`, `bl_std_print_error`, `bl_std_print_warn`, `bl_std_print_info`, `bl_std_print_success`, `bl_std_print_bold`, `bl_std_print_message`, `bl_std_print_tty`, `bl_std_dump_trace` | Diagnostics use stderr; explicit print/data helpers use stdout as documented; logging itself does not terminate. |
-| std process/error | `bl_std_exit_if_error`, `bl_std_fatal_error`, `bl_std_is_dry_run`, `bl_std_run` | The two explicitly named fatal helpers terminate; dry-run is a predicate; `run` returns command/timeout/supervisor status and never hides diagnostics. |
-| std filesystem/cleanup | `bl_std_safe_mkdir`, `bl_std_safe_touch`, `bl_std_safe_truncate`, `bl_std_register_cleanup_hook`, `bl_std_unregister_cleanup_hook`, `bl_std_register_cleanup_path`, `bl_std_unregister_cleanup_path`, `bl_std_make_temp_file`, `bl_std_make_temp_dir` | Mutators return recoverable failures; cleanup/temp APIs mutate only their documented registry and owned paths. |
-| std validation/reflection | `bl_std_assert_variable_name`, `bl_std_assert_indexed_array`, `bl_std_assert_associative_array`, `bl_std_command_path`, `bl_std_function_exists`, `bl_std_assert_function_exists`, `bl_std_assert_not_null`, `bl_std_assert_integer`, `bl_std_assert_integer_range`, `bl_std_assert_arg_count`, `bl_std_assert_command_exists`, `bl_std_assert_file_exists`, `bl_std_assert_executable`, `bl_std_assert_dir_exists` | Predicates return status; explicit `assert_*` APIs are intentional fail-fast precondition checks; named outputs are validated before writes. |
-| std miscellaneous | `bl_std_safe_cd`, `bl_std_safe_unalias`, `bl_std_get_my_source_dir`, `bl_std_ask_yes_no`, `bl_std_wait_for_enter` | `safe_cd` changes `PWD`; source-dir writes one validated output; interactive functions return recoverable EOF/non-TTY statuses. |
-| file | `bl_file_section_exists`, `bl_file_section_needs_update`, `bl_file_update_file_section` | Read-only predicates do not mutate; update is idempotent, symlink-preserving, atomic, metadata-preserving, and conflict-aware. |
-| git | `bl_git_detect_default_branch`, `bl_git_worktree_path_for_branch`, `bl_git_list_worktree_branches`, `bl_git_branch_upstream`, `bl_git_branch_merged_to_ref`, `bl_git_list_remote_branches`, `bl_git_update_repo`, `bl_git_get_current_branch`, `bl_git_check_script_up_to_date` | Read-only inspections use named outputs/stdout as documented; update and freshness helpers return documented recoverable Git statuses. |
-| gh | `bl_gh_require_cli`, `bl_gh_auth_status_diagnostics`, `bl_gh_report_command_failure`, `bl_gh_run`, `bl_gh_repo_from_remote_url`, `bl_gh_infer_repo_from_origin`, `bl_gh_repo_default_branch`, `bl_gh_api_with_retry` | Diagnostics go stderr; repository/API values use named outputs; retries are bounded and mutation-aware. |
-| str | `bl_str_lower`, `bl_str_upper`, `bl_str_ltrim`, `bl_str_rtrim`, `bl_str_trim`, `bl_str_contains`, `bl_str_starts_with`, `bl_str_ends_with`, `bl_str_split`, `bl_str_join` | String transforms/predicates preserve caller values until validation succeeds; split/join use validated named outputs. |
-| arg | `bl_arg_parse` | Parses into caller-owned validated arrays/maps and leaves them unchanged on failure. |
-| list | `bl_list_append`, `bl_list_prepend`, `bl_list_remove`, `bl_list_contains`, `bl_list_unique`, `bl_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |
-| launcher | `bl_launcher_die`, `bl_launcher_resolve_path`, `bl_launcher_package_root`, `bl_launcher_ensure_supported_bash`, `bl_launcher_lib_dir_is_usable`, `bl_launcher_resolve_lib_dir`, `bl_launcher_source_stdlib`, `bl_launcher_import_base_bash_lib`, `bl_launcher_run_script`, `bl_launcher_usage` | Entrypoint helpers may terminate only at the executable process boundary; path and usability helpers return status. `main` remains application-defined. |
+| lifecycle | `base_init`, `base_require_version` | Return recoverable setup/version statuses; initialize caller-owned state only once. |
+| std predicates and setup | `base_std_is_interactive`, `base_std_check_bash_version`, `base_std_import`, `base_std_add_to_path`, `base_std_dedupe_path`, `base_std_print_path`, `base_std_set_log_level`, `base_std_set_log_category_level`, `base_std_log_is_enabled` | Predicates return `0/1`; import and configuration return `0/1/2`; PATH and log settings intentionally mutate their documented state. |
+| std logging and display | `base_std_log_fatal`, `base_std_log_error`, `base_std_log_warn`, `base_std_log_info`, `base_std_log_debug`, `base_std_log_verbose`, `base_std_log_info_file`, `base_std_log_debug_file`, `base_std_log_verbose_file`, `base_std_log_info_enter`, `base_std_log_debug_enter`, `base_std_log_verbose_enter`, `base_std_log_info_leave`, `base_std_log_debug_leave`, `base_std_log_verbose_leave`, `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, `base_std_print_success`, `base_std_print_bold`, `base_std_print_message`, `base_std_print_tty`, `base_std_dump_trace` | Diagnostics use stderr; explicit print/data helpers use stdout as documented; logging itself does not terminate. |
+| std process/error | `base_std_exit_if_error`, `base_std_fatal_error`, `base_std_is_dry_run`, `base_std_run` | The two explicitly named fatal helpers terminate; dry-run is a predicate; `run` returns command/timeout/supervisor status and never hides diagnostics. |
+| std filesystem/cleanup | `base_std_safe_mkdir`, `base_std_safe_touch`, `base_std_safe_truncate`, `base_std_register_cleanup_hook`, `base_std_unregister_cleanup_hook`, `base_std_register_cleanup_path`, `base_std_unregister_cleanup_path`, `base_std_make_temp_file`, `base_std_make_temp_dir` | Mutators return recoverable failures; cleanup/temp APIs mutate only their documented registry and owned paths. |
+| std validation/reflection | `base_std_assert_variable_name`, `base_std_assert_indexed_array`, `base_std_assert_associative_array`, `base_std_command_path`, `base_std_function_exists`, `base_std_assert_function_exists`, `base_std_assert_not_null`, `base_std_assert_integer`, `base_std_assert_integer_range`, `base_std_assert_arg_count`, `base_std_assert_command_exists`, `base_std_assert_file_exists`, `base_std_assert_executable`, `base_std_assert_dir_exists` | Predicates return status; explicit `assert_*` APIs are intentional fail-fast precondition checks; named outputs are validated before writes. |
+| std miscellaneous | `base_std_safe_cd`, `base_std_safe_unalias`, `base_std_get_my_source_dir`, `base_std_ask_yes_no`, `base_std_wait_for_enter` | `safe_cd` changes `PWD`; source-dir writes one validated output; interactive functions return recoverable EOF/non-TTY statuses. |
+| file | `base_file_section_exists`, `base_file_section_needs_update`, `base_file_update_file_section` | Read-only predicates do not mutate; update is idempotent, symlink-preserving, atomic, metadata-preserving, and conflict-aware. |
+| git | `base_git_detect_default_branch`, `base_git_worktree_path_for_branch`, `base_git_list_worktree_branches`, `base_git_branch_upstream`, `base_git_branch_merged_to_ref`, `base_git_list_remote_branches`, `base_git_update_repo`, `base_git_get_current_branch`, `base_git_check_script_up_to_date` | Read-only inspections use named outputs/stdout as documented; update and freshness helpers return documented recoverable Git statuses. |
+| gh | `base_gh_require_cli`, `base_gh_auth_status_diagnostics`, `base_gh_report_command_failure`, `base_gh_run`, `base_gh_repo_from_remote_url`, `base_gh_infer_repo_from_origin`, `base_gh_repo_default_branch`, `base_gh_api_with_retry` | Diagnostics go stderr; repository/API values use named outputs; retries are bounded and mutation-aware. |
+| str | `base_str_lower`, `base_str_upper`, `base_str_ltrim`, `base_str_rtrim`, `base_str_trim`, `base_str_contains`, `base_str_starts_with`, `base_str_ends_with`, `base_str_split`, `base_str_join` | String transforms/predicates preserve caller values until validation succeeds; split/join use validated named outputs. |
+| arg | `base_arg_parse` | Parses into caller-owned validated arrays/maps and leaves them unchanged on failure. |
+| list | `base_list_append`, `base_list_prepend`, `base_list_remove`, `base_list_contains`, `base_list_unique`, `base_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |
+| launcher | `base_launcher_die`, `base_launcher_resolve_path`, `base_launcher_package_root`, `base_launcher_ensure_supported_bash`, `base_launcher_lib_dir_is_usable`, `base_launcher_resolve_lib_dir`, `base_launcher_source_stdlib`, `base_launcher_import_base_bash_lib`, `base_launcher_run_script`, `base_launcher_usage` | Entrypoint helpers may terminate only at the executable process boundary; path and usability helpers return status. `main` remains application-defined. |
 
 ## 7. v1.4.0 → v2 migration inventory
 
@@ -123,10 +123,10 @@ no inconsistent legacy behavior retained for compatibility.
 
 | Change | Migration consequence |
 | --- | --- |
-| Public namespace | The pre-release `base_bash_libs_*` names are replaced by the shorter `bl_*` module namespace; globals remain `BASE_BASH_LIBS_*`. |
-| Lifecycle | Sourcing is passive; callers invoke `bl_init` explicitly. |
+| Public namespace | The pre-release `base_bash_libs_*` names are replaced by the coherent `base_*` module namespace; globals remain `BASE_BASH_LIBS_*`. |
+| Lifecycle | Sourcing is passive; callers invoke `base_init` explicitly. |
 | Error handling | Ordinary imports, version checks, list mutators, safe filesystem helpers, directory changes, and source-dir resolution return statuses instead of terminating. Explicit `fatal`, `exit`, and `assert` names retain their intentional process semantics. |
-| Interactive defaults | `bl_std_ask_yes_no` supports `[y/N]` and `[Y/n]`, and Enter accepts the displayed default. |
+| Interactive defaults | `base_std_ask_yes_no` supports `[y/N]` and `[Y/n]`, and Enter accepts the displayed default. |
 | File safety | Section updates preserve symlinks/mode and return conflict status `6` when a concurrent writer wins the race. |
 | Named outputs | Output-first, caller-declared, prevalidated pass-by-name signatures are mandatory; aliases and readonly/wrong-kind outputs fail before side effects. |
 

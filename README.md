@@ -67,7 +67,7 @@ Source the installed stdlib from the Homebrew prefix:
 base_bash_libs_prefix="$(brew --prefix basefoundry/base/base-bash-libs)"
 source "$base_bash_libs_prefix/libexec/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
@@ -77,25 +77,25 @@ script should run with the stdlib preloaded from its shebang:
 ```bash
 #!/usr/bin/env base-bash
 
-bl_launcher_import_base_bash_lib str/lib_str.sh
+base_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local name="  Example  "
-    bl_str_trim name
-    bl_std_log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
-    bl_std_run echo "$name"
+    base_str_trim name
+    base_std_log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
+    base_std_run echo "$name"
 }
 ```
 
 Load companion libraries with absolute imports from the same package:
 
 ```bash
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
-bl_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
+base_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
 ```
 
 ### Source Checkout
@@ -121,19 +121,19 @@ Source the stdlib from that checkout:
 base_bash_libs_dir="$PWD/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 ```
 
 Load companion libraries with absolute imports from the same checkout:
 
 ```bash
-bl_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 You can also run source-checkout scripts through the launcher:
@@ -153,22 +153,22 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
-bl_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
-bl_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-bl_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
+base_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+base_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package
 version from the repository/package `VERSION` file. Downstream scripts can use
 that readonly constant when they need to display the loaded library version.
-Use `bl_require_version` to require a minimum library version:
+Use `base_require_version` to require a minimum library version:
 
 ```bash
-bl_require_version 1.4.0
+base_require_version 1.4.0
 ```
 
 ## Examples
