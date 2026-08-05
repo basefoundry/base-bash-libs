@@ -538,7 +538,9 @@ base_app_apply_standard_options() {
     BASE_BASH_LIBS_APP_NONINTERACTIVE="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[noninteractive]-0}"
     value="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]-auto}"
     BASE_BASH_LIBS_APP_COLOR="$value"
+    BASE_BASH_LIBS_DRY_RUN="$BASE_BASH_LIBS_APP_DRY_RUN"
     export BASE_BASH_LIBS_APP_DRY_RUN BASE_BASH_LIBS_APP_NONINTERACTIVE BASE_BASH_LIBS_APP_COLOR
+    export BASE_BASH_LIBS_DRY_RUN
 }
 
 # base_app_should_prompt - True only when policy permits interactive prompts.

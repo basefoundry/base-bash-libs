@@ -319,6 +319,7 @@ statuses, and side effects are normative in the linked module README and
 - `base_launcher_die` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_ensure_supported_bash` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_import_base_bash_lib` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
+- `base_launcher_init` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_lib_dir_is_usable` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_package_root` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_resolve_lib_dir` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
