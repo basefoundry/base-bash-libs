@@ -54,6 +54,9 @@ Deterministic single-file validation and auditable directory bundles are
 provided by [`scripts/library-bundle`](scripts/library-bundle).
 See [`docs/single-file-distribution.md`](docs/single-file-distribution.md) for
 the contributor and release-artifact workflow.
+Offline immutable vendoring, atomic updates/rollback, and standalone assembly
+are provided by [`scripts/vendor`](scripts/vendor); no runtime network access
+or `curl | bash` installer is used.
 The v2 API charter, effect/status contract, and complete public-surface audit
 are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
 mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).

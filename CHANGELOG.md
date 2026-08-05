@@ -28,6 +28,8 @@ and versions are tracked in the repo-root `VERSION` file.
   configuration, deterministic precedence and provenance, redacted reports,
   standard CLI policy options, prompt gating, and exactly-once LIFO lifecycle
   hooks.
+- Added offline immutable vendor creation, atomic update/rollback, tamper
+  verification, and standalone application assembly from verified bundles.
 
 ### Security
 
