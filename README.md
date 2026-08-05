@@ -43,6 +43,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/cli/lib_cli.sh`](lib/bash/cli/README.md)
   Declarative command contracts with nested subcommands, validation, help,
   completion, and a handler boundary for Bash applications.
+- [`lib/bash/app/lib_app.sh`](lib/bash/app/README.md)
+  Optional typed configuration, standard application options, prompt policy,
+  and exactly-once lifecycle hooks.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 The v2 API charter, effect/status contract, and complete public-surface audit

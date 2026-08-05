@@ -182,6 +182,23 @@ modules:
     stability: stable
     since: 2.0.0
     deprecated: false
+  - name: app
+    kind: sourceable-library
+    source: lib/bash/app/lib_app.sh
+    documentation: lib/bash/app/README.md
+    tests: lib/bash/app/tests/lib_app.bats
+    dependencies: std,cli
+    optional_commands: none
+    artifacts: lib/bash/app/lib_app.sh,lib/bash/app/README.md,lib/bash/app/tests/lib_app.bats
+    public_symbols: base_app_add_standard_options,base_app_apply_standard_options,base_app_config_define,base_app_config_get,base_app_config_load,base_app_config_provenance,base_app_config_report,base_app_config_set_cli,base_app_hook,base_app_init,base_app_prompt,base_app_run,base_app_should_prompt,base_app_status
+    signature_source: lib/bash/app/README.md
+    inputs: documented per symbol in the module README and API charter
+    outputs: documented per symbol; reports are redacted by the secret attribute
+    statuses: recoverable failures return status; malformed configuration returns 2
+    side_effects: configuration state and lifecycle hooks are explicit; sourcing is passive
+    stability: stable
+    since: 2.0.0
+    deprecated: false
   - name: launcher
     kind: executable-launcher
     source: bin/base-bash

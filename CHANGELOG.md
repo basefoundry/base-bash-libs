@@ -24,6 +24,10 @@ and versions are tracked in the repo-root `VERSION` file.
 - Added the single-file declarative CLI module with nested commands, aliases,
   options, positional validation, deterministic help, Bash completion metadata,
   and an adapter boundary for Bashly, Argc, and Argbash-generated models.
+- Added the optional single-file application policy module with data-only typed
+  configuration, deterministic precedence and provenance, redacted reports,
+  standard CLI policy options, prompt gating, and exactly-once LIFO lifecycle
+  hooks.
 
 ### Security
 

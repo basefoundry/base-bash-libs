@@ -700,6 +700,7 @@ contract_run_mode() {
         "$contract_repo_root/lib/bash/arg/lib_arg.sh"
         "$contract_repo_root/lib/bash/list/lib_list.sh"
         "$contract_repo_root/lib/bash/cli/lib_cli.sh"
+        "$contract_repo_root/lib/bash/app/lib_app.sh"
     )
 
     contract_assert_version "$@"
