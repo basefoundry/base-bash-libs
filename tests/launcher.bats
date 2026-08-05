@@ -91,6 +91,31 @@ SCRIPT
     [[ "$output" == *"did not define main()"* ]]
 }
 
+@test "base-bash init generates and safely repeats a standard project scaffold" {
+    local project_dir="$TEST_TMPDIR/generated"
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Initialized standard profile"* ]]
+    [ -x "$project_dir/bin/app" ]
+    [ -f "$project_dir/lib/app.sh" ]
+    [ -f "$project_dir/tests/run.sh" ]
+    [ -f "$project_dir/.github/workflows/validate.yml" ]
+
+    bats_run env PATH="$BASE_REPO_ROOT/bin:$PATH" BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$project_dir/bin/app" run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"hello=world"* ]]
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
+    [ "$status" -eq 0 ]
+
+    printf 'user edit\n' >> "$project_dir/README.md"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing to overwrite existing file"* ]]
+}
+
 @test "base-bash bounds symlink resolution" {
     local first_link="$TEST_TMPDIR/cycle-a"
     local second_link="$TEST_TMPDIR/cycle-b"
