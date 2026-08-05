@@ -60,3 +60,7 @@ preserved even if a hook fails. `INT`, `TERM`, and `HUP` map to statuses
 The policy module owns no global trap or shell-code strings itself. It uses
 the stdlib's shared cleanup dispatcher and can therefore coexist with other
 cleanup paths and hooks.
+
+The focused BATS coverage is in
+`lib/bash/app/tests/lib_app.bats`; the repository validation matrix also loads
+the module under every supported Bash option combination.
