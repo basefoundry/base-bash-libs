@@ -24,6 +24,7 @@ required_files=(
   scripts/release
   scripts/api-manifest
   scripts/library-bundle
+  scripts/vendor
   scripts/migrate-v2-symbols
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
@@ -37,6 +38,7 @@ required_files=(
   tests/api-manifest.bats
   tests/consumer-kit/tests/consumer_kit.bats
   tests/library-bundle.bats
+  tests/vendor.bats
   tests/lint-warnings.sh
 )
 
@@ -287,6 +289,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   bin/base-bash \
   scripts/api-manifest \
   scripts/library-bundle \
+  scripts/vendor \
   scripts/release \
   scripts/migrate-v2-symbols \
   tests/fixtures/basectl-release-stub \
@@ -305,14 +308,16 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   tests/api-manifest.bats \
   tests/consumer-kit/test_helper.bash \
   tests/consumer-kit/tests/consumer_kit.bats \
-  tests/library-bundle.bats
+  tests/library-bundle.bats \
+  tests/vendor.bats
 
 bats_files=(
   tests/release.bats
   tests/namespace-contract.bats
   tests/api-manifest.bats
   tests/consumer-kit/tests/consumer_kit.bats
-  tests/library-bundle.bats
+  tests/library-bundle.bats \
+  tests/vendor.bats
 )
 manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
 while IFS= read -r file; do

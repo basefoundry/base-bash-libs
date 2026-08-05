@@ -22,6 +22,7 @@ lint_files=(
   bin/base-bash
   scripts/release
   scripts/library-bundle
+  scripts/vendor
   tests/fixtures/basectl-release-stub
   tests/bash-42-release-smoke.sh
   tests/bash-42-logging-smoke.sh
@@ -44,6 +45,7 @@ lint_files=(
   tests/consumer-kit/test_helper.bash
   tests/consumer-kit/tests/consumer_kit.bats
   tests/library-bundle.bats
+  tests/vendor.bats
   tests/launcher.bats
   tests/release.bats
 )

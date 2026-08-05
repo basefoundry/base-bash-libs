@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+
+# Offline, immutable, atomic vendor/install workflow. Inputs are local verified
+# bundles; this command never downloads code and never evaluates bundle data.
+
+usage() {
+    cat >&2 <<'EOF'
+Usage:
+  scripts/vendor create BUNDLE DESTINATION
+  scripts/vendor update BUNDLE DESTINATION
+  scripts/vendor rollback DESTINATION
+  scripts/vendor verify DESTINATION
+  scripts/vendor standalone APPLICATION BUNDLE DESTINATION
+EOF
+}
+
+error() {
+    printf 'Vendor error: %s\n' "$*" >&2
+}
+
+hash_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$1" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$1" | awk '{print $1}'
+    fi
+}
+
+verify_bundle() {
+    local bundle="$1" expected path actual
+    [[ -f "$bundle/MANIFEST.sha256" && -f "$bundle/BUNDLE.release" ]] || {
+        error "bundle is missing provenance or hash metadata: $bundle"
+        return 1
+    }
+    while read -r expected path; do
+        [[ -n "$path" ]] || continue
+        [[ -f "$bundle/$path" ]] || { error "bundle file is missing: $path"; return 1; }
+        actual="$(hash_file "$bundle/$path")"
+        [[ "$actual" == "$expected" ]] || { error "bundle hash mismatch: $path"; return 1; }
+    done < "$bundle/MANIFEST.sha256"
+}
+
+copy_tree() {
+    local source="$1" destination="$2" file relative
+    while IFS= read -r -d '' file; do
+        relative="${file#"$source/"}"
+        mkdir -p "$destination/$(dirname -- "$relative")" || return 1
+        cp -- "$file" "$destination/$relative" || return 1
+        if [[ -x "$file" ]]; then chmod +x "$destination/$relative" || return 1; fi
+    done < <(find "$source" -type f -print0 | LC_ALL=C sort -z)
+}
+
+write_lock() {
+    local root="$1" bundle="$2" mode="$3"
+    local source_version source_commit manifest_hash
+    source_version="$(sed -n 's/^source_version=//p' "$bundle/BUNDLE.release" | sed -n '1p')"
+    source_commit="$(sed -n 's/^source_commit=//p' "$bundle/BUNDLE.release" | sed -n '1p')"
+    manifest_hash="$(hash_file "$bundle/MANIFEST.sha256")"
+    printf 'lock_format=1\nframework=base-bash-libs\nversion=%s\nsource_commit=%s\nmanifest_sha256=%s\nmode=%s\nverification=MANIFEST.sha256\n' \
+        "$source_version" "$source_commit" "$manifest_hash" "$mode" > "$root/base-bash-libs.lock"
+}
+
+install_bundle() {
+    local bundle="$1" destination="$2" mode="$3" temporary
+    verify_bundle "$bundle" || return $?
+    [[ -d "$bundle/lib/bash" && -f "$bundle/bin/base-bash" ]] || {
+        error "bundle is not a complete framework artifact: $bundle"
+        return 1
+    }
+    [[ ! -e "$destination" && ! -L "$destination" ]] || {
+        error "refusing to overwrite existing vendor destination '$destination'"
+        return 2
+    }
+    temporary="${destination}.tmp.$$"
+    rm -rf -- "$temporary" 2>/dev/null || true
+    mkdir -p "$temporary" || return 1
+    copy_tree "$bundle" "$temporary" || return 1
+    write_lock "$temporary" "$bundle" "$mode" || return 1
+    mv -- "$temporary" "$destination" || return 1
+    printf 'Installed immutable vendor tree: %s\n' "$destination"
+}
+
+update_bundle() {
+    local bundle="$1" destination="$2" temporary backup
+    verify_bundle "$bundle" || return $?
+    [[ -d "$destination" && -f "$destination/base-bash-libs.lock" ]] || {
+        error "vendor destination is not initialized: $destination"
+        return 1
+    }
+    backup="${destination}.previous"
+    [[ ! -e "$backup" && ! -L "$backup" ]] || {
+        error "refusing update while rollback directory exists: $backup"
+        return 2
+    }
+    temporary="${destination}.tmp.$$"
+    rm -rf -- "$temporary" 2>/dev/null || true
+    mkdir -p "$temporary" || return 1
+    copy_tree "$bundle" "$temporary" || return 1
+    write_lock "$temporary" "$bundle" update || return 1
+    mv -- "$destination" "$backup" || return 1
+    if ! mv -- "$temporary" "$destination"; then
+        mv -- "$backup" "$destination" 2>/dev/null || true
+        return 1
+    fi
+    printf 'Updated vendor tree atomically: %s (rollback=%s)\n' "$destination" "$backup"
+}
+
+rollback_bundle() {
+    local destination="$1" backup temporary
+    backup="${destination}.previous"
+    [[ -d "$backup" ]] || { error "no rollback directory exists: $backup"; return 1; }
+    temporary="${destination}.failed.$$"
+    [[ ! -e "$temporary" ]] || { error "rollback staging path exists: $temporary"; return 2; }
+    mv -- "$destination" "$temporary" || return 1
+    if ! mv -- "$backup" "$destination"; then
+        mv -- "$temporary" "$destination" 2>/dev/null || true
+        return 1
+    fi
+    printf 'Rolled back vendor tree: %s\n' "$destination"
+}
+
+verify_destination() {
+    local destination="$1" expected path actual lock_hash
+    [[ -f "$destination/base-bash-libs.lock" && -f "$destination/MANIFEST.sha256" ]] || {
+        error "vendor destination lacks lock or hash metadata: $destination"
+        return 1
+    }
+    while read -r expected path; do
+        [[ -n "$path" ]] || continue
+        [[ -f "$destination/$path" ]] || { error "vendor file is missing: $path"; return 1; }
+        actual="$(hash_file "$destination/$path")"
+        [[ "$actual" == "$expected" ]] || { error "vendor hash mismatch: $path"; return 1; }
+    done < "$destination/MANIFEST.sha256"
+    lock_hash="$(sed -n 's/^manifest_sha256=//p' "$destination/base-bash-libs.lock" | sed -n '1p')"
+    [[ "$lock_hash" == "$(hash_file "$destination/MANIFEST.sha256")" ]] || {
+        error 'vendor lock does not match MANIFEST.sha256'
+        return 1
+    }
+    printf 'Vendor lock and hashes are valid: %s\n' "$destination"
+}
+
+standalone_bundle() {
+    local application="$1" framework_bundle="$2" destination="$3" temporary
+    verify_bundle "$framework_bundle" || return $?
+    [[ -d "$application" && -f "$application/bin/app" ]] || {
+        error "application is not a generated project: $application"
+        return 1
+    }
+    [[ ! -e "$destination" && ! -L "$destination" ]] || {
+        error "refusing to overwrite standalone destination '$destination'"
+        return 2
+    }
+    temporary="${destination}.tmp.$$"
+    rm -rf -- "$temporary" 2>/dev/null || true
+    mkdir -p "$temporary" || return 1
+    copy_tree "$application" "$temporary" || return 1
+    # Put the verified framework at the standalone root so the copied
+    # launcher resolves lib/bash without ambient environment variables, and
+    # retain an explicit vendor copy for provenance/audit consumers.
+    copy_tree "$framework_bundle" "$temporary" || return 1
+    mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" || return 1
+    copy_tree "$framework_bundle" "$temporary/vendor/base-bash-libs" || return 1
+    cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" || return 1
+    chmod +x "$temporary/bin/base-bash" "$temporary/bin/app" || return 1
+    printf 'standalone_format=1\nframework_lock=%s\nprovenance=verified-offline-bundle\n' \
+        "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || return 1
+    mv -- "$temporary" "$destination" || return 1
+    printf 'Created standalone application bundle: %s\n' "$destination"
+}
+
+main() {
+    case "${1:-}" in
+        create) (($# == 3)) || { usage; return 2; }; install_bundle "$2" "$3" create ;;
+        update) (($# == 3)) || { usage; return 2; }; update_bundle "$2" "$3" ;;
+        rollback) (($# == 2)) || { usage; return 2; }; rollback_bundle "$2" ;;
+        verify) (($# == 2)) || { usage; return 2; }; verify_destination "$2" ;;
+        standalone) (($# == 4)) || { usage; return 2; }; standalone_bundle "$2" "$3" "$4" ;;
+        *) usage; return 2 ;;
+    esac
+}
+
+main "$@"
