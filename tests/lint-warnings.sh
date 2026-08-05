@@ -40,6 +40,8 @@ lint_files=(
   lib/bash/cli/lib_cli.sh
   lib/bash/app/lib_app.sh
   lib/bash/tests/test_helper.sh
+  tests/consumer-kit/test_helper.bash
+  tests/consumer-kit/tests/consumer_kit.bats
   tests/launcher.bats
   tests/release.bats
 )

@@ -116,6 +116,47 @@ SCRIPT
     [[ "$output" == *"refusing to overwrite existing file"* ]]
 }
 
+@test "base-bash check validates a consumer project without mutation" {
+    local project_dir="$TEST_TMPDIR/generated"
+    local before after
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    before="$(find "$project_dir" -type f -exec shasum {} + | sort)"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK project/framework-pin: 2.0.0"* ]]
+    [[ "$output" == *"OK project/namespace:"* ]]
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir" --format json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"check":"framework-pin"'* ]]
+    [[ "$output" == *'"status":"OK"'* ]]
+
+    after="$(find "$project_dir" -type f -exec shasum {} + | sort)"
+    [ "$before" = "$after" ]
+}
+
+@test "consumer check rejects legacy v1 symbols without executing them" {
+    local project_dir="$TEST_TMPDIR/legacy"
+
+    mkdir -p "$project_dir/bin" "$project_dir/lib" "$project_dir/tests"
+    printf '%s\n' '# legacy fixture' >"$project_dir/README.md"
+    printf '0.1.0\n' >"$project_dir/VERSION"
+    printf 'version=2.0.0\n' >"$project_dir/BASE_BASH_LIBS_PIN"
+    printf '%s\n' '#!/usr/bin/env bash' 'std_run dangerous-command' >"$project_dir/bin/app"
+    printf '%s\n' '#!/usr/bin/env bash' 'main() { :; }' >"$project_dir/lib/app.sh"
+    printf '%s\n' '@test "placeholder" { :; }' >"$project_dir/tests/app.bats"
+    chmod +x "$project_dir/bin/app"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir" --format json
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"check":"namespace"'* ]]
+    [[ "$output" == *"v1 API symbol detected"* ]]
+}
+
 @test "base-bash bounds symlink resolution" {
     local first_link="$TEST_TMPDIR/cycle-a"
     local second_link="$TEST_TMPDIR/cycle-b"

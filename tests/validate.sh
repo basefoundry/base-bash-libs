@@ -34,6 +34,7 @@ required_files=(
   tests/release.bats
   tests/namespace-contract.bats
   tests/api-manifest.bats
+  tests/consumer-kit/tests/consumer_kit.bats
   tests/lint-warnings.sh
 )
 
@@ -298,12 +299,15 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   "${manifest_shellcheck_paths[@]}" \
   tests/release.bats \
   tests/namespace-contract.bats \
-  tests/api-manifest.bats
+  tests/api-manifest.bats \
+  tests/consumer-kit/test_helper.bash \
+  tests/consumer-kit/tests/consumer_kit.bats
 
 bats_files=(
   tests/release.bats
   tests/namespace-contract.bats
   tests/api-manifest.bats
+  tests/consumer-kit/tests/consumer_kit.bats
 )
 manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
 while IFS= read -r file; do
