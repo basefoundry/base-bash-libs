@@ -10,37 +10,37 @@ Source the stdlib before this library:
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" --
-import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
+base_bash_libs_std_import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
 ```
 
 ## Public Functions
 
-- `gh_require_cli [install_hint]`
+- `base_bash_libs_gh_require_cli [install_hint]`
   Verifies that `gh` is available on `PATH`. When it is missing, the helper logs
   a generic error and an optional caller-provided install hint.
-- `gh_auth_status_diagnostics [login_hint]`
+- `base_bash_libs_gh_auth_status_diagnostics [login_hint]`
   Runs `gh auth status -h github.com`. On failure, it logs non-empty diagnostic
   lines from the GitHub CLI and then logs a caller-provided login hint, or the
   default `gh auth login -h github.com` hint.
-- `gh_report_command_failure <status> [gh args...]`
+- `base_bash_libs_gh_report_command_failure <status> [gh args...]`
   Logs a failed `gh` command and appends auth diagnostics. Protected reporting
   uses the control-first sensitive form documented below. The original status
   is returned.
-- `gh_run [gh args...]`
+- `base_bash_libs_gh_run [gh args...]`
   Runs `gh "$@"` after command availability checks. On command failure, it
   reports the failed command and auth diagnostics while preserving the original
   exit status. Protected calls use the sensitive form documented below.
-- `gh_repo_from_remote_url <remote_url> <result_var>`
+- `base_bash_libs_gh_repo_from_remote_url <remote_url> <result_var>`
   Parses supported GitHub SSH and HTTPS remote URLs into `owner/repo`. Returns
   non-zero for non-GitHub or malformed remotes and leaves the result variable
   unchanged on failure.
-- `gh_infer_repo_from_origin <repo_dir> <result_var> [--optional]`
+- `base_bash_libs_gh_infer_repo_from_origin <repo_dir> <result_var> [--optional]`
   Reads the `origin` remote from a local Git repository and stores `owner/repo`
   when it points to GitHub. With `--optional`, missing or non-GitHub remotes
   store an empty string and return success.
-- `gh_repo_default_branch <owner/repo> <result_var>`
+- `base_bash_libs_gh_repo_default_branch <owner/repo> <result_var>`
   Uses `gh repo view` to read the GitHub repository default branch.
-- `gh_api_with_retry [retry controls --] <endpoint> [gh api args...]`
+- `base_bash_libs_gh_api_with_retry [retry controls --] <endpoint> [gh api args...]`
   Runs `gh api "$@"` with idempotency-aware, elapsed-time-bounded retries.
   Reads may retry by default; mutations, GraphQL, file-backed payloads, and
   requests the parser cannot classify do not retry unless the caller explicitly
@@ -50,13 +50,13 @@ import "/path/to/base-bash-libs/lib/bash/gh/lib_gh.sh"
 All GitHub helper failures return a nonzero status and preserve the underlying
 `gh` status where applicable. The remote parser and origin inference helpers
 leave caller-owned result variables unchanged on failure; use `--optional` with
-`gh_infer_repo_from_origin` when a missing or non-GitHub origin is expected.
+`base_bash_libs_gh_infer_repo_from_origin` when a missing or non-GitHub origin is expected.
 
 Public functions validate the documented argument count before expanding
 required positional parameters. Invalid calls return `1`, including when the
 caller has enabled `nounset`; optional flags such as `--optional` are rejected
-when misspelled. `gh_run` passes every GitHub argument after its optional
-protected-diagnostic control prefix through unchanged. `gh_api_with_retry`
+when misspelled. `base_bash_libs_gh_run` passes every GitHub argument after its optional
+protected-diagnostic control prefix through unchanged. `base_bash_libs_gh_api_with_retry`
 preserves those caller arguments except for the documented internal
 response-metadata instrumentation on compatible retry-authorized calls.
 
@@ -75,14 +75,14 @@ handlers.
 The legacy form remains valid and uses the conservative defaults:
 
 ```bash
-gh_api_with_retry repos/basefoundry/base-bash-libs --jq .name
+base_bash_libs_gh_api_with_retry repos/basefoundry/base-bash-libs --jq .name
 ```
 
 When any framework retry or sensitive-diagnostic control is present, put every
 control in one leading prefix and terminate it with `--`:
 
 ```bash
-gh_api_with_retry \
+base_bash_libs_gh_api_with_retry \
     --retry-policy replay-safe \
     --max-attempts 4 \
     --max-elapsed-seconds 180 \
@@ -222,7 +222,7 @@ filesystem can still leave mode-`0600` files for operating-system cleanup.
 
 ## Secret-safe command diagnostics
 
-Ordinary `gh_run` and `gh_report_command_failure` failures render every GitHub
+Ordinary `base_bash_libs_gh_run` and `base_bash_libs_gh_report_command_failure` failures render every GitHub
 argument with Bash `%q`. This preserves argument boundaries and produces a
 copyable diagnostic, but it is not secret-safe. Headers, fields, URL userinfo,
 positional values, and `--option=value` forms are all rendered as supplied.
@@ -231,14 +231,14 @@ Use `--sensitive` whenever any GitHub argument may contain a credential or
 other value that must not enter terminal or persistent logs:
 
 ```bash
-gh_run --sensitive --safe-display "create release" -- \
+base_bash_libs_gh_run --sensitive --safe-display "create release" -- \
     release create "$tag" --notes "$private_notes"
 
-gh_api_with_retry --sensitive --safe-display "update project item" -- \
+base_bash_libs_gh_api_with_retry --sensitive --safe-display "update project item" -- \
     graphql --header "Authorization: Bearer $token" \
     --raw-field "query=$query"
 
-gh_report_command_failure --sensitive --safe-display "publish release" -- \
+base_bash_libs_gh_report_command_failure --sensitive --safe-display "publish release" -- \
     "$status" release create "$tag" --notes "$private_notes"
 ```
 
@@ -251,8 +251,8 @@ generic bracketed description.
 
 Protected diagnostics never render the GitHub argv. This applies to final
 failure records, retry notices, persistent logs, and the nested authentication
-check performed by `gh_run` and `gh_report_command_failure`. A protected
-`gh_api_with_retry` may inspect captured failure text internally to decide
+check performed by `base_bash_libs_gh_run` and `base_bash_libs_gh_report_command_failure`. A protected
+`base_bash_libs_gh_api_with_retry` may inspect captured failure text internally to decide
 whether and when to retry, but it does not replay that text on failure.
 Successful API output remains functional stdout and is byte-preserved after
 any internal response-metadata prefix is removed.

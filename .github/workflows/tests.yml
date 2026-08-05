@@ -41,7 +41,7 @@ jobs:
         run: |
           bash -c '
             source "$1"
-            check_bash_version
+            base_bash_libs_std_check_bash_version
           ' bash "$PWD/lib/bash/std/lib_std.sh"
 
       # The exact supported lower bound runs in the compatibility job. This

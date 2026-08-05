@@ -5,7 +5,7 @@ load ../lib/bash/tests/test_helper.sh
 setup() {
     setup_test_tmpdir
     PATH="$BASE_REPO_ROOT/bin:$BASE_TEST_ORIG_PATH"
-    unset DRY_RUN dry_run LOG_DEBUG LOG_UTC NO_COLOR BASE_BASH_BOOTSTRAP_SOURCE
+    unset BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_DRY_RUN BASE_BASH_LIBS_LOG_DEBUG BASE_BASH_LIBS_LOG_UTC NO_COLOR BASE_BASH_LIBS_BOOTSTRAP_SOURCE
 }
 
 create_script() {
@@ -26,20 +26,20 @@ create_script() {
 #!/usr/bin/env base-bash
 # shellcheck shell=bash
 
-import_base_bash_lib str/lib_str.sh
+base_bash_libs_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local value="$1"
-    str_trim value
+    base_bash_libs_str_trim value
 
     printf 'argc=%s\n' "$#"
     printf 'first=<%s>\n' "$1"
     printf 'second=<%s>\n' "${2-}"
     printf 'trimmed=<%s>\n' "$value"
-    printf 'script-dir=%s\n' "$__SCRIPT_DIR__"
+    printf 'script-dir=%s\n' "$BASE_BASH_LIBS_SCRIPT_DIR"
     printf 'loaded=%s\n' "${BASE_BASH_LIBS_STDLIB_LOADED:-}"
     printf 'base-home=%s\n' "${BASE_HOME-unset}"
-    printf 'str-trim=%s\n' "$(type -t str_trim)"
+    printf 'str-trim=%s\n' "$(type -t base_bash_libs_str_trim)"
 }
 SCRIPT
 

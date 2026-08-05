@@ -29,3 +29,21 @@ library boundary, such as the existing `file` and `git` libraries. Large
 libraries should stay navigable through section ordering, consistent function
 prefixes, README coverage, and focused tests rather than a shell module loader
 or chained source fragments.
+
+## Namespace and embedding contract
+
+The v2 public namespace is deliberately collision-resistant so a library can
+be sourced into an existing application without taking generic names:
+
+- Public functions use `base_bash_libs_<module>_<name>` (with the two stdlib
+  lifecycle exceptions documented in `lib/bash/README.md`).
+- Framework-owned globals, environment controls, metadata, and load guards use
+  `BASE_BASH_LIBS_...`.
+- Internal functions use `__base_bash_libs_<module>_...__` and are not callable
+  application API.
+
+Generic v1 aliases are not retained in v2. Any intentional caller-owned
+variables such as `PATH`, `NO_COLOR`, `TMPDIR`, `GH_TOKEN`, and `TZ` remain
+outside this namespace and are documented as inputs rather than framework
+state. Keep the complete migration map in sync with the source and run the
+namespace collision tests when adding a new public symbol.

@@ -38,7 +38,7 @@ arguments in a caller-owned array.
 
 Public API calls preserve the same process state unless their documented
 purpose is to change it. Examples of intentional mutation include PATH helpers,
-`safe_cd`, caller-owned output variables, file-editing helpers, and cleanup
+`base_bash_libs_std_safe_cd`, caller-owned output variables, file-editing helpers, and cleanup
 registrations while a hook or path remains active. Transient internal cleanup
 registrations restore the caller's preexisting `EXIT` trap when the operation
 finishes.
@@ -56,11 +56,29 @@ runtimes and in the digest-pinned, networkless Bash 4.2.53 compatibility image.
 
 ## Naming Contract
 
+The v2 namespace is part of the sourceable-library contract:
+
+- Public functions use `base_bash_libs_<module>_<name>`. The stdlib lifecycle
+  functions are `base_bash_libs_init` and `base_bash_libs_require_version`,
+  while the remaining stdlib functions use the `base_bash_libs_std_` segment.
+- Framework-owned globals, configuration variables, metadata, and load guards
+  use `BASE_BASH_LIBS_...`.
+- Implementation-only functions use `__base_bash_libs_<module>_...__` and are
+  not a supported call surface.
+
+Libraries do not define generic aliases for the old v1 names. This keeps
+default loading safe for applications that already have functions such as
+`import`, `log_info`, or `str_trim`. See
+[`docs/v2-symbol-map.md`](../../docs/v2-symbol-map.md) for the complete mapping
+and [`scripts/migrate-v2-symbols`](../../scripts/migrate-v2-symbols) for a
+mechanical migration aid. The single-file boundary remains unchanged: each
+public library is still one physical `.sh` file.
+
 Public helpers that accept caller-supplied variable or array names reserve the
 `__` prefix for library-internal state. Passing a caller-owned source or result
 name that begins with `__` fails before the helper changes caller state. Use a
 regular Bash variable name for public input and output values and arrays.
-`assert_variable_name` is the syntax-only exception: it validates whether any
+`base_bash_libs_std_assert_variable_name` is the syntax-only exception: it validates whether any
 identifier is legal Bash syntax, including names in the reserved namespace,
 without reading or writing the named variable.
 

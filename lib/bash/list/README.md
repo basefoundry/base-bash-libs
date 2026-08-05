@@ -9,17 +9,17 @@ helpers are available.
 
 ## Public API
 
-- `list_append <array> <value> [value...]`
+- `base_bash_libs_list_append <array> <value> [value...]`
   Append one or more values to a named indexed array.
-- `list_prepend <array> <value> [value...]`
+- `base_bash_libs_list_prepend <array> <value> [value...]`
   Prepend one or more values to a named indexed array.
-- `list_remove <array> <value>`
+- `base_bash_libs_list_remove <array> <value>`
   Remove all exact matches from a named indexed array.
-- `list_contains <value> <array>`
+- `base_bash_libs_list_contains <value> <array>`
   Predicate that checks whether a named indexed array contains a value.
-- `list_unique <result_array> <source_array>`
+- `base_bash_libs_list_unique <result_array> <source_array>`
   Store first-seen unique values in a named result array.
-- `list_length <result_var> <source_array>`
+- `base_bash_libs_list_length <result_var> <source_array>`
   Store an array length in a named result variable.
 
 ## Usage
@@ -32,21 +32,21 @@ source "/absolute/path/to/lib/bash/list/lib_list.sh"
 
 declare -a packages=("jq")
 
-list_append packages "shellcheck" "bats-core"
-list_prepend packages "bash"
+base_bash_libs_list_append packages "shellcheck" "bats-core"
+base_bash_libs_list_prepend packages "bash"
 
-if list_contains "shellcheck" packages; then
-    log_info "ShellCheck validation is available."
+if base_bash_libs_list_contains "shellcheck" packages; then
+    base_bash_libs_std_log_info "ShellCheck validation is available."
 fi
 ```
 
 Mutating helpers update the caller-owned array in place. Array arguments and
 array result variables must already be declared as indexed arrays, for example
 with `declare -a values=()`. Scalar result helpers accept the name of the output
-variable, validate it with `assert_variable_name`, and avoid stdout capture for
+variable, validate it with `base_bash_libs_std_assert_variable_name`, and avoid stdout capture for
 caller state.
 
-For `list_unique` and `list_length`, the result and source variable names must
+For `base_bash_libs_list_unique` and `base_bash_libs_list_length`, the result and source variable names must
 be distinct. An alias is rejected before the source is changed.
 
 ## Tests

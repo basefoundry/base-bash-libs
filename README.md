@@ -42,6 +42,8 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   membership checks, deduplication, and length results.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
+The v2 naming contract and complete v1-to-v2 migration map are in
+[`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
 
 ## Installation and Usage
 
@@ -74,25 +76,25 @@ script should run with the stdlib preloaded from its shebang:
 ```bash
 #!/usr/bin/env base-bash
 
-import_base_bash_lib str/lib_str.sh
+base_bash_libs_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local name="  Example  "
-    str_trim name
-    log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
-    std_run echo "$name"
+    base_bash_libs_str_trim name
+    base_bash_libs_std_log_info "Running with base-bash-libs $BASE_BASH_LIBS_VERSION"
+    base_bash_libs_std_run echo "$name"
 }
 ```
 
 Load companion libraries with absolute imports from the same package:
 
 ```bash
-import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
-import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
-import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
-import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
-import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
-import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/file/lib_file.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/git/lib_git.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/gh/lib_gh.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/str/lib_str.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/arg/lib_arg.sh"
+base_bash_libs_std_import "$base_bash_libs_prefix/libexec/lib/bash/list/lib_list.sh"
 ```
 
 ### Source Checkout
@@ -125,12 +127,12 @@ printf 'base-bash-libs version: %s\n' "$BASE_BASH_LIBS_VERSION"
 Load companion libraries with absolute imports from the same checkout:
 
 ```bash
-import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 You can also run source-checkout scripts through the launcher:
@@ -151,12 +153,12 @@ base_bash_libs_dir="$project_root/vendor/base-bash-libs"
 source "$base_bash_libs_dir/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_bash_libs_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
-import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
-import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
-import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
-import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
-import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
-import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/file/lib_file.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/git/lib_git.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/gh/lib_gh.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/str/lib_str.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/arg/lib_arg.sh"
+base_bash_libs_std_import "$base_bash_libs_dir/lib/bash/list/lib_list.sh"
 ```
 
 After `lib_std.sh` is sourced, `BASE_BASH_LIBS_VERSION` contains the package

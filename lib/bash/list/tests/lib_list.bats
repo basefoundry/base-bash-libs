@@ -26,7 +26,7 @@ create_script() {
 @test "lib_list can be sourced more than once" {
     source "$BASE_BASH_DIR/list/lib_list.sh"
 
-    [ "$(type -t list_append)" = "function" ]
+    [ "$(type -t base_bash_libs_list_append)" = "function" ]
 }
 
 @test "lib_list fails clearly when sourced without stdlib" {
@@ -39,7 +39,7 @@ create_script() {
 }
 
 @test "lib_list requires the stdlib loaded marker" {
-    bats_run bash -c 'log_error() { :; }; log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/list/lib_list.sh"
+    bats_run bash -c 'base_bash_libs_std_log_error() { :; }; base_bash_libs_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/list/lib_list.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_list.sh requires lib_std.sh to be sourced first"* ]]
@@ -51,12 +51,12 @@ create_script() {
 
     for mode in off e u p eu ep up eup; do
         for function_name in \
-            list_append \
-            list_prepend \
-            list_remove \
-            list_contains \
-            list_unique \
-            list_length; do
+            base_bash_libs_list_append \
+            base_bash_libs_list_prepend \
+            base_bash_libs_list_remove \
+            base_bash_libs_list_contains \
+            base_bash_libs_list_unique \
+            base_bash_libs_list_length; do
             bats_run "$BASH" -c '
                 mode="$1"
                 case "$mode" in *e*) set -e ;; esac
@@ -76,11 +76,11 @@ create_script() {
     done
 }
 
-@test "list_append and list_prepend mutate caller arrays in place" {
+@test "base_bash_libs_list_append and base_bash_libs_list_prepend mutate caller arrays in place" {
     local -a values=("middle")
 
-    list_append values "tail one" ""
-    list_prepend values "head"
+    base_bash_libs_list_append values "tail one" ""
+    base_bash_libs_list_prepend values "head"
 
     [ "${#values[@]}" -eq 4 ]
     [ "${values[0]}" = "head" ]
@@ -89,41 +89,41 @@ create_script() {
     [ "${values[3]}" = "" ]
 }
 
-@test "list_remove deletes all matching values and preserves order" {
+@test "base_bash_libs_list_remove deletes all matching values and preserves order" {
     local -a values=("alpha" "beta" "alpha" "" "gamma")
 
-    list_remove values "alpha"
+    base_bash_libs_list_remove values "alpha"
 
     [ "${#values[@]}" -eq 3 ]
     [ "${values[0]}" = "beta" ]
     [ "${values[1]}" = "" ]
     [ "${values[2]}" = "gamma" ]
 
-    list_remove values ""
+    base_bash_libs_list_remove values ""
 
     [ "${#values[@]}" -eq 2 ]
     [ "${values[0]}" = "beta" ]
     [ "${values[1]}" = "gamma" ]
 }
 
-@test "list_contains checks membership without printing" {
+@test "base_bash_libs_list_contains checks membership without printing" {
     local -a values=("alpha" "beta gamma" "")
     local stdout_file="$TEST_TMPDIR/list-contains.out"
 
-    list_contains "beta gamma" values >"$stdout_file"
-    list_contains "" values >>"$stdout_file"
+    base_bash_libs_list_contains "beta gamma" values >"$stdout_file"
+    base_bash_libs_list_contains "" values >>"$stdout_file"
 
-    if list_contains "delta" values; then
+    if base_bash_libs_list_contains "delta" values; then
         return 1
     fi
     [ ! -s "$stdout_file" ]
 }
 
-@test "list_unique stores deduplicated values in a named result array" {
+@test "base_bash_libs_list_unique stores deduplicated values in a named result array" {
     local -a values=("alpha" "beta" "alpha" "" "beta" "")
     local -a unique=()
 
-    list_unique unique values
+    base_bash_libs_list_unique unique values
 
     [ "${#unique[@]}" -eq 3 ]
     [ "${unique[0]}" = "alpha" ]
@@ -135,7 +135,7 @@ create_script() {
     local -a values=("alpha" "alpha" "beta")
     local rc
 
-    if list_unique values values 2>/dev/null; then
+    if base_bash_libs_list_unique values values 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -146,7 +146,7 @@ create_script() {
     [ "${values[1]}" = "alpha" ]
     [ "${values[2]}" = "beta" ]
 
-    if list_length values values 2>/dev/null; then
+    if base_bash_libs_list_length values values 2>/dev/null; then
         rc=0
     else
         rc=$?
@@ -159,15 +159,15 @@ create_script() {
 }
 
 @test "list helpers reject exact internal holder names before locals or mutation" {
-    local -r __list_array_name=actual
+    local -r __base_bash_libs_list_array_name=actual
     local -a actual=(keep)
-    local -ar __list_current=(alpha beta)
+    local -ar __base_bash_libs_list_current=(alpha beta)
     local -a result=(saved)
     local count=saved
     local stderr_file="$TEST_TMPDIR/list-internal-holder.err"
     local rc
 
-    if list_append __list_array_name new 2>"$stderr_file"; then
+    if base_bash_libs_list_append __base_bash_libs_list_array_name new 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -175,14 +175,14 @@ create_script() {
     [ "$rc" -eq 1 ]
     [ "${actual[*]}" = "keep" ]
 
-    if list_contains alpha __list_current 2>"$stderr_file"; then
+    if base_bash_libs_list_contains alpha __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
 
-    if list_unique result __list_current 2>"$stderr_file"; then
+    if base_bash_libs_list_unique result __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -190,23 +190,23 @@ create_script() {
     [ "$rc" -eq 1 ]
     [ "${result[*]}" = "saved" ]
 
-    if list_length count __list_current 2>"$stderr_file"; then
+    if base_bash_libs_list_length count __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
     [ "$rc" -eq 1 ]
     [ "$count" = "saved" ]
-    [ "${__list_current[*]}" = "alpha beta" ]
+    [ "${__base_bash_libs_list_current[*]}" = "alpha beta" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
 }
 
-@test "list_length stores the array length in a named variable" {
+@test "base_bash_libs_list_length stores the array length in a named variable" {
     local -a values=("alpha" "beta gamma" "")
     local count=""
 
-    list_length count values
+    base_bash_libs_list_length count values
 
     [ "$count" = "3" ]
 }
@@ -221,12 +221,12 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -a values=()
 declare -a unique=(old)
-list_prepend values head
-list_remove values head
-list_contains missing values && exit 10
-list_unique unique values
+base_bash_libs_list_prepend values head
+base_bash_libs_list_remove values head
+base_bash_libs_list_contains missing values && exit 10
+base_bash_libs_list_unique unique values
 count=invalid
-list_length count values
+base_bash_libs_list_length count values
 [[ -z "\${values[*]-}" ]]
 [[ -z "\${unique[*]-}" ]]
 [[ "\$count" == 0 ]]
@@ -243,7 +243,7 @@ EOF
     local rc
 
     readonly values
-    if list_append values beta 2>"$stderr_file"; then
+    if base_bash_libs_list_append values beta 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
@@ -262,13 +262,13 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 secret="not-valid"
-list_append "\$secret" "value"
+base_bash_libs_list_append "\$secret" "value"
 EOF
 
     bats_run bash "$script"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"assert_variable_name expects valid Bash variable names"* ]]
+    [[ "$output" == *"base_bash_libs_std_assert_variable_name expects valid Bash variable names"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -280,7 +280,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 values="alpha"
-list_append values "beta"
+base_bash_libs_list_append values "beta"
 EOF
 
     bats_run bash "$script"
@@ -293,7 +293,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -A values=([alpha]="one")
-list_contains "one" values
+base_bash_libs_list_contains "one" values
 EOF
 
     bats_run bash "$script"
@@ -306,7 +306,7 @@ EOF
 source "$BASE_BASH_DIR/std/lib_std.sh"
 source "$BASE_BASH_DIR/list/lib_list.sh"
 declare -a values=("alpha")
-list_unique unique values
+base_bash_libs_list_unique unique values
 EOF
 
     bats_run bash "$script"
