@@ -21,6 +21,9 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   Indexed-array helpers built on top of the stdlib.
 - `tests/`
   Common BATS helpers for Bash library test suites.
+- `base-bash-libs.release`
+  Embedded release identity copied with installed, archived, vendored, and
+  standalone `lib/bash` artifacts.
 
 The Base runtime shell files and Base version helpers remain in
 `basefoundry/base`. This repository carries only sourceable reusable library
@@ -86,3 +89,27 @@ without reading or writing the named variable.
 When one API accepts multiple caller-owned inputs or outputs, names that would
 alias an input with an output are rejected before mutation. The module README
 for that API documents the required distinct-name relationships.
+
+## Import contract
+
+Source the stdlib once, then load every companion module with the same
+package-relative API:
+
+```bash
+source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
+base_std_import str/lib_str.sh file/lib_file.sh
+```
+
+`base_std_import` resolves paths from the loaded package's `lib/bash` root, so
+the caller's cwd, script directory, Homebrew `libexec` layout, vendored tree,
+and symlinked installation path do not change the import. Absolute paths,
+`..` traversal, and symlinks that escape the package are rejected. Repeated
+loads are no-ops; dependency cycles and mixed-major package graphs fail with
+diagnostics. The launcher's `base_launcher_import_base_bash_lib` name is only
+a thin process-boundary adapter to this same loader.
+
+The loader promotes top-level `declare` statements in a module to global
+declarations while it is sourced. Module authors can therefore write normal
+module-level declarations without knowing that the loader itself is a
+function; declarations executed later inside public functions retain normal
+Bash scope rules. Every module remains a single physical `.sh` file.

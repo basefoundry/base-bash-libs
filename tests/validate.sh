@@ -123,6 +123,19 @@ IFS= read -r version < VERSION || {
   exit 1
 }
 
+release_metadata_version="$(sed -n 's/^version=//p' lib/bash/base-bash-libs.release | sed -n '1p')"
+if [[ "$release_metadata_version" != "$version" ]]; then
+  printf 'Embedded release metadata version (%s) does not match VERSION (%s).\n' \
+    "$release_metadata_version" "$version" >&2
+  exit 1
+fi
+for metadata_key in schema_version version commit dirty_state provenance; do
+  grep -E "^${metadata_key}=.+$" lib/bash/base-bash-libs.release >/dev/null || {
+    printf 'Embedded release metadata is missing key: %s\n' "$metadata_key" >&2
+    exit 1
+  }
+done
+
 if ! grep -F "| \`$version\` | [Apache-2.0](LICENSE) |" README.md >/dev/null; then
   printf 'README.md top strip does not match VERSION (%s) and Apache-2.0 license metadata.\n' "$version" >&2
   exit 1

@@ -11,12 +11,7 @@ setup() {
         source "$1/std/lib_std.sh"
         declare -a init_args=()
         base_init init_args --source "$1/tests/namespace-contract.bats" --
-        base_std_import "$1/file/lib_file.sh"
-        base_std_import "$1/git/lib_git.sh"
-        base_std_import "$1/gh/lib_gh.sh"
-        base_std_import "$1/str/lib_str.sh"
-        base_std_import "$1/arg/lib_arg.sh"
-        base_std_import "$1/list/lib_list.sh"
+        base_std_import file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh
 
         for function_name in $(compgen -A function); do
             case "$function_name" in
@@ -57,7 +52,7 @@ setup() {
         source "$1/std/lib_std.sh"
         declare -a init_args=()
         base_init init_args --source "$1/tests/namespace-contract.bats" --
-        base_std_import "$1/str/lib_str.sh"
+        base_std_import str/lib_str.sh
 
         [[ "$(type -t import)" == function ]]
         [[ "$(type -t log_info)" == function ]]

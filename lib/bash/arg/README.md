@@ -25,7 +25,7 @@ Aliasing is rejected before any caller-owned output is changed.
 source "/absolute/path/to/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" --
-source "/absolute/path/to/lib/bash/arg/lib_arg.sh"
+base_std_import arg/lib_arg.sh
 
 declare -A options=()
 declare -a positionals=()

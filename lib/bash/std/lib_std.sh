@@ -21,7 +21,15 @@
 #
 # Caller-visible metadata:
 #   BASE_BASH_LIBS_VERSION
-#                    Package version read from the repository/package VERSION file.
+#                    Package version read from VERSION or the embedded release
+#                    metadata carried with installed/copy-only artifacts.
+#   BASE_BASH_LIBS_COMMIT
+#                    Full source commit when the package came from a checkout;
+#                    embedded release commit or unknown for copied artifacts.
+#   BASE_BASH_LIBS_DIRTY_STATE
+#                    clean, dirty, or unknown source-tree state.
+#   BASE_BASH_LIBS_PROVENANCE
+#                    checkout, release-artifact, source-archive, copy, or unknown.
 #   BASE_BASH_LIBS_STDLIB_LOADED
 #                    Set to 1 after lib_std.sh has been loaded successfully.
 #
@@ -95,21 +103,58 @@ __base_bash_libs_std_require_supported_bash__() {
 __base_bash_libs_std_require_supported_bash__ || return 1 2>/dev/null || exit 1
 unset -f __base_bash_libs_std_require_supported_bash__
 
-__base_bash_libs_std_read_package_version__() {
-    local source_path="${1-}" version_file version
+__base_bash_libs_std_resolve_file_path__() {
+    local source_path="${1-}" link_dir target link_depth=0
 
     [[ -n "$source_path" ]] || return 1
-    version_file="$(cd -- "$(dirname -- "$source_path")/../../.." &>/dev/null && pwd -P)/VERSION" || return 1
-    [[ -r "$version_file" ]] || {
-        printf '%s\n' "Error: base-bash-libs VERSION file is not readable: $version_file" >&2
-        return 1
-    }
-    IFS= read -r version < "$version_file" || [[ -n "$version" ]] || {
-        printf '%s\n' "Error: Unable to read base-bash-libs version from: $version_file" >&2
-        return 1
-    }
+    [[ -e "$source_path" || -L "$source_path" ]] || return 1
+
+    while [[ -L "$source_path" ]]; do
+        ((link_depth += 1))
+        ((link_depth <= 40)) || return 1
+        link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2>/dev/null && pwd -P)" || return 1
+        target="$(readlink "$source_path")" || return 1
+        if [[ "$target" == /* ]]; then
+            source_path="$target"
+        else
+            source_path="$link_dir/$target"
+        fi
+    done
+
+    link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2>/dev/null && pwd -P)" || return 1
+    printf '%s/%s\n' "$link_dir" "$(basename -- "$source_path")"
+}
+
+__base_bash_libs_std_read_metadata_value__() {
+    local metadata_file="${1-}" requested_key="${2-}" metadata_key metadata_value
+
+    [[ -r "$metadata_file" && -n "$requested_key" ]] || return 1
+    while IFS='=' read -r metadata_key metadata_value; do
+        [[ "$metadata_key" == "$requested_key" ]] || continue
+        printf '%s' "$metadata_value"
+        return 0
+    done < "$metadata_file"
+    return 1
+}
+
+__base_bash_libs_std_read_package_version__() {
+    local source_path="${1-}" package_root version_file metadata_file version
+
+    [[ -n "$source_path" ]] || return 1
+    package_root="$(cd -- "$(dirname -- "$source_path")/../../.." &>/dev/null && pwd -P)" || return 1
+    version_file="$package_root/VERSION"
+    metadata_file="$package_root/lib/bash/base-bash-libs.release"
+
+    if [[ -r "$version_file" ]]; then
+        IFS= read -r version < "$version_file" || true
+    else
+        version="$(
+            __base_bash_libs_std_read_metadata_value__ "$metadata_file" version ||
+                printf '%s' ""
+        )"
+    fi
     [[ -n "$version" ]] || {
-        printf '%s\n' "Error: base-bash-libs VERSION file is empty: $version_file" >&2
+        printf '%s\n' "Error: base-bash-libs has no readable VERSION or embedded release metadata at '$package_root'." >&2
         return 1
     }
     printf '%s' "$version"
@@ -120,37 +165,81 @@ __base_bash_libs_std_read_package_version__() {
 # version is a no-op; attempting to mix versions fails before definitions are
 # replaced.
 if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_GUARD+x}" ]]; then
-    if [[ "${BASE_BASH_LIBS_STD_SOURCE_VERSION-}" != "$(__base_bash_libs_std_read_package_version__ "${BASH_SOURCE[0]}")" ||
-        "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" != "${BASH_SOURCE[0]}" ]]; then
-        printf '%s\n' "Error: incompatible base-bash-libs stdlib versions or sources are already loaded (loaded ${BASE_BASH_LIBS_STD_SOURCE_VERSION:-unknown} from ${BASE_BASH_LIBS_STD_SOURCE_PATH:-unknown}, requested $(__base_bash_libs_std_read_package_version__ "${BASH_SOURCE[0]}" 2>/dev/null || printf 'unknown') from ${BASH_SOURCE[0]})." >&2
+    __base_bash_libs_std_requested_source_path__="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+    __base_bash_libs_std_requested_source_version__="$(__base_bash_libs_std_read_package_version__ "$__base_bash_libs_std_requested_source_path__" 2>/dev/null || printf '%s' unknown)"
+    if [[ "${BASE_BASH_LIBS_STD_SOURCE_VERSION-}" != "$__base_bash_libs_std_requested_source_version__" ||
+        "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" != "$__base_bash_libs_std_requested_source_path__" ]]; then
+        if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" &&
+            "${BASE_BASH_LIBS_STD_SOURCE_VERSION%%.*}" != "${__base_bash_libs_std_requested_source_version__%%.*}" ]]; then
+            printf '%s\n' "Error: mixed-major base-bash-libs module graph refused (loaded v${BASE_BASH_LIBS_STD_SOURCE_VERSION%%.*}, requested v${__base_bash_libs_std_requested_source_version__%%.*}). v1 inputs are not fallback-loaded by v2; migrate imports to the package-relative base_std_import contract and use one v2 package root." >&2
+        else
+            printf '%s\n' "Error: incompatible base-bash-libs stdlib versions or sources are already loaded (loaded ${BASE_BASH_LIBS_STD_SOURCE_VERSION:-unknown} from ${BASE_BASH_LIBS_STD_SOURCE_PATH:-unknown}, requested $__base_bash_libs_std_requested_source_version__ from $__base_bash_libs_std_requested_source_path__)." >&2
+        fi
+        unset __base_bash_libs_std_requested_source_path__ __base_bash_libs_std_requested_source_version__
         unset -f __base_bash_libs_std_read_package_version__
+        unset -f __base_bash_libs_std_read_metadata_value__
         return 1 2>/dev/null || exit 1
     fi
-    unset -f __base_bash_libs_std_read_package_version__
+    unset __base_bash_libs_std_requested_source_path__ __base_bash_libs_std_requested_source_version__
+    unset -f __base_bash_libs_std_read_package_version__ __base_bash_libs_std_read_metadata_value__
     return 0
 fi
 
-if [[ -n "${BASE_BASH_LIBS_VERSION+x}" || -n "${BASE_BASH_LIBS_STDLIB_LOADED+x}" ]]; then
+if [[ -n "${BASE_BASH_LIBS_VERSION+x}" || -n "${BASE_BASH_LIBS_STDLIB_LOADED+x}" ||
+    -n "${BASE_BASH_LIBS_COMMIT+x}" || -n "${BASE_BASH_LIBS_DIRTY_STATE+x}" ||
+    -n "${BASE_BASH_LIBS_PROVENANCE+x}" ]]; then
     printf '%s\n' "Error: base-bash-libs metadata names are already owned by the caller; refusing to overwrite them." >&2
     return 1 2>/dev/null || exit 1
 fi
 
-readonly BASE_BASH_LIBS_STD_SOURCE_PATH="${BASH_SOURCE[0]}"
+readonly BASE_BASH_LIBS_STD_SOURCE_PATH="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}")" || {
+    printf '%s\n' "Error: Unable to resolve base-bash-libs stdlib source path from '${BASH_SOURCE[0]}'." >&2
+    return 1 2>/dev/null || exit 1
+}
 readonly BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &>/dev/null && pwd -P)" || {
     printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$BASE_BASH_LIBS_STD_SOURCE_PATH'." >&2
     return 1 2>/dev/null || exit 1
 }
+readonly BASE_BASH_LIBS_MODULE_ROOT="$BASE_BASH_LIBS_STD_ROOT/lib/bash"
 BASE_BASH_LIBS_VERSION="$(__base_bash_libs_std_read_package_version__ "$BASE_BASH_LIBS_STD_SOURCE_PATH")" || {
     return 1 2>/dev/null || exit 1
 }
 readonly BASE_BASH_LIBS_VERSION
 readonly BASE_BASH_LIBS_STD_SOURCE_VERSION="$BASE_BASH_LIBS_VERSION"
 readonly BASE_BASH_LIBS_STD_SOURCE_GUARD=1
+
+__base_bash_libs_std_metadata_file__="$BASE_BASH_LIBS_MODULE_ROOT/base-bash-libs.release"
+__base_bash_libs_std_embedded_commit__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" commit 2>/dev/null || printf '%s' unknown)"
+__base_bash_libs_std_embedded_dirty_state__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" dirty_state 2>/dev/null || printf '%s' unknown)"
+__base_bash_libs_std_embedded_provenance__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" provenance 2>/dev/null || printf '%s' source-archive)"
+
+BASE_BASH_LIBS_COMMIT="$__base_bash_libs_std_embedded_commit__"
+BASE_BASH_LIBS_DIRTY_STATE="$__base_bash_libs_std_embedded_dirty_state__"
+BASE_BASH_LIBS_PROVENANCE="$__base_bash_libs_std_embedded_provenance__"
+if [[ -e "$BASE_BASH_LIBS_STD_ROOT/.git" ]] && command -v git >/dev/null 2>&1; then
+    __base_bash_libs_std_git_commit__="$(git -C "$BASE_BASH_LIBS_STD_ROOT" rev-parse --verify HEAD 2>/dev/null || true)"
+    if [[ "$__base_bash_libs_std_git_commit__" =~ ^[[:xdigit:]]{40}$ ]]; then
+        BASE_BASH_LIBS_COMMIT="$__base_bash_libs_std_git_commit__"
+        if git -C "$BASE_BASH_LIBS_STD_ROOT" diff --quiet -- . 2>/dev/null &&
+            git -C "$BASE_BASH_LIBS_STD_ROOT" diff --cached --quiet -- . 2>/dev/null &&
+            [[ -z "$(git -C "$BASE_BASH_LIBS_STD_ROOT" status --porcelain --untracked-files=all 2>/dev/null)" ]]; then
+            BASE_BASH_LIBS_DIRTY_STATE=clean
+        else
+            BASE_BASH_LIBS_DIRTY_STATE=dirty
+        fi
+        BASE_BASH_LIBS_PROVENANCE=checkout
+    fi
+fi
+readonly BASE_BASH_LIBS_COMMIT BASE_BASH_LIBS_DIRTY_STATE BASE_BASH_LIBS_PROVENANCE
 # Used by companion libraries as a source-order guard. This marker means the
 # definitions and immutable metadata are loaded; it does not imply runtime init.
 # shellcheck disable=SC2034
 readonly BASE_BASH_LIBS_STDLIB_LOADED=1
-unset -f __base_bash_libs_std_read_package_version__
+declare -gA __base_bash_libs_std_import_state=()
+declare -ga __base_bash_libs_std_import_stack=()
+__base_bash_libs_std_import_state["$BASE_BASH_LIBS_STD_SOURCE_PATH"]=loaded
+unset __base_bash_libs_std_metadata_file__ __base_bash_libs_std_embedded_commit__ __base_bash_libs_std_embedded_dirty_state__ __base_bash_libs_std_embedded_provenance__ __base_bash_libs_std_git_commit__
+unset -f __base_bash_libs_std_read_package_version__ __base_bash_libs_std_read_metadata_value__
 
 __base_bash_libs_std_is_dotted_numeric_version__() {
     local version="${1-}" version_re='^[0-9]+([.][0-9]+)*$'
@@ -502,47 +591,146 @@ base_init() {
 ################################################# LIBRARY IMPORTER #####################################################
 
 #
-# base_std_import - Sources one or more other library files.
+# base_std_import - Sources package-relative library files.
 #
-# This function provides a robust way to include other shell libraries. It handles
-# both absolute and relative paths. Relative paths are resolved from the directory
-# of the main script that sourced this library.
+# Every supported consumer uses this loader. Paths are relative to the loaded
+# package's `lib/bash` root, never to the caller's cwd or script directory. The
+# loader validates the path, resolves symlinks, rejects package-root escapes,
+# tracks loading state, and sources each module at most once. During source,
+# top-level `declare` statements are promoted to globals so module authors do
+# not need function-scope implementation knowledge; declarations in functions
+# retain their normal Bash behavior after the module is loaded.
 #
 # Usage:
-#   base_std_import /path/to/absolute/lib.sh
-#   base_std_import relative/path/to/lib2.sh
-#
-# IMPORTANT NOTE: If your library has global variables declared with 'declare',
-# you must add the -g flag (e.g., `declare -gA my_map`). Since the library is
-# sourced inside this function, globals declared without -g would become local
-# to the function and be unavailable to other functions.
+#   base_std_import str/lib_str.sh
+#   base_std_import file/lib_file.sh git/lib_git.sh
 #
 base_std_import() {
-    local lib import_path source_status
-    for lib; do
-        import_path="$lib"
-        if [[ "$lib" != /* ]]; then
-           [[ -n "${BASE_BASH_LIBS_SCRIPT_DIR-}" ]] || {
-               base_std_log_error -l base_bash_libs.std \
-                   "base_std_import: base_init must run before relative imports."
-               return 2
-           }
-           import_path="$BASE_BASH_LIBS_SCRIPT_DIR/$lib"
-        fi
-        if [[ -f "$import_path" ]]; then
-            # shellcheck disable=SC1090
-            if source "$import_path"; then
-                :
-            else
-                source_status=$?
+    local module import_path canonical_path module_root source_status saved_declare component
+    local -a components=()
+
+    (($# > 0)) || {
+        base_std_log_error -l base_bash_libs.std \
+            "base_std_import: expected one or more package-relative module paths."
+        return 2
+    }
+
+    module_root="$(cd -P -- "$BASE_BASH_LIBS_MODULE_ROOT" 2>/dev/null && pwd -P)" || {
+        base_std_log_error -l base_bash_libs.std \
+            "base_std_import: package module root '$BASE_BASH_LIBS_MODULE_ROOT' is unavailable."
+        return 1
+    }
+
+    for module; do
+        [[ -n "$module" && "$module" != /* && "$module" != *$'\n'* && "$module" != *$'\r'* ]] || {
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: '$module' is not a package-relative module path."
+            return 2
+        }
+        [[ "$module" == *.sh ]] || {
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: module '$module' is not a shell library path."
+            return 2
+        }
+        case "$module" in
+            *'//'|/*|*/|./*|*/./*|.|..|../*|*/..|*/../*|*[^A-Za-z0-9_./-]*|*.sh/*)
                 base_std_log_error -l base_bash_libs.std \
-                    "Import of library '$lib' failed (status $source_status)."
-                return "$source_status"
-            fi
-        else
-            base_std_log_error -l base_bash_libs.std "Library '$lib' does not exist."
+                    "base_std_import: refusing unsafe package-relative path '$module'."
+                return 2
+                ;;
+        esac
+        IFS=/ read -r -a components <<<"$module"
+        ((${#components[@]} > 0)) || return 2
+        for component in "${components[@]}"; do
+            [[ "$component" != "" && "$component" != "." && "$component" != ".." ]] || {
+                base_std_log_error -l base_bash_libs.std \
+                    "base_std_import: refusing unsafe package-relative path '$module'."
+                return 2
+            }
+        done
+
+        import_path="$module_root/$module"
+        [[ -f "$import_path" ]] || {
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: module '$module' does not exist under '$module_root'."
             return 1
+        }
+        canonical_path="$(__base_bash_libs_std_resolve_file_path__ "$import_path" 2>/dev/null || true)"
+        [[ -n "$canonical_path" ]] || {
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: unable to resolve module '$module'."
+            return 1
+        }
+        case "$canonical_path" in
+            "$module_root"/*) ;;
+            *)
+                base_std_log_error -l base_bash_libs.std \
+                    "base_std_import: refusing module '$module' because its symlink resolves outside '$module_root'."
+                return 2
+                ;;
+        esac
+
+        case "${__base_bash_libs_std_import_state[$canonical_path]-}" in
+            loaded)
+                continue
+                ;;
+            loading)
+                base_std_log_error -l base_bash_libs.std \
+                    "base_std_import: dependency cycle detected while loading '$module'."
+                return 2
+                ;;
+        esac
+
+        [[ "$canonical_path" == "$BASE_BASH_LIBS_STD_SOURCE_PATH" ||
+            "${BASE_BASH_LIBS_STDLIB_LOADED:-}" == "1" ]] || {
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: module '$module' requires the std library dependency."
+            return 2
+        }
+
+        __base_bash_libs_std_import_state["$canonical_path"]=loading
+        __base_bash_libs_std_import_stack+=("$canonical_path")
+
+        # Bash scopes `declare` variables to this function when a file is
+        # sourced from here. A short-lived builtin wrapper makes module-level
+        # declarations global while leaving function bodies and caller state
+        # untouched. Preserve an intentionally caller-defined declare function.
+        # shellcheck disable=SC2316
+        saved_declare="$(builtin declare -f declare 2>/dev/null || true)"
+        declare() {
+            case "${1-}" in
+                -p|-F|-f)
+                    builtin declare "$@"
+                    ;;
+                *)
+                    case "${1-}" in
+                        -g|--*) builtin declare "$@" ;;
+                        *) builtin declare -g "$@" ;;
+                    esac
+                    ;;
+            esac
+        }
+
+        # shellcheck disable=SC1090
+        if source "$canonical_path"; then
+            source_status=0
+        else
+            source_status=$?
         fi
+
+        unset -f declare
+        if [[ -n "$saved_declare" ]]; then
+            eval "$saved_declare"
+        fi
+        __base_bash_libs_std_import_stack=()
+
+        if ((source_status != 0)); then
+            unset '__base_bash_libs_std_import_state['"$canonical_path"']'
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: module '$module' failed to load (status $source_status)."
+            return "$source_status"
+        fi
+        __base_bash_libs_std_import_state["$canonical_path"]=loaded
     done
     return 0
 }

@@ -74,7 +74,31 @@ Each public function documents the following dimensions in its module README:
   through the shared cleanup registry, and atomic file replacement is used
   where the operation mutates an existing file.
 
-## 4. Interactive behavior
+## 4. Import and package identity
+
+`base_std_import <module>...` is the only module-loading contract. Each module
+argument is relative to the loaded package's `lib/bash` root (for example,
+`str/lib_str.sh`); absolute paths and paths containing traversal components are
+invalid. The loader resolves symlinks before checking that the target remains
+inside that root, records `loading`/`loaded` state for idempotence and cycle
+detection, and requires the std dependency before companion modules. Imports do
+not depend on cwd, application script directory, Homebrew's `libexec` layout,
+or the location of a vendored copy.
+
+The loader promotes top-level module `declare` statements to global
+declarations while the source file is evaluated, eliminating the function-
+scoped sourcing footgun without changing declarations executed later inside
+public functions. Every module remains one physical sourceable `.sh` file.
+
+`lib/bash/base-bash-libs.release` carries the embedded release identity used
+when a copied, vendored, source-archive, Homebrew, or standalone artifact has
+no repository `VERSION` file. `BASE_BASH_LIBS_COMMIT` and
+`BASE_BASH_LIBS_DIRTY_STATE` report checkout provenance distinctly from the
+artifact's version; unknown values are explicit rather than inferred from cwd.
+Loading a second stdlib from another major version is rejected with migration
+guidance. v1 inputs are never fallback-loaded into a v2 module graph.
+
+## 5. Interactive behavior
 
 `base_std_ask_yes_no MESSAGE [yes|no]` defaults to `no` and displays `[y/N]`;
 passing `yes` displays `[Y/n]`. `y`/`n` are accepted case-insensitively, and
@@ -83,7 +107,7 @@ Enter accepts the displayed default. Invalid input is reprompted. Missing
 `base_std_wait_for_enter` has the same non-TTY/EOF rule. Neither API reads from
 or mutates the caller's ordinary stdin stream.
 
-## 5. File mutation guarantees
+## 6. File mutation guarantees
 
 `base_file_update_file_section` is idempotent and uses a temporary file followed
 by an atomic replacement. It resolves symlinks to edit the referent while
@@ -94,7 +118,7 @@ read. A concurrent change returns status `6` and leaves the newer target
 untouched. A failed read, copy, permission preservation, or commit returns a
 recoverable nonzero status and never reports success.
 
-## 6. Complete public-surface audit
+## 7. Complete public-surface audit
 
 The following is the complete v2 surface. The module README is the detailed
 signature/effects reference; this table makes coverage auditable.
@@ -102,7 +126,7 @@ signature/effects reference; this table makes coverage auditable.
 | Module | Public functions | Default result/effect contract |
 | --- | --- | --- |
 | lifecycle | `base_init`, `base_require_version` | Return recoverable setup/version statuses; initialize caller-owned state only once. |
-| std predicates and setup | `base_std_is_interactive`, `base_std_check_bash_version`, `base_std_import`, `base_std_add_to_path`, `base_std_dedupe_path`, `base_std_print_path`, `base_std_set_log_level`, `base_std_set_log_category_level`, `base_std_log_is_enabled` | Predicates return `0/1`; import and configuration return `0/1/2`; PATH and log settings intentionally mutate their documented state. |
+| std predicates and setup | `base_std_is_interactive`, `base_std_check_bash_version`, `base_std_import`, `base_std_add_to_path`, `base_std_dedupe_path`, `base_std_print_path`, `base_std_set_log_level`, `base_std_set_log_category_level`, `base_std_log_is_enabled` | Predicates return `0/1`; package-relative import and configuration return `0/1/2`; imports are idempotent, dependency-aware, cycle-safe, cwd-independent, and reject traversal/package-root escape; PATH and log settings intentionally mutate their documented state. |
 | std logging and display | `base_std_log_fatal`, `base_std_log_error`, `base_std_log_warn`, `base_std_log_info`, `base_std_log_debug`, `base_std_log_verbose`, `base_std_log_info_file`, `base_std_log_debug_file`, `base_std_log_verbose_file`, `base_std_log_info_enter`, `base_std_log_debug_enter`, `base_std_log_verbose_enter`, `base_std_log_info_leave`, `base_std_log_debug_leave`, `base_std_log_verbose_leave`, `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, `base_std_print_success`, `base_std_print_bold`, `base_std_print_message`, `base_std_print_tty`, `base_std_dump_trace` | Diagnostics use stderr; explicit print/data helpers use stdout as documented; logging itself does not terminate. |
 | std process/error | `base_std_exit_if_error`, `base_std_fatal_error`, `base_std_is_dry_run`, `base_std_run` | The two explicitly named fatal helpers terminate; dry-run is a predicate; `run` returns command/timeout/supervisor status and never hides diagnostics. |
 | std filesystem/cleanup | `base_std_safe_mkdir`, `base_std_safe_touch`, `base_std_safe_truncate`, `base_std_register_cleanup_hook`, `base_std_unregister_cleanup_hook`, `base_std_register_cleanup_path`, `base_std_unregister_cleanup_path`, `base_std_make_temp_file`, `base_std_make_temp_dir` | Mutators return recoverable failures; cleanup/temp APIs mutate only their documented registry and owned paths. |
@@ -116,7 +140,7 @@ signature/effects reference; this table makes coverage auditable.
 | list | `base_list_append`, `base_list_prepend`, `base_list_remove`, `base_list_contains`, `base_list_unique`, `base_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |
 | launcher | `base_launcher_die`, `base_launcher_resolve_path`, `base_launcher_package_root`, `base_launcher_ensure_supported_bash`, `base_launcher_lib_dir_is_usable`, `base_launcher_resolve_lib_dir`, `base_launcher_source_stdlib`, `base_launcher_import_base_bash_lib`, `base_launcher_run_script`, `base_launcher_usage` | Entrypoint helpers may terminate only at the executable process boundary; path and usability helpers return status. `main` remains application-defined. |
 
-## 7. v1.4.0 → v2 migration inventory
+## 8. v1.4.0 → v2 migration inventory
 
 This release line is a deliberate clean break. There are no generic aliases and
 no inconsistent legacy behavior retained for compatibility.

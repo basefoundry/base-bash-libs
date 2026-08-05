@@ -73,8 +73,9 @@ such output names are rejected before caller state is changed.
 - `base_std_check_bash_version`: returns zero for Bash 4.2 or newer and reports the
   required version otherwise.
 - `base_std_is_interactive`: returns zero when stdin is attached to an interactive TTY.
-- `base_std_import <path>`: sources a relative path from `BASE_BASH_LIBS_SCRIPT_DIR` or an
-  absolute path; returns a recoverable failure when the library cannot be sourced.
+- `base_std_import <path>...`: sources package-relative modules from the loaded
+  `lib/bash` root; returns a recoverable failure for missing, unsafe, cyclic,
+  or failed imports.
 - `base_std_get_my_source_dir <result_var>`: stores the caller script directory in a
   validated variable without printing it.
 
@@ -220,7 +221,7 @@ main "${app_args[@]}"
 ```
 
 The first argument is a caller-declared indexed array. Optional `--source`
-identifies the application script for relative imports and diagnostics. The
+identifies the application script for diagnostics and runtime context. The
 arguments after the configuration separator `--` are copied into the result
 array after these wrapper controls are consumed:
 
@@ -239,7 +240,13 @@ imported after initialization.
 Caller-visible metadata:
 
 - `BASE_BASH_LIBS_VERSION`: readonly package version read from the root
-  `VERSION` file
+  `VERSION` file when present, otherwise from the embedded
+  `lib/bash/base-bash-libs.release` metadata
+- `BASE_BASH_LIBS_COMMIT`: readonly full checkout commit or embedded release
+  commit; `unknown` when no identity is available
+- `BASE_BASH_LIBS_DIRTY_STATE`: readonly `clean`, `dirty`, or `unknown`
+- `BASE_BASH_LIBS_PROVENANCE`: readonly `checkout`, `release-artifact`,
+  `source-archive`, `copy`, or `unknown`
 - `BASE_BASH_LIBS_STDLIB_LOADED`: readonly marker set to `1` after
   `lib_std.sh` has loaded successfully; it does not imply runtime init
 - `BASE_BASH_LIBS_SCRIPT_ARGS`: original arguments before wrapper flags were stripped
@@ -602,24 +609,21 @@ redaction rules as other framework diagnostics.
 
 ## Importing Other Bash Libraries
 
-Use `base_std_import` to source helper libraries:
+Use `base_std_import` to source package-relative helper libraries:
 
 ```bash
 base_std_import file/lib_file.sh
-base_std_import /absolute/path/to/another_lib.sh
+base_std_import git/lib_git.sh str/lib_str.sh
 ```
 
-Relative imports resolve from `BASE_BASH_LIBS_SCRIPT_DIR`, which is the directory of the
-script being bootstrapped.
-
-Important Bash detail: imported files are sourced inside the `base_std_import` function.
-If an imported library needs global variables, declare them with `-g`:
-
-```bash
-declare -gA MY_LOOKUP=()
-```
-
-Without `-g`, Bash may create locals scoped to the base_std_import function.
+Imports resolve from the loaded package's `lib/bash` directory, independent of
+the caller's cwd or `BASE_BASH_LIBS_SCRIPT_DIR`. Absolute paths, traversal, and
+package-root-escaping symlinks are rejected. Imports are idempotent and cycle-
+safe, and every non-stdlib module requires the already-loaded std dependency.
+The loader makes top-level `declare` statements global while sourcing a module,
+so module authors do not need `declare -g` solely because the loader is a
+function. Declarations executed later inside functions retain normal Bash
+scope rules.
 
 ## PATH Helpers
 

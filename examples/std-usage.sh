@@ -8,7 +8,7 @@ source "$repo_root/lib/bash/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 
-base_std_import "$repo_root/lib/bash/file/lib_file.sh"
+base_std_import file/lib_file.sh
 
 example_file="${TMPDIR:-/tmp}/base-bash-libs-example.$$"
 trap 'rm -f "$example_file"' EXIT
