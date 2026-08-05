@@ -15,6 +15,12 @@ base_launcher_die() {
     exit 1
 }
 
+__base_bash_libs_launcher_usage_error__() {
+    printf 'ERROR: %s\n' "$*" >&2
+    base_launcher_usage >&2
+    return 2
+}
+
 base_launcher_resolve_path() {
     local source_path="${1:-}"
     local link_dir
@@ -63,11 +69,9 @@ base_launcher_package_root() {
 base_launcher_ensure_supported_bash() {
     local candidate
     local candidates=()
-    local current_version
     local display_version
 
-    current_version="${BASE_BASH_LIBS_TEST_BASH_VERSION:-${BASH_VERSINFO[0]}${BASH_VERSINFO[1]}}"
-    ((current_version >= 42)) && return 0
+    __base_bash_libs_launcher_bash_is_supported__ && return 0
 
     if [[ -n "${BASE_BASH_LIBS_TEST_BASH_CANDIDATES:-}" ]]; then
         IFS=: read -r -a candidates <<<"$BASE_BASH_LIBS_TEST_BASH_CANDIDATES"
@@ -83,17 +87,43 @@ base_launcher_ensure_supported_bash() {
         exec "$candidate" "$0" "$@"
     done
 
-    if [[ -n "${BASE_BASH_LIBS_TEST_BASH_VERSION:-}" ]]; then
-        display_version="${BASE_BASH_LIBS_TEST_BASH_VERSION:0:1}.${BASE_BASH_LIBS_TEST_BASH_VERSION:1}"
-    else
-        display_version="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
-    fi
+    display_version="$(__base_bash_libs_launcher_bash_display_version__)"
 
     {
         printf 'ERROR: base-bash requires Bash 4.2 or newer; current version is %s.\n' "$display_version"
         printf 'A supported Bash was not found at /opt/homebrew/bin/bash or /usr/local/bin/bash.\n'
     } >&2
     exit 1
+}
+
+__base_bash_libs_launcher_bash_parts__() {
+    local raw="${BASE_BASH_LIBS_TEST_BASH_VERSION:-${BASH_VERSINFO[0]}${BASH_VERSINFO[1]}}"
+    local major minor
+
+    if [[ "$raw" == *.* ]]; then
+        major="${raw%%.*}"
+        minor="${raw#*.}"
+    else
+        major="${raw:0:1}"
+        minor="${raw:1}"
+    fi
+    [[ "$major" =~ ^[0-9]+$ ]] || major=0
+    [[ "$minor" =~ ^[0-9]+$ ]] || minor=0
+    printf '%s\t%s\n' "$major" "$minor"
+}
+
+__base_bash_libs_launcher_bash_is_supported__() {
+    local major minor
+
+    IFS=$'\t' read -r major minor < <(__base_bash_libs_launcher_bash_parts__)
+    ((10#$major > 4 || (10#$major == 4 && 10#$minor >= 2)))
+}
+
+__base_bash_libs_launcher_bash_display_version__() {
+    local major minor
+
+    IFS=$'\t' read -r major minor < <(__base_bash_libs_launcher_bash_parts__)
+    printf '%s.%s\n' "$major" "$minor"
 }
 
 base_launcher_lib_dir_is_usable() {
@@ -129,7 +159,7 @@ base_launcher_resolve_lib_dir() {
 base_launcher_source_stdlib() {
     local stdlib_path="$BASE_BASH_LIBS_DIR/std/lib_std.sh"
     # shellcheck source=/dev/null
-    source "$stdlib_path" || exit $?
+    source "$stdlib_path"
 }
 
 base_launcher_import_base_bash_lib() {
@@ -146,12 +176,15 @@ base_launcher_run_script() {
     local -a runtime_args=()
     shift 2
 
-    [[ -f "$script_path" ]] || base_launcher_die "Script '$script_path' was not found."
+    [[ -f "$script_path" ]] || {
+        __base_bash_libs_launcher_usage_error__ "Script '$script_path' was not found."
+        return $?
+    }
 
     BASE_BASH_LIBS_DIR="$(base_launcher_resolve_lib_dir "$package_root")" || exit $?
     export BASE_BASH_LIBS_DIR
 
-    base_launcher_source_stdlib
+    base_launcher_source_stdlib || exit $?
     base_init runtime_args --source "$script_path" -- "$@" || exit $?
 
     unset -f main
@@ -167,29 +200,252 @@ base_launcher_run_script() {
 }
 
 base_launcher_usage() {
-    cat >&2 <<'EOF'
+    cat <<'EOF'
 Usage:
-  base-bash <script> [args...]
+  base-bash [--help|--version]
+  base-bash check
+  base-bash [--] <script> [args...]
 
-Run a Bash script with base-bash-libs stdlib preloaded.
+Commands:
+  --help       Show this help and exit successfully.
+  --version    Show launcher and loaded package provenance.
+  check        Diagnose Bash support, package health, imports, and tools.
+
+Run a Bash script with base-bash-libs preloaded. Arguments after the script
+are passed unchanged; use -- before a script whose path begins with a dash.
 EOF
+}
+
+__base_bash_libs_launcher_check_usage__() {
+    cat <<'EOF'
+Usage:
+  base-bash check
+
+Diagnose the launcher, loaded package identity, module imports, Bash support,
+and required or optional external tools without running an application.
+EOF
+}
+
+__base_bash_libs_launcher_metadata_value__() {
+    local metadata_file="$1"
+    local metadata_key="$2"
+
+    [[ -r "$metadata_file" ]] || return 1
+    sed -n "s/^${metadata_key}=//p" "$metadata_file" | sed -n '1p'
+}
+
+__base_bash_libs_launcher_metadata_root__() {
+    local lib_dir="$1"
+
+    cd -- "$lib_dir/../.." && pwd -P
+}
+
+__base_bash_libs_launcher_print_version__() {
+    local lib_dir="$1"
+    local metadata_root metadata_file version commit dirty_state provenance
+
+    metadata_root="$(__base_bash_libs_launcher_metadata_root__ "$lib_dir")" || return 1
+    metadata_file="$lib_dir/base-bash-libs.release"
+    version=""
+    if [[ -r "$metadata_root/VERSION" ]]; then
+        IFS= read -r version < "$metadata_root/VERSION" || true
+    fi
+    version="${version:-$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" version 2>/dev/null || true)}"
+    [[ -n "$version" ]] || {
+        printf 'ERROR: Unable to determine the base-bash-libs package version.\n' >&2
+        return 1
+    }
+
+    commit="$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" commit 2>/dev/null || printf '%s' unknown)"
+    dirty_state="$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" dirty_state 2>/dev/null || printf '%s' unknown)"
+    provenance="$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" provenance 2>/dev/null || printf '%s' unknown)"
+
+    if __base_bash_libs_launcher_bash_is_supported__; then
+        BASE_BASH_LIBS_DIR="$lib_dir"
+        export BASE_BASH_LIBS_DIR
+        if base_launcher_source_stdlib 2>/dev/null; then
+            commit="$BASE_BASH_LIBS_COMMIT"
+            dirty_state="$BASE_BASH_LIBS_DIRTY_STATE"
+            provenance="$BASE_BASH_LIBS_PROVENANCE"
+        fi
+    fi
+
+    printf 'base-bash %s\n' "$version"
+    printf 'commit: %s\n' "$commit"
+    printf 'dirty-state: %s\n' "$dirty_state"
+    printf 'provenance: %s\n' "$provenance"
+}
+
+__base_bash_libs_launcher_check_tool__() {
+    local tool="$1"
+    local required="$2"
+    local resolved_path
+
+    if resolved_path="$(command -v -- "$tool" 2>/dev/null)"; then
+        printf 'OK tool/%s: %s\n' "$tool" "$resolved_path"
+        return 0
+    fi
+    if [[ "$required" == 1 ]]; then
+        printf 'ERROR tool/%s: not found; install or expose it on PATH.\n' "$tool"
+        return 1
+    fi
+    printf 'WARN tool/%s: not found; related optional helpers may be unavailable.\n' "$tool"
+}
+
+__base_bash_libs_launcher_check_lib_dir__() {
+    local package_root="$1"
+    local explicit_dir="${BASE_BASH_LIBS_DIR:-}"
+    local candidate
+
+    if [[ -n "$explicit_dir" ]]; then
+        if base_launcher_lib_dir_is_usable "$explicit_dir"; then
+            printf '%s\n' "$(cd -L -- "$explicit_dir" && pwd -L)"
+            return 0
+        fi
+        printf 'ERROR package: BASE_BASH_LIBS_DIR %s does not contain std/lib_std.sh.\n' "$explicit_dir" >&2
+        return 1
+    fi
+
+    for candidate in "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
+        if base_launcher_lib_dir_is_usable "$candidate"; then
+            printf '%s\n' "$(cd -L -- "$candidate" && pwd -L)"
+            return 0
+        fi
+    done
+    printf 'ERROR package: no usable lib/bash directory was found under %s.\n' "$package_root" >&2
+    return 1
+}
+
+__base_bash_libs_launcher_check__() {
+    local package_root="$1"
+    local launcher_path
+    local lib_dir
+    local check_status=0
+    local import_status
+    local module
+    local -a required_tools=(bash awk basename cat cp date dirname grep mktemp mv readlink rm sed)
+    local -a optional_tools=(git gh timeout gtimeout)
+    local -a modules=(file/lib_file.sh git/lib_git.sh gh/lib_gh.sh str/lib_str.sh arg/lib_arg.sh list/lib_list.sh cli/lib_cli.sh)
+
+    if ! __base_bash_libs_launcher_bash_is_supported__; then
+        printf 'ERROR bash: Bash %s is unsupported; Bash 4.2 or newer is required.\n' \
+            "$(__base_bash_libs_launcher_bash_display_version__)"
+        check_status=1
+    else
+        printf 'OK bash: Bash %s is supported.\n' "$BASH_VERSION"
+    fi
+
+    launcher_path="$(base_launcher_resolve_path "$0" 2>/dev/null || true)"
+    if [[ -x "$launcher_path" ]]; then
+        printf 'OK installation: launcher=%s\n' "$launcher_path"
+    else
+        printf 'ERROR installation: launcher path could not be resolved or is not executable.\n'
+        check_status=1
+    fi
+
+    lib_dir="$(__base_bash_libs_launcher_check_lib_dir__ "$package_root")" || {
+        check_status=1
+        lib_dir=""
+    }
+
+    for module in "${required_tools[@]}"; do
+        __base_bash_libs_launcher_check_tool__ "$module" 1 || check_status=1
+    done
+    for module in "${optional_tools[@]}"; do
+        __base_bash_libs_launcher_check_tool__ "$module" 0 || check_status=1
+    done
+
+    [[ -n "$lib_dir" ]] || return "$check_status"
+    if ! __base_bash_libs_launcher_bash_is_supported__; then
+        printf 'SKIP package: cannot source the v2 package under an unsupported Bash.\n'
+        return "$check_status"
+    fi
+
+    BASE_BASH_LIBS_DIR="$lib_dir"
+    export BASE_BASH_LIBS_DIR
+    if ! base_launcher_source_stdlib 2>/dev/null; then
+        printf 'ERROR package: stdlib could not be sourced from %s.\n' "$lib_dir"
+        return 1
+    fi
+    if [[ -n "${BASE_BASH_LIBS_VERSION:-}" &&
+        -n "${BASE_BASH_LIBS_COMMIT:-}" &&
+        -n "${BASE_BASH_LIBS_DIRTY_STATE:-}" &&
+        -n "${BASE_BASH_LIBS_PROVENANCE:-}" ]]; then
+        printf 'OK package: base-bash-libs %s (commit=%s dirty-state=%s provenance=%s)\n' \
+            "$BASE_BASH_LIBS_VERSION" "$BASE_BASH_LIBS_COMMIT" \
+            "$BASE_BASH_LIBS_DIRTY_STATE" "$BASE_BASH_LIBS_PROVENANCE"
+    else
+        printf 'ERROR package: loaded package identity is incomplete.\n'
+        check_status=1
+    fi
+
+    if base_std_import "${modules[@]}" 2>/dev/null; then
+        printf 'OK imports: std plus %s companion modules loaded.\n' "${#modules[@]}"
+    else
+        import_status=$?
+        printf 'ERROR imports: companion module validation failed (status %s).\n' "$import_status"
+        check_status=1
+    fi
+    return "$check_status"
 }
 
 main() {
     local package_root
     local script_path
 
-    base_launcher_ensure_supported_bash "$@"
-    package_root="$(base_launcher_package_root)" || base_launcher_die "Unable to resolve base-bash-libs package root."
-
     case "${1:-}" in
-        ""|-h|--help|help)
+        -h|--help|help)
+            if (($# != 1)); then
+                __base_bash_libs_launcher_usage_error__ "--help does not accept application arguments."
+                return $?
+            fi
             base_launcher_usage
-            return 2
+            return 0
+            ;;
+        -V|--version)
+            if (($# != 1)); then
+                __base_bash_libs_launcher_usage_error__ "--version does not accept application arguments."
+                return $?
+            fi
+            package_root="$(base_launcher_package_root)" || base_launcher_die "Unable to resolve base-bash-libs package root."
+            BASE_BASH_LIBS_DIR="$(base_launcher_resolve_lib_dir "$package_root")" || return $?
+            __base_bash_libs_launcher_print_version__ "$BASE_BASH_LIBS_DIR"
+            return $?
+            ;;
+        check)
+            shift
+            (($# == 0)) || {
+                __base_bash_libs_launcher_check_usage__ >&2
+                return 2
+            }
+            package_root="$(base_launcher_package_root)" || base_launcher_die "Unable to resolve base-bash-libs package root."
+            __base_bash_libs_launcher_check__ "$package_root"
+            return $?
+            ;;
+        "")
+            __base_bash_libs_launcher_usage_error__ "A script path is required."
+            return $?
+            ;;
+        --)
+            shift
+            (($# > 0)) || {
+                __base_bash_libs_launcher_usage_error__ "A script path is required after --."
+                return $?
+            }
+            ;;
+        --*)
+            __base_bash_libs_launcher_usage_error__ "Unknown launcher option '$1'."
+            return $?
             ;;
     esac
 
-    script_path="$(base_launcher_resolve_path "$1")" || base_launcher_die "Script '$1' was not found."
+    base_launcher_ensure_supported_bash "$@"
+    package_root="$(base_launcher_package_root)" || base_launcher_die "Unable to resolve base-bash-libs package root."
+
+    script_path="$(base_launcher_resolve_path "$1")" || {
+        __base_bash_libs_launcher_usage_error__ "Script '$1' was not found."
+        return $?
+    }
     shift
 
     base_launcher_run_script "$script_path" "$package_root" "$@"

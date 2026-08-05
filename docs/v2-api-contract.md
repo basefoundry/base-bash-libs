@@ -107,7 +107,66 @@ Enter accepts the displayed default. Invalid input is reprompted. Missing
 `base_std_wait_for_enter` has the same non-TTY/EOF rule. Neither API reads from
 or mutates the caller's ordinary stdin stream.
 
-## 6. File mutation guarantees
+## 6. Launcher contract (v2 RC)
+
+`bin/base-bash` is a conventional application launcher. This contract is
+frozen for the v2 release candidate; later v2 changes require an explicit
+contract amendment rather than silently changing process, argv, or output
+semantics.
+
+### Commands and streams
+
+- `base-bash --help` (or `-h`/`help`) writes usage to stdout and returns `0`.
+- `base-bash --version` (or `-V`) writes the launcher/package version,
+  commit, dirty state, and provenance to stdout and returns `0`.
+- `base-bash check` performs a non-mutating diagnostic of Bash support,
+  launcher installation, package identity, companion imports, and required or
+  optional external tools. It writes `OK`, `WARN`, `SKIP`, and `ERROR` records
+  to stdout and returns `0` when required checks pass, otherwise `1`.
+- Missing scripts, unknown launcher options, extra command arguments, and
+  malformed launcher invocations write an explanation and usage to stderr and
+  return `2`. Application failures are not converted into usage errors.
+
+The launcher itself requires Bash 4.2 or newer. On macOS Bash 3.2, a launcher
+invocation that runs an application searches the supported candidate paths and
+re-execs itself with the first usable candidate. `--help`, `--version`, and
+`check` remain diagnostic commands and do not run the application.
+
+### Application lifecycle and argv
+
+For `base-bash [--] <script> [args...]`, the launcher resolves the script and
+package without changing the caller's working directory, sources the stdlib
+once, calls `base_init` once with the script path, sources the application once,
+and calls its `main` function exactly once. The script's arguments retain their
+original boundaries and the return status from `main` (or a fatal application
+failure) is the launcher's status. The launcher does not enable Bash strict
+mode or rewrite application traps/options. A script whose path begins with a
+dash is selected with the launcher's `--` separator; that separator is not
+forwarded to the application.
+
+The shared stdlib cleanup registry composes application cleanup hooks with
+existing `EXIT`, `INT`, and `TERM` traps. Hooks run exactly once, in LIFO order,
+before the launcher exits, while signal-derived statuses remain `130` for INT
+and `143` for TERM.
+
+### One-time wrapper-flag mapping
+
+The current wrapper controls are consumed by `base_init` only before the first
+argument separator. Everything after that separator is literal application
+argv. This mapping is the v2 migration reference:
+
+| Existing control | v2 behavior |
+| --- | --- |
+| `--debug-wrapper` | Enables DEBUG logging and is removed from application argv. |
+| `--verbose-wrapper` | Preserves the deprecated VERBOSE compatibility level and is removed from application argv. |
+| `--utc-wrapper` | Exports UTC logging for the initialized runtime and is removed from application argv. |
+| `--color` | Requests terminal colors and is removed from application argv. |
+| `base_init --` | Stops wrapper parsing; the separator and all following values remain literal application argv. (The launcher's own script-selection `--` is not forwarded.) |
+
+No other launcher option is implicitly forwarded. Applications that need an
+option beginning with `--` should place it after the first application `--`.
+
+## 7. File mutation guarantees
 
 `base_file_update_file_section` is idempotent and uses a temporary file followed
 by an atomic replacement. It resolves symlinks to edit the referent while
@@ -118,7 +177,7 @@ read. A concurrent change returns status `6` and leaves the newer target
 untouched. A failed read, copy, permission preservation, or commit returns a
 recoverable nonzero status and never reports success.
 
-## 7. Complete public-surface audit
+## 8. Complete public-surface audit
 
 The following is the complete v2 surface. The module README is the detailed
 signature/effects reference; this table makes coverage auditable.
@@ -138,9 +197,28 @@ signature/effects reference; this table makes coverage auditable.
 | str | `base_str_lower`, `base_str_upper`, `base_str_ltrim`, `base_str_rtrim`, `base_str_trim`, `base_str_contains`, `base_str_starts_with`, `base_str_ends_with`, `base_str_split`, `base_str_join` | String transforms/predicates preserve caller values until validation succeeds; split/join use validated named outputs. |
 | arg | `base_arg_parse` | Parses into caller-owned validated arrays/maps and leaves them unchanged on failure. |
 | list | `base_list_append`, `base_list_prepend`, `base_list_remove`, `base_list_contains`, `base_list_unique`, `base_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |
+| cli | `base_cli_model_init`, `base_cli_command`, `base_cli_option`, `base_cli_positional`, `base_cli_help`, `base_cli_parse`, `base_cli_run`, `base_cli_complete`, `base_cli_completion_script`, `base_cli_result_get`, `base_cli_result_get_positional`, `base_cli_result_count` | A single declarative model drives nested parsing, aliases, defaults, required/enum/validator/conflict checks, deterministic help, and completion. Successful parses publish fixed `BASE_BASH_LIBS_CLI_RESULT_*` globals; usage and validation errors return status `2`. |
 | launcher | `base_launcher_die`, `base_launcher_resolve_path`, `base_launcher_package_root`, `base_launcher_ensure_supported_bash`, `base_launcher_lib_dir_is_usable`, `base_launcher_resolve_lib_dir`, `base_launcher_source_stdlib`, `base_launcher_import_base_bash_lib`, `base_launcher_run_script`, `base_launcher_usage` | Entrypoint helpers may terminate only at the executable process boundary; path and usability helpers return status. `main` remains application-defined. |
 
-## 8. v1.4.0 → v2 migration inventory
+### Declarative CLI contract
+
+`lib_cli.sh` is the high-level application-facing command contract. The model
+is declared once and is consumed by parsing, validation, help, and completion;
+there is no separate handwritten usage path to drift. Command paths are
+canonical slash-separated names, with aliases accepted at every segment.
+Options support flags, scalar values, repeatable values, defaults, required
+values, enums, Bash-function validators, conflicts, hidden entries, and
+metavars. Positionals preserve boundaries and may be required, defaulted,
+validated, or repeatable (only as the final positional).
+
+`base_arg_parse` remains the low-level array parser for callers that need its
+direct caller-owned output contract. It is not silently replaced. Bashly,
+Argc, Argbash, and similar generators may adapt their build output into the
+native model, but they are optional build-time adapters and never runtime
+dependencies. The runtime stays Bash 4.2-compatible, avoids `eval`, and has no
+mandatory Python, Ruby, Node, or `jq` dependency.
+
+## 9. v1.4.0 → v2 migration inventory
 
 This release line is a deliberate clean break. There are no generic aliases and
 no inconsistent legacy behavior retained for compatibility.
@@ -156,5 +234,5 @@ no inconsistent legacy behavior retained for compatibility.
 
 The symbol-level mapping remains in [`v2-symbol-map.md`](v2-symbol-map.md), and
 the mechanical checker is [`scripts/migrate-v2-symbols`](../scripts/migrate-v2-symbols).
-The next milestone (#225) will derive a machine-readable manifest from this
-audit; any manifest disagreement is a release blocker.
+The machine-readable manifest is the checked-in companion to this audit; any
+manifest disagreement is a release blocker.

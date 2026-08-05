@@ -40,6 +40,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
 - [`lib/bash/list/lib_list.sh`](lib/bash/list/README.md)
   Indexed-array helpers built on the stdlib for in-place mutation,
   membership checks, deduplication, and length results.
+- [`lib/bash/cli/lib_cli.sh`](lib/bash/cli/README.md)
+  Declarative command contracts with nested subcommands, validation, help,
+  completion, and a handler boundary for Bash applications.
 
 See [`lib/bash/README.md`](lib/bash/README.md) for the package layout.
 The v2 API charter, effect/status contract, and complete public-surface audit
@@ -90,6 +93,14 @@ main() {
     base_std_run echo "$name"
 }
 ```
+
+The launcher contract is intentionally conventional: `base-bash --help` and
+`base-bash --version` return `0` with stdout data, `base-bash check` performs a
+non-mutating installation/package diagnostic, and malformed launcher usage
+returns `2` with stderr diagnostics. Use `base-bash --` before a script path
+that begins with `-`; application argv and the application `main` status are
+preserved. See the [v2 launcher contract](docs/v2-api-contract.md#6-launcher-contract-v2-rc)
+for lifecycle, cleanup, signal, and wrapper-flag details.
 
 Load companion libraries with package-relative imports from the loaded package:
 

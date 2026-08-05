@@ -240,6 +240,35 @@ statuses, and side effects are normative in the linked module README and
 - `base_list_remove` — signature: see [`lib/bash/list/README.md`](../lib/bash/list/README.md).
 - `base_list_unique` — signature: see [`lib/bash/list/README.md`](../lib/bash/list/README.md).
 
+### `cli`
+
+- Kind: `sourceable-library`
+- Source: [`lib/bash/cli/lib_cli.sh`](../lib/bash/cli/lib_cli.sh)
+- Documentation: [`lib/bash/cli/README.md`](../lib/bash/cli/README.md)
+- Tests: [`lib/bash/cli/tests/lib_cli.bats`](../lib/bash/cli/tests/lib_cli.bats)
+- Dependencies: `std`
+- Optional commands: `none`
+- Stability: `stable`; since `2.0.0`; deprecated: `false`
+- Inputs: documented per symbol in the module README and API charter
+- Outputs: documented per symbol; parsed results use BASE_BASH_LIBS_CLI_RESULT_* globals and named result variables
+- Statuses: documented per symbol; usage and validation errors return status 2
+- Side effects: documented per symbol; sourcing is passive and completion/help are non-mutating
+
+#### Public symbols
+
+- `base_cli_command` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_complete` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_completion_script` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_help` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_model_init` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_option` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_parse` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_count` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_get` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_result_get_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_run` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+
 ### `launcher`
 
 - Kind: `executable-launcher`
@@ -247,12 +276,12 @@ statuses, and side effects are normative in the linked module README and
 - Documentation: [`docs/v2-api-contract.md`](../docs/v2-api-contract.md)
 - Tests: [`tests/launcher.bats`](../tests/launcher.bats)
 - Dependencies: `std`
-- Optional commands: `bash,basename,dirname,realpath,readlink`
+- Optional commands: `awk,basename,cat,cp,date,dirname,grep,mktemp,mv,readlink,rm,sed,bash,git,gh,timeout,gtimeout`
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
-- Inputs: executable arguments and package paths documented by the launcher
-- Outputs: process status and delegated script output
-- Statuses: launcher boundary may terminate; helpers return documented status
-- Side effects: starts a child script and sources the stdlib at the boundary
+- Inputs: --help, --version, check, or [--] <script> [args...]; BASE_BASH_LIBS_DIR may select a package path
+- Outputs: help/version/check records and delegated script output; application stdout remains application-owned
+- Statuses: help/version 0; check 0 or 1; usage errors 2; delegated application status is preserved
+- Side effects: sources the stdlib and starts the delegated script; check is non-mutating
 
 #### Public symbols
 
