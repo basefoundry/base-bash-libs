@@ -58,6 +58,18 @@ The generic `basectl release` command is not a substitute for this guard. Its
 current manifest contract does not encode this repository's release line,
 artifact, provenance, or GA gates.
 
+Before any real publication attempt, run the repository-owned tag preflight:
+
+```bash
+scripts/release refs --version 2.0.0-rc.1
+```
+
+The preflight checks both `refs/tags/v2.0.0-rc.1` in the local checkout and the
+same tag on `origin`. It fails closed when Git cannot inspect either side or
+when the tag is already present. Published tags are immutable; a stale local
+tag may be removed only after confirming that the remote ref is absent and that
+the local object is the withdrawn July 2026 commit documented below.
+
 ## Withdrawn July 2026 Event
 
 On July 2, 2026, [PR #100](https://github.com/basefoundry/base-bash-libs/pull/100)

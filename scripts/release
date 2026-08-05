@@ -5,7 +5,7 @@
 release_usage() {
     cat >&2 <<'EOF'
 Usage:
-  scripts/release <check|plan|notes|publish> --version <version> [options]
+  scripts/release <check|plan|notes|refs|publish> --version <version> [options]
 
 Allowed release identifiers:
   2.0.0-alpha.N
@@ -16,6 +16,9 @@ Allowed release identifiers:
 N must be a positive integer without leading zeroes. Real publication remains
 locked until the verified-artifact and pre-GA release-candidate gates are
 complete.
+
+The refs command is a read-only preflight that fails closed when the candidate
+tag already exists locally or on origin.
 EOF
 }
 
@@ -38,6 +41,42 @@ release_version_kind() {
     return 1
 }
 
+release_check_tag_refs() {
+    local repo_root="$1"
+    local tag_name="$2"
+    local remote_refs=""
+    local git_status
+
+    if ! command -v git >/dev/null 2>&1; then
+        release_error "Git is required to inspect release tag '$tag_name'."
+        return 1
+    fi
+
+    if git -C "$repo_root" show-ref --verify --quiet "refs/tags/$tag_name"; then
+        release_error "Release tag '$tag_name' already exists in the local repository."
+        release_error "Remove only a confirmed stale local ref before retrying; never retag a published release."
+        return 1
+    else
+        git_status=$?
+        if ((git_status != 1)); then
+            release_error "Unable to inspect the local release tag '$tag_name' (git status $git_status)."
+            return 1
+        fi
+    fi
+
+    if ! remote_refs="$(git -C "$repo_root" ls-remote --tags origin "refs/tags/$tag_name" 2>/dev/null)"; then
+        release_error "Unable to inspect release tag '$tag_name' on origin; refusing to continue."
+        return 1
+    fi
+    if [[ -n "$remote_refs" ]]; then
+        release_error "Release tag '$tag_name' already exists on origin."
+        release_error "Published tags are immutable; choose a new policy-compliant release identifier."
+        return 1
+    fi
+
+    printf 'Release tag %s is absent locally and on origin.\n' "$tag_name"
+}
+
 main() {
     local canonical_manifest
     local command="${1-}"
@@ -57,7 +96,7 @@ main() {
     local seen_yes=0
 
     case "$command" in
-        check|plan|notes|publish)
+        check|plan|notes|refs|publish)
             ;;
         ""|-h|--help|help)
             release_usage
@@ -175,7 +214,13 @@ main() {
         return 1
     }
 
+    if [[ "$command" == "refs" ]]; then
+        release_check_tag_refs "$repo_root" "v$version"
+        return $?
+    fi
+
     if [[ "$command" == "publish" && "$dry_run" -eq 0 ]]; then
+        release_check_tag_refs "$repo_root" "v$version" || return $?
         if [[ "$version_kind" == "prerelease" ]]; then
             release_error "Publishing $version is locked until verified release artifacts and provenance land in #233."
         else

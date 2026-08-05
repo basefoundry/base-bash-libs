@@ -35,11 +35,16 @@ delegating safe operations to Base's generic release machinery.
 7. Sync local `main`, then inspect the release from the repository root:
 
    ```bash
+   scripts/release refs --version X.Y.Z
    scripts/release check --version X.Y.Z --manifest base_manifest.yaml
    scripts/release plan --version X.Y.Z --manifest base_manifest.yaml
    scripts/release notes --version X.Y.Z --manifest base_manifest.yaml
    scripts/release publish --version X.Y.Z --manifest base_manifest.yaml --dry-run
    ```
+
+   The `refs` preflight is mandatory before any real publication attempt. It
+   fails closed if the candidate tag exists locally or on `origin`, or if
+   either side cannot be inspected.
 
 8. Publish only after the readiness checks pass. Use `--yes` only from a
    trusted non-interactive release shell:

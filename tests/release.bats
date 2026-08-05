@@ -8,10 +8,37 @@ setup() {
     RELEASE_DRIVER="$BASE_REPO_ROOT/tests/fixtures/basectl-release-stub"
     RELEASE_CAPTURE="$TEST_TMPDIR/release-driver.out"
     RELEASE_PUBLISH_MARKER="$TEST_TMPDIR/actual-publish"
+    PATH="$BASE_TEST_ORIG_PATH"
+    export PATH
+    RELEASE_REAL_GIT="$(command -v git)"
+    RELEASE_GIT_STUB="$TEST_TMPDIR/git"
     export BASE_BASH_RELEASE_BASECTL="$RELEASE_DRIVER"
     export BASE_BASH_RELEASE_TEST_CAPTURE="$RELEASE_CAPTURE"
     export BASE_BASH_RELEASE_TEST_PUBLISH_MARKER="$RELEASE_PUBLISH_MARKER"
+    export BASE_BASH_RELEASE_TEST_LOCAL_TAG=""
+    export BASE_BASH_RELEASE_TEST_REMOTE_TAG=""
+    export BASE_BASH_RELEASE_TEST_REMOTE_STATUS="ok"
+    export BASE_BASH_RELEASE_REAL_GIT="$RELEASE_REAL_GIT"
 
+    cat >"$RELEASE_GIT_STUB" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${BASE_BASH_RELEASE_TEST_LOCAL_TAG:-}" == present && "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
+    exit 0
+fi
+if [[ "$*" == *"ls-remote --tags origin refs/tags/"* ]]; then
+    if [[ "${BASE_BASH_RELEASE_TEST_REMOTE_STATUS:-ok}" == error ]]; then
+        exit 2
+    fi
+    if [[ "${BASE_BASH_RELEASE_TEST_REMOTE_TAG:-}" == present ]]; then
+        printf 'deadbeef refs/tags/v2.0.0\n'
+    fi
+    exit 0
+fi
+exec "${BASE_BASH_RELEASE_REAL_GIT}" "$@"
+EOF
+    chmod +x "$RELEASE_GIT_STUB"
+    PATH="$TEST_TMPDIR:$BASE_TEST_ORIG_PATH"
+    export PATH
 }
 
 assert_driver_not_called() {
@@ -105,6 +132,43 @@ assert_driver_not_called() {
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"#240 RC rehearsal"* ]]
+    assert_driver_not_called
+}
+
+@test "release refs preflight accepts an unused candidate tag" {
+    bats_run "$RELEASE_SCRIPT" refs --version 2.0.0
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"v2.0.0 is absent locally and on origin"* ]]
+}
+
+@test "release refs preflight rejects a conflicting local tag" {
+    export BASE_BASH_RELEASE_TEST_LOCAL_TAG=present
+
+    bats_run "$RELEASE_SCRIPT" refs --version 2.0.0
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"already exists in the local repository"* ]]
+    [[ "$output" == *"never retag a published release"* ]]
+}
+
+@test "release refs preflight rejects a conflicting remote tag" {
+    export BASE_BASH_RELEASE_TEST_REMOTE_TAG=present
+
+    bats_run "$RELEASE_SCRIPT" refs --version 2.0.0
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"already exists on origin"* ]]
+    [[ "$output" == *"Published tags are immutable"* ]]
+}
+
+@test "release refs preflight fails closed when origin cannot be inspected" {
+    export BASE_BASH_RELEASE_TEST_REMOTE_STATUS=error
+
+    bats_run "$RELEASE_SCRIPT" refs --version 2.0.0
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unable to inspect release tag 'v2.0.0' on origin"* ]]
     assert_driver_not_called
 }
 

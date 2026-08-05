@@ -35,6 +35,7 @@ release_smoke_cleanup() {
 main() {
     local expected_major="${1-}" expected_minor="${2-}" expected_patch="${3-}"
     local script_dir repo_root release_script release_driver capture_path output_path
+    local real_git git_stub
 
     if (($# != 0 && $# != 3)); then
         release_smoke_fail "usage: $0 [expected-major expected-minor expected-patch]"
@@ -67,6 +68,22 @@ main() {
     release_driver="$repo_root/tests/fixtures/basectl-release-stub"
     capture_path="$release_smoke_dir/delegated.out"
     output_path="$release_smoke_dir/command.out"
+    real_git="$(command -v git)" || {
+        release_smoke_fail "Git is required for release-ref preflight smoke."
+        return 1
+    }
+    git_stub="$release_smoke_dir/git"
+    cat >"$git_stub" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == *"ls-remote --tags origin refs/tags/"* ]]; then
+    exit 0
+fi
+exec "${BASE_BASH_RELEASE_REAL_GIT}" "$@"
+EOF
+    chmod +x "$git_stub" || return 1
+    export BASE_BASH_RELEASE_REAL_GIT="$real_git"
+    PATH="$release_smoke_dir:$PATH"
+    export PATH
     export BASE_BASH_RELEASE_BASECTL="$release_driver"
     export BASE_BASH_RELEASE_TEST_CAPTURE="$capture_path"
 
