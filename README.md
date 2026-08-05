@@ -52,6 +52,9 @@ The reusable consumer conformance helpers and offline fixture are in
 [`tests/consumer-kit`](tests/consumer-kit/README.md).
 Deterministic single-file validation and auditable directory bundles are
 provided by [`scripts/library-bundle`](scripts/library-bundle).
+Production-shaped reference applications and transparent startup benchmarks
+are in [`examples/reference-apps`](examples/reference-apps) and
+[`benchmarks/reference-apps.sh`](benchmarks/reference-apps.sh).
 Optional generator, Bats, formatter, and package-channel recipes are in
 [`docs/integrations.md`](docs/integrations.md); they do not add mandatory Core
 dependencies.

@@ -62,6 +62,17 @@ required_files=(
   tests/lint-warnings.sh
   tests/docs-contract.sh
   tests/integrations.bats
+  examples/reference-apps/README.md
+  examples/reference-apps/installer/lib/app.sh
+  examples/reference-apps/installer/tests/app.bats
+  examples/reference-apps/release-helper/lib/app.sh
+  examples/reference-apps/release-helper/tests/app.bats
+  examples/reference-apps/ops-cli/lib/app.sh
+  examples/reference-apps/ops-cli/tests/app.bats
+  examples/reference-apps/verify.sh
+  benchmarks/README.md
+  benchmarks/reference-apps.sh
+  tests/reference-apps.bats
 )
 
 cd "$repo_root" || exit 1
@@ -337,11 +348,17 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   tests/consumer-kit/test_helper.bash \
   tests/consumer-kit/tests/consumer_kit.bats \
   tests/library-bundle.bats \
-  tests/vendor.bats
+  tests/vendor.bats \
   integrations/bashly/base_bashly.sh \
   integrations/bashly/example.sh \
   integrations/bats/base_bats_helper.bash \
-  tests/integrations.bats
+  tests/integrations.bats \
+  examples/reference-apps/installer/lib/app.sh \
+  examples/reference-apps/release-helper/lib/app.sh \
+  examples/reference-apps/ops-cli/lib/app.sh \
+  examples/reference-apps/verify.sh \
+  benchmarks/reference-apps.sh \
+  tests/reference-apps.bats
 
 bats_files=(
   tests/release.bats
@@ -351,6 +368,7 @@ bats_files=(
   tests/library-bundle.bats \
   tests/vendor.bats \
   tests/integrations.bats
+  tests/reference-apps.bats
 )
 manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
 while IFS= read -r file; do
@@ -369,5 +387,6 @@ run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
 run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?
 run_stage "Bashly integration example" integrations/bashly/example.sh candidate >/dev/null || exit $?
+run_stage "reference application smoke" examples/reference-apps/verify.sh >/dev/null || exit $?
 
 printf 'Bash library validation passed.\n'
