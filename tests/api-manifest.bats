@@ -22,9 +22,11 @@ setup() {
     source_symbols="$TEST_TMPDIR/source-symbols"
 
     "$BASE_REPO_ROOT/scripts/api-manifest" symbols | sort -u > "$manifest_symbols"
-    rg -No '^base_[A-Za-z0-9_]+\(\)' \
-        "$BASE_REPO_ROOT/lib/bash" "$BASE_REPO_ROOT/bin/base-bash" |
-        sed -E 's#^.*:([a-zA-Z0-9_]+)\(.*#\1#' | sort -u > "$source_symbols"
+    {
+        grep -h -E '^base_[A-Za-z0-9_]+\(\)' \
+            "$BASE_REPO_ROOT"/lib/bash/*/lib_*.sh
+        grep -h -E '^base_[A-Za-z0-9_]+\(\)' "$BASE_REPO_ROOT/bin/base-bash"
+    } | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)\(.*/\1/' | sort -u > "$source_symbols"
 
     run diff -u "$source_symbols" "$manifest_symbols"
     [ "$status" -eq 0 ]
