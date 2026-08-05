@@ -58,6 +58,9 @@ are in [`examples/reference-apps`](examples/reference-apps) and
 Community participation, independent validation, and maintainer succession are
 documented in [`docs/community.md`](docs/community.md) and
 [`docs/who-uses-base-bash.md`](docs/who-uses-base-bash.md).
+The first-party v2 release handoff is tracked in
+[`first-party-cutover.yaml`](first-party-cutover.yaml) and checked by
+[`scripts/first-party-cutover`](scripts/first-party-cutover).
 Optional generator, Bats, formatter, and package-channel recipes are in
 [`docs/integrations.md`](docs/integrations.md); they do not add mandatory Core
 dependencies.
