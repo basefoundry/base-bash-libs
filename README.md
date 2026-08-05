@@ -64,6 +64,10 @@ The machine-readable module/API contract is in
 [`base_api_manifest.yaml`](base_api_manifest.yaml), with its schema documented
 in [`docs/api-manifest-schema.md`](docs/api-manifest-schema.md) and its
 generated reference in [`docs/api-reference.md`](docs/api-reference.md).
+The supported-runtime, stability, and caller-responsibility contract is in
+[`docs/support-policy.md`](docs/support-policy.md); the security reporting
+process and threat model are in [`SECURITY.md`](SECURITY.md) and
+[`docs/threat-model.md`](docs/threat-model.md).
 
 ## Installation and Usage
 

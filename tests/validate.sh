@@ -11,15 +11,19 @@ required_files=(
   .github/base-project.yml
   LICENSE
   NOTICE
+  SECURITY.md
   base_manifest.yaml
   base_api_manifest.yaml
   docs/versioning-policy.md
+  docs/support-policy.md
+  docs/threat-model.md
   docs/v2-api-contract.md
   docs/v2-symbol-map.md
   docs/api-reference.md
   docs/api-manifest-schema.md
   docs/support-matrix.md
   .github/workflows/project-intake.yml
+  .github/ISSUE_TEMPLATE/config.yml
   .github/workflows/tests.yml
   bin/base-bash
   scripts/release
