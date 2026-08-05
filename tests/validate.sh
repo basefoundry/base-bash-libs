@@ -27,6 +27,14 @@ required_files=(
   docs/api-reference.md
   docs/api-manifest-schema.md
   docs/support-matrix.md
+  docs/integrations.md
+  integrations/bashly/base_bashly.sh
+  integrations/bashly/example.sh
+  integrations/bats/base_bats_helper.bash
+  integrations/project-kit/.shellcheckrc
+  integrations/project-kit/.editorconfig
+  integrations/project-kit/shfmt.conf
+  integrations/package-managers/registry.yaml
   .github/workflows/project-intake.yml
   .github/ISSUE_TEMPLATE/config.yml
   .github/workflows/tests.yml
@@ -53,6 +61,7 @@ required_files=(
   tests/vendor.bats
   tests/lint-warnings.sh
   tests/docs-contract.sh
+  tests/integrations.bats
 )
 
 cd "$repo_root" || exit 1
@@ -329,6 +338,10 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   tests/consumer-kit/tests/consumer_kit.bats \
   tests/library-bundle.bats \
   tests/vendor.bats
+  integrations/bashly/base_bashly.sh \
+  integrations/bashly/example.sh \
+  integrations/bats/base_bats_helper.bash \
+  tests/integrations.bats
 
 bats_files=(
   tests/release.bats
@@ -336,7 +349,8 @@ bats_files=(
   tests/api-manifest.bats
   tests/consumer-kit/tests/consumer_kit.bats
   tests/library-bundle.bats \
-  tests/vendor.bats
+  tests/vendor.bats \
+  tests/integrations.bats
 )
 manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
 while IFS= read -r file; do
@@ -354,5 +368,6 @@ run_stage "release invariants" tests/release-invariants.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
 run_stage "examples/cookbook-cleanup-temp.sh" examples/cookbook-cleanup-temp.sh >/dev/null || exit $?
 run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists-strings.sh >/dev/null || exit $?
+run_stage "Bashly integration example" integrations/bashly/example.sh candidate >/dev/null || exit $?
 
 printf 'Bash library validation passed.\n'

@@ -1,0 +1,13 @@
+schema_version: 1
+artifact: base-bash-libs
+release_policy: immutable-v2-asset-and-sha256
+entries:
+  - name: bpkg
+    status: planned-after-v2-ga
+    install_metadata: publish-only-after-verified-release-asset
+  - name: basher
+    status: planned-after-v2-ga
+    install_metadata: publish-only-after-verified-release-asset
+  - name: basalt
+    status: planned-after-v2-ga
+    install_metadata: publish-only-after-verified-release-asset
