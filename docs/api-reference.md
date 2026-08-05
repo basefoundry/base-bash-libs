@@ -316,6 +316,7 @@ statuses, and side effects are normative in the linked module README and
 
 #### Public symbols
 
+- `base_launcher_check_project` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_die` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_ensure_supported_bash` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
 - `base_launcher_import_base_bash_lib` — signature: see [`docs/v2-api-contract.md`](../docs/v2-api-contract.md).
