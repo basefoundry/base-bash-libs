@@ -38,6 +38,7 @@ lint_files=(
   lib/bash/arg/lib_arg.sh
   lib/bash/list/lib_list.sh
   lib/bash/cli/lib_cli.sh
+  lib/bash/app/lib_app.sh
   lib/bash/tests/test_helper.sh
   tests/launcher.bats
   tests/release.bats

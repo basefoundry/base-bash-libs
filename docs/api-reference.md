@@ -269,6 +269,37 @@ statuses, and side effects are normative in the linked module README and
 - `base_cli_result_get_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_run` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 
+### `app`
+
+- Kind: `sourceable-library`
+- Source: [`lib/bash/app/lib_app.sh`](../lib/bash/app/lib_app.sh)
+- Documentation: [`lib/bash/app/README.md`](../lib/bash/app/README.md)
+- Tests: [`lib/bash/app/tests/lib_app.bats`](../lib/bash/app/tests/lib_app.bats)
+- Dependencies: `std,cli`
+- Optional commands: `none`
+- Stability: `stable`; since `2.0.0`; deprecated: `false`
+- Inputs: documented per symbol in the module README and API charter
+- Outputs: documented per symbol; reports are redacted by the secret attribute
+- Statuses: recoverable failures return status; malformed configuration returns 2
+- Side effects: configuration state and lifecycle hooks are explicit; sourcing is passive
+
+#### Public symbols
+
+- `base_app_add_standard_options` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_apply_standard_options` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_define` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_get` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_load` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_provenance` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_report` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_config_set_cli` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_hook` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_init` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_prompt` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_run` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_should_prompt` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+- `base_app_status` — signature: see [`lib/bash/app/README.md`](../lib/bash/app/README.md).
+
 ### `launcher`
 
 - Kind: `executable-launcher`
