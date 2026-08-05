@@ -49,8 +49,14 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Established the v2 API charter in `docs/v2-api-contract.md`: public
+  functions now use the short `bl_` namespace, ordinary failures return
+  recoverable statuses, interactive defaults are explicit, and file-section
+  updates detect concurrent writers with status `6`. Intentional process
+  termination is limited to explicitly named fatal/exit/assert APIs and the
+  standalone launcher boundary.
 - Made `lib_std.sh` sourcing passive and introduced the explicit, idempotent
-  `base_bash_libs_init` lifecycle API. Wrapper flags now return through a
+  `bl_init` lifecycle API. Wrapper flags now return through a
   caller-owned array without hidden positional-parameter mutation; launchers,
   examples, and companion-library tests initialize explicitly.
 - Namespaced the v2 public API, runtime globals, environment controls, load

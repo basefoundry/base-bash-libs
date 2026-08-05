@@ -6,7 +6,7 @@ setup() {
     setup_test_tmpdir
     source "$BASE_BASH_DIR/std/lib_std.sh"
     declare -a setup_args=()
-    base_bash_libs_init setup_args --source "$BASE_BASH_DIR/file/tests/lib_file.bats" --
+    bl_init setup_args --source "$BASE_BASH_DIR/file/tests/lib_file.bats" --
     source "$BASE_BASH_DIR/file/lib_file.sh"
 }
 
@@ -26,26 +26,26 @@ file_mode() {
     fi
 }
 
-@test "base_bash_libs_file_update_file_section appends a new marked block when markers are absent" {
+@test "bl_file_update_file_section appends a new marked block when markers are absent" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "first" "second"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "first" "second"
 
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\nsecond\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section logs adding when markers are absent" {
+@test "bl_file_update_file_section logs adding when markers are absent" {
     local script="$TEST_TMPDIR/add-log.sh"
     local target="$TEST_TMPDIR/config.txt"
     cat > "$script" <<EOF
 #!/usr/bin/env bash
 source "$BASE_BASH_DIR/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
+bl_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 printf 'line-one' > "\$1"
-base_bash_libs_file_update_file_section "\$1" "# BEGIN" "# END" "first"
+bl_file_update_file_section "\$1" "# BEGIN" "# END" "first"
 EOF
     chmod +x "$script"
 
@@ -57,21 +57,21 @@ EOF
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section appends to an empty file without a leading blank line" {
+@test "bl_file_update_file_section appends to an empty file without a leading blank line" {
     local target="$TEST_TMPDIR/config.txt"
     touch "$target"
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "first"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "first"
 
     [ "$(cat "$target")" = $'# BEGIN\nfirst\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section preserves normal file mode when appending" {
+@test "bl_file_update_file_section preserves normal file mode when appending" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
     chmod 0644 "$target"
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "first"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "first"
 
     [ "$(file_mode "$target")" = "644" ]
     [ "$(cat "$target")" = $'line-one\n# BEGIN\nfirst\n# END' ]
@@ -80,7 +80,7 @@ EOF
 @test "lib_file can be sourced more than once" {
     source "$BASE_BASH_DIR/file/lib_file.sh"
 
-    [ "$(type -t base_bash_libs_file_update_file_section)" = "function" ]
+    [ "$(type -t bl_file_update_file_section)" = "function" ]
 }
 
 @test "lib_file fails clearly when sourced without stdlib" {
@@ -93,14 +93,14 @@ EOF
 }
 
 @test "lib_file requires the stdlib loaded marker" {
-    bats_run bash -c 'base_bash_libs_std_log_error() { :; }; base_bash_libs_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/file/lib_file.sh"
+    bats_run bash -c 'bl_std_log_error() { :; }; bl_std_log_debug() { :; }; source "$1"; rc=$?; printf "source-rc=%s\n" "$rc"; exit "$rc"' bash "$BASE_BASH_DIR/file/lib_file.sh"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"lib_file.sh requires lib_std.sh to be sourced first"* ]]
     [[ "$output" == *"source-rc=1"* ]]
 }
 
-@test "base_bash_libs_file_update_file_section reports zero-argument usage under strict options" {
+@test "bl_file_update_file_section reports zero-argument usage under strict options" {
     local script="$TEST_TMPDIR/update-file-section-usage-strict.sh"
 
     cat > "$script" <<EOF
@@ -108,9 +108,9 @@ EOF
 set -euo pipefail
 source "$BASE_BASH_DIR/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
+bl_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
-base_bash_libs_file_update_file_section
+bl_file_update_file_section
 printf 'after\n'
 EOF
     chmod +x "$script"
@@ -119,12 +119,12 @@ EOF
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Insufficient arguments."* ]]
-    [[ "$output" == *"Usage: base_bash_libs_file_update_file_section"* ]]
+    [[ "$output" == *"Usage: bl_file_update_file_section"* ]]
     [[ "$output" != *"unbound variable"* ]]
     [[ "$output" != *"after"* ]]
 }
 
-@test "base_bash_libs_file_update_file_section accepts empty content under strict options" {
+@test "bl_file_update_file_section accepts empty content under strict options" {
     local script="$TEST_TMPDIR/update-file-section-empty-strict.sh"
     local target="$TEST_TMPDIR/strict-config.txt"
 
@@ -134,9 +134,9 @@ EOF
 set -euo pipefail
 source "$BASE_BASH_DIR/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
+bl_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
-base_bash_libs_file_update_file_section "\$1" "# BEGIN" "# END"
+bl_file_update_file_section "\$1" "# BEGIN" "# END"
 printf 'strict=preserved\n'
 EOF
     chmod +x "$script"
@@ -149,53 +149,53 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section writes option-like markers literally" {
+@test "bl_file_update_file_section writes option-like markers literally" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
 
-    base_bash_libs_file_update_file_section "$target" "-n" "-e" "value"
+    bl_file_update_file_section "$target" "-n" "-e" "value"
 
     [ "$(cat "$target")" = $'line-one\n-n\nvalue\n-e' ]
 }
 
-@test "base_bash_libs_file_update_file_section preserves literal backslashes in markers and content" {
+@test "bl_file_update_file_section preserves literal backslashes in markers and content" {
     local target="$TEST_TMPDIR/config.txt"
     local beginning='\t'
     local ending='\e'
     local replacement='replacement\t'
     printf '%s\nold\n%s\nafter\n' "$beginning" "$ending" > "$target"
 
-    base_bash_libs_file_update_file_section "$target" "$beginning" "$ending" "$replacement"
+    bl_file_update_file_section "$target" "$beginning" "$ending" "$replacement"
 
     printf -v expected '%s\n%s\n%s\nafter' "$beginning" "$replacement" "$ending"
     [ "$(cat "$target")" = "$expected" ]
 }
 
-@test "base_bash_libs_file_update_file_section preserves symlinks while updating their targets" {
+@test "bl_file_update_file_section preserves symlinks while updating their targets" {
     local target="$TEST_TMPDIR/config.txt"
     local link="$TEST_TMPDIR/config-link"
     printf 'before\n# BEGIN\nold\n# END\nafter\n' > "$target"
     ln -s "$(basename "$target")" "$link"
 
-    base_bash_libs_file_update_file_section "$link" "# BEGIN" "# END" "new"
+    bl_file_update_file_section "$link" "# BEGIN" "# END" "new"
 
     [ -L "$link" ]
     [ "$(readlink "$link")" = "$(basename "$target")" ]
     [ "$(cat "$link")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section treats option-like target paths literally" {
+@test "bl_file_update_file_section treats option-like target paths literally" {
     local target="-config.txt"
     pushd "$TEST_TMPDIR" >/dev/null
     printf 'before' > "$target"
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$(cat "./$target")" = $'before\n# BEGIN\nnew\n# END' ]
     popd >/dev/null
 }
 
-@test "base_bash_libs_file_update_file_section replaces the first matching section" {
+@test "bl_file_update_file_section replaces the first matching section" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -205,12 +205,12 @@ old
 after
 EOF
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section ignores marker substrings embedded in longer lines" {
+@test "bl_file_update_file_section ignores marker substrings embedded in longer lines" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -220,12 +220,35 @@ echo # END
 after
 EOF
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$(cat "$target")" = $'before\necho # BEGIN\nold\necho # END\nafter\n# BEGIN\nnew\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section preserves executable file mode when replacing" {
+@test "bl_file_update_file_section rejects a concurrent writer before commit" {
+    local target="$TEST_TMPDIR/config.txt"
+    local stderr_file="$TEST_TMPDIR/concurrent.err"
+
+    printf 'before\n# BEGIN\nold\n# END\nafter\n' > "$target"
+    eval "$(declare -f __base_bash_libs_file_commit_temp__ | sed '1s/__base_bash_libs_file_commit_temp__/__orig_base_bash_libs_file_commit_temp__/')"
+    __base_bash_libs_file_commit_temp__() {
+        printf 'writer-won\n' > "$target"
+        __orig_base_bash_libs_file_commit_temp__ "$@"
+    }
+
+    if bl_file_update_file_section "$target" "# BEGIN" "# END" "new" 2>"$stderr_file"; then
+        return 1
+    else
+        status=$?
+    fi
+
+    unset -f __base_bash_libs_file_commit_temp__ __orig_base_bash_libs_file_commit_temp__
+    [ "$status" -eq 6 ]
+    [ "$(cat "$target")" = "writer-won" ]
+    [[ "$(cat "$stderr_file")" == *"Concurrent modification detected"* ]]
+}
+
+@test "bl_file_update_file_section preserves executable file mode when replacing" {
     local target="$TEST_TMPDIR/script.sh"
     cat <<'EOF' > "$target"
 #!/usr/bin/env bash
@@ -235,14 +258,14 @@ echo old
 EOF
     chmod 0755 "$target"
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "echo new"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "echo new"
 
     [ -x "$target" ]
     [ "$(file_mode "$target")" = "755" ]
     [ "$(cat "$target")" = $'#!/usr/bin/env bash\n# BEGIN\necho new\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section replaces an existing section with multi-line content" {
+@test "bl_file_update_file_section replaces an existing section with multi-line content" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -252,12 +275,12 @@ old
 after
 EOF
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "first" "second" "third"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "first" "second" "third"
 
     [ "$(cat "$target")" = $'before\n# BEGIN\nfirst\nsecond\nthird\n# END\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section registers internal temp files for cleanup" {
+@test "bl_file_update_file_section registers internal temp files for cleanup" {
     local registration_file="$TEST_TMPDIR/registered-cleanup-paths.txt"
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -268,14 +291,14 @@ old
 after
 EOF
 
-    eval "$(declare -f base_bash_libs_std_register_cleanup_path | sed '1s/base_bash_libs_std_register_cleanup_path/__orig_std_register_cleanup_path/')"
-    base_bash_libs_std_register_cleanup_path() {
+    eval "$(declare -f bl_std_register_cleanup_path | sed '1s/bl_std_register_cleanup_path/__orig_std_register_cleanup_path/')"
+    bl_std_register_cleanup_path() {
         printf '%s\n' "$@" >> "$registration_file"
         __orig_std_register_cleanup_path "$@"
     }
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
-    unset -f base_bash_libs_std_register_cleanup_path __orig_std_register_cleanup_path
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    unset -f bl_std_register_cleanup_path __orig_std_register_cleanup_path
 
     [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
     [[ "$(cat "$registration_file")" == *"base-file-section-new."* ]]
@@ -283,7 +306,7 @@ EOF
     [[ "$(cat "$registration_file")" == *"config.txt."* ]]
 }
 
-@test "base_bash_libs_file_update_file_section unregisters temp files after eager cleanup" {
+@test "bl_file_update_file_section unregisters temp files after eager cleanup" {
     local cleanup_path
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -294,7 +317,7 @@ old
 after
 EOF
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     for cleanup_path in "${__base_bash_libs_std_cleanup_paths[@]+"${__base_bash_libs_std_cleanup_paths[@]}"}"; do
         if [[ "$cleanup_path" == *"base-file-section-new."* ||
@@ -306,7 +329,7 @@ EOF
     done
 }
 
-@test "base_bash_libs_file_update_file_section restores a preexisting EXIT trap after transient cleanup" {
+@test "bl_file_update_file_section restores a preexisting EXIT trap after transient cleanup" {
     local script="$TEST_TMPDIR/update-file-section-exit-trap.sh"
     local target="$TEST_TMPDIR/update-file-section-exit-trap.txt"
     local log_file="$TEST_TMPDIR/update-file-section-exit-trap.log"
@@ -316,11 +339,11 @@ EOF
 #!/usr/bin/env bash
 source "$BASE_BASH_DIR/std/lib_std.sh"
 declare -a app_args=()
-base_bash_libs_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
+bl_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
 trap 'printf "caller\n" >> "$log_file"' EXIT
 before_trap="\$(trap -p EXIT)"
-base_bash_libs_file_update_file_section "$target" '# BEGIN' '# END' 'managed'
+bl_file_update_file_section "$target" '# BEGIN' '# END' 'managed'
 after_trap="\$(trap -p EXIT)"
 [[ "\$after_trap" == "\$before_trap" ]]
 EOF
@@ -333,7 +356,7 @@ EOF
     [ "$(cat "$target")" = $'before\n# BEGIN\nmanaged\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section skips unchanged existing section" {
+@test "bl_file_update_file_section skips unchanged existing section" {
     local before_inode
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -346,22 +369,22 @@ after
 EOF
     before_inode="$(file_inode "$target")"
 
-    capture_command base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "same" "content"
+    capture_command bl_file_update_file_section "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"Updating '$target'"* ]]
     [ "$(file_inode "$target")" = "$before_inode" ]
     [ "$(cat "$target")" = $'before\n# BEGIN\nsame\ncontent\n# END\nafter' ]
 
-    base_bash_libs_std_set_log_level DEBUG
-    base_bash_libs_std_set_log_category_level -l base_bash_libs.file DEBUG
-    capture_command base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "same" "content"
+    bl_std_set_log_level DEBUG
+    bl_std_set_log_category_level -l base_bash_libs.file DEBUG
+    capture_command bl_file_update_file_section "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Section already up to date in '$target'."* ]]
 }
 
-@test "base_bash_libs_file_section_exists detects a present marked section" {
+@test "bl_file_section_exists detects a present marked section" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -371,19 +394,19 @@ managed
 after
 EOF
 
-    capture_command base_bash_libs_file_section_exists "$target" "# BEGIN" "# END"
+    capture_command bl_file_section_exists "$target" "# BEGIN" "# END"
 
     [ "$status" -eq 0 ]
 }
 
-@test "base_bash_libs_file_section_exists returns no-change for absent and missing target files" {
+@test "bl_file_section_exists returns no-change for absent and missing target files" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'plain\ncontent\n' > "$target"
 
-    capture_command base_bash_libs_file_section_exists "$target" "# BEGIN" "# END"
+    capture_command bl_file_section_exists "$target" "# BEGIN" "# END"
     [ "$status" -eq 1 ]
 
-    capture_command base_bash_libs_file_section_exists "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END"
+    capture_command bl_file_section_exists "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END"
     [ "$status" -eq 1 ]
 }
 
@@ -391,18 +414,18 @@ EOF
     local target="$TEST_TMPDIR/config.txt"
     printf 'plain\ncontent\n' > "$target"
 
-    capture_command base_bash_libs_file_section_exists "$target" "" "# END"
+    capture_command bl_file_section_exists "$target" "" "# END"
     [ "$status" -eq 2 ]
 
-    capture_command base_bash_libs_file_section_needs_update "$target" "# BEGIN" "# BEGIN"
+    capture_command bl_file_section_needs_update "$target" "# BEGIN" "# BEGIN"
     [ "$status" -eq 2 ]
 
-    capture_command base_bash_libs_file_update_file_section "$target" "# BEGIN" $'# END\nextra' "new"
+    capture_command bl_file_update_file_section "$target" "# BEGIN" $'# END\nextra' "new"
     [ "$status" -eq 1 ]
     [ "$(cat "$target")" = $'plain\ncontent' ]
 }
 
-@test "base_bash_libs_file_section_exists rejects asymmetric markers" {
+@test "bl_file_section_exists rejects asymmetric markers" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -410,13 +433,13 @@ before
 orphaned
 EOF
 
-    bats_run base_bash_libs_file_section_exists "$target" "# BEGIN" "# END"
+    bats_run bl_file_section_exists "$target" "# BEGIN" "# END"
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"Asymmetric markers in '$target': 1 start, 0 end. Manual repair needed."* ]]
 }
 
-@test "base_bash_libs_file_section_exists rejects misordered markers" {
+@test "bl_file_section_exists rejects misordered markers" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -426,13 +449,13 @@ middle
 after
 EOF
 
-    bats_run base_bash_libs_file_section_exists "$target" "# BEGIN" "# END"
+    bats_run bl_file_section_exists "$target" "# BEGIN" "# END"
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"Misordered markers in '$target'. Manual repair needed."* ]]
 }
 
-@test "base_bash_libs_file_section_needs_update detects changed marked section content" {
+@test "bl_file_section_needs_update detects changed marked section content" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -442,12 +465,12 @@ old
 after
 EOF
 
-    capture_command base_bash_libs_file_section_needs_update "$target" "# BEGIN" "# END" "new"
+    capture_command bl_file_section_needs_update "$target" "# BEGIN" "# END" "new"
 
     [ "$status" -eq 0 ]
 }
 
-@test "base_bash_libs_file_section_needs_update returns no-change for matching section content" {
+@test "bl_file_section_needs_update returns no-change for matching section content" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -458,23 +481,23 @@ content
 after
 EOF
 
-    capture_command base_bash_libs_file_section_needs_update "$target" "# BEGIN" "# END" "same" "content"
+    capture_command bl_file_section_needs_update "$target" "# BEGIN" "# END" "same" "content"
 
     [ "$status" -eq 1 ]
 }
 
-@test "base_bash_libs_file_section_needs_update returns change-needed for absent and missing target files" {
+@test "bl_file_section_needs_update returns change-needed for absent and missing target files" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'plain\ncontent\n' > "$target"
 
-    capture_command base_bash_libs_file_section_needs_update "$target" "# BEGIN" "# END" "new"
+    capture_command bl_file_section_needs_update "$target" "# BEGIN" "# END" "new"
     [ "$status" -eq 0 ]
 
-    capture_command base_bash_libs_file_section_needs_update "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END" "new"
+    capture_command bl_file_section_needs_update "$TEST_TMPDIR/missing.txt" "# BEGIN" "# END" "new"
     [ "$status" -eq 0 ]
 }
 
-@test "base_bash_libs_file_update_file_section does not export replacement content to awk" {
+@test "bl_file_update_file_section does not export replacement content to awk" {
     local awk_log="$TEST_TMPDIR/awk-env.log"
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -494,14 +517,14 @@ EOF
         command awk "$@"
     }
 
-    base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "secret" "value"
+    bl_file_update_file_section "$target" "# BEGIN" "# END" "secret" "value"
     unset -f awk
 
     [ "$(cat "$awk_log")" = "not-leaked" ]
     [ "$(cat "$target")" = $'before\n# BEGIN\nsecret\nvalue\n# END\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section removes a marked block with remove option" {
+@test "bl_file_update_file_section removes a marked block with remove option" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -511,12 +534,12 @@ remove-me
 after
 EOF
 
-    base_bash_libs_file_update_file_section -r "$target" "# BEGIN" "# END"
+    bl_file_update_file_section -r "$target" "# BEGIN" "# END"
 
     [ "$(cat "$target")" = $'before\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section removes only the first matching marked block with remove option" {
+@test "bl_file_update_file_section removes only the first matching marked block with remove option" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -530,12 +553,12 @@ keep-me
 after
 EOF
 
-    base_bash_libs_file_update_file_section -r "$target" "# BEGIN" "# END"
+    bl_file_update_file_section -r "$target" "# BEGIN" "# END"
 
     [ "$(cat "$target")" = $'before\nmiddle\n# BEGIN\nkeep-me\n# END\nafter' ]
 }
 
-@test "base_bash_libs_file_update_file_section rejects a section with only a start marker" {
+@test "bl_file_update_file_section rejects a section with only a start marker" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -543,14 +566,14 @@ before
 orphaned
 EOF
 
-    bats_run base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bats_run bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Asymmetric markers in '$target': 1 start, 0 end. Manual repair needed."* ]]
     [ "$(cat "$target")" = $'before\n# BEGIN\norphaned' ]
 }
 
-@test "base_bash_libs_file_update_file_section rejects a section with only an end marker" {
+@test "bl_file_update_file_section rejects a section with only an end marker" {
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
 before
@@ -558,14 +581,14 @@ orphaned
 # END
 EOF
 
-    bats_run base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bats_run bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Asymmetric markers in '$target': 0 start, 1 end. Manual repair needed."* ]]
     [ "$(cat "$target")" = $'before\norphaned\n# END' ]
 }
 
-@test "base_bash_libs_file_update_file_section rejects end markers before start markers" {
+@test "bl_file_update_file_section rejects end markers before start markers" {
     local before
     local target="$TEST_TMPDIR/config.txt"
     cat <<'EOF' > "$target"
@@ -577,33 +600,33 @@ after
 EOF
     before="$(cat "$target")"
 
-    bats_run base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "new"
+    bats_run bl_file_update_file_section "$target" "# BEGIN" "# END" "new"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"Misordered markers in '$target'. Manual repair needed."* ]]
     [ "$(cat "$target")" = "$before" ]
 }
 
-@test "base_bash_libs_file_update_file_section is a no-op for a missing target file" {
+@test "bl_file_update_file_section is a no-op for a missing target file" {
     local target="$TEST_TMPDIR/missing.txt"
 
-    capture_command base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "value"
+    capture_command bl_file_update_file_section "$target" "# BEGIN" "# END" "value"
 
     [ "$status" -eq 0 ]
     [ ! -e "$target" ]
 }
 
-@test "base_bash_libs_file_update_file_section rejects content arguments when removing a section" {
+@test "bl_file_update_file_section rejects content arguments when removing a section" {
     local target="$TEST_TMPDIR/config.txt"
     touch "$target"
 
-    bats_run base_bash_libs_file_update_file_section -r "$target" "# BEGIN" "# END" "unexpected"
+    bats_run bl_file_update_file_section -r "$target" "# BEGIN" "# END" "unexpected"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"When -r flag is used"* ]]
 }
 
-@test "base_bash_libs_file_update_file_section cleans up temp file when initial copy fails" {
+@test "bl_file_update_file_section cleans up temp file when initial copy fails" {
     local target="$TEST_TMPDIR/config.txt"
     printf 'line-one' > "$target"
 
@@ -612,7 +635,7 @@ EOF
         return 1
     }
 
-    capture_command base_bash_libs_file_update_file_section "$target" "# BEGIN" "# END" "value"
+    capture_command bl_file_update_file_section "$target" "# BEGIN" "# END" "value"
     unset -f cp
 
     [ "$status" -eq 1 ]

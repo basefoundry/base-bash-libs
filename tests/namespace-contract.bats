@@ -10,17 +10,17 @@ setup() {
     run env -i PATH="$PATH" bash --noprofile --norc -c '
         source "$1/std/lib_std.sh"
         declare -a init_args=()
-        base_bash_libs_init init_args --source "$1/tests/namespace-contract.bats" --
-        base_bash_libs_std_import "$1/file/lib_file.sh"
-        base_bash_libs_std_import "$1/git/lib_git.sh"
-        base_bash_libs_std_import "$1/gh/lib_gh.sh"
-        base_bash_libs_std_import "$1/str/lib_str.sh"
-        base_bash_libs_std_import "$1/arg/lib_arg.sh"
-        base_bash_libs_std_import "$1/list/lib_list.sh"
+        bl_init init_args --source "$1/tests/namespace-contract.bats" --
+        bl_std_import "$1/file/lib_file.sh"
+        bl_std_import "$1/git/lib_git.sh"
+        bl_std_import "$1/gh/lib_gh.sh"
+        bl_std_import "$1/str/lib_str.sh"
+        bl_std_import "$1/arg/lib_arg.sh"
+        bl_std_import "$1/list/lib_list.sh"
 
         for function_name in $(compgen -A function); do
             case "$function_name" in
-                base_bash_libs_*|__base_bash_libs_*) ;;
+                bl_*|__base_bash_libs_*) ;;
                 *) printf "unprefixed function: %s\n" "$function_name"; exit 1 ;;
             esac
         done
@@ -32,14 +32,14 @@ setup() {
             }
         done
 
-        declare -F base_bash_libs_std_log_info >/dev/null
-        declare -F base_bash_libs_std_run >/dev/null
-        declare -F base_bash_libs_str_trim >/dev/null
-        declare -F base_bash_libs_list_append >/dev/null
-        declare -F base_bash_libs_arg_parse >/dev/null
-        declare -F base_bash_libs_file_update_file_section >/dev/null
-        declare -F base_bash_libs_git_update_repo >/dev/null
-        declare -F base_bash_libs_gh_run >/dev/null
+        declare -F bl_std_log_info >/dev/null
+        declare -F bl_std_run >/dev/null
+        declare -F bl_str_trim >/dev/null
+        declare -F bl_list_append >/dev/null
+        declare -F bl_arg_parse >/dev/null
+        declare -F bl_file_update_file_section >/dev/null
+        declare -F bl_git_update_repo >/dev/null
+        declare -F bl_gh_run >/dev/null
     ' bash "$BASE_BASH_DIR"
 
     [ "$status" -eq 0 ]
@@ -56,15 +56,15 @@ setup() {
 
         source "$1/std/lib_std.sh"
         declare -a init_args=()
-        base_bash_libs_init init_args --source "$1/tests/namespace-contract.bats" --
-        base_bash_libs_std_import "$1/str/lib_str.sh"
+        bl_init init_args --source "$1/tests/namespace-contract.bats" --
+        bl_std_import "$1/str/lib_str.sh"
 
         [[ "$(type -t import)" == function ]]
         [[ "$(type -t log_info)" == function ]]
         [[ "$(type -t std_run)" == function ]]
         [[ "$(type -t str_trim)" == function ]]
         [[ "$COLOR_RED" == application-red ]]
-        [[ "$(type -t base_bash_libs_str_trim)" == function ]]
+        [[ "$(type -t bl_str_trim)" == function ]]
         printf "collision-safe=yes\n"
     ' bash "$BASE_BASH_DIR"
 
@@ -77,7 +77,7 @@ setup() {
         for file in "$1"/*/lib_*.sh; do
             while IFS= read -r function_name; do
                 case "$function_name" in
-                    base_bash_libs_*|__base_bash_libs_*) ;;
+                    bl_*|__base_bash_libs_*) ;;
                     *) printf "unprefixed function in %s: %s\n" "$file" "$function_name"; exit 1 ;;
                 esac
             done < <(sed -nE "s/^([A-Za-z_][A-Za-z0-9_]*)\\(\\).*/\\1/p" "$file")
@@ -99,6 +99,20 @@ setup() {
     [[ "$output" == "" ]]
 }
 
+@test "every public v2 function is listed in the API charter" {
+    charter="$BASE_BASH_DIR/../../docs/v2-api-contract.md"
+    while IFS= read -r function_name; do
+        [[ "$function_name" == main ]] && continue
+        grep -F "\`$function_name\`" "$charter" >/dev/null || {
+            printf 'undocumented public function: %s\n' "$function_name"
+            return 1
+        }
+    done < <(
+        sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)\(\).*/\1/p' "$BASE_BASH_DIR"/*/lib_*.sh "$BASE_BASH_DIR"/../../bin/base-bash |
+            awk '/^bl_/ { print }' | sort -u
+    )
+}
+
 @test "migration tool rewrites public, owned-state, and internal symbols" {
     local fixture="$TEST_TMPDIR/legacy-script.sh"
 
@@ -110,7 +124,7 @@ setup() {
 
     run "$BASE_REPO_ROOT/scripts/migrate-v2-symbols" "$fixture"
     [ "$status" -eq 0 ]
-    grep -F 'base_bash_libs_std_import "$library_path"' "$fixture"
+    grep -F 'bl_std_import "$library_path"' "$fixture"
     grep -F '__base_bash_libs_std_example__()' "$fixture"
     grep -F '__base_bash_libs_str_example__()' "$fixture"
     grep -F 'BASE_BASH_LIBS_DRY_RUN=1' "$fixture"

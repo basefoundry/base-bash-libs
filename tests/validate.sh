@@ -13,6 +13,7 @@ required_files=(
   NOTICE
   base_manifest.yaml
   docs/versioning-policy.md
+  docs/v2-api-contract.md
   docs/v2-symbol-map.md
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml

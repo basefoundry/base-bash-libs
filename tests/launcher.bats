@@ -26,11 +26,11 @@ create_script() {
 #!/usr/bin/env base-bash
 # shellcheck shell=bash
 
-base_bash_libs_launcher_import_base_bash_lib str/lib_str.sh
+bl_launcher_import_base_bash_lib str/lib_str.sh
 
 main() {
     local value="$1"
-    base_bash_libs_str_trim value
+    bl_str_trim value
 
     printf 'argc=%s\n' "$#"
     printf 'first=<%s>\n' "$1"
@@ -39,7 +39,7 @@ main() {
     printf 'script-dir=%s\n' "$BASE_BASH_LIBS_SCRIPT_DIR"
     printf 'loaded=%s\n' "${BASE_BASH_LIBS_STDLIB_LOADED:-}"
     printf 'base-home=%s\n' "${BASE_HOME-unset}"
-    printf 'str-trim=%s\n' "$(type -t base_bash_libs_str_trim)"
+    printf 'str-trim=%s\n' "$(type -t bl_str_trim)"
 }
 SCRIPT
 
