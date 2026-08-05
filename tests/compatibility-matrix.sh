@@ -19,9 +19,19 @@ done < <(find "$matrix_repo_root/lib" "$matrix_repo_root/bin" "$matrix_repo_root
 
 matrix_probe_bash() {
     local matrix_bash="$1"
-    local matrix_file
+    local matrix_file matrix_version matrix_major matrix_minor matrix_patch
 
     [[ -x "$matrix_bash" ]] || matrix_fail "Bash runtime is not executable: $matrix_bash"
+    matrix_version="$($matrix_bash -c 'printf "%s.%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}" "${BASH_VERSINFO[2]}"' 2>/dev/null)" ||
+        matrix_fail "unable to determine Bash version for $matrix_bash"
+    IFS=. read -r matrix_major matrix_minor matrix_patch <<<"$matrix_version"
+    if ((matrix_major < 4 ||
+        (matrix_major == 4 && matrix_minor < 2) ||
+        (matrix_major == 4 && matrix_minor == 2 && matrix_patch < 53))); then
+        printf 'SKIP bash=%s version=%s reason=below-minimum-4.2.53\n' \
+            "$matrix_bash" "$matrix_version"
+        return 0
+    fi
     for matrix_file in "${matrix_bash_files[@]}"; do
         "$matrix_bash" -n "$matrix_file" || matrix_fail "$matrix_bash failed syntax check for $matrix_file"
     done
