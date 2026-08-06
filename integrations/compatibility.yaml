@@ -1,0 +1,57 @@
+schema_version: 1
+framework_release_line: v2.0.0
+update_policy: review-pins-on-every-upstream-release
+
+# These are the exact upstream revisions used when the v2 integration
+# contract was reviewed.  Adapters remain optional: the pins describe the
+# boundary we test, not dependencies that Core installs at runtime.
+adapters:
+  - name: bashly
+    version: v1.4.0
+    repository: https://github.com/bashly-framework/bashly
+    commit: 977c96d9345408be1f33c0205947e07c8a37bad2
+    help_owner: bashly
+    lifecycle_owner: base-bash
+    contract_test: integrations/bashly/example.sh
+  - name: argc
+    version: v1.24.0
+    repository: https://github.com/sigoden/argc
+    commit: db60e133729f2e779043e91a1360b46722cb80d2
+    help_owner: argc-until-v2-handoff
+    lifecycle_owner: base-bash
+    contract_test: docs/integrations.md
+  - name: argbash
+    version: 2.11.0
+    repository: https://github.com/matejak/argbash
+    commit: f6d2005d945aa118ca588ac87cf42686e3b13da8
+    help_owner: argbash-until-v2-handoff
+    lifecycle_owner: base-bash
+    contract_test: docs/integrations.md
+
+tools:
+  - name: bats-core
+    version: v1.14.0
+    repository: https://github.com/bats-core/bats-core
+    commit: 7868b95ea08b22bc76f2585e51cf4b7b3ff124ef
+    contract_test: integrations/bats/base_bats_helper.bash
+  - name: shellcheck
+    version: v0.11.0
+    repository: https://github.com/koalaman/shellcheck
+    commit: b12c2a6a0834a5b8c12b1c0eb36704f698de5bac
+    contract_test: integrations/project-kit/.shellcheckrc
+  - name: shfmt
+    version: v3.13.1
+    repository: https://github.com/mvdan/sh
+    commit: 879bcfa6d2db958fc385c09f739b3e97c4ae6010
+    contract_test: integrations/project-kit/shfmt.conf
+
+package_channels:
+  - name: bpkg
+    status: deferred
+    reason: no maintained immutable v2 package publication contract is verified
+  - name: basher
+    status: deferred
+    reason: no maintained immutable v2 package publication contract is verified
+  - name: basalt
+    status: deferred
+    reason: no maintained immutable v2 package publication contract is verified

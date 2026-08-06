@@ -5,9 +5,15 @@ entries:
   - name: bpkg
     status: planned-after-v2-ga
     install_metadata: publish-only-after-verified-release-asset
+    verification: release-asset-sha256-and-provenance
+    maintenance: explicit-owner-and-update-path-required
   - name: basher
     status: planned-after-v2-ga
     install_metadata: publish-only-after-verified-release-asset
+    verification: release-asset-sha256-and-provenance
+    maintenance: explicit-owner-and-update-path-required
   - name: basalt
     status: planned-after-v2-ga
     install_metadata: publish-only-after-verified-release-asset
+    verification: release-asset-sha256-and-provenance
+    maintenance: explicit-owner-and-update-path-required

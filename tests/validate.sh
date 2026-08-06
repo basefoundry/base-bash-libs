@@ -36,6 +36,8 @@ required_files=(
     integrations/project-kit/.editorconfig
     integrations/project-kit/shfmt.conf
     integrations/package-managers/registry.yaml
+    integrations/compatibility.yaml
+    docs/discovery/awesome-bash.md
     .github/workflows/project-intake.yml
     .github/ISSUE_TEMPLATE/config.yml
     .github/workflows/tests.yml
@@ -53,6 +55,7 @@ required_files=(
     tests/artifact-contract.sh
     tests/property-contract.sh
     tests/benchmark-contract.sh
+    tests/integration-release-contract.sh
     tests/concurrency-contract.sh
     tests/quality-contract.sh
     tests/shfmt-contract.sh
@@ -125,6 +128,7 @@ check_no_strict_mode() {
         tests/artifact-contract.sh
         tests/property-contract.sh
         tests/benchmark-contract.sh
+        tests/integration-release-contract.sh
         tests/concurrency-contract.sh
         tests/quality-contract.sh
         tests/shfmt-contract.sh
@@ -377,6 +381,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/artifact-contract.sh \
     tests/property-contract.sh \
     tests/benchmark-contract.sh \
+    tests/integration-release-contract.sh \
     tests/concurrency-contract.sh \
     tests/quality-contract.sh \
     tests/shfmt-contract.sh \
@@ -434,6 +439,7 @@ run_stage "Bash caller-option contract" tests/bash-option-contract.sh || exit $?
 run_stage "deterministic property contract" tests/property-contract.sh || exit $?
 run_stage "distribution artifact contract" tests/artifact-contract.sh || exit $?
 run_stage "benchmark contract" tests/benchmark-contract.sh || exit $?
+run_stage "integration release contract" tests/integration-release-contract.sh || exit $?
 run_stage "concurrency contract" tests/concurrency-contract.sh || exit $?
 run_stage "quality workflow contract" tests/quality-contract.sh || exit $?
 run_stage "support matrix" tests/compatibility-matrix.sh || exit $?
