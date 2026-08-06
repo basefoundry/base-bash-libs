@@ -2,11 +2,11 @@
 
 ## Current Release Line
 
-`v1.4.0` remains the stable Base Bash release while the 5/5 initiative in
-[#214](https://github.com/basefoundry/base-bash-libs/issues/214) is in progress.
-The initiative has one stable target: `v2.0.0`.
+`v1.4.0` remains the last stable Base Bash release until the verified
+`v2.0.0` GA asset is published. The release-preparation candidate is now
+`v2.0.0`; the 5/5 initiative has one stable target and will not create a
+stable `v1.5.0` or reset the version to 0.x.
 
-The project will not publish a stable `v1.5.0` or reset its version to 0.x.
 Those choices would either hide breaking changes inside the current 1.x
 compatibility range or move version precedence backward.
 

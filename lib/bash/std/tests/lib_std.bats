@@ -895,7 +895,7 @@ EOF
             "$BASE_BASH_LIBS_COMMIT" "$BASE_BASH_LIBS_DIRTY_STATE"
     ' bash "$artifact_dir")"
 
-    [[ "$output" == *"version=1.4.0"* ]]
+    [[ "$output" == *"version=2.0.0"* ]]
     [[ "$output" == *"provenance=release-artifact"* ]]
     [[ "$output" == *"commit=unknown"* ]]
     [[ "$output" == *"dirty=unknown"* ]]
@@ -913,7 +913,7 @@ EOF
     ' bash "$link_path")"
 
     [[ "$output" == *"root=$BASE_REPO_ROOT"* ]]
-    [[ "$output" == *"version=1.4.0"* ]]
+    [[ "$output" == *"version=2.0.0"* ]]
 }
 
 @test "mixed-major stdlib inputs fail with migration guidance" {
@@ -922,7 +922,10 @@ EOF
 
     mkdir -p "$other_root/lib"
     cp -R "$BASE_REPO_ROOT/lib/bash" "$other_root/lib/"
-    printf '2.0.0\n' > "$other_root/VERSION"
+    printf '1.4.0\n' > "$other_root/VERSION"
+    sed 's/^version=.*/version=1.4.0/' \
+        "$BASE_REPO_ROOT/lib/bash/base-bash-libs.release" \
+        > "$other_root/lib/bash/base-bash-libs.release"
 
     output="$(bash -c '
         source "$1/lib/bash/std/lib_std.sh"
