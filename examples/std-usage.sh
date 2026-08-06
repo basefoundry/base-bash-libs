@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 # shellcheck source=/dev/null
 source "$repo_root/lib/bash/std/lib_std.sh"
 
+# shellcheck disable=SC2034 # base_init publishes into this caller-owned array by name.
 declare -a app_args=()
 base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 

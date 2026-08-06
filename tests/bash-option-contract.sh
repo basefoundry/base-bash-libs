@@ -723,6 +723,7 @@ contract_run_mode() {
         contract_source_module "$module"
     done
 
+    # shellcheck disable=SC2034 # base_init publishes into this caller-owned array by name.
     local -a contract_init_args=()
     base_init contract_init_args --source "$contract_script_dir/bash-option-contract.sh" --
 

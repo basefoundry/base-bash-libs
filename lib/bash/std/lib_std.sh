@@ -192,14 +192,16 @@ if [[ -n "${BASE_BASH_LIBS_VERSION+x}" || -n "${BASE_BASH_LIBS_STDLIB_LOADED+x}"
     return 1 2>/dev/null || exit 1
 fi
 
-readonly BASE_BASH_LIBS_STD_SOURCE_PATH="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}")" || {
+BASE_BASH_LIBS_STD_SOURCE_PATH="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}")" || {
     printf '%s\n' "Error: Unable to resolve base-bash-libs stdlib source path from '${BASH_SOURCE[0]}'." >&2
     return 1 2>/dev/null || exit 1
 }
-readonly BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &>/dev/null && pwd -P)" || {
+readonly BASE_BASH_LIBS_STD_SOURCE_PATH
+BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &>/dev/null && pwd -P)" || {
     printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$BASE_BASH_LIBS_STD_SOURCE_PATH'." >&2
     return 1 2>/dev/null || exit 1
 }
+readonly BASE_BASH_LIBS_STD_ROOT
 readonly BASE_BASH_LIBS_MODULE_ROOT="$BASE_BASH_LIBS_STD_ROOT/lib/bash"
 BASE_BASH_LIBS_VERSION="$(__base_bash_libs_std_read_package_version__ "$BASE_BASH_LIBS_STD_SOURCE_PATH")" || {
     return 1 2>/dev/null || exit 1
@@ -399,6 +401,7 @@ __base_bash_libs_std_init_publish_array__() {
     local result_name="$1" value
     shift
     eval "$result_name=()"
+    # shellcheck disable=SC2034 # eval publishes each value into a caller array.
     for value; do
         eval "$result_name+=(\"\$value\")"
     done

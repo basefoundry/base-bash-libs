@@ -7,13 +7,13 @@ unreported pass.
 
 | Dimension | Supported contract | Evidence |
 | --- | --- | --- |
-| Bash | 4.2.53 minimum; representative 4.x; current 5.x | Pinned networkless Bash 4.2 smoke, current runner validation, \`tests/compatibility-matrix.sh\` |
+| Bash | 4.2.53 minimum; representative 4.x; current 5.x | Pinned networkless Bash 4.2 smoke, current runner validation, \`tests/compatibility-matrix.sh\`, deterministic property and artifact contracts |
 | macOS | Current GitHub-hosted macOS with Homebrew Bash; system Bash 3.2 is rejected with remediation | macOS validation and unsupported-system-Bash smoke |
 | Linux/glibc | Ubuntu runner and pinned Bash 4.2 container | Ubuntu validation and compatibility workflow |
 | Linux/musl | Alpine/musl syntax and option-contract probe when the runner provides Docker | \`tests/compatibility-matrix.sh --container alpine\` |
 | BSD userland | Best-effort portability checks; no release guarantee until a maintained CI runner is available | Explicitly reported as advisory |
 | Locale | UTF-8 and \`C\` locale behavior for parsing, sorting, and diagnostics | Option and parser tests; caller owns locale selection |
-| Filesystem | Local POSIX filesystem; symlink and race checks are fail-closed | cleanup, import, bundle, and vendor tests |
+| Filesystem | Local POSIX filesystem; symlink and race checks are fail-closed | cleanup, import, bundle, vendor, marker, and artifact-contract tests |
 | Network | Core tests are networkless; GitHub/Homebrew integrations are optional and bounded | workflow permissions, Docker \`--network none\`, retry tests |
 
 ## Strict-option combinations
@@ -27,8 +27,17 @@ runs it under the pinned Bash 4.2 image as well as the current runner Bash.
 
 The same checks apply to source checkouts, Homebrew-style installed roots,
 verified vendored roots, generated project kits, and deterministic standalone
-bundles. \`scripts/library-bundle verify\` and \`scripts/vendor verify\` must pass
-before an artifact is described as release-ready.
+bundles. \`tests/artifact-contract.sh\` runs all eight supported caller-option
+combinations through the source, generated, vendored, and standalone paths;
+\`scripts/library-bundle verify\` and \`scripts/vendor verify\` must pass before
+an artifact is described as release-ready.
+
+## Reproducible adversarial coverage
+
+\`tests/property-contract.sh\` runs 128 deterministic, seeded cases covering
+argv quoting, empty and glob-like fields, repeatable options, marker edits, and
+command-like data. The seed is reported on failure so a downstream report can
+replay the exact case without network access or a package manager.
 
 ## Caller responsibilities
 

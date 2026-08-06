@@ -76,6 +76,7 @@ main() {
         smoke_fail "unable to source lib_std.sh."
         return 1
     fi
+    # shellcheck disable=SC2034 # base_init publishes into this caller-owned array by name.
     local -a smoke_args=()
     if ! base_init smoke_args --source "${BASH_SOURCE[0]}" --; then
         smoke_fail "unable to initialize lib_std.sh."
