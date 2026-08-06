@@ -22,3 +22,18 @@ Each fixture has failure-path BATS coverage. The apps use only supported public
 APIs; optional network and GitHub operations are never performed by tests.
 Release inputs remain immutable pins and are verified by the repository bundle
 and vendor checks.
+
+The RC→GA and rollback rehearsal is explicit and networkless. Given two
+independently verified unpacked framework roots, run:
+
+```bash
+examples/reference-apps/release-rehearsal.sh \
+  --candidate /path/to/v2-candidate \
+  --rollback /path/to/previous-v2-release \
+  --report /tmp/base-reference-release.tsv
+```
+
+The required evidence schema and platform matrix live in
+[`release-evidence.yaml`](release-evidence.yaml). Placeholders remain marked
+`pending-ga-asset` until the canonical v2 asset, checksum, and provenance are
+published; the repository never treats a moving checkout as release evidence.

@@ -80,6 +80,8 @@ required_files=(
     examples/reference-apps/ops-cli/lib/app.sh
     examples/reference-apps/ops-cli/tests/app.bats
     examples/reference-apps/verify.sh
+    examples/reference-apps/release-rehearsal.sh
+    examples/reference-apps/release-evidence.yaml
     benchmarks/README.md
     benchmarks/reference-apps.sh
     tests/reference-apps.bats
@@ -129,6 +131,7 @@ check_no_strict_mode() {
         tests/property-contract.sh
         tests/benchmark-contract.sh
         tests/integration-release-contract.sh
+        tests/reference-release-contract.sh
         tests/concurrency-contract.sh
         tests/quality-contract.sh
         tests/shfmt-contract.sh
@@ -382,6 +385,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/property-contract.sh \
     tests/benchmark-contract.sh \
     tests/integration-release-contract.sh \
+    tests/reference-release-contract.sh \
     tests/concurrency-contract.sh \
     tests/quality-contract.sh \
     tests/shfmt-contract.sh \
@@ -408,6 +412,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     examples/reference-apps/release-helper/lib/app.sh \
     examples/reference-apps/ops-cli/lib/app.sh \
     examples/reference-apps/verify.sh \
+    examples/reference-apps/release-rehearsal.sh \
     benchmarks/reference-apps.sh \
     tests/reference-apps.bats \
     tests/community-contract.sh \
@@ -440,6 +445,7 @@ run_stage "deterministic property contract" tests/property-contract.sh || exit $
 run_stage "distribution artifact contract" tests/artifact-contract.sh || exit $?
 run_stage "benchmark contract" tests/benchmark-contract.sh || exit $?
 run_stage "integration release contract" tests/integration-release-contract.sh || exit $?
+run_stage "reference release contract" tests/reference-release-contract.sh || exit $?
 run_stage "concurrency contract" tests/concurrency-contract.sh || exit $?
 run_stage "quality workflow contract" tests/quality-contract.sh || exit $?
 run_stage "support matrix" tests/compatibility-matrix.sh || exit $?
