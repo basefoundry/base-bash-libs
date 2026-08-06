@@ -178,6 +178,20 @@ IFS= read -r version < VERSION || {
   exit 1
 }
 
+readme_head="$(sed -n '1,16p' README.md | tr -d '\r')"
+if ! printf '%s\n' "$readme_head" | grep -F "[![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-bash-libs/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-bash-libs/actions/workflows/tests.yml)" >/dev/null; then
+  printf 'README.md is missing the main-branch tests health badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "[![Release](https://img.shields.io/github/v/release/basefoundry/base-bash-libs?sort=semver&label=release)](https://github.com/basefoundry/base-bash-libs/releases)" >/dev/null; then
+  printf 'README.md is missing the GitHub release badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "[![Bash](https://img.shields.io/badge/Bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)" >/dev/null; then
+  printf 'README.md is missing the supported Bash version badge.\n' >&2
+  exit 1
+fi
+
 if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
   printf 'VERSION is not a SemVer-compatible version: %s\n' "$version" >&2
   exit 1

@@ -1,5 +1,9 @@
 # base-bash-libs
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-bash-libs/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-bash-libs/actions/workflows/tests.yml)
+[![Release](https://img.shields.io/github/v/release/basefoundry/base-bash-libs?sort=semver&label=release)](https://github.com/basefoundry/base-bash-libs/releases)
+[![Bash](https://img.shields.io/badge/Bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)
+
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
 | `1.4.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v1.4.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v1.4.0) |
