@@ -15,6 +15,11 @@ required_files=(
   base_manifest.yaml
   base_api_manifest.yaml
   docs/versioning-policy.md
+  docs/README.md
+  docs/v2/quickstart.md
+  docs/v2/architecture.md
+  docs/v2/migration-v1.4-to-v2.md
+  integrations.md
   docs/support-policy.md
   docs/threat-model.md
   docs/v2-api-contract.md
@@ -47,6 +52,7 @@ required_files=(
   tests/library-bundle.bats
   tests/vendor.bats
   tests/lint-warnings.sh
+  tests/docs-contract.sh
 )
 
 cd "$repo_root" || exit 1
@@ -130,6 +136,8 @@ done <<<"$manifest_module_paths"
 printf 'Repository baseline is present.\n'
 
 run_stage "strict-mode guard" check_no_strict_mode || exit $?
+
+run_stage "documentation contract" tests/docs-contract.sh || exit $?
 
 version=""
 IFS= read -r version < VERSION || {

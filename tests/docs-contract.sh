@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+cd "$repo_root" || exit 1
+
+required=(
+  docs/README.md
+  docs/v2/quickstart.md
+  docs/v2/architecture.md
+  docs/v2/migration-v1.4-to-v2.md
+  integrations.md
+)
+for file in "${required[@]}"; do
+  [[ -f "$file" ]] || { printf 'Missing documentation contract file: %s\n' "$file" >&2; exit 1; }
+done
+
+if grep -R -n -E 'checkout[[:space:]]+main|/archive/refs/heads/main|git clone .*[^[:alnum:]]main([[:space:]]|$)' \
+  docs/v2 README.md; then
+  printf 'Adoption documentation must not install from an unreleased moving main branch.\n' >&2
+  exit 1
+fi
+
+grep -F 'v2/quickstart.md' docs/README.md >/dev/null || { printf 'Documentation link is missing: v2/quickstart.md\n' >&2; exit 1; }
+grep -F 'v2/architecture.md' docs/README.md >/dev/null || { printf 'Documentation link is missing: v2/architecture.md\n' >&2; exit 1; }
+grep -F 'v2/migration-v1.4-to-v2.md' docs/README.md >/dev/null || { printf 'Documentation link is missing: v2/migration-v1.4-to-v2.md\n' >&2; exit 1; }
+for link in SECURITY.md docs/support-policy.md docs/threat-model.md; do
+  grep -R -F "$link" docs/README.md README.md >/dev/null || {
+    printf 'Documentation link is missing: %s\n' "$link" >&2
+    exit 1
+  }
+done
+
+printf 'Documentation contract passed.\n'
