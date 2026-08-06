@@ -38,7 +38,7 @@ release notes, then resume from the failed consumer after a reviewed fix.
 
 ## Current state
 
-Base's `basectl help` integration defect is fixed in the issue-backed PR above
-and validated locally against the v2 API. Base Demo and Homebrew remain
+Base's `basectl help` integration defect is fixed in the merged issue-backed PR
+above and validated locally against the v2 API. Base Demo and Homebrew remain
 intentionally unchanged until the v2 GA artifact is published; their current
 v1.4 pins are historical inputs to the final cutover checklist.

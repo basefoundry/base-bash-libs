@@ -15,7 +15,7 @@ consumers:
     repository: basefoundry/base
     tracker: https://github.com/basefoundry/base/issues/1880
     pull_request: https://github.com/basefoundry/base/pull/1881
-    current_state: v2-api-migration-under-review
+    current_state: v2-api-migration-merged-pending-ga
   - name: base-demo
     repository: basefoundry/base-demo
     tracker: base-bash-libs-240
