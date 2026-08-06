@@ -7,6 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-06
+
 ### Added
 
 - Added the v2 RC launcher contract: conventional stdout help/version commands,
