@@ -49,6 +49,8 @@ required_files=(
   tests/bash-42-logging-smoke.sh
   tests/bash-option-contract.sh
   tests/compatibility-matrix.sh
+  tests/artifact-contract.sh
+  tests/property-contract.sh
   tests/release-invariants.sh
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
@@ -115,6 +117,8 @@ check_no_strict_mode() {
     tests/bash-42-logging-smoke.sh
     tests/bash-option-contract.sh
     tests/compatibility-matrix.sh
+    tests/artifact-contract.sh
+    tests/property-contract.sh
     tests/release-invariants.sh
     tests/validate.sh
     tests/lint-warnings.sh
@@ -361,6 +365,8 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   tests/bash-42-logging-smoke.sh \
   tests/bash-option-contract.sh \
   tests/compatibility-matrix.sh \
+  tests/artifact-contract.sh \
+  tests/property-contract.sh \
   tests/release-invariants.sh \
   tests/validate.sh \
   tests/lint-warnings.sh \
@@ -412,6 +418,8 @@ run_stage "BATS test suites" bats \
 run_stage "Bash logging smoke" tests/bash-42-logging-smoke.sh || exit $?
 run_stage "Bash release guard smoke" tests/bash-42-release-smoke.sh || exit $?
 run_stage "Bash caller-option contract" tests/bash-option-contract.sh || exit $?
+run_stage "deterministic property contract" tests/property-contract.sh || exit $?
+run_stage "distribution artifact contract" tests/artifact-contract.sh || exit $?
 run_stage "support matrix" tests/compatibility-matrix.sh || exit $?
 run_stage "release invariants" tests/release-invariants.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh >/dev/null || exit $?
