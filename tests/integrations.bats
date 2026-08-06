@@ -22,3 +22,10 @@ setup() {
     grep -F 'shell=bash' "$repo_root/integrations/project-kit/.shellcheckrc"
     grep -F 'language-dialect = bash' "$repo_root/integrations/project-kit/shfmt.conf"
 }
+
+@test "integration release contract keeps immutable pins and deferred channels" {
+    run "$repo_root/tests/integration-release-contract.sh"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pins=6 package_channels=3"* ]]
+}

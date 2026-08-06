@@ -32,6 +32,7 @@ lint_files=(
     tests/artifact-contract.sh
     tests/property-contract.sh
     tests/benchmark-contract.sh
+    tests/integration-release-contract.sh
     tests/concurrency-contract.sh
     tests/quality-contract.sh
     tests/shfmt-contract.sh

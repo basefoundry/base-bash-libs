@@ -57,6 +57,18 @@ immutable v2 asset, checksum, provenance, and a maintained update path exist.
 No package-manager URL in this repository is presented as an official install
 source before those gates pass.
 
+The exact upstream revisions reviewed for the adapters and project tools are
+recorded in [`integrations/compatibility.yaml`](../integrations/compatibility.yaml).
+The repository checks the shape and full-SHA pins without downloading optional
+tools. A pin is reviewed when the upstream release changes; an adapter failure
+is surfaced as a contract failure rather than silently widening the supported
+range.
+
+The proposed discovery submission is tracked in
+[`docs/discovery/awesome-bash.md`](discovery/awesome-bash.md). It stays a draft
+until the v2 release asset, reference applications, and public documentation
+are available.
+
 ## Compatibility table
 
 | Integration | Supported boundary | Mandatory dependency | Verification |
