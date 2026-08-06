@@ -77,9 +77,9 @@ BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
     artifact_fail 'standard project generation failed'
 
 PATH="$artifact_repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
-    "$artifact_project/bin/app" --help >/dev/null || artifact_fail 'generated app help failed'
+    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" --help >/dev/null || artifact_fail 'generated app help failed'
 PATH="$artifact_repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
-    "$artifact_project/bin/app" run --dry-run >/dev/null || artifact_fail 'generated app dry-run failed'
+    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" run --dry-run >/dev/null || artifact_fail 'generated app dry-run failed'
 
 "$artifact_repo_root/scripts/vendor" standalone "$artifact_project" "$artifact_bundle" \
     "$artifact_standalone" >/dev/null || artifact_fail 'standalone bundle creation failed'
