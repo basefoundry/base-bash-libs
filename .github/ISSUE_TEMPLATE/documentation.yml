@@ -1,0 +1,19 @@
+name: Documentation improvement
+description: Report unclear, missing, or inaccurate documentation.
+title: "docs: "
+labels: [documentation]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Location and audience
+      description: Link the page and explain who is blocked.
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: Suggested correction
+      description: Include an example or evidence when possible.
+    validations:
+      required: true

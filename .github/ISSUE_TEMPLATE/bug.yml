@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible defect in the framework or its tooling.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, use the private process in SECURITY.md instead of a public issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Include the expected and actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Framework reference
+      description: Tag plus full commit or verified asset checksum.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Bash version, OS/libc, locale, userland, and relevant external tools.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and validation
+      description: Give a minimal command and the tests you ran.
+    validations:
+      required: true
