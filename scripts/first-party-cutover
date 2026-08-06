@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+manifest="$repo_root/first-party-cutover.yaml"
+allow_pending=0
+base_dir=""
+base_demo_dir=""
+homebrew_dir=""
+
+usage() {
+    printf '%s\n' \
+        'Usage: scripts/first-party-cutover check [--allow-pending]' \
+        '       [--base-dir DIR] [--base-demo-dir DIR] [--homebrew-dir DIR]'
+}
+
+while (($#)); do
+    case "$1" in
+        check) ;;
+        --allow-pending) allow_pending=1 ;;
+        --base-dir) [[ -n "${2-}" ]] || { usage >&2; exit 2; }; base_dir="$2"; shift ;;
+        --base-demo-dir) [[ -n "${2-}" ]] || { usage >&2; exit 2; }; base_demo_dir="$2"; shift ;;
+        --homebrew-dir) [[ -n "${2-}" ]] || { usage >&2; exit 2; }; homebrew_dir="$2"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) printf 'Unknown cutover option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+[[ -f "$manifest" ]] || { printf 'Missing cutover manifest: %s\n' "$manifest" >&2; exit 1; }
+grep -F 'target_release: 2.0.0' "$manifest" >/dev/null || { printf 'Cutover target must be 2.0.0.\n' >&2; exit 1; }
+grep -F 'tag: v2.0.0' "$manifest" >/dev/null || { printf 'Cutover tag must be v2.0.0.\n' >&2; exit 1; }
+
+release_status="$(sed -n 's/^release_status:[[:space:]]*//p' "$manifest" | sed -n '1p')"
+if [[ "$release_status" != published ]]; then
+    if ((allow_pending)); then
+        printf 'PENDING release_status=%s\n' "$release_status"
+    else
+        printf 'Cutover is locked until the v2.0.0 asset is published (status=%s).\n' "$release_status" >&2
+        exit 1
+    fi
+fi
+
+check_no_legacy() {
+    local directory="$1"
+    [[ -n "$directory" && -d "$directory" ]] || return 0
+    if grep -R -n -E 'base_bash_libs_(require_version|std_|file_|git_|gh_|str_|arg_|list_)' \
+        "$directory" --include='*.sh' --include='*.bash' --include='*.bats' 2>/dev/null; then
+        printf 'Legacy base-bash-libs symbols remain under %s.\n' "$directory" >&2
+        return 1
+    fi
+}
+
+if [[ -n "$base_dir" ]]; then
+    [[ -f "$base_dir/base_init.sh" ]] || { printf 'Base directory lacks base_init.sh: %s\n' "$base_dir" >&2; exit 1; }
+    grep -F 'base_require_version' "$base_dir/base_init.sh" >/dev/null || {
+        printf 'Base does not call the v2 version helper.\n' >&2; exit 1;
+    }
+    check_no_legacy "$base_dir" || exit $?
+fi
+check_no_legacy "$base_demo_dir" || exit $?
+if [[ -n "$homebrew_dir" ]]; then
+    formula="$homebrew_dir/Formula/base-bash-libs.rb"
+    [[ -f "$formula" ]] || { printf 'Homebrew formula is missing: %s\n' "$formula" >&2; exit 1; }
+    grep -F 'v2.0.0' "$formula" >/dev/null || { printf 'Homebrew formula is not pinned to v2.0.0.\n' >&2; exit 1; }
+    grep -E 'type -t (std_run|update_file_section|git_get_current_branch|gh_run)' "$formula" >/dev/null && {
+        printf 'Homebrew formula still tests legacy generic symbols.\n' >&2; exit 1;
+    }
+fi
+
+printf 'First-party cutover manifest is structurally valid.\n'

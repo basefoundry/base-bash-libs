@@ -82,6 +82,10 @@ required_files=(
   .github/ISSUE_TEMPLATE/feature.yml
   .github/ISSUE_TEMPLATE/documentation.yml
   tests/community-contract.sh
+  first-party-cutover.yaml
+  docs/first-party-cutover.md
+  scripts/first-party-cutover
+  tests/first-party-cutover.bats
 )
 
 cd "$repo_root" || exit 1
@@ -367,8 +371,10 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
   examples/reference-apps/ops-cli/lib/app.sh \
   examples/reference-apps/verify.sh \
   benchmarks/reference-apps.sh \
-  tests/reference-apps.bats
-  tests/community-contract.sh
+  tests/reference-apps.bats \
+  tests/community-contract.sh \
+  scripts/first-party-cutover \
+  tests/first-party-cutover.bats
 
 bats_files=(
   tests/release.bats
@@ -377,8 +383,9 @@ bats_files=(
   tests/consumer-kit/tests/consumer_kit.bats
   tests/library-bundle.bats \
   tests/vendor.bats \
-  tests/integrations.bats
-  tests/reference-apps.bats
+  tests/integrations.bats \
+  tests/reference-apps.bats \
+  tests/first-party-cutover.bats
 )
 manifest_test_paths="$(scripts/api-manifest test-paths)" || exit $?
 while IFS= read -r file; do
@@ -399,5 +406,6 @@ run_stage "examples/cookbook-args-lists-strings.sh" examples/cookbook-args-lists
 run_stage "Bashly integration example" integrations/bashly/example.sh candidate >/dev/null || exit $?
 run_stage "reference application smoke" examples/reference-apps/verify.sh >/dev/null || exit $?
 run_stage "community contract" tests/community-contract.sh >/dev/null || exit $?
+run_stage "first-party cutover pending check" scripts/first-party-cutover check --allow-pending >/dev/null || exit $?
 
 printf 'Bash library validation passed.\n'
