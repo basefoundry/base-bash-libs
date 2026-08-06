@@ -1,0 +1,2 @@
+# Optional project configuration. Values are data, never shell code.
+name=world

@@ -1,0 +1,12 @@
+name: validate
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mfinelli/setup-bats@v1
+      - run: shellcheck --severity=warning bin/app lib/app.sh tests/app.bats
+      - run: ./tests/run.sh
