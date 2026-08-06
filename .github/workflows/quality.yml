@@ -1,0 +1,79 @@
+name: Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Enforce warning ShellCheck profile
+        run: ./tests/lint-warnings.sh
+
+      - name: Enforce repository quality contract
+        run: ./tests/quality-contract.sh
+
+      - name: Enforce shfmt profile
+        run: |
+          if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+            format_base="origin/$GITHUB_BASE_REF"
+          else
+            format_base='HEAD^'
+          fi
+          mapfile -t format_files < <(
+            git diff --name-only "$format_base"...HEAD -- \
+              '*.sh' '*.bash' 'bin/base-bash' 'scripts/api-manifest' \
+              'scripts/first-party-cutover' 'scripts/library-bundle' \
+              'scripts/migrate-v2-symbols' 'scripts/release' 'scripts/vendor' \
+              'tests/fixtures/basectl-release-stub'
+          )
+          ((${#format_files[@]} > 0)) || {
+            echo 'No changed Bash sources require formatting.'
+            exit 0
+          }
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            --user 65534:65534 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --workdir /workspace \
+            docker.io/mvdan/shfmt@sha256:44154be4ec86510d0d98d6eae0cd9d2927bcf8499791fdbee1fa2009b1b32589 \
+            -d -ln bash -i 4 -sr "${format_files[@]}"
+
+      - name: Lint GitHub workflows
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            --user 65534:65534 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --workdir /workspace \
+            docker.io/rhysd/actionlint@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
+            -color

@@ -302,6 +302,7 @@ jobs:
               ;;
           esac
 
+          # shellcheck disable=SC2153 # This is an intentional workflow-level env input.
           if [[ ! "$PULL_REQUEST_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
             fail_policy "$target_head_sha" "Pull request number must be a positive integer" || true
             exit 1
