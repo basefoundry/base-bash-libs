@@ -52,6 +52,9 @@ The reusable consumer conformance helpers and offline fixture are in
 [`tests/consumer-kit`](tests/consumer-kit/README.md).
 Deterministic single-file validation and auditable directory bundles are
 provided by [`scripts/library-bundle`](scripts/library-bundle).
+Optional generator, Bats, formatter, and package-channel recipes are in
+[`docs/integrations.md`](docs/integrations.md); they do not add mandatory Core
+dependencies.
 See [`docs/single-file-distribution.md`](docs/single-file-distribution.md) for
 the contributor and release-artifact workflow.
 Offline immutable vendoring, atomic updates/rollback, and standalone assembly
