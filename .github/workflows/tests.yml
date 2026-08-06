@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Validate (${{ matrix.os }})
@@ -17,8 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-latest
-          - ubuntu-latest
+          - macos-14
+          - ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -97,6 +101,52 @@ jobs:
               bash tests/property-contract.sh
               bash tests/artifact-contract.sh
               bash tests/benchmark-contract.sh
+            '
+
+  representative-bash:
+    name: Compatibility (Bash ${{ matrix.version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: 4.4.23
+            image: docker.io/library/bash@sha256:43ad196f649f1a759d7d5a18c771f2d87290051b4ae053b6eadb0a8b72dbd4eb
+          - version: 5.0.18
+            image: docker.io/library/bash@sha256:2ec6d5dd02c732f425fe18c4bd5f02065381ec0083311dffcfb7bad62430e88f
+          - version: 5.2.37
+            image: docker.io/library/bash@sha256:534a5f1d11652aadaa9f08838f6637ac11a46a8b4b736a4cbf09c5945e38516f
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run representative Bash contract
+        env:
+          BASH_IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm \
+            --platform linux/amd64 \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges=true \
+            --pids-limit 128 \
+            --user 65534:65534 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777 \
+            --env HOME=/tmp \
+            --env TMPDIR=/tmp \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --workdir /workspace \
+            "$BASH_IMAGE" \
+            bash -c '
+              set -e
+              bash tests/bash-option-contract.sh
+              bash tests/property-contract.sh
+              bash tests/artifact-contract.sh
+              bash tests/benchmark-contract.sh
+              bash tests/concurrency-contract.sh
             '
 
   release-gates:
