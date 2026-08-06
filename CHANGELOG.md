@@ -89,6 +89,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Documentation
 
+- Added README health and support badges for CI, releases, and the supported
+  Bash runtime.
 - Aligned the public Bash API documentation with implementation behavior,
   including list removal argument order, TTY detection, assertion semantics,
   temporary output arguments, and fatal function assertions.
