@@ -168,11 +168,12 @@ jobs:
       - name: Run networkless platform matrix
         run: |
           ./tests/compatibility-matrix.sh --container alpine
-          docker run --rm --network none --read-only --cap-drop ALL \
+          docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 \
             --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
-            --workdir /workspace alpine:3.20 sh -c \
-            'apk add --no-cache bash >/dev/null && bash examples/reference-apps/verify.sh'
+            --workdir /workspace \
+            docker.io/library/bash@sha256:69d156705ff4829e60cd958dd356e8db024195efcdb0504eb3426c84647c6e88 \
+            bash examples/reference-apps/verify.sh
 
       - name: Verify deterministic release invariants
         run: ./tests/release-invariants.sh
