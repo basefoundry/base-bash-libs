@@ -16,3 +16,8 @@ mutation, warm-process throughput, and application-specific work. Compare only
 records with the same Bash build, OS/libc, CPU/load conditions, framework
 commit, and iteration count. These are engineering measurements, not a
 universal performance claim.
+
+`tests/benchmark-contract.sh` is the networkless CI contract for this output.
+It runs two iterations for each reference application and checks the schema,
+provenance, timing fields, application coverage, and methodology marker. It
+does not treat a single host's timing as a cross-platform performance claim.

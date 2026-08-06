@@ -96,6 +96,7 @@ jobs:
               bash tests/bash-option-contract.sh 4 2 53
               bash tests/property-contract.sh
               bash tests/artifact-contract.sh
+              bash tests/benchmark-contract.sh
             '
 
   release-gates:

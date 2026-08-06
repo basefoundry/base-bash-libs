@@ -31,6 +31,7 @@ lint_files=(
   tests/lint-warnings.sh
   tests/artifact-contract.sh
   tests/property-contract.sh
+  tests/benchmark-contract.sh
   examples/std-usage.sh
   examples/cookbook-cleanup-temp.sh
   examples/cookbook-args-lists-strings.sh
