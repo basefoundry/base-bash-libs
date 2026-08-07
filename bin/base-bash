@@ -298,37 +298,37 @@ demo_execute() {
     local -a config_args=()
 
     base_app_apply_standard_options demo_policy
-    if base_cli_result_get config config_file 2> /dev/null; then
+    if base_cli_result_get config config_file 2>/dev/null; then
         config_args+=(--project "$config_file")
     fi
-    if base_cli_result_get user_config user_config 2> /dev/null; then
+    if base_cli_result_get user_config user_config 2>/dev/null; then
         config_args+=(--user "$user_config")
     fi
     base_app_config_load demo_policy "${config_args[@]}" || return $?
     base_app_hook demo_policy cleanup generated_cleanup demo_cleanup_hook || return $?
 
     case "$command" in
-    status)
-        base_std_log_info -l generated.demo "framework=${BASE_BASH_LIBS_VERSION:-unknown}"
-        printf 'status=ready\n'
-        ;;
-    run)
-        base_app_config_get demo_policy name name || return $?
-        if ((BASE_BASH_LIBS_APP_DRY_RUN)); then
-            printf 'dry-run=would-greet:%s\n' "$name" >&2
-        else
-            base_std_log_info -l generated.demo "running application"
-            printf 'hello=%s\n' "$name"
-        fi
-        ;;
-    fail)
-        base_std_log_error -l generated.demo 'intentional failure example'
-        return 1
-        ;;
-    *)
-        base_std_log_error -l generated.demo "unknown command '$command'"
-        return 2
-        ;;
+        status)
+            base_std_log_info -l generated.demo "framework=${BASE_BASH_LIBS_VERSION:-unknown}"
+            printf 'status=ready\n'
+            ;;
+        run)
+            base_app_config_get demo_policy name name || return $?
+            if ((BASE_BASH_LIBS_APP_DRY_RUN)); then
+                printf 'dry-run=would-greet:%s\n' "$name" >&2
+            else
+                base_std_log_info -l generated.demo "running application"
+                printf 'hello=%s\n' "$name"
+            fi
+            ;;
+        fail)
+            base_std_log_error -l generated.demo 'intentional failure example'
+            return 1
+            ;;
+        *)
+            base_std_log_error -l generated.demo "unknown command '$command'"
+            return 2
+            ;;
     esac
 }
 
@@ -414,7 +414,7 @@ if ! command -v shfmt >/dev/null 2>&1; then
     printf 'ERROR: shfmt is required\n' >&2
     exit 1
 fi
-shfmt -d -i 4 -sr bin/app lib/app.sh tests/app.bats || exit $?
+shfmt -d bin/app lib/app.sh tests/app.bats || exit $?
 EOF
 }
 
@@ -429,7 +429,7 @@ lint:
 	shellcheck --severity=warning bin/app lib/app.sh tests/app.bats
 
 fmt:
-	shfmt -w -i 4 -sr bin/app lib/app.sh tests/app.bats
+	shfmt -w bin/app lib/app.sh tests/app.bats
 EOF
 }
 
@@ -805,7 +805,7 @@ base_launcher_check_project() {
         __base_bash_libs_launcher_project_record__ "$format" WARN shellcheck "not installed; install ShellCheck to enable lint validation"
     fi
     if shfmt_path="$(command -v shfmt 2>/dev/null)"; then
-        if "$shfmt_path" -d -i 4 -sr "${source_files[@]}" "$project_dir/tests/app.bats" >/dev/null 2>&1; then
+        if "$shfmt_path" -d "${source_files[@]}" "$project_dir/tests/app.bats" >/dev/null 2>&1; then
             __base_bash_libs_launcher_project_record__ "$format" OK format "shfmt clean"
         else
             __base_bash_libs_launcher_project_record__ "$format" ERROR format "shfmt reported formatting differences"
