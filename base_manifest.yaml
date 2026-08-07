@@ -19,4 +19,24 @@ release:
     formula_path: Formula/base-bash-libs.rb
     package: basefoundry/base/base-bash-libs
 
+github:
+  pr:
+    required_sections:
+      default:
+        - Summary
+        - Issue
+        - Validation
+      labels:
+        needs-demo:
+          - Demo Impact
+        security:
+          - Security Notes
+      paths:
+        docs/**:
+          - Docs Impact
+        lib/bash/**:
+          - API Impact
+        .github/**:
+          - CI Impact
+
 artifacts: []

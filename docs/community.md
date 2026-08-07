@@ -10,9 +10,10 @@
   vulnerabilities or sensitive conduct concerns.
 
 Normal contributions may come from a public fork and may be submitted with
-standard Git, GitHub, Bats, and ShellCheck tooling. `basectl`, dedicated
-worktrees, and a pre-existing issue are helpful but not prerequisites for a
-small fix. Required CI and the review checklist remain mandatory.
+standard Git, GitHub, Bats, and ShellCheck tooling. A pre-existing issue,
+dedicated worktree, and Base helper command are the recommended workflow for
+tracked work; the issue, validation, and review-checklist requirements still
+apply to small fixes.
 
 ## Review and decisions
 
