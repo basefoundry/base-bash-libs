@@ -33,6 +33,7 @@ lint_files=(
     tests/property-contract.sh
     tests/benchmark-contract.sh
     tests/integration-release-contract.sh
+    tests/reference-release-contract.sh
     tests/concurrency-contract.sh
     tests/quality-contract.sh
     tests/shfmt-contract.sh

@@ -101,6 +101,7 @@ jobs:
               bash tests/property-contract.sh
               bash tests/artifact-contract.sh
               bash tests/benchmark-contract.sh
+              bash examples/reference-apps/verify.sh
             '
 
   representative-bash:
@@ -147,6 +148,7 @@ jobs:
               bash tests/artifact-contract.sh
               bash tests/benchmark-contract.sh
               bash tests/concurrency-contract.sh
+              bash examples/reference-apps/verify.sh
             '
 
   release-gates:
@@ -164,7 +166,14 @@ jobs:
         run: sudo apt-get install -y bats shellcheck
 
       - name: Run networkless platform matrix
-        run: ./tests/compatibility-matrix.sh --container alpine
+        run: |
+          ./tests/compatibility-matrix.sh --container alpine
+          docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --workdir /workspace \
+            docker.io/library/bash@sha256:69d156705ff4829e60cd958dd356e8db024195efcdb0504eb3426c84647c6e88 \
+            bash examples/reference-apps/verify.sh
 
       - name: Verify deterministic release invariants
         run: ./tests/release-invariants.sh

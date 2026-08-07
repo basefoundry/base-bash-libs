@@ -1,0 +1,48 @@
+schema_version: 1
+release_line: v2.0.0
+status: pending-ga-asset
+
+# Fill these fields only from the canonical release asset and its independently
+# verified checksum. A local checkout or a moving branch is not acceptable.
+candidate:
+  ref: pending-v2.0.0-rc-or-ga
+  commit: pending
+  sha256: pending
+rollback:
+  ref: v1.4.0
+  commit: 2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+  sha256: historical-release-asset-checksum-required
+
+deployment_modes:
+  - source-checkout
+  - vendored-tree
+  - generated-bundle
+  - standalone-bundle
+
+platform_matrix:
+  - bash: 4.2.53
+    os: linux
+    libc: glibc
+    evidence: required
+  - bash: current
+    os: linux
+    libc: glibc
+    evidence: required
+  - bash: current
+    os: macOS
+    libc: system
+    evidence: required
+  - bash: current
+    os: BSD-derived-userland
+    libc: system
+    evidence: advisory
+  - bash: current
+    os: linux
+    libc: musl
+    evidence: required
+
+rehearsal_command: examples/reference-apps/release-rehearsal.sh
+benchmark_command: BASE_REFERENCE_BENCHMARK_ITERATIONS=2 benchmarks/reference-apps.sh
+claims:
+  - no-external-production-use-claim
+  - no-unsupported-performance-claim
