@@ -15,17 +15,28 @@ operation must enter through the repository-owned `scripts/release` guard.
 
 ## Workflow
 
-1. Create or choose a GitHub issue for roadmap or multi-step work. A small,
-   self-contained fix may be submitted directly from a public fork.
-2. Use one of the standard issue labels: `bug`, `enhancement`,
-   `documentation`, `ci`, or `security`.
-3. For tracked work, create an issue-backed branch:
+1. Create or choose a GitHub issue before starting implementation work.
+   Contributions from a public fork are welcome, but the issue and
+   pull-request contract still applies.
+2. Give the issue exactly one primary category label:
+   - `bug` for defects or regressions.
+   - `enhancement` for new capabilities, refactors, and maintenance.
+   - `documentation` for documentation-only work.
+   - `ci` for workflows, tests, release automation, or CI reliability.
+   - `security` for security hardening, dependency pinning, or vulnerabilities.
+3. If the issue is tracked in the repository Project, move it to `In Progress`
+   before branch or worktree work begins. Move it to `In Review` when the pull
+   request opens, and verify it is `Done` after merge or closure.
+4. Create an issue-backed branch:
 
    ```text
    <category>/<issue>-<YYYYMMDD>-<slug>
    ```
 
-4. Use a dedicated Git worktree for each pull request so the main checkout can
+   The category must match the issue's one primary category label, and the date
+   must be a real calendar date. The branch-name ruleset and the trusted
+   `base/issue-branch-policy` workflow enforce this for every contribution.
+5. Use a dedicated Git worktree for each pull request so the main checkout can
    stay on the default branch:
 
    ```bash
@@ -33,12 +44,16 @@ operation must enter through the repository-owned `scripts/release` guard.
    git worktree add -b <branch> ../base-bash-libs-worktrees/<slug> origin/<default-branch>
    ```
 
-5. Keep the pull request scoped to the issue when one exists and link it with
-   `Fixes #<issue>` or `Closes #<issue>` when merge should close the issue.
-6. Run the project checks before opening or updating a pull request.
-7. Update `CHANGELOG.md` only for notable user-visible or release-worthy
+6. Keep the pull request scoped to one issue and link it with `Fixes #<issue>`
+   or `Closes #<issue>` when merge should close the issue. Fill in the standard
+   `Summary`, `Issue`, and `Validation` sections plus any applicable impact
+   sections required by `base_manifest.yaml`.
+7. Run the project checks before opening or updating a pull request. The full
+   hosted tests and quality workflows remain release gates even though the
+   default branch baseline does not require every job as a merge check.
+8. Update `CHANGELOG.md` only for notable user-visible or release-worthy
    changes.
-8. After merge, sync the default branch, remove the worktree, and delete merged
+9. After merge, sync the default branch, remove the worktree, and delete merged
    local and remote branches when safe:
 
    ```bash
