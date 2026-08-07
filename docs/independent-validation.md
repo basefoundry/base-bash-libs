@@ -22,3 +22,7 @@ Follow-up owner and date:
 The minimum evidence is a reproducible command/test log and the exact
 immutable reference. A claim of production use is not accepted from a local
 demo or an internal reference application alone.
+
+The current first-party readiness results are recorded separately in the
+[consumer validation status ledger](consumer-validation-status.md). That
+ledger is intentionally not an independent-consumer claim.

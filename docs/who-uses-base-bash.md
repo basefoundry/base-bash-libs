@@ -15,3 +15,6 @@ Independent consumers can contribute a durable fixture or a redacted case
 study through the [validation template](independent-validation.md). Findings
 must link to a resolved issue or an explicitly accepted limitation before the
 entry is published.
+
+For current first-party readiness evidence and known gaps, see the [consumer
+validation status ledger](consumer-validation-status.md).
