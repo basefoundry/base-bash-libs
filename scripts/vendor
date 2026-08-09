@@ -4,7 +4,7 @@
 # bundles; this command never downloads code and never evaluates bundle data.
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 Usage:
   scripts/vendor create BUNDLE DESTINATION
   scripts/vendor update BUNDLE DESTINATION
@@ -19,7 +19,7 @@ error() {
 }
 
 hash_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
+    if command -v sha256sum > /dev/null 2>&1; then
         sha256sum -- "$1" | awk '{print $1}'
     else
         shasum -a 256 -- "$1" | awk '{print $1}'
@@ -34,9 +34,15 @@ verify_bundle() {
     }
     while read -r expected path; do
         [[ -n "$path" ]] || continue
-        [[ -f "$bundle/$path" ]] || { error "bundle file is missing: $path"; return 1; }
+        [[ -f "$bundle/$path" ]] || {
+            error "bundle file is missing: $path"
+            return 1
+        }
         actual="$(hash_file "$bundle/$path")"
-        [[ "$actual" == "$expected" ]] || { error "bundle hash mismatch: $path"; return 1; }
+        [[ "$actual" == "$expected" ]] || {
+            error "bundle hash mismatch: $path"
+            return 1
+        }
     done < "$bundle/MANIFEST.sha256"
 }
 
@@ -71,12 +77,22 @@ install_bundle() {
         error "refusing to overwrite existing vendor destination '$destination'"
         return 2
     }
-    temporary="${destination}.tmp.$$"
-    rm -rf -- "$temporary" 2>/dev/null || true
-    mkdir -p "$temporary" || return 1
-    copy_tree "$bundle" "$temporary" || return 1
-    write_lock "$temporary" "$bundle" "$mode" || return 1
-    mv -- "$temporary" "$destination" || return 1
+    temporary="$(mktemp -d "${destination}.tmp.XXXXXX")" || {
+        error "unable to create a private staging directory beside '$destination'"
+        return 1
+    }
+    if ! copy_tree "$bundle" "$temporary"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    if ! write_lock "$temporary" "$bundle" "$mode"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    if ! mv -- "$temporary" "$destination"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     printf 'Installed immutable vendor tree: %s\n' "$destination"
 }
 
@@ -92,14 +108,25 @@ update_bundle() {
         error "refusing update while rollback directory exists: $backup"
         return 2
     }
-    temporary="${destination}.tmp.$$"
-    rm -rf -- "$temporary" 2>/dev/null || true
-    mkdir -p "$temporary" || return 1
-    copy_tree "$bundle" "$temporary" || return 1
-    write_lock "$temporary" "$bundle" update || return 1
-    mv -- "$destination" "$backup" || return 1
+    temporary="$(mktemp -d "${destination}.tmp.XXXXXX")" || {
+        error "unable to create a private staging directory beside '$destination'"
+        return 1
+    }
+    if ! copy_tree "$bundle" "$temporary"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    if ! write_lock "$temporary" "$bundle" update; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    if ! mv -- "$destination" "$backup"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     if ! mv -- "$temporary" "$destination"; then
-        mv -- "$backup" "$destination" 2>/dev/null || true
+        mv -- "$backup" "$destination" 2> /dev/null || true
+        rm -rf -- "$temporary"
         return 1
     fi
     printf 'Updated vendor tree atomically: %s (rollback=%s)\n' "$destination" "$backup"
@@ -108,12 +135,21 @@ update_bundle() {
 rollback_bundle() {
     local destination="$1" backup temporary
     backup="${destination}.previous"
-    [[ -d "$backup" ]] || { error "no rollback directory exists: $backup"; return 1; }
-    temporary="${destination}.failed.$$"
-    [[ ! -e "$temporary" ]] || { error "rollback staging path exists: $temporary"; return 2; }
-    mv -- "$destination" "$temporary" || return 1
+    [[ -d "$backup" ]] || {
+        error "no rollback directory exists: $backup"
+        return 1
+    }
+    temporary="$(mktemp -d "${destination}.failed.XXXXXX")" || {
+        error "unable to create a private rollback staging directory beside '$destination'"
+        return 1
+    }
+    if ! mv -- "$destination" "$temporary/current"; then
+        rmdir -- "$temporary" 2> /dev/null || true
+        return 1
+    fi
     if ! mv -- "$backup" "$destination"; then
-        mv -- "$temporary" "$destination" 2>/dev/null || true
+        mv -- "$temporary/current" "$destination" 2> /dev/null || true
+        rmdir -- "$temporary" 2> /dev/null || true
         return 1
     fi
     printf 'Rolled back vendor tree: %s\n' "$destination"
@@ -127,9 +163,15 @@ verify_destination() {
     }
     while read -r expected path; do
         [[ -n "$path" ]] || continue
-        [[ -f "$destination/$path" ]] || { error "vendor file is missing: $path"; return 1; }
+        [[ -f "$destination/$path" ]] || {
+            error "vendor file is missing: $path"
+            return 1
+        }
         actual="$(hash_file "$destination/$path")"
-        [[ "$actual" == "$expected" ]] || { error "vendor hash mismatch: $path"; return 1; }
+        [[ "$actual" == "$expected" ]] || {
+            error "vendor hash mismatch: $path"
+            return 1
+        }
     done < "$destination/MANIFEST.sha256"
     lock_hash="$(sed -n 's/^manifest_sha256=//p' "$destination/base-bash-libs.lock" | sed -n '1p')"
     [[ "$lock_hash" == "$(hash_file "$destination/MANIFEST.sha256")" ]] || {
@@ -150,32 +192,78 @@ standalone_bundle() {
         error "refusing to overwrite standalone destination '$destination'"
         return 2
     }
-    temporary="${destination}.tmp.$$"
-    rm -rf -- "$temporary" 2>/dev/null || true
-    mkdir -p "$temporary" || return 1
-    copy_tree "$application" "$temporary" || return 1
+    temporary="$(mktemp -d "${destination}.tmp.XXXXXX")" || {
+        error "unable to create a private staging directory beside '$destination'"
+        return 1
+    }
+    if ! copy_tree "$application" "$temporary"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     # Put the verified framework at the standalone root so the copied
     # launcher resolves lib/bash without ambient environment variables, and
     # retain an explicit vendor copy for provenance/audit consumers.
-    copy_tree "$framework_bundle" "$temporary" || return 1
-    mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" || return 1
-    copy_tree "$framework_bundle" "$temporary/vendor/base-bash-libs" || return 1
-    cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" || return 1
-    chmod +x "$temporary/bin/base-bash" "$temporary/bin/app" || return 1
+    if ! copy_tree "$framework_bundle" "$temporary" ||
+        ! mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
+        ! copy_tree "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
+        ! cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" ||
+        ! chmod +x "$temporary/bin/base-bash" "$temporary/bin/app"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     printf 'standalone_format=1\nframework_lock=%s\nprovenance=verified-offline-bundle\n' \
-        "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || return 1
-    mv -- "$temporary" "$destination" || return 1
+        "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    if ! mv -- "$temporary" "$destination"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     printf 'Created standalone application bundle: %s\n' "$destination"
 }
 
 main() {
     case "${1:-}" in
-        create) (($# == 3)) || { usage; return 2; }; install_bundle "$2" "$3" create ;;
-        update) (($# == 3)) || { usage; return 2; }; update_bundle "$2" "$3" ;;
-        rollback) (($# == 2)) || { usage; return 2; }; rollback_bundle "$2" ;;
-        verify) (($# == 2)) || { usage; return 2; }; verify_destination "$2" ;;
-        standalone) (($# == 4)) || { usage; return 2; }; standalone_bundle "$2" "$3" "$4" ;;
-        *) usage; return 2 ;;
+    create)
+        (($# == 3)) || {
+            usage
+            return 2
+        }
+        install_bundle "$2" "$3" create
+        ;;
+    update)
+        (($# == 3)) || {
+            usage
+            return 2
+        }
+        update_bundle "$2" "$3"
+        ;;
+    rollback)
+        (($# == 2)) || {
+            usage
+            return 2
+        }
+        rollback_bundle "$2"
+        ;;
+    verify)
+        (($# == 2)) || {
+            usage
+            return 2
+        }
+        verify_destination "$2"
+        ;;
+    standalone)
+        (($# == 4)) || {
+            usage
+            return 2
+        }
+        standalone_bundle "$2" "$3" "$4"
+        ;;
+    *)
+        usage
+        return 2
+        ;;
     esac
 }
 
