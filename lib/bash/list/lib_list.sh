@@ -6,7 +6,7 @@
 [[ -n "${BASE_BASH_LIBS_LIST_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_list.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 readonly BASE_BASH_LIBS_LIST_LOADED=1
 
@@ -56,7 +56,11 @@ base_list_prepend() {
     __base_bash_libs_list_values=("$@")
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     __base_bash_libs_list_combined=("${__base_bash_libs_list_values[@]+"${__base_bash_libs_list_values[@]}"}" "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}")
-    eval "$__base_bash_libs_list_array_name=(\"\${__base_bash_libs_list_combined[@]}\")"
+    if ((${#__base_bash_libs_list_combined[@]} > 0)); then
+        eval "$__base_bash_libs_list_array_name=(\"\${__base_bash_libs_list_combined[@]}\")"
+    else
+        eval "$__base_bash_libs_list_array_name=()"
+    fi
 }
 
 #
@@ -78,7 +82,11 @@ base_list_remove() {
         __base_bash_libs_list_filtered+=("$__base_bash_libs_list_item")
     done
 
-    eval "$__base_bash_libs_list_array_name=(\"\${__base_bash_libs_list_filtered[@]}\")"
+    if ((${#__base_bash_libs_list_filtered[@]} > 0)); then
+        eval "$__base_bash_libs_list_array_name=(\"\${__base_bash_libs_list_filtered[@]}\")"
+    else
+        eval "$__base_bash_libs_list_array_name=()"
+    fi
 }
 
 base_list_contains() {
@@ -118,7 +126,11 @@ base_list_unique() {
         __base_bash_libs_list_unique+=("$__base_bash_libs_list_item")
     done
 
-    eval "$__base_bash_libs_list_result_name=(\"\${__base_bash_libs_list_unique[@]}\")"
+    if ((${#__base_bash_libs_list_unique[@]} > 0)); then
+        eval "$__base_bash_libs_list_result_name=(\"\${__base_bash_libs_list_unique[@]}\")"
+    else
+        eval "$__base_bash_libs_list_result_name=()"
+    fi
 }
 
 base_list_length() {
