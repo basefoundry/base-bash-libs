@@ -256,10 +256,7 @@ base_arg_parse() {
             __base_bash_libs_arg_set_assoc_value__ "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_option_name" "${__base_bash_libs_arg_options[$__base_bash_libs_arg_option_name]}"
         done
     fi
-    eval "$__base_bash_libs_arg_positionals_name=()"
-    for __base_bash_libs_arg_current in "${__base_bash_libs_arg_positionals[@]+"${__base_bash_libs_arg_positionals[@]}"}"; do
-        eval "$__base_bash_libs_arg_positionals_name+=(\"\$__base_bash_libs_arg_current\")"
-    done
+    eval "$__base_bash_libs_arg_positionals_name=(\"\${__base_bash_libs_arg_positionals[@]}\")"
 
     for __base_bash_libs_arg_repeatable_name in "${__base_bash_libs_arg_repeatable_names[@]+"${__base_bash_libs_arg_repeatable_names[@]}"}"; do
         __base_bash_libs_arg_publish_values=()
@@ -274,10 +271,7 @@ base_arg_parse() {
                 fi
             done
         fi
-        eval "$__base_bash_libs_arg_repeatable_name=()"
-        for __base_bash_libs_arg_repeatable_value in "${__base_bash_libs_arg_publish_values[@]+"${__base_bash_libs_arg_publish_values[@]}"}"; do
-            eval "$__base_bash_libs_arg_repeatable_name+=(\"\$__base_bash_libs_arg_repeatable_value\")"
-        done
+        eval "$__base_bash_libs_arg_repeatable_name=(\"\${__base_bash_libs_arg_publish_values[@]}\")"
     done
     return 0
 }
