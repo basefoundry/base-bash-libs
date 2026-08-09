@@ -76,6 +76,31 @@ declare_demo_model() {
     [[ "$output" == *"admin (manage)"* ]]
 }
 
+
+@test "help redacts sensitive defaults and aligns long option labels" {
+    base_cli_model_init secrets name=secrets version=2.0.0
+    base_cli_command secrets run "Run"
+    base_cli_option secrets run api_token value --api-token default='top-secret' sensitive=true help='Authentication token'
+    base_cli_option secrets run extraordinarily_long_option value --extraordinarily-long-option default=visible help='Long option'
+
+    bats_run base_cli_help secrets run
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--api-token <api_token>                                     Authentication token (default: <redacted>)"* ]]
+    [[ "$output" != *"top-secret"* ]]
+    [[ "$output" == *"--extraordinarily-long-option <extraordinarily_long_option> Long option (default: visible)"* ]]
+}
+
+@test "conflicts must reference an already declared option" {
+    base_cli_model_init invalid name=invalid
+    base_cli_command invalid run "Run"
+
+    bats_run base_cli_option invalid run mode flag --mode conflicts=missing
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"conflict option 'missing' is not declared"* ]]
+}
+
 @test "usage errors return status 2 with diagnostics" {
     declare_demo_model
 

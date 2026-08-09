@@ -18,6 +18,8 @@ metadata in one source of truth. It is one sourceable file and requires
   [conflicts=A,B] [sensitive=true|false] [hidden=true|false]` declares a
   `flag`, single `value`, or `repeatable` option. Tokens are exact `-x` or
   `--long` spellings; long options also accept `--long=value` for value kinds.
+  Conflict names must refer to options already declared on the same or an
+  ancestor command. Sensitive defaults are redacted in generated help.
 - `base_cli_positional MODEL PATH NAME [required=true|false]
   [repeatable=true|false] [default=VALUE] [enum=A,B] [validator=FUNCTION]
   [help=TEXT] [metavar=NAME]` declares a positional argument. A repeatable
