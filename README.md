@@ -59,37 +59,23 @@ provided by [`scripts/library-bundle`](scripts/library-bundle).
 Production-shaped reference applications and transparent startup benchmarks
 are in [`examples/reference-apps`](examples/reference-apps) and
 [`benchmarks/reference-apps.sh`](benchmarks/reference-apps.sh).
-Community participation, independent validation, and maintainer succession are
-documented in [`docs/community.md`](docs/community.md) and
-[`docs/who-uses-base-bash.md`](docs/who-uses-base-bash.md).
-The first-party v2 release handoff is tracked in
-[`first-party-cutover.yaml`](first-party-cutover.yaml) and checked by
-[`scripts/first-party-cutover`](scripts/first-party-cutover).
-Optional generator, Bats, formatter, and package-channel recipes are in
-[`docs/integrations.md`](docs/integrations.md); they do not add mandatory Core
-dependencies.
-See [`docs/single-file-distribution.md`](docs/single-file-distribution.md) for
-the contributor and release-artifact workflow.
-Offline immutable vendoring, atomic updates/rollback, and standalone assembly
-are provided by [`scripts/vendor`](scripts/vendor); no runtime network access
-or `curl | bash` installer is used.
-The v2 API charter, effect/status contract, and complete public-surface audit
-are in [`docs/v2-api-contract.md`](docs/v2-api-contract.md). The symbol-level
-mapping and migration aid are in [`docs/v2-symbol-map.md`](docs/v2-symbol-map.md).
-Start with the [versioned v2 documentation](docs/README.md), especially the
-[five-minute quickstart](docs/v2/quickstart.md) and the
-[v1.4.0-to-v2 migration guide](docs/v2/migration-v1.4-to-v2.md).
-See the [support policy](docs/support-policy.md),
-[threat model](docs/threat-model.md), and [security policy](SECURITY.md) before
-embedding the framework in a production or privileged workflow.
-The machine-readable module/API contract is in
-[`base_api_manifest.yaml`](base_api_manifest.yaml), with its schema documented
-in [`docs/api-manifest-schema.md`](docs/api-manifest-schema.md) and its
-generated reference in [`docs/api-reference.md`](docs/api-reference.md).
-The supported-runtime, stability, and caller-responsibility contract is in
-[`docs/support-policy.md`](docs/support-policy.md); the security reporting
-process and threat model are in [`SECURITY.md`](SECURITY.md) and
-[`docs/threat-model.md`](docs/threat-model.md).
+For the rest of the documentation, use the map near the end of this README.
+
+## When to reach for Base Bash
+
+Use Base Bash when Bash is the runtime you have to ship and you still need
+production-grade structure: macOS or Linux provisioning and init scripts, CI
+glue on hosts where no other language runtime is guaranteed, embedded recovery
+or bootstrap environments, and small operational tools that must remain
+sourceable, auditable, and easy to vendor.
+
+If you can choose a richer runtime, choose the tool that best fits the job.
+Base Bash is deliberately for the cases where leaving Bash is not practical;
+it adds safe execution, typed configuration, declarative CLI contracts,
+cleanup/lifecycle boundaries, and immutable package identity to that constraint.
+
+The shortest path is the [five-minute quickstart](docs/v2/quickstart.md),
+followed by the examples and the non-mutating `base-bash check` command.
 
 ## Installation and Usage
 
@@ -271,6 +257,36 @@ brew install bats-core shellcheck
 Local validation runs the logging compatibility smoke on the installed
 supported Bash. CI runs the same script on the exact minimum runtime, Bash
 4.2.53, using a digest-pinned Docker Official Image.
+
+## Documentation map
+
+Start with the [versioned v2 documentation](docs/README.md), especially the
+[five-minute quickstart](docs/v2/quickstart.md) and the
+[v1.4.0-to-v2 migration guide](docs/v2/migration-v1.4-to-v2.md).
+
+- [API charter and status contract](docs/v2-api-contract.md)
+- [API symbol map](docs/v2-symbol-map.md)
+- [Generated API reference](docs/api-reference.md) and
+  [manifest schema](docs/api-manifest-schema.md)
+- [Pinned consumption](docs/pinned-consumption.md),
+  [vendor workflow](docs/vendor-workflow.md), and
+  [single-file distribution](docs/single-file-distribution.md)
+- [Integrations](docs/integrations.md) for optional generator, Bats, formatter,
+  and package-channel recipes
+- [Support matrix](docs/support-matrix.md), [support policy](docs/support-policy.md),
+  [threat model](docs/threat-model.md), and [security policy](SECURITY.md)
+- [Community participation and independent validation](docs/community.md),
+  [who uses Base Bash](docs/who-uses-base-bash.md), and the
+  [consumer-validation status](docs/consumer-validation-status.md)
+- [Versioning policy](docs/versioning-policy.md) and
+  [release process](docs/release-process.md)
+
+The first-party v2 release handoff is tracked in
+[`first-party-cutover.yaml`](first-party-cutover.yaml) and checked by
+[`scripts/first-party-cutover`](scripts/first-party-cutover). The machine-readable
+release contract lives in [`base_manifest.yaml`](base_manifest.yaml), and the
+machine-readable module/API contract lives in
+[`base_api_manifest.yaml`](base_api_manifest.yaml).
 
 ## Base
 
