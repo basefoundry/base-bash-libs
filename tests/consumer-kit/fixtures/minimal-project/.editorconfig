@@ -9,3 +9,6 @@ indent_size = 4
 
 [*.sh]
 shell_variant = bash
+
+[*.bats]
+shell_variant = bats
