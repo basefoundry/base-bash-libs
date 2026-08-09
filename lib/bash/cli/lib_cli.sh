@@ -344,6 +344,44 @@ base_cli_model_init() {
     return 0
 }
 
+# base_cli_validate_model - Verify that every declared command handler exists.
+#
+# Declaration remains order-independent: callers may declare a model before
+# defining its handlers. Call this explicitly from tests or CI after all
+# handlers have been loaded to fail early on wiring mistakes.
+base_cli_validate_model() {
+    local model="${1-}" key path handler
+    local -a missing_handlers=()
+
+    (($# == 1)) || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_validate_model: expected a model identifier.'
+        return 2
+    }
+    if ! __base_bash_libs_cli_valid_model__ "$model" || ! __base_bash_libs_cli_model_exists__ "$model"; then
+        __base_bash_libs_cli_declaration_usage__ "base_cli_validate_model: model '$model' is not initialized."
+        return 2
+    fi
+
+    handler="${__base_bash_libs_cli_models["$model|meta|handler"]-}"
+    if [[ -n "$handler" ]] && ! declare -F "$handler" >/dev/null 2>&1; then
+        missing_handlers+=("<root>:$handler")
+    fi
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$key" == "$model|command|handler|"* ]] || continue
+        path="${key#"$model|command|handler|"}"
+        handler="${__base_bash_libs_cli_models["$key"]-}"
+        [[ -n "$handler" ]] || continue
+        if ! declare -F "$handler" >/dev/null 2>&1; then
+            missing_handlers+=("$path:$handler")
+        fi
+    done
+    if ((${#missing_handlers[@]} > 0)); then
+        __base_bash_libs_cli_declaration_usage__ "base_cli_validate_model: handlers are not defined: ${missing_handlers[*]}"
+        return 2
+    fi
+    return 0
+}
+
 # base_cli_command - Adds a command path such as `admin/user` to a model.
 # Usage: base_cli_command model path description [handler] [aliases=a,b]
 base_cli_command() {

@@ -142,6 +142,21 @@ declare_demo_model() {
     [ "$handler_calls" -eq 1 ]
 }
 
+@test "explicit model validation catches undeclared handlers" {
+    base_cli_model_init validate name=validate handler=missing_root
+    base_cli_command validate run "Run" handler=missing_run
+
+    bats_run base_cli_validate_model validate
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"<root>:missing_root"* ]]
+    [[ "$output" == *"run:missing_run"* ]]
+
+    missing_root() { :; }
+    missing_run() { :; }
+    base_cli_validate_model validate
+}
+
 @test "completion emits aliases and a self-contained completion adapter" {
     declare_demo_model
 

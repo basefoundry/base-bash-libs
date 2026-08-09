@@ -8,6 +8,8 @@ metadata in one source of truth. It is one sourceable file and requires
 ## Public API
 
 - `base_cli_model_init MODEL [name=PROGRAM] [version=VERSION] [description=TEXT] [handler=FUNCTION]`
+- `base_cli_validate_model MODEL` checks all declared handlers after the model
+  and application functions have been loaded; use it in tests or CI.
   starts or replaces a model. `MODEL` is an in-process identifier and `name`
   is the executable name shown in usage and completion output.
 - `base_cli_command MODEL PATH DESCRIPTION [HANDLER] [aliases=A,B]` declares a

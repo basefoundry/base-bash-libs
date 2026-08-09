@@ -268,6 +268,7 @@ statuses, and side effects are normative in the linked module README and
 - `base_cli_result_get` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_result_get_positional` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_run` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_validate_model` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 
 ### `app`
 
