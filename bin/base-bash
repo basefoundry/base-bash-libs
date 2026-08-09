@@ -939,7 +939,7 @@ main() {
             return $?
         }
         ;;
-    --*)
+    -*)
         __base_bash_libs_launcher_usage_error__ "Unknown launcher option '$1'."
         return $?
         ;;
