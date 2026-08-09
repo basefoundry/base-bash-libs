@@ -363,7 +363,7 @@ base_cli_validate_model() {
     fi
 
     handler="${__base_bash_libs_cli_models["$model|meta|handler"]-}"
-    if [[ -n "$handler" ]] && ! declare -F "$handler" >/dev/null 2>&1; then
+    if [[ -n "$handler" ]] && ! declare -F "$handler" > /dev/null 2>&1; then
         missing_handlers+=("<root>:$handler")
     fi
     for key in "${!__base_bash_libs_cli_models[@]}"; do
@@ -371,7 +371,7 @@ base_cli_validate_model() {
         path="${key#"$model|command|handler|"}"
         handler="${__base_bash_libs_cli_models["$key"]-}"
         [[ -n "$handler" ]] || continue
-        if ! declare -F "$handler" >/dev/null 2>&1; then
+        if ! declare -F "$handler" > /dev/null 2>&1; then
             missing_handlers+=("$path:$handler")
         fi
     done
