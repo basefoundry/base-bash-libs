@@ -600,8 +600,7 @@ base_git_check_script_up_to_date() {
         tracked_status=$?
     fi
     case "$tracked_status" in
-    0)
-        ;;
+    0) ;;
     1)
         base_std_log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
         return 0
@@ -619,8 +618,7 @@ base_git_check_script_up_to_date() {
         diff_status=$?
     fi
     case "$diff_status" in
-    0)
-        ;;
+    0) ;;
     1)
         dirty=true
         ;;
@@ -635,8 +633,7 @@ base_git_check_script_up_to_date() {
         diff_status=$?
     fi
     case "$diff_status" in
-    0)
-        ;;
+    0) ;;
     1)
         dirty=true
         ;;
