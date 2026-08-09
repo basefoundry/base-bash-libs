@@ -6,12 +6,12 @@
 [[ -n "${BASE_BASH_LIBS_APP_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_app.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 if [[ "${BASE_BASH_LIBS_CLI_LOADED:-}" != "1" ]]; then
-    if ! base_std_import cli/lib_cli.sh 2>/dev/null; then
+    if ! base_std_import cli/lib_cli.sh 2> /dev/null; then
         printf '%s\n' "Error: lib_app.sh requires lib_cli.sh to be available in the loaded package." >&2
-        return 1 2>/dev/null || exit 1
+        return 1 2> /dev/null || exit 1
     fi
 fi
 readonly BASE_BASH_LIBS_APP_LOADED=1
@@ -54,7 +54,7 @@ __base_bash_libs_app_valid_identifier__() {
 }
 
 __base_bash_libs_app_model_exists__() {
-    [[ -n "${__base_bash_libs_app_models[${1-}|name]+set}" ]]
+    [[ -n "${__base_bash_libs_app_models["${1-}|name"]+set}" ]]
 }
 
 __base_bash_libs_app_parse_attrs__() {
@@ -83,13 +83,13 @@ __base_bash_libs_app_parse_attrs__() {
 __base_bash_libs_app_attr_allowed__() {
     local key="${1-}"
     case "$key" in
-        name|description|env|default|required|secret|enum|validator|help)
-            return 0
-            ;;
-        *)
-            __base_bash_libs_app_error__ "unknown application attribute '$key'."
-            return 2
-            ;;
+    name | description | env | default | required | secret | enum | validator | help)
+        return 0
+        ;;
+    *)
+        __base_bash_libs_app_error__ "unknown application attribute '$key'."
+        return 2
+        ;;
     esac
 }
 
@@ -110,38 +110,38 @@ __base_bash_libs_app_trim__() {
 
 __base_bash_libs_app_validate_value__() {
     local model="$1" key="$2" value="$3" type enum validator item
-    type="${__base_bash_libs_app_config[$model|$key|type]-}"
-    enum="${__base_bash_libs_app_config[$model|$key|enum]-}"
-    validator="${__base_bash_libs_app_config[$model|$key|validator]-}"
+    type="${__base_bash_libs_app_config["$model|$key|type"]-}"
+    enum="${__base_bash_libs_app_config["$model|$key|enum"]-}"
+    validator="${__base_bash_libs_app_config["$model|$key|validator"]-}"
 
     case "$type" in
-        string|path) ;;
-        bool)
-            __base_bash_libs_app_validate_bool__ "$value" || {
-                __base_bash_libs_app_error__ "configuration '$key' expects a boolean."
-                return 2
-            }
-            ;;
-        integer)
-            [[ "$value" =~ ^-?[0-9]+$ ]] || {
-                __base_bash_libs_app_error__ "configuration '$key' expects an integer."
-                return 2
-            }
-            ;;
-        enum)
-            [[ -n "$enum" ]] || {
-                __base_bash_libs_app_error__ "configuration '$key' has no enum values."
-                return 2
-            }
-            ;;
-        *)
-            __base_bash_libs_app_error__ "configuration '$key' has unsupported type '$type'."
+    string | path) ;;
+    bool)
+        __base_bash_libs_app_validate_bool__ "$value" || {
+            __base_bash_libs_app_error__ "configuration '$key' expects a boolean."
             return 2
-            ;;
+        }
+        ;;
+    integer)
+        [[ "$value" =~ ^-?[0-9]+$ ]] || {
+            __base_bash_libs_app_error__ "configuration '$key' expects an integer."
+            return 2
+        }
+        ;;
+    enum)
+        [[ -n "$enum" ]] || {
+            __base_bash_libs_app_error__ "configuration '$key' has no enum values."
+            return 2
+        }
+        ;;
+    *)
+        __base_bash_libs_app_error__ "configuration '$key' has unsupported type '$type'."
+        return 2
+        ;;
     esac
     if [[ -n "$enum" ]]; then
         local matched=0
-        IFS=, read -r -a __base_bash_libs_app_enum_values <<<"$enum"
+        IFS=, read -r -a __base_bash_libs_app_enum_values <<< "$enum"
         for item in "${__base_bash_libs_app_enum_values[@]}"; do
             if [[ "$item" == "$value" ]]; then
                 matched=1
@@ -154,11 +154,11 @@ __base_bash_libs_app_validate_value__() {
         }
     fi
     if [[ -n "$validator" ]]; then
-        declare -F "$validator" >/dev/null 2>&1 || {
+        declare -F "$validator" > /dev/null 2>&1 || {
             __base_bash_libs_app_error__ "validator '$validator' for configuration '$key' is not defined."
             return 2
         }
-        "$validator" "$value" >/dev/null 2>&1 || {
+        "$validator" "$value" > /dev/null 2>&1 || {
             __base_bash_libs_app_error__ "configuration '$key' failed validator '$validator'."
             return 2
         }
@@ -194,23 +194,23 @@ __base_bash_libs_app_set_file_values__() {
             __base_bash_libs_app_error__ "configuration file '$file' line $line_number has invalid key '$key'."
             return 2
         }
-        [[ -n "${__base_bash_libs_app_config[$model|$key|type]+set}" ]] || {
+        [[ -n "${__base_bash_libs_app_config["$model|$key|type"]+set}" ]] || {
             __base_bash_libs_app_error__ "configuration file '$file' line $line_number contains unknown key '$key'."
             return 2
         }
         __base_bash_libs_app_set_value__ "$model" "$key" "$value" "$source" || return $?
-    done <"$file"
+    done < "$file"
 }
 
 __base_bash_libs_app_hook_dispatch__() {
     local model="$1" phase="$2" status="$3" index hook function
     local -a hooks=()
 
-    IFS=, read -r -a hooks <<<"${__base_bash_libs_app_models[$model|hooks|$phase]-}"
-    for ((index=${#hooks[@]} - 1; index >= 0; index--)); do
+    IFS=, read -r -a hooks <<< "${__base_bash_libs_app_models["$model|hooks|$phase"]-}"
+    for ((index = ${#hooks[@]} - 1; index >= 0; index--)); do
         hook="${hooks[index]}"
         [[ -n "$hook" ]] || continue
-        function="${__base_bash_libs_app_hooks[$model|$phase|$hook]-}"
+        function="${__base_bash_libs_app_hooks["$model|$phase|$hook"]-}"
         [[ -n "$function" ]] || continue
         if ! "$function" "$phase" "$status"; then
             base_std_log_warn -l base_bash_libs.app "Application $phase hook '$hook' failed; preserving status $status."
@@ -225,14 +225,14 @@ __base_bash_libs_app_cleanup_dispatch__() {
         status=$entry_status
     fi
     [[ -n "$model" ]] || return "$status"
-    [[ "${__base_bash_libs_app_models[$model|cleanup-dispatched]-0}" == 1 ]] && return "$status"
+    [[ "${__base_bash_libs_app_models["$model|cleanup-dispatched"]-0}" == 1 ]] && return "$status"
     __base_bash_libs_app_models["$model|cleanup-dispatched"]=1
     case "$status" in
-        0) __base_bash_libs_app_hook_dispatch__ "$model" normal "$status" ;;
-        129) __base_bash_libs_app_hook_dispatch__ "$model" hup "$status" ;;
-        130) __base_bash_libs_app_hook_dispatch__ "$model" int "$status" ;;
-        143) __base_bash_libs_app_hook_dispatch__ "$model" term "$status" ;;
-        *) __base_bash_libs_app_hook_dispatch__ "$model" fatal "$status" ;;
+    0) __base_bash_libs_app_hook_dispatch__ "$model" normal "$status" ;;
+    129) __base_bash_libs_app_hook_dispatch__ "$model" hup "$status" ;;
+    130) __base_bash_libs_app_hook_dispatch__ "$model" int "$status" ;;
+    143) __base_bash_libs_app_hook_dispatch__ "$model" term "$status" ;;
+    *) __base_bash_libs_app_hook_dispatch__ "$model" fatal "$status" ;;
     esac
     __base_bash_libs_app_hook_dispatch__ "$model" cleanup "$status"
     BASE_BASH_LIBS_APP_LAST_STATUS="$status"
@@ -306,7 +306,7 @@ base_app_config_define() {
         __base_bash_libs_app_error__ "base_app_config_define: invalid key '$key'."
         return 2
     }
-    case "$type" in string|path|bool|integer|enum) ;; *)
+    case "$type" in string | path | bool | integer | enum) ;; *)
         __base_bash_libs_app_error__ "base_app_config_define: unsupported type '$type'."
         return 2
         ;;
@@ -354,7 +354,7 @@ base_app_config_define() {
             __base_bash_libs_app_config["$model|$key|$argument"]="${__base_bash_libs_app_attrs[$argument]}"
         fi
     done
-    config_key="${__base_bash_libs_app_models[$model|config-keys]-}"
+    config_key="${__base_bash_libs_app_models["$model|config-keys"]-}"
     if [[ -n "$config_key" ]]; then config_key="$config_key,$key"; else config_key="$key"; fi
     __base_bash_libs_app_models["$model|config-keys"]="$config_key"
     return 0
@@ -369,14 +369,14 @@ base_app_config_set_cli() {
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
-    [[ -n "${__base_bash_libs_app_config[$model|$key|type]+set}" ]] || return 1
+    [[ -n "${__base_bash_libs_app_config["$model|$key|type"]+set}" ]] || return 1
     __base_bash_libs_app_cli["$model|$key"]="$value"
 }
 
 # base_app_config_load - Applies user, project, environment, and CLI values.
 # Precedence is CLI > environment > project > user > default.
 base_app_config_load() {
-    local model="${1-}" argument project_file="" user_file="" key env_name value
+    local model="${1-}" argument project_file="" user_file="" key value_key env_name value
     local -a cli_pairs=()
     local parse_options=1
 
@@ -394,19 +394,28 @@ base_app_config_load() {
             continue
         fi
         if ((parse_options)) && [[ "$argument" == --project || "$argument" == --config ]]; then
-            (($# > 0)) || { __base_bash_libs_app_error__ "$argument requires a file."; return 2; }
+            (($# > 0)) || {
+                __base_bash_libs_app_error__ "$argument requires a file."
+                return 2
+            }
             project_file="$1"
             shift
             continue
         fi
         if ((parse_options)) && [[ "$argument" == --user ]]; then
-            (($# > 0)) || { __base_bash_libs_app_error__ '--user requires a file.'; return 2; }
+            (($# > 0)) || {
+                __base_bash_libs_app_error__ '--user requires a file.'
+                return 2
+            }
             user_file="$1"
             shift
             continue
         fi
         if ((parse_options)) && [[ "$argument" == --cli ]]; then
-            (($# > 0)) || { __base_bash_libs_app_error__ '--cli requires key=value.'; return 2; }
+            (($# > 0)) || {
+                __base_bash_libs_app_error__ '--cli requires key=value.'
+                return 2
+            }
             cli_pairs+=("$1")
             shift
             continue
@@ -415,17 +424,18 @@ base_app_config_load() {
         return 2
     done
 
-    IFS=, read -r -a __base_bash_libs_app_keys <<<"${__base_bash_libs_app_models[$model|config-keys]-}"
+    IFS=, read -r -a __base_bash_libs_app_keys <<< "${__base_bash_libs_app_models["$model|config-keys"]-}"
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        unset "__base_bash_libs_app_values[$model|$key]" "__base_bash_libs_app_provenance[$model|$key]"
-        if [[ -n "${__base_bash_libs_app_config[$model|$key|default]+set}" ]]; then
-            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_config[$model|$key|default]}" default || return $?
+        value_key="$model|$key"
+        unset "__base_bash_libs_app_values[$value_key]" "__base_bash_libs_app_provenance[$value_key]"
+        if [[ -n "${__base_bash_libs_app_config["$model|$key|default"]+set}" ]]; then
+            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_config["$model|$key|default"]}" default || return $?
         fi
     done
     [[ -z "$user_file" ]] || __base_bash_libs_app_set_file_values__ "$model" "$user_file" user || return $?
     [[ -z "$project_file" ]] || __base_bash_libs_app_set_file_values__ "$model" "$project_file" project || return $?
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        env_name="${__base_bash_libs_app_config[$model|$key|env]-}"
+        env_name="${__base_bash_libs_app_config["$model|$key|env"]-}"
         if [[ -n "$env_name" && -n "${!env_name+x}" ]]; then
             __base_bash_libs_app_set_value__ "$model" "$key" "${!env_name}" environment || return $?
         fi
@@ -437,18 +447,18 @@ base_app_config_load() {
         }
         key="${argument%%=*}"
         value="${argument#*=}"
-        [[ -n "${__base_bash_libs_app_config[$model|$key|type]+set}" ]] || {
+        [[ -n "${__base_bash_libs_app_config["$model|$key|type"]+set}" ]] || {
             __base_bash_libs_app_error__ "CLI configuration contains unknown key '$key'."
             return 2
         }
         __base_bash_libs_app_set_value__ "$model" "$key" "$value" cli || return $?
     done
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        if [[ -n "${__base_bash_libs_app_cli[$model|$key]+set}" ]]; then
-            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_cli[$model|$key]}" cli || return $?
+        if [[ -n "${__base_bash_libs_app_cli["$model|$key"]+set}" ]]; then
+            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_cli["$model|$key"]}" cli || return $?
         fi
-        if [[ -z "${__base_bash_libs_app_provenance[$model|$key]-}" ]] &&
-            __base_bash_libs_app_bool_true__ "${__base_bash_libs_app_config[$model|$key|required]-false}"; then
+        if [[ -z "${__base_bash_libs_app_provenance["$model|$key"]-}" ]] &&
+            __base_bash_libs_app_bool_true__ "${__base_bash_libs_app_config["$model|$key|required"]-false}"; then
             __base_bash_libs_app_error__ "required configuration '$key' was not provided."
             return 2
         fi
@@ -466,8 +476,8 @@ base_app_config_get() {
     }
     __base_bash_libs_std_assert_public_variable_names__ base_app_config_get "$result_name" || return 1
     __base_bash_libs_std_assert_writable_output__ base_app_config_get "$result_name" || return 1
-    [[ -n "${__base_bash_libs_app_values[$model|$key]+set}" ]] || return 1
-    printf -v "$result_name" '%s' "${__base_bash_libs_app_values[$model|$key]}"
+    [[ -n "${__base_bash_libs_app_values["$model|$key"]+set}" ]] || return 1
+    printf -v "$result_name" '%s' "${__base_bash_libs_app_values["$model|$key"]}"
 }
 
 # base_app_config_provenance - Copies the source of one effective value.
@@ -480,8 +490,17 @@ base_app_config_provenance() {
     }
     __base_bash_libs_std_assert_public_variable_names__ base_app_config_provenance "$result_name" || return 1
     __base_bash_libs_std_assert_writable_output__ base_app_config_provenance "$result_name" || return 1
-    [[ -n "${__base_bash_libs_app_provenance[$model|$key]+set}" ]] || return 1
-    printf -v "$result_name" '%s' "${__base_bash_libs_app_provenance[$model|$key]}"
+    [[ -n "${__base_bash_libs_app_provenance["$model|$key"]+set}" ]] || return 1
+    printf -v "$result_name" '%s' "${__base_bash_libs_app_provenance["$model|$key"]}"
+}
+
+__base_bash_libs_app_escape_report_field__() {
+    local value="${1-}"
+    value="${value//\\/\\\\}"
+    value="${value//$'\t'/\\t}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    printf '%s' "$value"
 }
 
 # base_app_config_report - Emits deterministic, secret-redacted effective data.
@@ -493,13 +512,16 @@ base_app_config_report() {
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
-    IFS=, read -r -a __base_bash_libs_app_keys <<<"${__base_bash_libs_app_models[$model|config-keys]-}"
+    IFS=, read -r -a __base_bash_libs_app_keys <<< "${__base_bash_libs_app_models["$model|config-keys"]-}"
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        value="${__base_bash_libs_app_values[$model|$key]-<unset>}"
-        source="${__base_bash_libs_app_provenance[$model|$key]-unset}"
-        secret="${__base_bash_libs_app_config[$model|$key|secret]-false}"
+        value="${__base_bash_libs_app_values["$model|$key"]-<unset>}"
+        source="${__base_bash_libs_app_provenance["$model|$key"]-unset}"
+        secret="${__base_bash_libs_app_config["$model|$key|secret"]-false}"
         __base_bash_libs_app_bool_true__ "$secret" && value='<redacted>'
-        printf '%s\t%s\t%s\n' "$key" "$source" "$value"
+        printf '%s\t%s\t%s\n' \
+            "$(__base_bash_libs_app_escape_report_field__ "$key")" \
+            "$(__base_bash_libs_app_escape_report_field__ "$source")" \
+            "$(__base_bash_libs_app_escape_report_field__ "$value")"
     done
 }
 
@@ -572,7 +594,7 @@ base_app_hook() {
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
-    case "$phase" in normal|fatal|int|term|hup|cleanup) ;; *)
+    case "$phase" in normal | fatal | int | term | hup | cleanup) ;; *)
         __base_bash_libs_app_error__ "base_app_hook: unsupported phase '$phase'."
         return 2
         ;;
@@ -585,13 +607,13 @@ base_app_hook() {
         __base_bash_libs_app_error__ "base_app_hook: invalid function name '$function_name'."
         return 2
     }
-    declare -F "$function_name" >/dev/null 2>&1 || {
+    declare -F "$function_name" > /dev/null 2>&1 || {
         __base_bash_libs_app_error__ "base_app_hook: function '$function_name' is not defined."
         return 1
     }
-    [[ -z "${__base_bash_libs_app_hooks[$model|$phase|$hook]+set}" ]] || return 1
+    [[ -z "${__base_bash_libs_app_hooks["$model|$phase|$hook"]+set}" ]] || return 1
     __base_bash_libs_app_hooks["$model|$phase|$hook"]="$function_name"
-    hooks="${__base_bash_libs_app_models[$model|hooks|$phase]-}"
+    hooks="${__base_bash_libs_app_models["$model|hooks|$phase"]-}"
     if [[ -n "$hooks" ]]; then hooks="$hooks,$hook"; else hooks="$hook"; fi
     __base_bash_libs_app_models["$model|hooks|$phase"]="$hooks"
     return 0
@@ -607,7 +629,7 @@ base_app_run() {
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
     __base_bash_libs_app_valid_identifier__ "$handler" || return 2
-    declare -F "$handler" >/dev/null 2>&1 || {
+    declare -F "$handler" > /dev/null 2>&1 || {
         __base_bash_libs_app_error__ "base_app_run: handler '$handler' is not defined."
         return 1
     }

@@ -80,6 +80,19 @@ declare_test_config() {
     [[ "$output" != *"top-secret"* ]]
 }
 
+@test "effective report escapes field delimiters in non-secret values" {
+    base_app_init report name=report
+    base_app_config_define report message string default='unused'
+    base_app_config_set_cli report message $'line\twith\nseparators'
+    base_app_config_load report
+
+    bats_run base_app_config_report report
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *$'message\tcli\tline\\twith\\nseparators'* ]]
+    [ "$(printf '%s\n' "$output" | awk 'END { print NR }')" -eq 1 ]
+}
+
 @test "standard options publish opt-in policy and noninteractive prompts are denied" {
     base_cli_model_init demo name=demo
     base_cli_command demo run "Run"
