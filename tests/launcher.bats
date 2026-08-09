@@ -240,6 +240,10 @@ SCRIPT
     [[ "$output" == *"ERROR: Unknown launcher option"* ]]
     [[ "$output" == *"Usage:"* ]]
 
+    bats_run "$BASE_REPO_ROOT/bin/base-bash" -x
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"ERROR: Unknown launcher option '-x'"* ]]
+
     bats_run "$BASE_REPO_ROOT/bin/base-bash" "$missing_script"
     [ "$status" -eq 2 ]
     [[ "$output" == *"ERROR: Script "*" was not found."* ]]

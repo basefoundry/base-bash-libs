@@ -21,7 +21,8 @@ base_bats_run() {
 base_bats_check() {
     local project_root="$1"
     local format="${2:-human}"
-    local launcher="$(base_bats_repo_root)/bin/base-bash"
+    local launcher
+    launcher="$(base_bats_repo_root)/bin/base-bash"
 
     BASE_BASH_LIBS_DIR="$(base_bats_framework_dir)" \
         "$launcher" check --project "$project_root" --format "$format"
