@@ -658,10 +658,8 @@ EOF
     printf 'local one\n' > "$repo/shared/one.txt"
     printf 'local two\n' > "$repo/shared/two.txt"
 
-    pushd "$repo" >/dev/null
-    __base_bash_libs_git_only_path_dirty__ "shared"
+    __base_bash_libs_git_only_path_dirty__ "$repo" "shared"
     rc=$?
-    popd >/dev/null
 
     [ "$rc" -eq 0 ]
 }
@@ -677,7 +675,7 @@ EOF
     printf 'local change\n' >> "$repo/shared/hello world.txt"
 
     pushd "$repo" >/dev/null
-    __base_bash_libs_git_only_path_dirty__ "shared"
+    __base_bash_libs_git_only_path_dirty__ "$repo" "shared"
     rc=$?
     popd >/dev/null
 
@@ -698,7 +696,7 @@ EOF
 
     pushd "$repo" >/dev/null
     set +e
-    __base_bash_libs_git_only_path_dirty__ "shared"
+    __base_bash_libs_git_only_path_dirty__ "$repo" "shared"
     rc=$?
     set -e
     popd >/dev/null
@@ -718,7 +716,7 @@ EOF
 
     pushd "$repo" >/dev/null
     set +e
-    __base_bash_libs_git_only_path_dirty__ "shared"
+    __base_bash_libs_git_only_path_dirty__ "$repo" "shared"
     rc=$?
     set -e
     popd >/dev/null
@@ -737,7 +735,7 @@ EOF
     git -C "$repo" mv shared/one.txt shared/two.txt
 
     pushd "$repo" >/dev/null
-    __base_bash_libs_git_only_path_dirty__ "shared"
+    __base_bash_libs_git_only_path_dirty__ "$repo" "shared"
     rc=$?
     popd >/dev/null
 

@@ -214,13 +214,13 @@ __base_bash_libs_git_path_matches_allowed_path__() {
 }
 
 __base_bash_libs_git_only_path_dirty__() {
-    (($# == 1)) || return 1
+    (($# == 2)) || return 1
 
-    local allowed_path="$1"
+    local repo_dir="$1" allowed_path="$2"
     local status_file status_record status_code path related_path
 
     base_std_make_temp_file status_file base-git-status || return 1
-    if ! git status --porcelain=v1 --untracked-files=no --ignore-submodules=none -z > "$status_file"; then
+    if ! git -C "$repo_dir" status --porcelain=v1 --untracked-files=no --ignore-submodules=none -z > "$status_file"; then
         base_std_unregister_cleanup_path "$status_file"
         rm -f -- "$status_file"
         return 1
@@ -400,7 +400,7 @@ base_git_update_repo() {
         dirty=true
     fi
     if [[ "$dirty" == true ]]; then
-        if [[ -n "$allowed_dirty_path" ]] && __base_bash_libs_git_only_path_dirty__ "$allowed_dirty_path"; then
+        if [[ -n "$allowed_dirty_path" ]] && __base_bash_libs_git_only_path_dirty__ "$git_repo" "$allowed_dirty_path"; then
             base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' only has tracked changes in '$allowed_dirty_path'; attempting git pull."
         else
             base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' has local changes; skipping auto-update. Commit or stash to enable git pull."
