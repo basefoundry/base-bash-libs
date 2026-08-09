@@ -26,6 +26,8 @@ base_app_config_provenance deploy channel source
 The deterministic precedence is `CLI > environment > project > user >
 default`. `base_app_config_report` prints `key`, source, and effective value
 as tab-separated records and redacts values declared with `secret=true`.
+Backslashes, tabs, carriage returns, and newlines in fields are escaped as
+`\\`, `\\t`, `\\r`, and `\\n` so each record remains one safe line.
 `base_app_config_set_cli` is a programmatic equivalent of `--cli key=value`.
 
 Supported types are `string`, `path`, `bool`, `integer`, and `enum`. Optional
