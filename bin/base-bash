@@ -308,27 +308,27 @@ demo_execute() {
     base_app_hook demo_policy cleanup generated_cleanup demo_cleanup_hook || return $?
 
     case "$command" in
-        status)
-            base_std_log_info -l generated.demo "framework=${BASE_BASH_LIBS_VERSION:-unknown}"
-            printf 'status=ready\n'
-            ;;
-        run)
-            base_app_config_get demo_policy name name || return $?
-            if ((BASE_BASH_LIBS_APP_DRY_RUN)); then
-                printf 'dry-run=would-greet:%s\n' "$name" >&2
-            else
-                base_std_log_info -l generated.demo "running application"
-                printf 'hello=%s\n' "$name"
-            fi
-            ;;
-        fail)
-            base_std_log_error -l generated.demo 'intentional failure example'
-            return 1
-            ;;
-        *)
-            base_std_log_error -l generated.demo "unknown command '$command'"
-            return 2
-            ;;
+    status)
+        base_std_log_info -l generated.demo "framework=${BASE_BASH_LIBS_VERSION:-unknown}"
+        printf 'status=ready\n'
+        ;;
+    run)
+        base_app_config_get demo_policy name name || return $?
+        if ((BASE_BASH_LIBS_APP_DRY_RUN)); then
+            printf 'dry-run=would-greet:%s\n' "$name" >&2
+        else
+            base_std_log_info -l generated.demo "running application"
+            printf 'hello=%s\n' "$name"
+        fi
+        ;;
+    fail)
+        base_std_log_error -l generated.demo 'intentional failure example'
+        return 1
+        ;;
+    *)
+        base_std_log_error -l generated.demo "unknown command '$command'"
+        return 2
+        ;;
     esac
 }
 
