@@ -6,7 +6,7 @@
 [[ -n "${BASE_BASH_LIBS_ARG_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_arg.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 readonly BASE_BASH_LIBS_ARG_LOADED=1
 
@@ -23,9 +23,9 @@ __base_bash_libs_arg_assert_distinct_names__() {
     local __base_bash_libs_arg_left_index __base_bash_libs_arg_right_index
 
     for ((__base_bash_libs_arg_left_index = 0; __base_bash_libs_arg_left_index < ${#__base_bash_libs_arg_distinct_names[@]}; __base_bash_libs_arg_left_index++)); do
-        for ((__base_bash_libs_arg_right_index = __base_bash_libs_arg_left_index + 1;
-            __base_bash_libs_arg_right_index < ${#__base_bash_libs_arg_distinct_names[@]};
-            __base_bash_libs_arg_right_index++)); do
+        for ((__base_bash_libs_arg_right_index = __base_bash_libs_arg_left_index + 1;  \
+        __base_bash_libs_arg_right_index < ${#__base_bash_libs_arg_distinct_names[@]};  \
+        __base_bash_libs_arg_right_index++)); do
             if [[ "${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_left_index]}" == "${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_right_index]}" ]]; then
                 base_std_log_error -l base_bash_libs.arg \
                     "base_arg_parse: caller-owned variables must be distinct; '${__base_bash_libs_arg_distinct_names[__base_bash_libs_arg_left_index]}' was provided more than once."
@@ -111,7 +111,7 @@ __base_bash_libs_arg_parse_specs__() {
             base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_spec' contains an empty option token."
             return 2
         fi
-        IFS='|' read -r -a __base_bash_libs_arg_tokens <<<"$__base_bash_libs_arg_tokens_part"
+        IFS='|' read -r -a __base_bash_libs_arg_tokens <<< "$__base_bash_libs_arg_tokens_part"
         for __base_bash_libs_arg_token in "${__base_bash_libs_arg_tokens[@]+"${__base_bash_libs_arg_tokens[@]}"}"; do
             if ! [[ "$__base_bash_libs_arg_token" =~ $__base_bash_libs_arg_token_re ]] || [[ "$__base_bash_libs_arg_token" == *"="* ]]; then
                 base_std_log_error -l base_bash_libs.arg "base_arg_parse: option spec '$__base_bash_libs_arg_spec' has invalid option token '$__base_bash_libs_arg_token'."
@@ -256,28 +256,30 @@ base_arg_parse() {
             __base_bash_libs_arg_set_assoc_value__ "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_option_name" "${__base_bash_libs_arg_options[$__base_bash_libs_arg_option_name]}"
         done
     fi
-    eval "$__base_bash_libs_arg_positionals_name=()"
-    for __base_bash_libs_arg_current in "${__base_bash_libs_arg_positionals[@]+"${__base_bash_libs_arg_positionals[@]}"}"; do
-        eval "$__base_bash_libs_arg_positionals_name+=(\"\$__base_bash_libs_arg_current\")"
-    done
+    if ((${#__base_bash_libs_arg_positionals[@]} > 0)); then
+        eval "$__base_bash_libs_arg_positionals_name=(\"\${__base_bash_libs_arg_positionals[@]}\")"
+    else
+        eval "$__base_bash_libs_arg_positionals_name=()"
+    fi
 
     for __base_bash_libs_arg_repeatable_name in "${__base_bash_libs_arg_repeatable_names[@]+"${__base_bash_libs_arg_repeatable_names[@]}"}"; do
         __base_bash_libs_arg_publish_values=()
         # shellcheck disable=SC2199 # The + expansion safely detects Bash 4.2 empty arrays under nounset.
         if [[ -n "${__base_bash_libs_arg_repeatable_values[@]+set}" ]]; then
-            for ((__base_bash_libs_arg_repeatable_index = 0;
-                __base_bash_libs_arg_repeatable_index < ${#__base_bash_libs_arg_repeatable_values[@]};
-                __base_bash_libs_arg_repeatable_index += 2)); do
+            for ((__base_bash_libs_arg_repeatable_index = 0;  \
+            __base_bash_libs_arg_repeatable_index < ${#__base_bash_libs_arg_repeatable_values[@]};  \
+            __base_bash_libs_arg_repeatable_index += 2)); do
                 if [[ "${__base_bash_libs_arg_repeatable_values[__base_bash_libs_arg_repeatable_index]}" == "$__base_bash_libs_arg_repeatable_name" ]]; then
                     __base_bash_libs_arg_repeatable_value="${__base_bash_libs_arg_repeatable_values[__base_bash_libs_arg_repeatable_index + 1]}"
                     __base_bash_libs_arg_publish_values+=("$__base_bash_libs_arg_repeatable_value")
                 fi
             done
         fi
-        eval "$__base_bash_libs_arg_repeatable_name=()"
-        for __base_bash_libs_arg_repeatable_value in "${__base_bash_libs_arg_publish_values[@]+"${__base_bash_libs_arg_publish_values[@]}"}"; do
-            eval "$__base_bash_libs_arg_repeatable_name+=(\"\$__base_bash_libs_arg_repeatable_value\")"
-        done
+        if ((${#__base_bash_libs_arg_publish_values[@]} > 0)); then
+            eval "$__base_bash_libs_arg_repeatable_name=(\"\${__base_bash_libs_arg_publish_values[@]}\")"
+        else
+            eval "$__base_bash_libs_arg_repeatable_name=()"
+        fi
     done
     return 0
 }
