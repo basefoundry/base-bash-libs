@@ -61,3 +61,11 @@ setup() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"hash mismatch"* ]]
 }
+
+@test "artifact staging never uses predictable PID-derived paths" {
+    run grep -Eq '\.\$\$' "$BASE_REPO_ROOT/scripts/vendor" "$BASE_REPO_ROOT/scripts/library-bundle" "$BASE_REPO_ROOT/bin/base-bash"
+    [ "$status" -eq 1 ]
+    grep -F 'mktemp' "$BASE_REPO_ROOT/scripts/vendor" >/dev/null
+    grep -F 'mktemp' "$BASE_REPO_ROOT/scripts/library-bundle" >/dev/null
+    grep -F 'mktemp' "$BASE_REPO_ROOT/bin/base-bash" >/dev/null
+}
