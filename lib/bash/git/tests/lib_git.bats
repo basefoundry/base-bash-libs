@@ -164,6 +164,24 @@ setup() {
     [ "$branch" = "main" ]
 }
 
+@test "default branch fallback order is shared by public and update helpers" {
+    local repo="$TEST_TMPDIR/repo"
+    local branch=""
+
+    init_git_repo "$repo"
+    printf 'base\n' >"$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" update-ref refs/remotes/origin/master HEAD
+    git -C "$repo" update-ref refs/heads/main HEAD
+
+    base_git_detect_default_branch "$repo" branch
+    [ "$branch" = "master" ]
+    pushd "$repo" >/dev/null
+    branch="$(__base_bash_libs_git_expected_update_branch__)"
+    popd >/dev/null
+    [ "$branch" = "master" ]
+}
+
 @test "git worktree helpers surface producer failures" {
     git() {
         printf 'worktree command failed\n' >&2

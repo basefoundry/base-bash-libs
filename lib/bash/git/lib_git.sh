@@ -6,9 +6,42 @@
 [[ -n "${BASE_BASH_LIBS_GIT_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_git.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 readonly BASE_BASH_LIBS_GIT_LOADED=1
+
+__base_bash_libs_git_detect_default_branch__() {
+    (($# <= 1)) || return 1
+
+    local repo_dir="${1:-}" default_branch
+    local -a git_cmd=(git)
+    [[ -z "$repo_dir" ]] || git_cmd+=(-C "$repo_dir")
+
+    if default_branch="$("${git_cmd[@]}" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2> /dev/null)"; then
+        default_branch="${default_branch#origin/}"
+        [[ -n "$default_branch" ]] && {
+            printf '%s\n' "$default_branch"
+            return 0
+        }
+    fi
+    if "${git_cmd[@]}" show-ref --verify --quiet refs/remotes/origin/main; then
+        printf '%s\n' main
+        return 0
+    fi
+    if "${git_cmd[@]}" show-ref --verify --quiet refs/remotes/origin/master; then
+        printf '%s\n' master
+        return 0
+    fi
+    if "${git_cmd[@]}" show-ref --verify --quiet refs/heads/main; then
+        printf '%s\n' main
+        return 0
+    fi
+    if "${git_cmd[@]}" show-ref --verify --quiet refs/heads/master; then
+        printf '%s\n' master
+        return 0
+    fi
+    return 1
+}
 
 base_git_detect_default_branch() {
     if (($# != 2)); then
@@ -28,23 +61,8 @@ base_git_detect_default_branch() {
     base_std_assert_variable_name "$__base_bash_libs_git_detect_result_name" || return 1
     __base_bash_libs_std_assert_writable_output__ base_git_detect_default_branch "$__base_bash_libs_git_detect_result_name" || return 1
 
-    if __base_bash_libs_git_detect_branch="$(git -C "$__base_bash_libs_git_detect_repo_dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
-        __base_bash_libs_git_detect_branch="${__base_bash_libs_git_detect_branch#origin/}"
-        if [[ -n "$__base_bash_libs_git_detect_branch" ]]; then
-            printf -v "$__base_bash_libs_git_detect_result_name" '%s' "$__base_bash_libs_git_detect_branch"
-            return 0
-        fi
-    fi
-
-    if git -C "$__base_bash_libs_git_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/main ||
-        git -C "$__base_bash_libs_git_detect_repo_dir" show-ref --verify --quiet refs/heads/main; then
-        printf -v "$__base_bash_libs_git_detect_result_name" '%s' main
-        return 0
-    fi
-
-    if git -C "$__base_bash_libs_git_detect_repo_dir" show-ref --verify --quiet refs/remotes/origin/master ||
-        git -C "$__base_bash_libs_git_detect_repo_dir" show-ref --verify --quiet refs/heads/master; then
-        printf -v "$__base_bash_libs_git_detect_result_name" '%s' master
+    if __base_bash_libs_git_detect_branch="$(__base_bash_libs_git_detect_default_branch__ "$__base_bash_libs_git_detect_repo_dir")"; then
+        printf -v "$__base_bash_libs_git_detect_result_name" '%s' "$__base_bash_libs_git_detect_branch"
         return 0
     fi
 
@@ -75,18 +93,18 @@ base_git_worktree_path_for_branch() {
     fi
     while IFS= read -r line; do
         case "$line" in
-            "worktree "*)
-                path="${line#worktree }"
-                ;;
-            "branch "*)
-                ref="${line#branch }"
-                if [[ "$ref" == "$target_ref" ]]; then
-                    printf '%s\n' "$path"
-                    return 0
-                fi
-                ;;
+        "worktree "*)
+            path="${line#worktree }"
+            ;;
+        "branch "*)
+            ref="${line#branch }"
+            if [[ "$ref" == "$target_ref" ]]; then
+                printf '%s\n' "$path"
+                return 0
+            fi
+            ;;
         esac
-    done <<<"$output"
+    done <<< "$output"
 
     return 1
 }
@@ -110,22 +128,22 @@ base_git_list_worktree_branches() {
 
     while IFS= read -r line; do
         case "$line" in
-            "")
-                if [[ -n "$path" && -n "$branch" ]]; then
-                    branch="${branch#refs/heads/}"
-                    printf '%s\t%s\n' "$path" "$branch"
-                fi
-                path=""
-                branch=""
-                ;;
-            "worktree "*)
-                path="${line#worktree }"
-                ;;
-            "branch "*)
-                branch="${line#branch }"
-                ;;
+        "")
+            if [[ -n "$path" && -n "$branch" ]]; then
+                branch="${branch#refs/heads/}"
+                printf '%s\t%s\n' "$path" "$branch"
+            fi
+            path=""
+            branch=""
+            ;;
+        "worktree "*)
+            path="${line#worktree }"
+            ;;
+        "branch "*)
+            branch="${line#branch }"
+            ;;
         esac
-    done <<<"$output"
+    done <<< "$output"
 }
 
 base_git_branch_upstream() {
@@ -160,7 +178,7 @@ base_git_branch_merged_to_ref() {
         return 1
     fi
 
-    git -C "$repo_dir" merge-base --is-ancestor "refs/heads/$branch" "$ref" >/dev/null 2>&1
+    git -C "$repo_dir" merge-base --is-ancestor "refs/heads/$branch" "$ref" > /dev/null 2>&1
 }
 
 base_git_list_remote_branches() {
@@ -179,7 +197,7 @@ base_git_list_remote_branches() {
     while IFS=$' \t' read -r _sha ref; do
         [[ "$ref" == refs/heads/* ]] || continue
         printf '%s\n' "${ref#refs/heads/}"
-    done <<<"$output"
+    done <<< "$output"
 }
 
 #
@@ -249,31 +267,8 @@ __base_bash_libs_git_expected_update_branch__() {
         return 0
     fi
 
-    if default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
-        default_branch="${default_branch#origin/}"
-        if [[ -n "$default_branch" ]]; then
-            printf '%s\n' "$default_branch"
-            return 0
-        fi
-    fi
-
-    if git show-ref --verify --quiet refs/remotes/origin/main; then
-        printf '%s\n' main
-        return 0
-    fi
-
-    if git show-ref --verify --quiet refs/remotes/origin/master; then
-        printf '%s\n' master
-        return 0
-    fi
-
-    if git show-ref --verify --quiet refs/heads/main; then
-        printf '%s\n' main
-        return 0
-    fi
-
-    if git show-ref --verify --quiet refs/heads/master; then
-        printf '%s\n' master
+    if default_branch="$(__base_bash_libs_git_detect_default_branch__)"; then
+        printf '%s\n' "$default_branch"
         return 0
     fi
 
@@ -287,7 +282,7 @@ __base_bash_libs_git_update_repo_finish__() {
     local submodule_log="${4:-}"
 
     if [[ "$should_popd" == true ]]; then
-        popd >/dev/null || status=1
+        popd > /dev/null || status=1
     fi
 
     if [[ -n "$git_log" ]]; then
@@ -314,7 +309,7 @@ __base_bash_libs_git_pull_with_retry__() {
     fi
 
     while ((attempt <= max_attempts)); do
-        if git pull --ff-only >"$git_log" 2>&1; then
+        if git pull --ff-only > "$git_log" 2>&1; then
             if ((attempt > 1)); then
                 base_std_log_debug -l base_bash_libs.git "git pull succeeded on attempt $attempt."
             fi
@@ -409,7 +404,7 @@ base_git_update_repo() {
             base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' only has tracked changes in '$allowed_dirty_path'; attempting git pull."
         else
             base_std_log_debug -l base_bash_libs.git "Repo '$git_repo' has local changes; skipping auto-update. Commit or stash to enable git pull."
-        __base_bash_libs_git_update_repo_finish__ "$git_log" true 0
+            __base_bash_libs_git_update_repo_finish__ "$git_log" true 0
             return $?
         fi
     fi
@@ -427,7 +422,7 @@ base_git_update_repo() {
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1
         return $?
     fi
-    if ! { git submodule init && git submodule sync && git submodule update; } >"$submodule_log" 2>&1; then
+    if ! { git submodule init && git submodule sync && git submodule update; } > "$submodule_log" 2>&1; then
         base_std_log_error -l base_bash_libs.git "git submodule update failed on repo '$git_repo'"
         [[ -s "$submodule_log" ]] && base_std_log_info_file -l base_bash_libs.git "$submodule_log"
         __base_bash_libs_git_update_repo_finish__ "$git_log" true 1 "$submodule_log"
@@ -581,7 +576,7 @@ base_git_check_script_up_to_date() {
     fi
 
     local repo_root_status
-    if repo_root=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null); then
+    if repo_root=$(git -C "$script_dir" rev-parse --show-toplevel 2> /dev/null); then
         :
     else
         repo_root_status=$?
@@ -589,7 +584,7 @@ base_git_check_script_up_to_date() {
         return 5
     fi
     local prefix_status
-    if prefix=$(git -C "$script_dir" rev-parse --show-prefix 2>/dev/null); then
+    if prefix=$(git -C "$script_dir" rev-parse --show-prefix 2> /dev/null); then
         :
     else
         prefix_status=$?
@@ -599,22 +594,22 @@ base_git_check_script_up_to_date() {
     rel_path="${prefix}$(basename -- "$script_path")"
 
     local tracked_status
-    if git -C "$repo_root" ls-files --error-unmatch -- "$rel_path" >/dev/null 2>&1; then
+    if git -C "$repo_root" ls-files --error-unmatch -- "$rel_path" > /dev/null 2>&1; then
         tracked_status=0
     else
         tracked_status=$?
     fi
     case "$tracked_status" in
-        0)
-            ;;
-        1)
-            base_std_log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
-            return 0
-            ;;
-        *)
-            base_std_log_error -l base_bash_libs.git "Unable to determine whether '$rel_path' is tracked (git status $tracked_status)."
-            return 5
-            ;;
+    0)
+        ;;
+    1)
+        base_std_log_info -l base_bash_libs.git "Script '$rel_path' is not tracked in git; skipping latest-version check."
+        return 0
+        ;;
+    *)
+        base_std_log_error -l base_bash_libs.git "Unable to determine whether '$rel_path' is tracked (git status $tracked_status)."
+        return 5
+        ;;
     esac
 
     local dirty=false diff_status
@@ -624,15 +619,15 @@ base_git_check_script_up_to_date() {
         diff_status=$?
     fi
     case "$diff_status" in
-        0)
-            ;;
-        1)
-            dirty=true
-            ;;
-        *)
-            base_std_log_error -l base_bash_libs.git "Unable to inspect working-tree changes for '$rel_path' (git status $diff_status)."
-            return 5
-            ;;
+    0)
+        ;;
+    1)
+        dirty=true
+        ;;
+    *)
+        base_std_log_error -l base_bash_libs.git "Unable to inspect working-tree changes for '$rel_path' (git status $diff_status)."
+        return 5
+        ;;
     esac
     if git -C "$repo_root" diff --cached --quiet -- "$rel_path"; then
         diff_status=0
@@ -640,22 +635,22 @@ base_git_check_script_up_to_date() {
         diff_status=$?
     fi
     case "$diff_status" in
-        0)
-            ;;
-        1)
-            dirty=true
-            ;;
-        *)
-            base_std_log_error -l base_bash_libs.git "Unable to inspect staged changes for '$rel_path' (git status $diff_status)."
-            return 5
-            ;;
+    0)
+        ;;
+    1)
+        dirty=true
+        ;;
+    *)
+        base_std_log_error -l base_bash_libs.git "Unable to inspect staged changes for '$rel_path' (git status $diff_status)."
+        return 5
+        ;;
     esac
     if [[ "$dirty" == true ]]; then
         base_std_log_warn -l base_bash_libs.git "Script '$rel_path' has local modifications; version may not match repo."
     fi
 
     local branch_name branch_status
-    if branch_name=$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null); then
+    if branch_name=$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2> /dev/null); then
         :
     else
         branch_status=$?
@@ -699,14 +694,14 @@ base_git_check_script_up_to_date() {
     fi
 
     local behind ahead rev_list_status
-    if behind=$(git -C "$repo_root" rev-list --count "HEAD..$upstream" 2>/dev/null); then
+    if behind=$(git -C "$repo_root" rev-list --count "HEAD..$upstream" 2> /dev/null); then
         :
     else
         rev_list_status=$?
         base_std_log_error -l base_bash_libs.git "Unable to compare HEAD with '$upstream' (git status $rev_list_status); freshness is unknown."
         return 5
     fi
-    if ahead=$(git -C "$repo_root" rev-list --count "$upstream..HEAD" 2>/dev/null); then
+    if ahead=$(git -C "$repo_root" rev-list --count "$upstream..HEAD" 2> /dev/null); then
         :
     else
         rev_list_status=$?
