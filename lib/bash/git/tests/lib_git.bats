@@ -59,7 +59,7 @@ setup() {
                 exit "$rc"
             ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/git/lib_git.sh" "$function_name"
 
-            [ "$status" -eq 1 ]
+            [ "$status" -eq 2 ]
             [[ "$output" == *"Usage:"* ]]
             [[ "$output" != *"unbound variable"* ]]
         done
@@ -68,23 +68,23 @@ setup() {
 
 @test "git optional forms reject excess arguments and unsupported option placement" {
     capture_command base_git_list_worktree_branches one two
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_list_worktree_branches [repo_dir]"* ]]
 
     capture_command base_git_list_remote_branches one two
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_list_remote_branches [repo_dir]"* ]]
 
     capture_command base_git_worktree_path_for_branch branch repo extra
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"* ]]
 
     capture_command base_git_check_script_up_to_date --refresh script.sh
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_check_script_up_to_date [--fetch] <script_path>"* ]]
 
     capture_command base_git_check_script_up_to_date --fetch
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_check_script_up_to_date [--fetch] <script_path>"* ]]
 }
 
@@ -304,7 +304,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$branch" = "sentinel" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'branch' is readonly"* ]]
 }
@@ -322,7 +322,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$detected" = "keep-detected" ]
 
     if base_git_get_current_branch . __base_bash_libs_git_branch_result_name 2>"$stderr_file"; then
@@ -330,7 +330,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$current" = "keep-current" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
@@ -406,7 +406,7 @@ EOF
 @test "base_git_get_current_branch usage names the current function" {
     bats_run base_git_get_current_branch
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_get_current_branch <directory> <result_variable_name>"* ]]
     [[ "$output" != *"Usage: get_git_branch"* ]]
 }
@@ -418,7 +418,7 @@ EOF
 
     bats_run base_git_get_current_branch "$repo" "bad-name"
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"base_git_get_current_branch: result variable name must be a valid Bash variable name"* ]]
     [[ "$output" != *"invalid variable name"* ]]
 }
@@ -426,7 +426,7 @@ EOF
 @test "base_git_update_repo usage names the current function" {
     capture_command base_git_update_repo
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
     [[ "$output" != *"Usage: update_repo"* ]]
 }
@@ -1037,7 +1037,7 @@ EOF
 
     bats_run base_git_check_script_up_to_date --fetch "$script_path"
 
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 4 ]
     [[ "$output" == *"Fetched upstream state before latest-version check."* ]]
     [[ "$output" == *"Repository is 1 commit(s) behind origin/main"* ]]
 }
@@ -1213,7 +1213,7 @@ EOF
 
     bats_run base_git_check_script_up_to_date "$script_path"
 
-    [ "$status" -eq 4 ]
+    [ "$status" -eq 5 ]
     [[ "$output" == *"has diverged from origin/main"* ]]
     [[ "$output" != *"up to date"* ]]
 }
@@ -1235,7 +1235,7 @@ EOF
     bats_run base_git_check_script_up_to_date --fetch "$script_path"
     unset -f git
 
-    [ "$status" -eq 5 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *"freshness is unknown"* ]]
     [[ "$output" != *"up to date"* ]]
 }
@@ -1257,7 +1257,7 @@ EOF
     bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
-    [ "$status" -eq 5 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *"freshness is unknown"* ]]
     [[ "$output" != *"up to date"* ]]
 }
@@ -1280,7 +1280,7 @@ EOF
     bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
-    [ "$status" -eq 5 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *"Unable to discover the Git repository"* ]]
     [[ "$output" != *"up to date"* ]]
 }
@@ -1302,7 +1302,7 @@ EOF
     bats_run base_git_check_script_up_to_date "$script_path"
     unset -f git
 
-    [ "$status" -eq 5 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *"Unable to inspect working-tree changes"* ]]
     [[ "$output" != *"up to date"* ]]
 }

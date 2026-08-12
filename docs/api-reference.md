@@ -132,7 +132,7 @@ statuses, and side effects are normative in the linked module README and
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter
 - Outputs: documented per symbol; named outputs are caller-owned
-- Statuses: documented per symbol; recoverable failures return status
+- Statuses: usage and contract errors return 2; recoverable failures and false predicates return 1 unless a symbol documents a specific status; freshness checks use 3 for dirty, 4 for behind, and 5 for diverged
 - Side effects: documented per symbol; sourcing is passive
 
 #### Public symbols
@@ -158,7 +158,7 @@ statuses, and side effects are normative in the linked module README and
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter
 - Outputs: documented per symbol; named outputs are caller-owned
-- Statuses: documented per symbol; recoverable failures return status
+- Statuses: usage and contract errors return 2; recoverable failures return 1 unless a symbol preserves an underlying gh status
 - Side effects: documented per symbol; sourcing is passive
 
 #### Public symbols

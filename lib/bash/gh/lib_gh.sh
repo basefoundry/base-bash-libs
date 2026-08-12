@@ -6,7 +6,7 @@
 [[ -n "${BASE_BASH_LIBS_GH_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_gh.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 readonly BASE_BASH_LIBS_GH_LOADED=1
 
@@ -16,12 +16,12 @@ readonly BASE_BASH_LIBS_GH_LOADED=1
 base_gh_require_cli() {
     if (($# > 1)); then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_require_cli [install_hint]"
-        return 1
+        return 2
     fi
 
     local install_hint="${1:-}"
 
-    command -v gh >/dev/null 2>&1 || {
+    command -v gh > /dev/null 2>&1 || {
         base_std_log_error -l base_bash_libs.gh "Required command 'gh' was not found on PATH."
         [[ -z "$install_hint" ]] || base_std_log_error -l base_bash_libs.gh "$install_hint"
         return 1
@@ -32,14 +32,14 @@ __base_bash_libs_gh_sensitive_controls_usage__() {
     local __base_bash_libs_gh_controls_helper_name="${1-}"
 
     case "$__base_bash_libs_gh_controls_helper_name" in
-        base_gh_report_command_failure)
-            base_std_log_error -l base_bash_libs.gh \
-                "Usage: base_gh_report_command_failure <status> [gh args...] or base_gh_report_command_failure --sensitive [--safe-display <label>] -- <status> [gh args...]"
-            ;;
-        *)
-            base_std_log_error -l base_bash_libs.gh \
-                "Usage: $__base_bash_libs_gh_controls_helper_name [--sensitive [--safe-display <label>] --] [gh args...]"
-            ;;
+    base_gh_report_command_failure)
+        base_std_log_error -l base_bash_libs.gh \
+            "Usage: base_gh_report_command_failure <status> [gh args...] or base_gh_report_command_failure --sensitive [--safe-display <label>] -- <status> [gh args...]"
+        ;;
+    *)
+        base_std_log_error -l base_bash_libs.gh \
+            "Usage: $__base_bash_libs_gh_controls_helper_name [--sensitive [--safe-display <label>] --] [gh args...]"
+        ;;
     esac
 }
 
@@ -58,64 +58,63 @@ __base_bash_libs_gh_parse_sensitive_controls__() {
     local __base_bash_libs_gh_controls_separator_seen=0
 
     case "${1-}" in
-        --sensitive | --safe-display)
-            ;;
-        *)
-            printf -v "$__base_bash_libs_gh_controls_consumed_result_name" '%s' 0
-            printf -v "$__base_bash_libs_gh_controls_sensitive_result_name" '%s' 0
-            printf -v "$__base_bash_libs_gh_controls_display_result_name" '%s' ""
-            return 0
-            ;;
+    --sensitive | --safe-display) ;;
+    *)
+        printf -v "$__base_bash_libs_gh_controls_consumed_result_name" '%s' 0
+        printf -v "$__base_bash_libs_gh_controls_sensitive_result_name" '%s' 0
+        printf -v "$__base_bash_libs_gh_controls_display_result_name" '%s' ""
+        return 0
+        ;;
     esac
 
     while (($#)); do
         case "${1-}" in
-            --sensitive)
-                if ((__base_bash_libs_gh_controls_sensitive)); then
-                    __base_bash_libs_gh_sensitive_controls_usage__ "$__base_bash_libs_gh_controls_helper_name"
-                    return 1
-                fi
-                __base_bash_libs_gh_controls_sensitive=1
-                __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 1))
-                shift
-                ;;
-            --safe-display)
-                if ((__base_bash_libs_gh_controls_display_seen)) || (($# < 2)) ||
-                    ! __base_bash_libs_std_is_safe_display__ "${2-}"; then
-                    base_std_log_error -l base_bash_libs.gh \
-                        "$__base_bash_libs_gh_controls_helper_name: --safe-display requires one non-empty printable ASCII label that does not begin with '-'."
-                    return 1
-                fi
-                __base_bash_libs_gh_controls_safe_display="$2"
-                __base_bash_libs_gh_controls_display_seen=1
-                __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 2))
-                shift 2
-                ;;
-            --)
-                __base_bash_libs_gh_controls_separator_seen=1
-                __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 1))
-                shift
-                break
-                ;;
-            *)
-                # Do not echo the malformed token: it may itself contain a
-                # credential in an option=value form.
+        --sensitive)
+            if ((__base_bash_libs_gh_controls_sensitive)); then
+                __base_bash_libs_gh_sensitive_controls_usage__ "$__base_bash_libs_gh_controls_helper_name"
+                return 2
+            fi
+            __base_bash_libs_gh_controls_sensitive=1
+            __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 1))
+            shift
+            ;;
+        --safe-display)
+            if ((__base_bash_libs_gh_controls_display_seen)) || (($# < 2)) ||
+                ! __base_bash_libs_std_is_safe_display__ "${2-}"; then
                 base_std_log_error -l base_bash_libs.gh \
-                    "$__base_bash_libs_gh_controls_helper_name: protected diagnostic controls must end with -- before GitHub arguments."
-                return 1
-                ;;
+                    "$__base_bash_libs_gh_controls_helper_name: --safe-display requires one non-empty printable ASCII label that does not begin with '-'."
+                return 2
+            fi
+            __base_bash_libs_gh_controls_safe_display="$2"
+            __base_bash_libs_gh_controls_display_seen=1
+            __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 2))
+            shift 2
+            ;;
+        --)
+            __base_bash_libs_gh_controls_separator_seen=1
+            __base_bash_libs_gh_controls_consumed=$((__base_bash_libs_gh_controls_consumed + 1))
+            shift
+            break
+            ;;
+        *)
+            # Do not echo the malformed token: it may itself contain a
+            # credential in an option=value form.
+            base_std_log_error -l base_bash_libs.gh \
+                "$__base_bash_libs_gh_controls_helper_name: protected diagnostic controls must end with -- before GitHub arguments."
+            return 2
+            ;;
         esac
     done
 
     if ((!__base_bash_libs_gh_controls_sensitive)); then
         base_std_log_error -l base_bash_libs.gh \
             "$__base_bash_libs_gh_controls_helper_name: --safe-display is valid only with --sensitive."
-        return 1
+        return 2
     fi
     if ((!__base_bash_libs_gh_controls_separator_seen)); then
         base_std_log_error -l base_bash_libs.gh \
             "$__base_bash_libs_gh_controls_helper_name: --sensitive requires -- before GitHub arguments."
-        return 1
+        return 2
     fi
 
     printf -v "$__base_bash_libs_gh_controls_consumed_result_name" '%s' "$__base_bash_libs_gh_controls_consumed"
@@ -145,7 +144,7 @@ __base_bash_libs_gh_auth_status_diagnostics__() {
         while IFS= read -r __base_bash_libs_gh_auth_line || [[ -n "$__base_bash_libs_gh_auth_line" ]]; do
             [[ -n "$__base_bash_libs_gh_auth_line" ]] &&
                 base_std_log_error -l base_bash_libs.gh "gh auth status: $__base_bash_libs_gh_auth_line"
-        done <<<"$__base_bash_libs_gh_auth_output"
+        done <<< "$__base_bash_libs_gh_auth_output"
     fi
     [[ -z "$__base_bash_libs_gh_auth_login_hint" ]] || base_std_log_error -l base_bash_libs.gh "$__base_bash_libs_gh_auth_login_hint"
     return 1
@@ -157,7 +156,7 @@ __base_bash_libs_gh_auth_status_diagnostics__() {
 base_gh_auth_status_diagnostics() {
     if (($# > 1)); then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_auth_status_diagnostics [login_hint]"
-        return 1
+        return 2
     fi
 
     __base_bash_libs_gh_auth_status_diagnostics__ 0 "" "${1:-Run 'gh auth login -h github.com' and retry.}"
@@ -191,24 +190,24 @@ base_gh_report_command_failure() {
 
     __base_bash_libs_gh_parse_sensitive_controls__ __base_bash_libs_gh_report_public_consumed \
         __base_bash_libs_gh_report_public_sensitive __base_bash_libs_gh_report_public_safe_display \
-        base_gh_report_command_failure "$@" || return 1
+        base_gh_report_command_failure "$@" || return $?
     ((__base_bash_libs_gh_report_public_consumed == 0)) || shift "$__base_bash_libs_gh_report_public_consumed"
 
     if (($# < 1)); then
         __base_bash_libs_gh_sensitive_controls_usage__ base_gh_report_command_failure
-        return 1
+        return 2
     fi
     __base_bash_libs_gh_report_public_status="$1"
     shift
 
     if [[ ! "$__base_bash_libs_gh_report_public_status" =~ ^[0-9]{1,3}$ ]]; then
         __base_bash_libs_gh_sensitive_controls_usage__ base_gh_report_command_failure
-        return 1
+        return 2
     fi
     __base_bash_libs_gh_report_public_status=$((10#$__base_bash_libs_gh_report_public_status))
     if ((__base_bash_libs_gh_report_public_status < 1 || __base_bash_libs_gh_report_public_status > 255)); then
         __base_bash_libs_gh_sensitive_controls_usage__ base_gh_report_command_failure
-        return 1
+        return 2
     fi
 
     __base_bash_libs_gh_report_command_failure__ "$__base_bash_libs_gh_report_public_status" \
@@ -221,7 +220,7 @@ base_gh_run() {
     local __base_bash_libs_gh_run_status=0
 
     __base_bash_libs_gh_parse_sensitive_controls__ __base_bash_libs_gh_run_consumed __base_bash_libs_gh_run_sensitive \
-        __base_bash_libs_gh_run_safe_display base_gh_run "$@" || return 1
+        __base_bash_libs_gh_run_safe_display base_gh_run "$@" || return $?
     ((__base_bash_libs_gh_run_consumed == 0)) || shift "$__base_bash_libs_gh_run_consumed"
     # A caller may provide `gh` as a shell function. Lock the normalized
     # diagnostic policy before invoking it so Bash's dynamic scope cannot let
@@ -246,18 +245,18 @@ __base_bash_libs_gh_parse_repo_from_remote_url__() {
     local __base_bash_libs_gh_parse_repo
 
     case "$__base_bash_libs_gh_parse_remote_url" in
-        git@github.com:*)
-            __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#git@github.com:}"
-            ;;
-        ssh://git@github.com/*)
-            __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#ssh://git@github.com/}"
-            ;;
-        https://github.com/*)
-            __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#https://github.com/}"
-            ;;
-        *)
-            return 1
-            ;;
+    git@github.com:*)
+        __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#git@github.com:}"
+        ;;
+    ssh://git@github.com/*)
+        __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#ssh://git@github.com/}"
+        ;;
+    https://github.com/*)
+        __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_remote_url#https://github.com/}"
+        ;;
+    *)
+        return 1
+        ;;
     esac
 
     __base_bash_libs_gh_parse_repo="${__base_bash_libs_gh_parse_repo%.git}"
@@ -268,9 +267,9 @@ __base_bash_libs_gh_parse_repo_from_remote_url__() {
 base_gh_repo_from_remote_url() {
     if (($# != 2)); then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_from_remote_url <remote_url> <result_variable_name>"
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_from_remote_url "${2-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_from_remote_url "${2-}" || return 2
 
     local __base_bash_libs_gh_remote_url="$1"
     local __base_bash_libs_gh_result_name="$2"
@@ -278,21 +277,21 @@ base_gh_repo_from_remote_url() {
 
     if [[ -z "$__base_bash_libs_gh_remote_url" || -z "$__base_bash_libs_gh_result_name" ]]; then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_from_remote_url <remote_url> <result_variable_name>"
-        return 1
+        return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_gh_repo_from_remote_url "$__base_bash_libs_gh_result_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_gh_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_repo_from_remote_url "$__base_bash_libs_gh_result_name" || return 2
 
-    __base_bash_libs_gh_parse_repo_from_remote_url__ "$__base_bash_libs_gh_remote_url" __base_bash_libs_gh_parsed_repo || return 1
+    __base_bash_libs_gh_parse_repo_from_remote_url__ "$__base_bash_libs_gh_remote_url" __base_bash_libs_gh_parsed_repo || return 2
     printf -v "$__base_bash_libs_gh_result_name" '%s' "$__base_bash_libs_gh_parsed_repo"
 }
 
 base_gh_infer_repo_from_origin() {
     if (($# < 2 || $# > 3)) || { (($# == 3)) && [[ "$3" != "--optional" ]]; }; then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_infer_repo_from_origin "${2-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_gh_infer_repo_from_origin "${2-}" || return 2
 
     local __base_bash_libs_gh_infer_repo_dir="$1"
     local __base_bash_libs_gh_infer_result_name="$2"
@@ -301,16 +300,16 @@ base_gh_infer_repo_from_origin() {
 
     if [[ -z "$__base_bash_libs_gh_infer_repo_dir" || -z "$__base_bash_libs_gh_infer_result_name" ]]; then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
-        return 1
+        return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_infer_result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_gh_infer_repo_from_origin "$__base_bash_libs_gh_infer_result_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_gh_infer_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_infer_repo_from_origin "$__base_bash_libs_gh_infer_result_name" || return 2
 
     if [[ "${3:-}" == "--optional" ]]; then
         __base_bash_libs_gh_infer_optional=1
     fi
 
-    __base_bash_libs_gh_infer_remote_url="$(git -C "$__base_bash_libs_gh_infer_repo_dir" remote get-url origin 2>/dev/null || true)"
+    __base_bash_libs_gh_infer_remote_url="$(git -C "$__base_bash_libs_gh_infer_repo_dir" remote get-url origin 2> /dev/null || true)"
     if [[ -z "$__base_bash_libs_gh_infer_remote_url" ]] ||
         ! __base_bash_libs_gh_parse_repo_from_remote_url__ "$__base_bash_libs_gh_infer_remote_url" __base_bash_libs_gh_infer_parsed_repo; then
         if ((__base_bash_libs_gh_infer_optional)); then
@@ -327,9 +326,9 @@ base_gh_infer_repo_from_origin() {
 base_gh_repo_default_branch() {
     if (($# != 2)); then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_default_branch <owner/repo> <result_variable_name>"
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_default_branch "${2-}" || return 1
+    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_default_branch "${2-}" || return 2
 
     local __base_bash_libs_gh_repo="$1"
     local __base_bash_libs_gh_repo_result_name="$2"
@@ -337,13 +336,13 @@ base_gh_repo_default_branch() {
 
     if [[ -z "$__base_bash_libs_gh_repo" || -z "$__base_bash_libs_gh_repo_result_name" ]]; then
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_default_branch <owner/repo> <result_variable_name>"
-        return 1
+        return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_repo_result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_gh_repo_default_branch "$__base_bash_libs_gh_repo_result_name" || return 1
+    base_std_assert_variable_name "$__base_bash_libs_gh_repo_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_repo_default_branch "$__base_bash_libs_gh_repo_result_name" || return 2
 
     base_gh_require_cli || return 1
-    __base_bash_libs_gh_repo_default_branch="$(gh repo view "$__base_bash_libs_gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)" || __base_bash_libs_gh_repo_status=$?
+    __base_bash_libs_gh_repo_default_branch="$(gh repo view "$__base_bash_libs_gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name 2> /dev/null)" || __base_bash_libs_gh_repo_status=$?
     if ((__base_bash_libs_gh_repo_status != 0)); then
         base_gh_report_command_failure "$__base_bash_libs_gh_repo_status" repo view "$__base_bash_libs_gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name
         return $?
@@ -367,8 +366,8 @@ __base_bash_libs_gh_api_bounded_decimal__() {
 
     [[ "$__base_bash_libs_gh_decimal_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_decimal_value} -le 4 ]] || return 1
     __base_bash_libs_gh_decimal_normalized=$((10#$__base_bash_libs_gh_decimal_value))
-    ((__base_bash_libs_gh_decimal_normalized >= __base_bash_libs_gh_decimal_min &&
-        __base_bash_libs_gh_decimal_normalized <= __base_bash_libs_gh_decimal_max)) || return 1
+    ((__base_bash_libs_gh_decimal_normalized >= __base_bash_libs_gh_decimal_min && \
+    __base_bash_libs_gh_decimal_normalized <= __base_bash_libs_gh_decimal_max)) || return 1
     printf -v "$__base_bash_libs_gh_decimal_result_name" '%s' "$__base_bash_libs_gh_decimal_normalized"
 }
 
@@ -394,11 +393,11 @@ __base_bash_libs_gh_parse_api_controls__() {
     local __base_bash_libs_gh_controls_cap_seen=0 __base_bash_libs_gh_controls_started=0
 
     case "${1-}" in
-        --sensitive | --safe-display | --retry-policy | --max-attempts | \
-            --max-elapsed-seconds | --attempt-timeout-seconds | \
-            --base-delay-seconds | --max-delay-seconds)
-            __base_bash_libs_gh_controls_started=1
-            ;;
+    --sensitive | --safe-display | --retry-policy | --max-attempts | \
+        --max-elapsed-seconds | --attempt-timeout-seconds | \
+        --base-delay-seconds | --max-delay-seconds)
+        __base_bash_libs_gh_controls_started=1
+        ;;
     esac
 
     if ((!__base_bash_libs_gh_controls_started)); then
@@ -416,129 +415,129 @@ __base_bash_libs_gh_parse_api_controls__() {
 
     while (($#)); do
         case "${1-}" in
-            --sensitive)
-                if ((__base_bash_libs_gh_controls_sensitive_value)); then
-                    __base_bash_libs_gh_api_controls_usage__
-                    return 1
-                fi
-                __base_bash_libs_gh_controls_sensitive_value=1
-                __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 1))
-                shift
-                ;;
-            --safe-display)
-                if ((__base_bash_libs_gh_controls_display_seen)) || (($# < 2)) ||
-                    ! __base_bash_libs_std_is_safe_display__ "${2-}"; then
-                    base_std_log_error -l base_bash_libs.gh \
-                        "base_gh_api_with_retry: --safe-display requires one non-empty printable ASCII label that does not begin with '-'."
-                    return 1
-                fi
-                __base_bash_libs_gh_controls_display_value="$2"
-                __base_bash_libs_gh_controls_display_seen=1
-                __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
-                shift 2
-                ;;
-            --retry-policy)
-                if ((__base_bash_libs_gh_controls_policy_seen)) || (($# < 2)); then
-                    __base_bash_libs_gh_api_controls_usage__
-                    return 1
-                fi
-                case "$2" in
-                    read-only | never | replay-safe) __base_bash_libs_gh_controls_policy_value="$2" ;;
-                    *)
-                        base_std_log_error -l base_bash_libs.gh \
-                            "base_gh_api_with_retry: --retry-policy must be read-only, never, or replay-safe."
-                        return 1
-                        ;;
-                esac
-                __base_bash_libs_gh_controls_policy_seen=1
-                __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
-                shift 2
-                ;;
-            --max-attempts | --max-elapsed-seconds | --attempt-timeout-seconds | \
-                --base-delay-seconds | --max-delay-seconds)
-                local __base_bash_libs_gh_controls_numeric_option="$1" __base_bash_libs_gh_controls_numeric_value
-                if (($# < 2)); then
-                    __base_bash_libs_gh_api_controls_usage__
-                    return 1
-                fi
-                case "$__base_bash_libs_gh_controls_numeric_option" in
-                    --max-attempts)
-                        ((__base_bash_libs_gh_controls_attempts_seen == 0)) &&
-                            __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 10 __base_bash_libs_gh_controls_numeric_value || {
-                            __base_bash_libs_gh_api_controls_usage__
-                            return 1
-                        }
-                        __base_bash_libs_gh_controls_attempts_seen=1
-                        __base_bash_libs_gh_controls_attempts_value="$__base_bash_libs_gh_controls_numeric_value"
-                        ;;
-                    --max-elapsed-seconds)
-                        ((__base_bash_libs_gh_controls_elapsed_seen == 0)) &&
-                            __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 3600 __base_bash_libs_gh_controls_numeric_value || {
-                            __base_bash_libs_gh_api_controls_usage__
-                            return 1
-                        }
-                        __base_bash_libs_gh_controls_elapsed_seen=1
-                        __base_bash_libs_gh_controls_elapsed_value="$__base_bash_libs_gh_controls_numeric_value"
-                        ;;
-                    --attempt-timeout-seconds)
-                        ((__base_bash_libs_gh_controls_timeout_seen == 0)) &&
-                            __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 600 __base_bash_libs_gh_controls_numeric_value || {
-                            __base_bash_libs_gh_api_controls_usage__
-                            return 1
-                        }
-                        __base_bash_libs_gh_controls_timeout_seen=1
-                        __base_bash_libs_gh_controls_timeout_value="$__base_bash_libs_gh_controls_numeric_value"
-                        ;;
-                    --base-delay-seconds)
-                        ((__base_bash_libs_gh_controls_base_seen == 0)) &&
-                            __base_bash_libs_gh_api_bounded_decimal__ "$2" 0 60 __base_bash_libs_gh_controls_numeric_value || {
-                            __base_bash_libs_gh_api_controls_usage__
-                            return 1
-                        }
-                        __base_bash_libs_gh_controls_base_seen=1
-                        __base_bash_libs_gh_controls_base_value="$__base_bash_libs_gh_controls_numeric_value"
-                        ;;
-                    --max-delay-seconds)
-                        ((__base_bash_libs_gh_controls_cap_seen == 0)) &&
-                            __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 300 __base_bash_libs_gh_controls_numeric_value || {
-                            __base_bash_libs_gh_api_controls_usage__
-                            return 1
-                        }
-                        __base_bash_libs_gh_controls_cap_seen=1
-                        __base_bash_libs_gh_controls_cap_value="$__base_bash_libs_gh_controls_numeric_value"
-                        ;;
-                esac
-                __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
-                shift 2
-                ;;
-            --)
-                __base_bash_libs_gh_controls_separator=1
-                __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 1))
-                shift
-                break
-                ;;
+        --sensitive)
+            if ((__base_bash_libs_gh_controls_sensitive_value)); then
+                __base_bash_libs_gh_api_controls_usage__
+                return 2
+            fi
+            __base_bash_libs_gh_controls_sensitive_value=1
+            __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 1))
+            shift
+            ;;
+        --safe-display)
+            if ((__base_bash_libs_gh_controls_display_seen)) || (($# < 2)) ||
+                ! __base_bash_libs_std_is_safe_display__ "${2-}"; then
+                base_std_log_error -l base_bash_libs.gh \
+                    "base_gh_api_with_retry: --safe-display requires one non-empty printable ASCII label that does not begin with '-'."
+                return 2
+            fi
+            __base_bash_libs_gh_controls_display_value="$2"
+            __base_bash_libs_gh_controls_display_seen=1
+            __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
+            shift 2
+            ;;
+        --retry-policy)
+            if ((__base_bash_libs_gh_controls_policy_seen)) || (($# < 2)); then
+                __base_bash_libs_gh_api_controls_usage__
+                return 2
+            fi
+            case "$2" in
+            read-only | never | replay-safe) __base_bash_libs_gh_controls_policy_value="$2" ;;
             *)
                 base_std_log_error -l base_bash_libs.gh \
-                    "base_gh_api_with_retry: framework controls must end with -- before GitHub arguments."
-                return 1
+                    "base_gh_api_with_retry: --retry-policy must be read-only, never, or replay-safe."
+                return 2
                 ;;
+            esac
+            __base_bash_libs_gh_controls_policy_seen=1
+            __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
+            shift 2
+            ;;
+        --max-attempts | --max-elapsed-seconds | --attempt-timeout-seconds | \
+            --base-delay-seconds | --max-delay-seconds)
+            local __base_bash_libs_gh_controls_numeric_option="$1" __base_bash_libs_gh_controls_numeric_value
+            if (($# < 2)); then
+                __base_bash_libs_gh_api_controls_usage__
+                return 2
+            fi
+            case "$__base_bash_libs_gh_controls_numeric_option" in
+            --max-attempts)
+                ((__base_bash_libs_gh_controls_attempts_seen == 0)) &&
+                    __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 10 __base_bash_libs_gh_controls_numeric_value || {
+                    __base_bash_libs_gh_api_controls_usage__
+                    return 2
+                }
+                __base_bash_libs_gh_controls_attempts_seen=1
+                __base_bash_libs_gh_controls_attempts_value="$__base_bash_libs_gh_controls_numeric_value"
+                ;;
+            --max-elapsed-seconds)
+                ((__base_bash_libs_gh_controls_elapsed_seen == 0)) &&
+                    __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 3600 __base_bash_libs_gh_controls_numeric_value || {
+                    __base_bash_libs_gh_api_controls_usage__
+                    return 2
+                }
+                __base_bash_libs_gh_controls_elapsed_seen=1
+                __base_bash_libs_gh_controls_elapsed_value="$__base_bash_libs_gh_controls_numeric_value"
+                ;;
+            --attempt-timeout-seconds)
+                ((__base_bash_libs_gh_controls_timeout_seen == 0)) &&
+                    __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 600 __base_bash_libs_gh_controls_numeric_value || {
+                    __base_bash_libs_gh_api_controls_usage__
+                    return 2
+                }
+                __base_bash_libs_gh_controls_timeout_seen=1
+                __base_bash_libs_gh_controls_timeout_value="$__base_bash_libs_gh_controls_numeric_value"
+                ;;
+            --base-delay-seconds)
+                ((__base_bash_libs_gh_controls_base_seen == 0)) &&
+                    __base_bash_libs_gh_api_bounded_decimal__ "$2" 0 60 __base_bash_libs_gh_controls_numeric_value || {
+                    __base_bash_libs_gh_api_controls_usage__
+                    return 2
+                }
+                __base_bash_libs_gh_controls_base_seen=1
+                __base_bash_libs_gh_controls_base_value="$__base_bash_libs_gh_controls_numeric_value"
+                ;;
+            --max-delay-seconds)
+                ((__base_bash_libs_gh_controls_cap_seen == 0)) &&
+                    __base_bash_libs_gh_api_bounded_decimal__ "$2" 1 300 __base_bash_libs_gh_controls_numeric_value || {
+                    __base_bash_libs_gh_api_controls_usage__
+                    return 2
+                }
+                __base_bash_libs_gh_controls_cap_seen=1
+                __base_bash_libs_gh_controls_cap_value="$__base_bash_libs_gh_controls_numeric_value"
+                ;;
+            esac
+            __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 2))
+            shift 2
+            ;;
+        --)
+            __base_bash_libs_gh_controls_separator=1
+            __base_bash_libs_gh_controls_consumed_value=$((__base_bash_libs_gh_controls_consumed_value + 1))
+            shift
+            break
+            ;;
+        *)
+            base_std_log_error -l base_bash_libs.gh \
+                "base_gh_api_with_retry: framework controls must end with -- before GitHub arguments."
+            return 2
+            ;;
         esac
     done
 
     if ((!__base_bash_libs_gh_controls_separator)); then
         base_std_log_error -l base_bash_libs.gh \
             "base_gh_api_with_retry: framework controls require -- before GitHub arguments."
-        return 1
+        return 2
     fi
     if ((__base_bash_libs_gh_controls_display_seen && !__base_bash_libs_gh_controls_sensitive_value)); then
         base_std_log_error -l base_bash_libs.gh \
             "base_gh_api_with_retry: --safe-display is valid only with --sensitive."
-        return 1
+        return 2
     fi
     if ((__base_bash_libs_gh_controls_base_value > __base_bash_libs_gh_controls_cap_value)); then
         base_std_log_error -l base_bash_libs.gh \
             "base_gh_api_with_retry: --base-delay-seconds must not exceed --max-delay-seconds."
-        return 1
+        return 2
     fi
 
     printf -v "$__base_bash_libs_gh_controls_consumed_name" '%s' "$__base_bash_libs_gh_controls_consumed_value"
@@ -556,9 +555,9 @@ __base_bash_libs_gh_api_path_is_stream__() {
     local __base_bash_libs_gh_stream_path="${1-}"
 
     case "$__base_bash_libs_gh_stream_path" in
-        - | /dev/stdin | /dev/fd/* | /proc/self/fd/* | /proc/[0-9]*/fd/*)
-            return 0
-            ;;
+    - | /dev/stdin | /dev/fd/* | /proc/self/fd/* | /proc/[0-9]*/fd/*)
+        return 0
+        ;;
     esac
     [[ -n "$__base_bash_libs_gh_stream_path" ]] || return 1
     # Existing non-regular sources (FIFO, character/block device, or socket)
@@ -595,199 +594,198 @@ __base_bash_libs_gh_api_classify_argv__() {
         fi
 
         case "$__base_bash_libs_gh_class_token" in
-            --)
-                __base_bash_libs_gh_class_flags_done=1
-                ;;
-            --method | --field | --raw-field | --input | --cache | --header | \
-                --hostname | --jq | --preview | --template)
-                if (($# == 0)); then
-                    __base_bash_libs_gh_class_ambiguous_value=1
-                    continue
-                fi
-                __base_bash_libs_gh_class_value="$1"
-                shift
-                case "$__base_bash_libs_gh_class_token" in
-                    --method)
-                        __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
-                        __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        ;;
-                    --field)
-                        __base_bash_libs_gh_class_field_seen=1
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
-                            __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
-                        else
-                            __base_bash_libs_gh_class_field_payload=""
-                        fi
-                        if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
-                            __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
-                            if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
-                                __base_bash_libs_gh_class_stdin_value=1
-                            else
-                                __base_bash_libs_gh_class_file_value=1
-                            fi
-                        fi
-                        ;;
-                    --raw-field)
-                        __base_bash_libs_gh_class_field_seen=1
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        ;;
-                    --input)
-                        __base_bash_libs_gh_class_input_seen=$((__base_bash_libs_gh_class_input_seen + 1))
-                        if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_value"; then
-                            __base_bash_libs_gh_class_stdin_value=1
-                        elif [[ -n "$__base_bash_libs_gh_class_value" ]]; then
-                            __base_bash_libs_gh_class_file_value=1
-                        else
-                            __base_bash_libs_gh_class_ambiguous_value=1
-                        fi
-                        ;;
-                esac
-                ;;
-            --method=* | --field=* | --raw-field=* | --input=* | --cache=* | \
-                --header=* | --hostname=* | --jq=* | --preview=* | --template=*)
-                __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_token#*=}"
-                case "$__base_bash_libs_gh_class_token" in
-                    --method=*)
-                        __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
-                        __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        ;;
-                    --field=*)
-                        __base_bash_libs_gh_class_field_seen=1
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
-                            __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
-                        else
-                            __base_bash_libs_gh_class_field_payload=""
-                        fi
-                        if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
-                            __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
-                            if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
-                                __base_bash_libs_gh_class_stdin_value=1
-                            else
-                                __base_bash_libs_gh_class_file_value=1
-                            fi
-                        fi
-                        ;;
-                    --raw-field=*)
-                        __base_bash_libs_gh_class_field_seen=1
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        ;;
-                    --input=*)
-                        __base_bash_libs_gh_class_input_seen=$((__base_bash_libs_gh_class_input_seen + 1))
-                        if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_value"; then
-                            __base_bash_libs_gh_class_stdin_value=1
-                        elif [[ -n "$__base_bash_libs_gh_class_value" ]]; then
-                            __base_bash_libs_gh_class_file_value=1
-                        else
-                            __base_bash_libs_gh_class_ambiguous_value=1
-                        fi
-                        ;;
-                    *)
-                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                        ;;
-                esac
-                ;;
-            --include)
-                __base_bash_libs_gh_class_include_value=1
-                ;;
-            --include=*)
-                __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_token#*=}"
-                case "$__base_bash_libs_gh_class_bool" in
-                    1 | t | T | true | TRUE | True) __base_bash_libs_gh_class_include_value=1 ;;
-                    0 | f | F | false | FALSE | False) __base_bash_libs_gh_class_include_value=0 ;;
-                    *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
-                esac
-                ;;
-            --allow-escape-sequences | --paginate | --silent | --slurp | --verbose)
-                ;;
-            --allow-escape-sequences=* | --paginate=* | --silent=* | --slurp=* | --verbose=*)
-                __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_token#*=}"
-                case "$__base_bash_libs_gh_class_bool" in
-                    0 | 1 | f | F | false | FALSE | False | \
-                        t | T | true | TRUE | True) ;;
-                    *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
-                esac
-                ;;
-            --*)
+        --)
+            __base_bash_libs_gh_class_flags_done=1
+            ;;
+        --method | --field | --raw-field | --input | --cache | --header | \
+            --hostname | --jq | --preview | --template)
+            if (($# == 0)); then
                 __base_bash_libs_gh_class_ambiguous_value=1
+                continue
+            fi
+            __base_bash_libs_gh_class_value="$1"
+            shift
+            case "$__base_bash_libs_gh_class_token" in
+            --method)
+                __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
+                __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
                 ;;
-            -?*)
-                __base_bash_libs_gh_class_short="${__base_bash_libs_gh_class_token#-}"
-                while [[ -n "$__base_bash_libs_gh_class_short" ]]; do
-                    __base_bash_libs_gh_class_char="${__base_bash_libs_gh_class_short:0:1}"
-                    __base_bash_libs_gh_class_short="${__base_bash_libs_gh_class_short:1}"
-                    case "$__base_bash_libs_gh_class_char" in
-                        i)
-                            if [[ "$__base_bash_libs_gh_class_short" == =* ]]; then
-                                __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_short#=}"
-                                __base_bash_libs_gh_class_short=""
-                                case "$__base_bash_libs_gh_class_bool" in
-                                    1 | t | T | true | TRUE | True) __base_bash_libs_gh_class_include_value=1 ;;
-                                    0 | f | F | false | FALSE | False) __base_bash_libs_gh_class_include_value=0 ;;
-                                    *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
-                                esac
-                            else
-                                __base_bash_libs_gh_class_include_value=1
-                            fi
-                            ;;
-                        F | H | q | X | p | f | t)
-                            if [[ -n "$__base_bash_libs_gh_class_short" ]]; then
-                                __base_bash_libs_gh_class_value="$__base_bash_libs_gh_class_short"
-                                __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_value#= }"
-                                [[ "$__base_bash_libs_gh_class_short" == =* ]] &&
-                                    __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_short#=}"
-                                __base_bash_libs_gh_class_short=""
-                            elif (($#)); then
-                                __base_bash_libs_gh_class_value="$1"
-                                shift
-                            else
-                                __base_bash_libs_gh_class_value=""
-                                __base_bash_libs_gh_class_ambiguous_value=1
-                            fi
-                            case "$__base_bash_libs_gh_class_char" in
-                                X)
-                                    __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
-                                    __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
-                                    [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                                    ;;
-                                F)
-                                    __base_bash_libs_gh_class_field_seen=1
-                                    [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                                    if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
-                                        __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
-                                    else
-                                        __base_bash_libs_gh_class_field_payload=""
-                                    fi
-                                    if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
-                                        __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
-                                        if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
-                                            __base_bash_libs_gh_class_stdin_value=1
-                                        else
-                                            __base_bash_libs_gh_class_file_value=1
-                                        fi
-                                    fi
-                                    ;;
-                                f)
-                                    __base_bash_libs_gh_class_field_seen=1
-                                    [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
-                                    ;;
-                            esac
-                            break
-                            ;;
-                        *)
-                            __base_bash_libs_gh_class_ambiguous_value=1
-                            __base_bash_libs_gh_class_short=""
-                            ;;
-                    esac
-                done
+            --field)
+                __base_bash_libs_gh_class_field_seen=1
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
+                    __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
+                else
+                    __base_bash_libs_gh_class_field_payload=""
+                fi
+                if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
+                    __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
+                    if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
+                        __base_bash_libs_gh_class_stdin_value=1
+                    else
+                        __base_bash_libs_gh_class_file_value=1
+                    fi
+                fi
+                ;;
+            --raw-field)
+                __base_bash_libs_gh_class_field_seen=1
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                ;;
+            --input)
+                __base_bash_libs_gh_class_input_seen=$((__base_bash_libs_gh_class_input_seen + 1))
+                if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_value"; then
+                    __base_bash_libs_gh_class_stdin_value=1
+                elif [[ -n "$__base_bash_libs_gh_class_value" ]]; then
+                    __base_bash_libs_gh_class_file_value=1
+                else
+                    __base_bash_libs_gh_class_ambiguous_value=1
+                fi
+                ;;
+            esac
+            ;;
+        --method=* | --field=* | --raw-field=* | --input=* | --cache=* | \
+            --header=* | --hostname=* | --jq=* | --preview=* | --template=*)
+            __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_token#*=}"
+            case "$__base_bash_libs_gh_class_token" in
+            --method=*)
+                __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
+                __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                ;;
+            --field=*)
+                __base_bash_libs_gh_class_field_seen=1
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
+                    __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
+                else
+                    __base_bash_libs_gh_class_field_payload=""
+                fi
+                if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
+                    __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
+                    if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
+                        __base_bash_libs_gh_class_stdin_value=1
+                    else
+                        __base_bash_libs_gh_class_file_value=1
+                    fi
+                fi
+                ;;
+            --raw-field=*)
+                __base_bash_libs_gh_class_field_seen=1
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                ;;
+            --input=*)
+                __base_bash_libs_gh_class_input_seen=$((__base_bash_libs_gh_class_input_seen + 1))
+                if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_value"; then
+                    __base_bash_libs_gh_class_stdin_value=1
+                elif [[ -n "$__base_bash_libs_gh_class_value" ]]; then
+                    __base_bash_libs_gh_class_file_value=1
+                else
+                    __base_bash_libs_gh_class_ambiguous_value=1
+                fi
                 ;;
             *)
-                __base_bash_libs_gh_class_endpoint_count=$((__base_bash_libs_gh_class_endpoint_count + 1))
-                ((__base_bash_libs_gh_class_endpoint_count == 1)) && __base_bash_libs_gh_class_endpoint="$__base_bash_libs_gh_class_token"
+                [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
                 ;;
+            esac
+            ;;
+        --include)
+            __base_bash_libs_gh_class_include_value=1
+            ;;
+        --include=*)
+            __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_token#*=}"
+            case "$__base_bash_libs_gh_class_bool" in
+            1 | t | T | true | TRUE | True) __base_bash_libs_gh_class_include_value=1 ;;
+            0 | f | F | false | FALSE | False) __base_bash_libs_gh_class_include_value=0 ;;
+            *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
+            esac
+            ;;
+        --allow-escape-sequences | --paginate | --silent | --slurp | --verbose) ;;
+        --allow-escape-sequences=* | --paginate=* | --silent=* | --slurp=* | --verbose=*)
+            __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_token#*=}"
+            case "$__base_bash_libs_gh_class_bool" in
+            0 | 1 | f | F | false | FALSE | False | \
+                t | T | true | TRUE | True) ;;
+            *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
+            esac
+            ;;
+        --*)
+            __base_bash_libs_gh_class_ambiguous_value=1
+            ;;
+        -?*)
+            __base_bash_libs_gh_class_short="${__base_bash_libs_gh_class_token#-}"
+            while [[ -n "$__base_bash_libs_gh_class_short" ]]; do
+                __base_bash_libs_gh_class_char="${__base_bash_libs_gh_class_short:0:1}"
+                __base_bash_libs_gh_class_short="${__base_bash_libs_gh_class_short:1}"
+                case "$__base_bash_libs_gh_class_char" in
+                i)
+                    if [[ "$__base_bash_libs_gh_class_short" == =* ]]; then
+                        __base_bash_libs_gh_class_bool="${__base_bash_libs_gh_class_short#=}"
+                        __base_bash_libs_gh_class_short=""
+                        case "$__base_bash_libs_gh_class_bool" in
+                        1 | t | T | true | TRUE | True) __base_bash_libs_gh_class_include_value=1 ;;
+                        0 | f | F | false | FALSE | False) __base_bash_libs_gh_class_include_value=0 ;;
+                        *) __base_bash_libs_gh_class_ambiguous_value=1 ;;
+                        esac
+                    else
+                        __base_bash_libs_gh_class_include_value=1
+                    fi
+                    ;;
+                F | H | q | X | p | f | t)
+                    if [[ -n "$__base_bash_libs_gh_class_short" ]]; then
+                        __base_bash_libs_gh_class_value="$__base_bash_libs_gh_class_short"
+                        __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_value#= }"
+                        [[ "$__base_bash_libs_gh_class_short" == =* ]] &&
+                            __base_bash_libs_gh_class_value="${__base_bash_libs_gh_class_short#=}"
+                        __base_bash_libs_gh_class_short=""
+                    elif (($#)); then
+                        __base_bash_libs_gh_class_value="$1"
+                        shift
+                    else
+                        __base_bash_libs_gh_class_value=""
+                        __base_bash_libs_gh_class_ambiguous_value=1
+                    fi
+                    case "$__base_bash_libs_gh_class_char" in
+                    X)
+                        __base_bash_libs_gh_class_method_count=$((__base_bash_libs_gh_class_method_count + 1))
+                        __base_bash_libs_gh_class_method_value="$__base_bash_libs_gh_class_value"
+                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                        ;;
+                    F)
+                        __base_bash_libs_gh_class_field_seen=1
+                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                        if [[ "$__base_bash_libs_gh_class_value" == *=* ]]; then
+                            __base_bash_libs_gh_class_field_payload="${__base_bash_libs_gh_class_value#*=}"
+                        else
+                            __base_bash_libs_gh_class_field_payload=""
+                        fi
+                        if [[ "$__base_bash_libs_gh_class_field_payload" == @* ]]; then
+                            __base_bash_libs_gh_class_file_path="${__base_bash_libs_gh_class_field_payload#@}"
+                            if __base_bash_libs_gh_api_path_is_stream__ "$__base_bash_libs_gh_class_file_path"; then
+                                __base_bash_libs_gh_class_stdin_value=1
+                            else
+                                __base_bash_libs_gh_class_file_value=1
+                            fi
+                        fi
+                        ;;
+                    f)
+                        __base_bash_libs_gh_class_field_seen=1
+                        [[ -n "$__base_bash_libs_gh_class_value" ]] || __base_bash_libs_gh_class_ambiguous_value=1
+                        ;;
+                    esac
+                    break
+                    ;;
+                *)
+                    __base_bash_libs_gh_class_ambiguous_value=1
+                    __base_bash_libs_gh_class_short=""
+                    ;;
+                esac
+            done
+            ;;
+        *)
+            __base_bash_libs_gh_class_endpoint_count=$((__base_bash_libs_gh_class_endpoint_count + 1))
+            ((__base_bash_libs_gh_class_endpoint_count == 1)) && __base_bash_libs_gh_class_endpoint="$__base_bash_libs_gh_class_token"
+            ;;
         esac
     done
 
@@ -826,11 +824,11 @@ __base_bash_libs_gh_api_can_inject_include__() {
         __base_bash_libs_gh_inject_value=0
     for __base_bash_libs_gh_inject_token; do
         case "$__base_bash_libs_gh_inject_token" in
-            --include | --include=* | -i | -i=* | \
-                --paginate | --paginate=* | --slurp | --slurp=* | \
-                --verbose | --verbose=*)
-                __base_bash_libs_gh_inject_value=0
-                ;;
+        --include | --include=* | -i | -i=* | \
+            --paginate | --paginate=* | --slurp | --slurp=* | \
+            --verbose | --verbose=*)
+            __base_bash_libs_gh_inject_value=0
+            ;;
         esac
     done
     printf -v "$__base_bash_libs_gh_inject_result_name" '%s' "$__base_bash_libs_gh_inject_value"
@@ -843,15 +841,15 @@ __base_bash_libs_gh_api_unstructured_transport_is_safe__() {
 
     for __base_bash_libs_gh_transport_token; do
         case "$__base_bash_libs_gh_transport_token" in
-            --jq | --jq=* | --template | --template=* | --silent | --silent=true | \
-                --paginate | --paginate=true | --slurp | --slurp=true | \
-                --verbose | --verbose=true | -q | -q?* | -t | -t?*)
-                __base_bash_libs_gh_transport_value=0
-                ;;
+        --jq | --jq=* | --template | --template=* | --silent | --silent=true | \
+            --paginate | --paginate=true | --slurp | --slurp=true | \
+            --verbose | --verbose=true | -q | -q?* | -t | -t?*)
+            __base_bash_libs_gh_transport_value=0
+            ;;
         esac
     done
     case "${GH_DEBUG-}:${DEBUG-}" in
-        *api*) __base_bash_libs_gh_transport_value=0 ;;
+    *api*) __base_bash_libs_gh_transport_value=0 ;;
     esac
     printf -v "$__base_bash_libs_gh_transport_result_name" '%s' "$__base_bash_libs_gh_transport_value"
 }
@@ -863,7 +861,7 @@ __base_bash_libs_gh_api_replay_file__() {
         # A block exactly the size of the parsed header prefix makes POSIX dd
         # skip it without byte-at-a-time copying. Suppress dd's own EPIPE text;
         # the caller reports a channel-safe replay diagnostic.
-        command dd if="$__base_bash_libs_gh_replay_file" bs="$__base_bash_libs_gh_replay_prefix" skip=1 2>/dev/null
+        command dd if="$__base_bash_libs_gh_replay_file" bs="$__base_bash_libs_gh_replay_prefix" skip=1 2> /dev/null
     else
         command cat -- "$__base_bash_libs_gh_replay_file"
     fi
@@ -877,7 +875,7 @@ __base_bash_libs_gh_api_monotonic_seconds__() {
 
 __base_bash_libs_gh_api_epoch_seconds__() {
     local __base_bash_libs_gh_epoch_result_name="$1" __base_bash_libs_gh_epoch_value
-    __base_bash_libs_gh_epoch_value="$(command date +%s 2>/dev/null)" || return 1
+    __base_bash_libs_gh_epoch_value="$(command date +%s 2> /dev/null)" || return 1
     [[ "$__base_bash_libs_gh_epoch_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_epoch_value} -le 12 ]] || return 1
     printf -v "$__base_bash_libs_gh_epoch_result_name" '%s' "$__base_bash_libs_gh_epoch_value"
 }
@@ -908,20 +906,20 @@ __base_bash_libs_gh_api_sleep__() {
     __base_bash_libs_gh_sleep_pid=$!
     __base_bash_libs_gh_api_active_sleep_pid="$__base_bash_libs_gh_sleep_pid"
     if ((__base_bash_libs_gh_api_cancel_status != 0)); then
-        kill -KILL "$__base_bash_libs_gh_sleep_pid" 2>/dev/null || true
-        wait "$__base_bash_libs_gh_sleep_pid" 2>/dev/null || true
+        kill -KILL "$__base_bash_libs_gh_sleep_pid" 2> /dev/null || true
+        wait "$__base_bash_libs_gh_sleep_pid" 2> /dev/null || true
         __base_bash_libs_gh_api_active_sleep_pid=""
         return "$__base_bash_libs_gh_api_cancel_status"
     fi
-    if wait "$__base_bash_libs_gh_sleep_pid" 2>/dev/null; then
+    if wait "$__base_bash_libs_gh_sleep_pid" 2> /dev/null; then
         __base_bash_libs_gh_sleep_status=0
     else
         __base_bash_libs_gh_sleep_status=$?
     fi
     __base_bash_libs_gh_api_active_sleep_pid=""
     if ((__base_bash_libs_gh_api_cancel_status != 0)); then
-        kill -KILL "$__base_bash_libs_gh_sleep_pid" 2>/dev/null || true
-        wait "$__base_bash_libs_gh_sleep_pid" 2>/dev/null || true
+        kill -KILL "$__base_bash_libs_gh_sleep_pid" 2> /dev/null || true
+        wait "$__base_bash_libs_gh_sleep_pid" 2> /dev/null || true
         return "$__base_bash_libs_gh_api_cancel_status"
     fi
     return "$__base_bash_libs_gh_sleep_status"
@@ -971,12 +969,12 @@ __base_bash_libs_gh_api_call_hook__() {
     local -a __base_bash_libs_gh_api_attempt_argv=()
 
     case "$__base_bash_libs_gh_hook_kind" in
-        attempt) __base_bash_libs_gh_api_attempt__ "$@" ;;
-        epoch) __base_bash_libs_gh_api_epoch_seconds__ "$@" ;;
-        jitter) __base_bash_libs_gh_api_jitter_seconds__ "$@" ;;
-        monotonic) __base_bash_libs_gh_api_monotonic_seconds__ "$@" ;;
-        sleep) __base_bash_libs_gh_api_sleep__ "$@" ;;
-        *) return 1 ;;
+    attempt) __base_bash_libs_gh_api_attempt__ "$@" ;;
+    epoch) __base_bash_libs_gh_api_epoch_seconds__ "$@" ;;
+    jitter) __base_bash_libs_gh_api_jitter_seconds__ "$@" ;;
+    monotonic) __base_bash_libs_gh_api_monotonic_seconds__ "$@" ;;
+    sleep) __base_bash_libs_gh_api_sleep__ "$@" ;;
+    *) return 1 ;;
     esac
 }
 
@@ -992,13 +990,13 @@ __base_bash_libs_gh_api_attempt__() {
     __base_bash_libs_std_run_once__ __base_bash_libs_gh_attempt_outcome \
         "$__base_bash_libs_gh_attempt_timeout" "$__base_bash_libs_gh_attempt_timeout_path" \
         "$__base_bash_libs_gh_attempt_number" gh api "$@" \
-        >|"$__base_bash_libs_gh_attempt_stdout" 2>|"$__base_bash_libs_gh_attempt_stderr"
+        >| "$__base_bash_libs_gh_attempt_stdout" 2>| "$__base_bash_libs_gh_attempt_stderr"
 }
 
 __base_bash_libs_gh_api_byte_length__() {
     local __base_bash_libs_gh_byte_result_name="$1" __base_bash_libs_gh_byte_value __base_bash_libs_gh_byte_count
 
-    __base_bash_libs_gh_byte_count="$(printf '%s' "$2" | command wc -c 2>/dev/null)" || return 1
+    __base_bash_libs_gh_byte_count="$(printf '%s' "$2" | command wc -c 2> /dev/null)" || return 1
     __base_bash_libs_gh_byte_count="${__base_bash_libs_gh_byte_count//[[:space:]]/}"
     [[ "$__base_bash_libs_gh_byte_count" =~ ^[0-9]{1,8}$ ]] || return 1
     __base_bash_libs_gh_byte_value="$((10#$__base_bash_libs_gh_byte_count))"
@@ -1012,20 +1010,20 @@ __base_bash_libs_gh_api_file_prefix_is_nul_free__() {
 
     [[ "$__base_bash_libs_gh_nul_bytes" =~ ^[1-9][0-9]{0,7}$ ]] || return 1
     __base_bash_libs_gh_nul_raw_count="$(
-        LC_ALL=C command dd if="$__base_bash_libs_gh_nul_file" bs="$__base_bash_libs_gh_nul_bytes" count=1 2>/dev/null |
-            LC_ALL=C command wc -c 2>/dev/null
+        LC_ALL=C command dd if="$__base_bash_libs_gh_nul_file" bs="$__base_bash_libs_gh_nul_bytes" count=1 2> /dev/null |
+            LC_ALL=C command wc -c 2> /dev/null
         __base_bash_libs_gh_nul_pipeline_status=("${PIPESTATUS[@]}")
-        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 &&
-            __base_bash_libs_gh_nul_pipeline_status[1] == 0)) || exit 1
+        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 && \
+        __base_bash_libs_gh_nul_pipeline_status[1] == 0)) || exit 1
     )" || return 1
     __base_bash_libs_gh_nul_clean_count="$(
-        LC_ALL=C command dd if="$__base_bash_libs_gh_nul_file" bs="$__base_bash_libs_gh_nul_bytes" count=1 2>/dev/null |
+        LC_ALL=C command dd if="$__base_bash_libs_gh_nul_file" bs="$__base_bash_libs_gh_nul_bytes" count=1 2> /dev/null |
             LC_ALL=C command tr -d '\000' |
-            LC_ALL=C command wc -c 2>/dev/null
+            LC_ALL=C command wc -c 2> /dev/null
         __base_bash_libs_gh_nul_pipeline_status=("${PIPESTATUS[@]}")
-        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 &&
-            __base_bash_libs_gh_nul_pipeline_status[1] == 0 &&
-            __base_bash_libs_gh_nul_pipeline_status[2] == 0)) || exit 1
+        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 && \
+        __base_bash_libs_gh_nul_pipeline_status[1] == 0 && \
+        __base_bash_libs_gh_nul_pipeline_status[2] == 0)) || exit 1
     )" || return 1
     __base_bash_libs_gh_nul_raw_count="${__base_bash_libs_gh_nul_raw_count//[[:space:]]/}"
     __base_bash_libs_gh_nul_clean_count="${__base_bash_libs_gh_nul_clean_count//[[:space:]]/}"
@@ -1040,11 +1038,11 @@ __base_bash_libs_gh_api_file_size__() {
 
     [[ -f "$__base_bash_libs_gh_size_file" ]] || return 1
     if __base_bash_libs_gh_size_value="$(
-        LC_ALL=C command stat -c '%s' "$__base_bash_libs_gh_size_file" 2>/dev/null
+        LC_ALL=C command stat -c '%s' "$__base_bash_libs_gh_size_file" 2> /dev/null
     )" && [[ "$__base_bash_libs_gh_size_value" =~ ^[0-9]{1,18}$ ]]; then
         :
     elif __base_bash_libs_gh_size_value="$(
-        LC_ALL=C command stat -f '%z' "$__base_bash_libs_gh_size_file" 2>/dev/null
+        LC_ALL=C command stat -f '%z' "$__base_bash_libs_gh_size_file" 2> /dev/null
     )" && [[ "$__base_bash_libs_gh_size_value" =~ ^[0-9]{1,18}$ ]]; then
         :
     else
@@ -1062,10 +1060,10 @@ __base_bash_libs_gh_api_file_is_nul_free__() {
     ((10#$__base_bash_libs_gh_nul_raw_count <= __base_bash_libs_gh_nul_max_bytes)) || return 1
     __base_bash_libs_gh_nul_clean_count="$(
         LC_ALL=C command tr -d '\000' < "$__base_bash_libs_gh_nul_file" |
-            LC_ALL=C command wc -c 2>/dev/null
+            LC_ALL=C command wc -c 2> /dev/null
         __base_bash_libs_gh_nul_pipeline_status=("${PIPESTATUS[@]}")
-        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 &&
-            __base_bash_libs_gh_nul_pipeline_status[1] == 0)) || exit 1
+        ((__base_bash_libs_gh_nul_pipeline_status[0] == 0 && \
+        __base_bash_libs_gh_nul_pipeline_status[1] == 0)) || exit 1
     )" || return 1
     __base_bash_libs_gh_nul_clean_count="${__base_bash_libs_gh_nul_clean_count//[[:space:]]/}"
     [[ "$__base_bash_libs_gh_nul_clean_count" =~ ^[0-9]{1,8}$ ]] || return 1
@@ -1157,46 +1155,46 @@ __base_bash_libs_gh_api_parse_headers__() {
             __base_bash_libs_gh_headers_value="${__base_bash_libs_gh_headers_value#"${__base_bash_libs_gh_headers_value%%[!$' \t']*}"}"
             __base_bash_libs_gh_headers_value="${__base_bash_libs_gh_headers_value%"${__base_bash_libs_gh_headers_value##*[!$' \t']}"}"
             case "$__base_bash_libs_gh_headers_name" in
-                retry-after)
-                    if [[ ! "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ || ${#__base_bash_libs_gh_headers_value} -gt 10 ]]; then
-                        __base_bash_libs_gh_headers_invalid_value=1
-                    elif [[ -n "$__base_bash_libs_gh_headers_retry_value" &&
-                        "$__base_bash_libs_gh_headers_retry_value" != "$__base_bash_libs_gh_headers_value" ]]; then
+            retry-after)
+                if [[ ! "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ || ${#__base_bash_libs_gh_headers_value} -gt 10 ]]; then
+                    __base_bash_libs_gh_headers_invalid_value=1
+                elif [[ -n "$__base_bash_libs_gh_headers_retry_value" &&
+                    "$__base_bash_libs_gh_headers_retry_value" != "$__base_bash_libs_gh_headers_value" ]]; then
+                    __base_bash_libs_gh_headers_invalid_value=1
+                else
+                    __base_bash_libs_gh_headers_retry_value="$((10#$__base_bash_libs_gh_headers_value))"
+                fi
+                ;;
+            x-ratelimit-remaining)
+                if [[ "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_headers_value} -le 10 ]]; then
+                    __base_bash_libs_gh_headers_normalized="$((10#$__base_bash_libs_gh_headers_value))"
+                    if [[ -n "$__base_bash_libs_gh_headers_remaining_value" &&
+                        "$__base_bash_libs_gh_headers_remaining_value" != "$__base_bash_libs_gh_headers_normalized" ]]; then
                         __base_bash_libs_gh_headers_invalid_value=1
                     else
-                        __base_bash_libs_gh_headers_retry_value="$((10#$__base_bash_libs_gh_headers_value))"
+                        __base_bash_libs_gh_headers_remaining_value="$__base_bash_libs_gh_headers_normalized"
                     fi
-                    ;;
-                x-ratelimit-remaining)
-                    if [[ "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_headers_value} -le 10 ]]; then
-                        __base_bash_libs_gh_headers_normalized="$((10#$__base_bash_libs_gh_headers_value))"
-                        if [[ -n "$__base_bash_libs_gh_headers_remaining_value" &&
-                            "$__base_bash_libs_gh_headers_remaining_value" != "$__base_bash_libs_gh_headers_normalized" ]]; then
-                            __base_bash_libs_gh_headers_invalid_value=1
-                        else
-                            __base_bash_libs_gh_headers_remaining_value="$__base_bash_libs_gh_headers_normalized"
-                        fi
-                    else
+                else
+                    __base_bash_libs_gh_headers_invalid_value=1
+                fi
+                ;;
+            x-ratelimit-reset)
+                if [[ "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_headers_value} -le 12 ]]; then
+                    __base_bash_libs_gh_headers_normalized="$((10#$__base_bash_libs_gh_headers_value))"
+                    if [[ -n "$__base_bash_libs_gh_headers_reset_value" &&
+                        "$__base_bash_libs_gh_headers_reset_value" != "$__base_bash_libs_gh_headers_normalized" ]]; then
                         __base_bash_libs_gh_headers_invalid_value=1
-                    fi
-                    ;;
-                x-ratelimit-reset)
-                    if [[ "$__base_bash_libs_gh_headers_value" =~ ^[0-9]+$ && ${#__base_bash_libs_gh_headers_value} -le 12 ]]; then
-                        __base_bash_libs_gh_headers_normalized="$((10#$__base_bash_libs_gh_headers_value))"
-                        if [[ -n "$__base_bash_libs_gh_headers_reset_value" &&
-                            "$__base_bash_libs_gh_headers_reset_value" != "$__base_bash_libs_gh_headers_normalized" ]]; then
-                            __base_bash_libs_gh_headers_invalid_value=1
-                        else
-                            __base_bash_libs_gh_headers_reset_value="$__base_bash_libs_gh_headers_normalized"
-                        fi
                     else
-                        __base_bash_libs_gh_headers_invalid_value=1
+                        __base_bash_libs_gh_headers_reset_value="$__base_bash_libs_gh_headers_normalized"
                     fi
-                    ;;
+                else
+                    __base_bash_libs_gh_headers_invalid_value=1
+                fi
+                ;;
             esac
         done
         ((__base_bash_libs_gh_headers_terminated)) || __base_bash_libs_gh_headers_invalid_value=1
-    } 7<"$__base_bash_libs_gh_headers_file"
+    } 7< "$__base_bash_libs_gh_headers_file"
     ((__base_bash_libs_gh_headers_terminated)) || __base_bash_libs_gh_headers_bytes=0
     if ((__base_bash_libs_gh_headers_bytes > 0)) &&
         ! __base_bash_libs_gh_api_file_prefix_is_nul_free__ "$__base_bash_libs_gh_headers_file" \
@@ -1238,10 +1236,10 @@ __base_bash_libs_gh_api_parse_stderr__() {
                 break
             fi
             case "$__base_bash_libs_gh_stderr_lines" in
-                1) __base_bash_libs_gh_stderr_first="$__base_bash_libs_gh_stderr_line" ;;
-                2) __base_bash_libs_gh_stderr_second="$__base_bash_libs_gh_stderr_line" ;;
+            1) __base_bash_libs_gh_stderr_first="$__base_bash_libs_gh_stderr_line" ;;
+            2) __base_bash_libs_gh_stderr_second="$__base_bash_libs_gh_stderr_line" ;;
             esac
-        done 7<"$__base_bash_libs_gh_stderr_file"
+        done 7< "$__base_bash_libs_gh_stderr_file"
     fi
 
     # GitHub CLI renders HTTP/API response errors as `gh: ...`, so that
@@ -1251,23 +1249,22 @@ __base_bash_libs_gh_api_parse_stderr__() {
     # narrow transient suffix allowlist; extra/debug lines fail closed.
     if ((!__base_bash_libs_gh_stderr_invalid_value)) && ((__base_bash_libs_gh_stderr_lines == 2)) &&
         [[ "$__base_bash_libs_gh_stderr_first" =~ ^error\ connecting\ to\ ([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)(:[0-9]{1,5})?$ ]] &&
-        [[ "$__base_bash_libs_gh_stderr_second" == \
-            "check your internet connection or https://githubstatus.com" ]]; then
+        [[ "$__base_bash_libs_gh_stderr_second" == "check your internet connection or https://githubstatus.com" ]]; then
         __base_bash_libs_gh_stderr_transport_value=1
     elif ((!__base_bash_libs_gh_stderr_invalid_value)) && ((__base_bash_libs_gh_stderr_lines == 1)) &&
         [[ "$__base_bash_libs_gh_stderr_first" =~ $__base_bash_libs_gh_stderr_url_error_re ]]; then
         __base_bash_libs_gh_stderr_detail="${BASH_REMATCH[2]}"
         __base_bash_libs_gh_stderr_lower="${__base_bash_libs_gh_stderr_detail,,}"
         case "$__base_bash_libs_gh_stderr_lower" in
-            "eof" | "unexpected eof" | "net/http: tls handshake timeout" | \
-                dial\ tcp\ *:\ connect:\ connection\ refused | \
-                dial\ tcp\ *:\ connect:\ network\ is\ unreachable | \
-                dial\ tcp\ *:\ connect:\ no\ route\ to\ host | \
-                read\ tcp\ *:\ read:\ connection\ reset\ by\ peer | \
-                write\ tcp\ *:\ write:\ connection\ reset\ by\ peer | \
-                *": i/o timeout" | *": connection timed out")
-                __base_bash_libs_gh_stderr_transport_value=1
-                ;;
+        "eof" | "unexpected eof" | "net/http: tls handshake timeout" | \
+            dial\ tcp\ *:\ connect:\ connection\ refused | \
+            dial\ tcp\ *:\ connect:\ network\ is\ unreachable | \
+            dial\ tcp\ *:\ connect:\ no\ route\ to\ host | \
+            read\ tcp\ *:\ read:\ connection\ reset\ by\ peer | \
+            write\ tcp\ *:\ write:\ connection\ reset\ by\ peer | \
+            *": i/o timeout" | *": connection timed out")
+            __base_bash_libs_gh_stderr_transport_value=1
+            ;;
         esac
     fi
 
@@ -1319,14 +1316,14 @@ __base_bash_libs_gh_api_failure_metadata__() {
         __base_bash_libs_gh_meta_retryable_value=0
     elif [[ -n "$__base_bash_libs_gh_meta_status" ]]; then
         case "$__base_bash_libs_gh_meta_status" in
-            408 | 425 | 429 | 500 | 502 | 503 | 504)
+        408 | 425 | 429 | 500 | 502 | 503 | 504)
+            __base_bash_libs_gh_meta_retryable_value=1
+            ;;
+        403)
+            if [[ -n "$__base_bash_libs_gh_meta_retry_after" || "$__base_bash_libs_gh_meta_remaining" == "0" ]]; then
                 __base_bash_libs_gh_meta_retryable_value=1
-                ;;
-            403)
-                if [[ -n "$__base_bash_libs_gh_meta_retry_after" || "$__base_bash_libs_gh_meta_remaining" == "0" ]]; then
-                    __base_bash_libs_gh_meta_retryable_value=1
-                fi
-                ;;
+            fi
+            ;;
         esac
     elif ((__base_bash_libs_gh_meta_transport && __base_bash_libs_gh_meta_transport_allowed)); then
         __base_bash_libs_gh_meta_retryable_value=1
@@ -1334,7 +1331,7 @@ __base_bash_libs_gh_api_failure_metadata__() {
 
     if ((__base_bash_libs_gh_meta_retryable_value)) && {
         [[ "$__base_bash_libs_gh_meta_status" == "429" || "$__base_bash_libs_gh_meta_status" == "403" ||
-            "$__base_bash_libs_gh_meta_remaining" == "0" ]];
+            "$__base_bash_libs_gh_meta_remaining" == "0" ]]
     }; then
         __base_bash_libs_gh_meta_rate_value=1
     fi
@@ -1357,7 +1354,7 @@ __base_bash_libs_gh_api_failure_metadata__() {
     fi
     if [[ -n "$__base_bash_libs_gh_meta_reset_delay" ]] && {
         [[ -z "$__base_bash_libs_gh_meta_delay_value" ]] ||
-            ((__base_bash_libs_gh_meta_reset_delay > __base_bash_libs_gh_meta_delay_value));
+            ((__base_bash_libs_gh_meta_reset_delay > __base_bash_libs_gh_meta_delay_value))
     }; then
         __base_bash_libs_gh_meta_delay_value="$__base_bash_libs_gh_meta_reset_delay"
     fi
@@ -1391,7 +1388,7 @@ __base_bash_libs_gh_api_cleanup_capture__() {
     local __base_bash_libs_gh_cleanup_path
     for __base_bash_libs_gh_cleanup_path in "$@"; do
         [[ -n "$__base_bash_libs_gh_cleanup_path" ]] || continue
-        command rm -f -- "$__base_bash_libs_gh_cleanup_path" 2>/dev/null || true
+        command rm -f -- "$__base_bash_libs_gh_cleanup_path" 2> /dev/null || true
     done
 }
 
@@ -1403,8 +1400,8 @@ __base_bash_libs_gh_api_cleanup_workspace__() {
         "$__base_bash_libs_gh_workspace_dir/stdout" \
         "$__base_bash_libs_gh_workspace_dir/stderr" \
         "$__base_bash_libs_gh_workspace_dir/guardian" \
-        "$__base_bash_libs_gh_workspace_dir/guardian.ready" 2>/dev/null || true
-    command rmdir -- "$__base_bash_libs_gh_workspace_dir" 2>/dev/null || true
+        "$__base_bash_libs_gh_workspace_dir/guardian.ready" 2> /dev/null || true
+    command rmdir -- "$__base_bash_libs_gh_workspace_dir" 2> /dev/null || true
 }
 
 __base_bash_libs_gh_api_start_capture_guardian__() {
@@ -1413,7 +1410,7 @@ __base_bash_libs_gh_api_start_capture_guardian__() {
     local __base_bash_libs_gh_guard_pid __base_bash_libs_gh_guard_fd __base_bash_libs_gh_guard_monitor_was_enabled=0
     local __base_bash_libs_gh_guard_probe
 
-    if ! exec {__base_bash_libs_gh_guard_fd}<>"$__base_bash_libs_gh_guard_workspace/guardian"; then
+    if ! exec {__base_bash_libs_gh_guard_fd}<> "$__base_bash_libs_gh_guard_workspace/guardian"; then
         return 1
     fi
     [[ $- == *m* ]] && __base_bash_libs_gh_guard_monitor_was_enabled=1
@@ -1428,7 +1425,7 @@ __base_bash_libs_gh_api_start_capture_guardian__() {
         # actual parent relationship reported for its own BASHPID. A recycled
         # owner PID cannot impersonate that relationship after reparenting.
         exec {__base_bash_libs_gh_guard_fd}>&-
-        if ! exec {__base_bash_libs_gh_guard_read_fd}<"$__base_bash_libs_gh_guard_workspace/guardian"; then
+        if ! exec {__base_bash_libs_gh_guard_read_fd}< "$__base_bash_libs_gh_guard_workspace/guardian"; then
             __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_guard_workspace"
             exit 1
         fi
@@ -1445,22 +1442,22 @@ __base_bash_libs_gh_api_start_capture_guardian__() {
             __base_bash_libs_gh_guard_parent_pid=""
             if [[ -x /bin/ps ]]; then
                 __base_bash_libs_gh_guard_parent_pid="$(
-                    LC_ALL=C /bin/ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2>/dev/null
+                    LC_ALL=C /bin/ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2> /dev/null
                 )" || __base_bash_libs_gh_guard_parent_pid=""
             else
                 __base_bash_libs_gh_guard_parent_pid="$(
-                    LC_ALL=C command ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2>/dev/null
+                    LC_ALL=C command ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2> /dev/null
                 )" || __base_bash_libs_gh_guard_parent_pid=""
             fi
             __base_bash_libs_gh_guard_parent_pid="${__base_bash_libs_gh_guard_parent_pid//[[:space:]]/}"
             if [[ "$__base_bash_libs_gh_guard_parent_pid" =~ ^[1-9][0-9]*$ ]]; then
                 [[ "$__base_bash_libs_gh_guard_parent_pid" == "$__base_bash_libs_gh_guard_owner_pid" ]] || break
-            elif ! kill -0 "$__base_bash_libs_gh_guard_owner_pid" 2>/dev/null; then
+            elif ! kill -0 "$__base_bash_libs_gh_guard_owner_pid" 2> /dev/null; then
                 break
             fi
         done
         __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_guard_workspace"
-    ) </dev/null >/dev/null 2>&1 &
+    ) < /dev/null > /dev/null 2>&1 &
     __base_bash_libs_gh_guard_pid=$!
     if ((__base_bash_libs_gh_guard_monitor_was_enabled)); then
         set -m
@@ -1469,12 +1466,12 @@ __base_bash_libs_gh_api_start_capture_guardian__() {
     fi
     for ((__base_bash_libs_gh_guard_probe = 0; __base_bash_libs_gh_guard_probe < 100; __base_bash_libs_gh_guard_probe++)); do
         [[ -e "$__base_bash_libs_gh_guard_workspace/guardian.ready" ]] && break
-        kill -0 "$__base_bash_libs_gh_guard_pid" 2>/dev/null || break
+        kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null || break
         __base_bash_libs_std_sleep_interval__ 0.01 || break
     done
     if [[ ! -e "$__base_bash_libs_gh_guard_workspace/guardian.ready" ]]; then
-        kill -KILL "$__base_bash_libs_gh_guard_pid" 2>/dev/null || true
-        wait "$__base_bash_libs_gh_guard_pid" 2>/dev/null || true
+        kill -KILL "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
+        wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
         exec {__base_bash_libs_gh_guard_fd}>&-
         return 1
     fi
@@ -1486,17 +1483,17 @@ __base_bash_libs_gh_api_stop_capture_guardian__() {
     local __base_bash_libs_gh_guard_pid="${1-}" __base_bash_libs_gh_guard_fd="${2-}"
 
     if [[ "$__base_bash_libs_gh_guard_fd" =~ ^[1-9][0-9]*$ ]]; then
-        { printf 'stop\n' 1>&"$__base_bash_libs_gh_guard_fd"; } 2>/dev/null || true
+        { printf 'stop\n' 1>&"$__base_bash_libs_gh_guard_fd"; } 2> /dev/null || true
         exec {__base_bash_libs_gh_guard_fd}>&-
     fi
     if [[ "$__base_bash_libs_gh_guard_pid" =~ ^[1-9][0-9]*$ ]]; then
         # `wait` can reap only this shell's child, so a guardian that has
         # already exited can never turn a recycled PID into a signal target.
-        while kill -0 "$__base_bash_libs_gh_guard_pid" 2>/dev/null; do
-            wait "$__base_bash_libs_gh_guard_pid" 2>/dev/null && break
-            kill -0 "$__base_bash_libs_gh_guard_pid" 2>/dev/null || break
+        while kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null; do
+            wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null && break
+            kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null || break
         done
-        wait "$__base_bash_libs_gh_guard_pid" 2>/dev/null || true
+        wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
     fi
 }
 
@@ -1531,8 +1528,8 @@ __base_bash_libs_gh_api_finish__() {
     fi
 
     case "$__base_bash_libs_gh_finish_method" in
-        GET | HEAD | OPTIONS | POST | PUT | PATCH | DELETE) ;;
-        *) __base_bash_libs_gh_finish_method=OTHER ;;
+    GET | HEAD | OPTIONS | POST | PUT | PATCH | DELETE) ;;
+    *) __base_bash_libs_gh_finish_method=OTHER ;;
     esac
     [[ "$__base_bash_libs_gh_finish_http" =~ ^[0-9]{3}$ ]] || __base_bash_libs_gh_finish_http=unknown
     [[ "$__base_bash_libs_gh_finish_elapsed" =~ ^[0-9]+$ ]] || __base_bash_libs_gh_finish_elapsed=unknown
@@ -1613,11 +1610,11 @@ __base_bash_libs_gh_api_with_retry_impl__() {
     __base_bash_libs_gh_parse_api_controls__ __base_bash_libs_gh_api_consumed __base_bash_libs_gh_api_sensitive \
         __base_bash_libs_gh_api_safe_display __base_bash_libs_gh_api_policy __base_bash_libs_gh_api_max_attempts \
         __base_bash_libs_gh_api_max_elapsed __base_bash_libs_gh_api_attempt_timeout __base_bash_libs_gh_api_base_delay \
-        __base_bash_libs_gh_api_max_delay "$@" || return 1
+        __base_bash_libs_gh_api_max_delay "$@" || return $?
     ((__base_bash_libs_gh_api_consumed == 0)) || shift "$__base_bash_libs_gh_api_consumed"
     if (($# == 0)); then
         __base_bash_libs_gh_api_controls_usage__
-        return 1
+        return 2
     fi
 
     base_gh_require_cli || return 1
@@ -1625,19 +1622,19 @@ __base_bash_libs_gh_api_with_retry_impl__() {
         __base_bash_libs_gh_api_file __base_bash_libs_gh_api_graphql __base_bash_libs_gh_api_ambiguous "$@"
 
     case "$__base_bash_libs_gh_api_policy" in
-        never)
-            __base_bash_libs_gh_api_retry_authorized=0
-            ;;
-        replay-safe)
-            ((__base_bash_libs_gh_api_stdin == 0)) && __base_bash_libs_gh_api_retry_authorized=1
-            ;;
-        read-only)
-            if ((!__base_bash_libs_gh_api_stdin && !__base_bash_libs_gh_api_file && !__base_bash_libs_gh_api_graphql && !__base_bash_libs_gh_api_ambiguous)); then
-                case "$__base_bash_libs_gh_api_method" in
-                    GET | HEAD | OPTIONS) __base_bash_libs_gh_api_retry_authorized=1 ;;
-                esac
-            fi
-            ;;
+    never)
+        __base_bash_libs_gh_api_retry_authorized=0
+        ;;
+    replay-safe)
+        ((__base_bash_libs_gh_api_stdin == 0)) && __base_bash_libs_gh_api_retry_authorized=1
+        ;;
+    read-only)
+        if ((!__base_bash_libs_gh_api_stdin && !__base_bash_libs_gh_api_file && !__base_bash_libs_gh_api_graphql && !__base_bash_libs_gh_api_ambiguous)); then
+            case "$__base_bash_libs_gh_api_method" in
+            GET | HEAD | OPTIONS) __base_bash_libs_gh_api_retry_authorized=1 ;;
+            esac
+        fi
+        ;;
     esac
 
     __base_bash_libs_gh_api_attempt_argv=("$@")
@@ -1667,9 +1664,9 @@ __base_bash_libs_gh_api_with_retry_impl__() {
     __base_bash_libs_std_make_internal_temp_dir__ --keep __base_bash_libs_gh_api_capture_workspace \
         base-bash-libs-gh-api || return 1
     __base_bash_libs_gh_api_owned_workspace="$__base_bash_libs_gh_api_capture_workspace"
-    if ! command chmod 700 "$__base_bash_libs_gh_api_owned_workspace" 2>/dev/null ||
-        ! command mkfifo "$__base_bash_libs_gh_api_owned_workspace/guardian" 2>/dev/null ||
-        ! command chmod 600 "$__base_bash_libs_gh_api_owned_workspace/guardian" 2>/dev/null; then
+    if ! command chmod 700 "$__base_bash_libs_gh_api_owned_workspace" 2> /dev/null ||
+        ! command mkfifo "$__base_bash_libs_gh_api_owned_workspace/guardian" 2> /dev/null ||
+        ! command chmod 600 "$__base_bash_libs_gh_api_owned_workspace/guardian" 2> /dev/null; then
         __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_api_owned_workspace"
         base_std_log_error -l base_bash_libs.gh \
             "base_gh_api_with_retry: could not secure the retry capture workspace."
@@ -1684,9 +1681,9 @@ __base_bash_libs_gh_api_with_retry_impl__() {
     fi
     __base_bash_libs_gh_api_stdout="$__base_bash_libs_gh_api_owned_workspace/stdout"
     __base_bash_libs_gh_api_stderr="$__base_bash_libs_gh_api_owned_workspace/stderr"
-    if ! : > "$__base_bash_libs_gh_api_stdout" 2>/dev/null ||
-        ! : > "$__base_bash_libs_gh_api_stderr" 2>/dev/null ||
-        ! command chmod 600 "$__base_bash_libs_gh_api_stdout" "$__base_bash_libs_gh_api_stderr" 2>/dev/null; then
+    if ! : > "$__base_bash_libs_gh_api_stdout" 2> /dev/null ||
+        ! : > "$__base_bash_libs_gh_api_stderr" 2> /dev/null ||
+        ! command chmod 600 "$__base_bash_libs_gh_api_stdout" "$__base_bash_libs_gh_api_stderr" 2> /dev/null; then
         __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_api_owned_workspace"
         base_std_log_error -l base_bash_libs.gh \
             "base_gh_api_with_retry: could not secure retry capture files."
@@ -1840,7 +1837,7 @@ __base_bash_libs_gh_api_with_retry_impl__() {
             __base_bash_libs_gh_api_reason=""
         fi
 
-        if ((__base_bash_libs_gh_api_metadata_invalid || !__base_bash_libs_gh_api_retryable || !__base_bash_libs_gh_api_retry_authorized ||
+        if ((__base_bash_libs_gh_api_metadata_invalid || !__base_bash_libs_gh_api_retryable || !__base_bash_libs_gh_api_retry_authorized || \
             __base_bash_libs_gh_api_attempt >= __base_bash_libs_gh_api_max_attempts)); then
             __base_bash_libs_gh_api_finish__ "$__base_bash_libs_gh_api_status" "$__base_bash_libs_gh_api_stdout" "$__base_bash_libs_gh_api_stderr" \
                 "$__base_bash_libs_gh_api_sensitive" "$__base_bash_libs_gh_api_display" "$__base_bash_libs_gh_api_attempt" \
@@ -1968,8 +1965,8 @@ base_gh_api_with_retry() {
         __base_bash_libs_gh_api_public_status="$__base_bash_libs_gh_api_cancel_status"
     fi
     if [[ -n "$__base_bash_libs_gh_api_active_sleep_pid" ]]; then
-        kill -KILL "$__base_bash_libs_gh_api_active_sleep_pid" 2>/dev/null || true
-        wait "$__base_bash_libs_gh_api_active_sleep_pid" 2>/dev/null || true
+        kill -KILL "$__base_bash_libs_gh_api_active_sleep_pid" 2> /dev/null || true
+        wait "$__base_bash_libs_gh_api_active_sleep_pid" 2> /dev/null || true
     fi
     __base_bash_libs_gh_api_stop_capture_guardian__ "$__base_bash_libs_gh_api_guardian_pid" \
         "$__base_bash_libs_gh_api_guardian_fd"
@@ -1990,13 +1987,13 @@ base_gh_api_with_retry() {
     [[ -z "$__base_bash_libs_gh_api_saved_term_trap" ]] || eval "$__base_bash_libs_gh_api_saved_term_trap"
 
     case "$__base_bash_libs_gh_api_cancel_signal" in
-        HUP | INT | QUIT | TERM)
-            # Cleanup is complete and the exact caller disposition is active
-            # again. Re-delivery preserves default termination and invokes
-            # custom handlers; an explicitly ignored signal was never
-            # intercepted above.
-            kill "-$__base_bash_libs_gh_api_cancel_signal" "$BASHPID" 2>/dev/null || true
-            ;;
+    HUP | INT | QUIT | TERM)
+        # Cleanup is complete and the exact caller disposition is active
+        # again. Re-delivery preserves default termination and invokes
+        # custom handlers; an explicitly ignored signal was never
+        # intercepted above.
+        kill "-$__base_bash_libs_gh_api_cancel_signal" "$BASHPID" 2> /dev/null || true
+        ;;
     esac
     return "$__base_bash_libs_gh_api_public_status"
 }

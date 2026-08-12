@@ -51,9 +51,11 @@ base_std_log_info "Current branch: $branch"
 ## Behavior Notes
 
 - Public functions validate the documented argument count before expanding
-  required positional parameters. Invalid calls return `1`, including when the
-  caller has enabled `nounset`; extra arguments are rejected unless the
-  signature explicitly accepts them.
+  required positional parameters. Usage and contract errors return `2`,
+  including when the caller has enabled `nounset`; recoverable Git failures and
+  false predicates return `1` unless the function documents a more specific
+  status. Extra arguments are rejected unless the signature explicitly accepts
+  them.
 - The library does not change the caller's `errexit`, `nounset`, `pipefail`,
   `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters.
   Parsing that requires field splitting uses a command-scoped `IFS`, so a
@@ -83,11 +85,11 @@ base_std_log_info "Current branch: $branch"
 | Status | Meaning |
 | ---: | --- |
 | `0` | Current or ahead of upstream, or an explicit non-error skip state. |
-| `1` | Invalid usage. |
-| `2` | Behind upstream; the script may be stale. |
+| `1` | Operational failure while discovering metadata, inspecting changes, fetching, or comparing revisions. |
+| `2` | Invalid usage or contract. |
 | `3` | The tracked script has local modifications. This takes precedence over a successful current, ahead, behind, or diverged comparison, and over documented skip states. |
-| `4` | The repository has diverged from upstream. |
-| `5` | Operational failure while discovering repository metadata, inspecting changes, fetching, or comparing revisions. Freshness is unknown. |
+| `4` | Behind upstream; the script may be stale. |
+| `5` | The repository has diverged from upstream. |
 
 Operational failures take precedence over the dirty status because the result
 cannot be trusted. Every status is accompanied by an explicit diagnostic, and

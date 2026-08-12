@@ -173,7 +173,7 @@ gh_api_retry_observed() {
                 exit "$rc"
             ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/gh/lib_gh.sh" "$function_name"
 
-            [ "$status" -eq 1 ]
+            [ "$status" -eq 2 ]
             [[ "$output" == *"Usage:"* ]]
             [[ "$output" != *"unbound variable"* ]]
         done
@@ -182,27 +182,27 @@ gh_api_retry_observed() {
 
 @test "GitHub optional forms reject excess arguments and invalid values" {
     capture_command base_gh_require_cli one two
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_require_cli [install_hint]"* ]]
 
     capture_command base_gh_auth_status_diagnostics one two
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_auth_status_diagnostics [login_hint]"* ]]
 
     capture_command base_gh_infer_repo_from_origin repo result --required
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"* ]]
 
     capture_command base_gh_report_command_failure invalid issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_report_command_failure <status> [gh args...]"* ]]
 
     capture_command base_gh_report_command_failure 0 issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_report_command_failure <status> [gh args...]"* ]]
 
     capture_command base_gh_report_command_failure 256 issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_report_command_failure <status> [gh args...]"* ]]
 }
 
@@ -218,45 +218,45 @@ exit 0
 EOF
 
     capture_command base_gh_run --sensitive "--opaque=$secret" -- issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"protected diagnostic controls must end with --"* ]]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_api_with_retry --safe-display "safe API operation" -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"--safe-display is valid only with --sensitive"* ]]
 
     capture_command base_gh_run --sensitive --safe-display "--token=$secret" -- issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"one non-empty printable ASCII label"* ]]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_run --sensitive --safe-display "-H$secret" -- issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"one non-empty printable ASCII label"* ]]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_api_with_retry --sensitive --safe-display "-fsecret=$secret" -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"one non-empty printable ASCII label"* ]]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_run --sensitive --safe-display "$unicode_label" -- issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"one non-empty printable ASCII label"* ]]
     [[ "$output" != *"unicode-label-canary"* ]]
 
     capture_command base_gh_report_command_failure --sensitive 77 issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"protected diagnostic controls must end with --"* ]]
 
     capture_command base_gh_report_command_failure --sensitive -- "status=$secret" issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Usage: base_gh_report_command_failure"* ]]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_run --sensitive --safe-display $'unsafe\nparser-secret' -- issue list
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"one non-empty printable ASCII label"* ]]
     [[ "$output" != *"parser-secret"* ]]
     [ ! -e "$invocation_file" ]
@@ -365,7 +365,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$repo" = "sentinel" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'repo' is readonly"* ]]
 }
@@ -383,7 +383,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$parsed" = "keep-parsed" ]
 
     if base_gh_infer_repo_from_origin . __base_bash_libs_gh_infer_result_name --optional 2>"$stderr_file"; then
@@ -391,7 +391,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$inferred" = "keep-inferred" ]
 
     if base_gh_repo_default_branch owner/project __base_bash_libs_gh_repo_result_name 2>"$stderr_file"; then
@@ -399,7 +399,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$defaulted" = "keep-defaulted" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
@@ -670,22 +670,22 @@ EOF
 
     bats_run base_gh_repo_from_remote_url "https://example.com/owner/repo.git" repo
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ "$repo" = "sentinel" ]
 
     bats_run base_gh_repo_from_remote_url "https://github.com/owner" repo
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ "$repo" = "sentinel" ]
 
     bats_run base_gh_repo_from_remote_url "ssh://git@github.com//repo.git" repo
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ "$repo" = "sentinel" ]
 
     bats_run base_gh_repo_from_remote_url "https://github.com/owner/repo?query=1" repo
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ "$repo" = "sentinel" ]
 }
 
@@ -840,23 +840,23 @@ EOF
     }
 
     capture_command base_gh_api_with_retry --retry-policy "$secret" -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" != *"$secret"* ]]
 
     capture_command base_gh_api_with_retry --max-attempts 0 -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --max-attempts 2 --max-attempts 3 -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --base-delay-seconds 5 --max-delay-seconds 4 -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --attempt-timeout-seconds 601 -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --max-elapsed-seconds 3601 -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --retry-policy read-only repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     capture_command base_gh_api_with_retry --safe-display "safe operation" -- repos/owner/repo
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ ! -e "$invocation_file" ]
 }
 
