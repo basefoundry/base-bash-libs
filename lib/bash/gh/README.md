@@ -53,12 +53,14 @@ leave caller-owned result variables unchanged on failure; use `--optional` with
 `base_gh_infer_repo_from_origin` when a missing or non-GitHub origin is expected.
 
 Public functions validate the documented argument count before expanding
-required positional parameters. Invalid calls return `1`, including when the
-caller has enabled `nounset`; optional flags such as `--optional` are rejected
-when misspelled. `base_gh_run` passes every GitHub argument after its optional
-protected-diagnostic control prefix through unchanged. `base_gh_api_with_retry`
-preserves those caller arguments except for the documented internal
-response-metadata instrumentation on compatible retry-authorized calls.
+required positional parameters. Usage and contract errors return `2`, including
+when the caller has enabled `nounset`; recoverable GitHub failures return `1`
+unless the function preserves the underlying `gh` status. Optional flags such
+as `--optional` are rejected when misspelled. `base_gh_run` passes every GitHub
+argument after its optional protected-diagnostic control prefix through
+unchanged. `base_gh_api_with_retry` preserves those caller arguments except for
+the documented internal response-metadata instrumentation on compatible
+retry-authorized calls.
 
 The library does not change the caller's `errexit`, `nounset`, `pipefail`,
 `noclobber`, `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional

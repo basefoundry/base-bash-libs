@@ -44,31 +44,31 @@ contract_expect_status() {
 }
 
 contract_quiet_call() {
-    "$@" >/dev/null 2>&1
+    "$@" > /dev/null 2>&1
 }
 
 contract_quiet_success() {
     local label="${1-}" status
     shift
 
-    "$@" >/dev/null 2>&1
+    "$@" > /dev/null 2>&1
     status=$?
     contract_assert_equal "$label status" 0 "$status"
 }
 
 contract_quiet_subshell() {
-    ("$@") >/dev/null 2>&1
+    ("$@") > /dev/null 2>&1
 }
 
 contract_enable_mode() {
     case "$contract_mode" in
-        e | eu | ep | eup) builtin set -o errexit ;;
+    e | eu | ep | eup) builtin set -o errexit ;;
     esac
     case "$contract_mode" in
-        u | eu | up | eup) builtin set -o nounset ;;
+    u | eu | up | eup) builtin set -o nounset ;;
     esac
     case "$contract_mode" in
-        p | ep | up | eup) builtin set -o pipefail ;;
+    p | ep | up | eup) builtin set -o pipefail ;;
     esac
 }
 
@@ -77,13 +77,13 @@ contract_assert_mode_options() {
     local actual_errexit=0 actual_nounset=0 actual_pipefail=0
 
     case "$contract_mode" in
-        e | eu | ep | eup) expected_errexit=1 ;;
+    e | eu | ep | eup) expected_errexit=1 ;;
     esac
     case "$contract_mode" in
-        u | eu | up | eup) expected_nounset=1 ;;
+    u | eu | up | eup) expected_nounset=1 ;;
     esac
     case "$contract_mode" in
-        p | ep | up | eup) expected_pipefail=1 ;;
+    p | ep | up | eup) expected_pipefail=1 ;;
     esac
     case "$-" in *e*) actual_errexit=1 ;; esac
     case "$-" in *u*) actual_nounset=1 ;; esac
@@ -98,8 +98,8 @@ contract_assert_mode_options() {
 
 contract_assert_version() {
     if (($# == 0)); then
-        if ((BASH_VERSINFO[0] < 4 ||
-            (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2))); then
+        if ((BASH_VERSINFO[0] < 4 || (\
+            BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2))); then
             contract_fail "requires Bash 4.2 or newer; running $BASH_VERSION"
         fi
         return 0
@@ -476,40 +476,40 @@ contract_git_stub() {
     fi
 
     case "${1-}" in
-        symbolic-ref)
-            if [[ "${4-}" == "refs/remotes/origin/HEAD" ]]; then
-                printf 'origin/main\n'
-            else
-                printf 'main\n'
-            fi
-            ;;
-        show-ref | merge-base)
-            return 0
-            ;;
-        worktree)
-            printf 'worktree /contract/worktree\nHEAD 0123456789\nbranch refs/heads/main\n\n'
-            ;;
-        for-each-ref)
+    symbolic-ref)
+        if [[ "${4-}" == "refs/remotes/origin/HEAD" ]]; then
             printf 'origin/main\n'
-            ;;
-        ls-remote)
-            printf '0123456789abcdef\trefs/heads/main\n'
-            printf 'fedcba9876543210\trefs/heads/topic/one\n'
-            ;;
-        remote)
-            printf 'git@github.com:basefoundry/base-bash-libs.git\n'
-            ;;
-        rev-parse)
-            case "${2-}" in
-                --is-inside-work-tree) printf 'true\n' ;;
-                --show-toplevel) printf '%s\n' "$contract_tmp" ;;
-                --show-prefix) printf '\n' ;;
-                *) return 1 ;;
-            esac
-            ;;
-        *)
-            return 0
-            ;;
+        else
+            printf 'main\n'
+        fi
+        ;;
+    show-ref | merge-base)
+        return 0
+        ;;
+    worktree)
+        printf 'worktree /contract/worktree\nHEAD 0123456789\nbranch refs/heads/main\n\n'
+        ;;
+    for-each-ref)
+        printf 'origin/main\n'
+        ;;
+    ls-remote)
+        printf '0123456789abcdef\trefs/heads/main\n'
+        printf 'fedcba9876543210\trefs/heads/topic/one\n'
+        ;;
+    remote)
+        printf 'git@github.com:basefoundry/base-bash-libs.git\n'
+        ;;
+    rev-parse)
+        case "${2-}" in
+        --is-inside-work-tree) printf 'true\n' ;;
+        --show-toplevel) printf '%s\n' "$contract_tmp" ;;
+        --show-prefix) printf '\n' ;;
+        *) return 1 ;;
+        esac
+        ;;
+    *)
+        return 0
+        ;;
     esac
 }
 
@@ -541,11 +541,11 @@ contract_gh_stub() {
         return 1
     fi
     case "${1-}:${2-}" in
-        repo:view) printf 'main\n' ;;
-        api:*)
-            ((contract_gh_include == 0)) || printf 'HTTP/2.0 200 OK\r\n\r\n'
-            printf '{"contract":true}\n'
-            ;;
+    repo:view) printf 'main\n' ;;
+    api:*)
+        ((contract_gh_include == 0)) || printf 'HTTP/2.0 200 OK\r\n\r\n'
+        printf '{"contract":true}\n'
+        ;;
     esac
     return 0
 }
@@ -573,17 +573,17 @@ contract_git_gh_api_smoke() {
     contract_quiet_success "base_git_check_script_up_to_date missing file" \
         base_git_check_script_up_to_date "$contract_tmp/missing-script"
 
-    contract_expect_status "base_git_detect_default_branch usage" 1 contract_quiet_call base_git_detect_default_branch
-    contract_expect_status "base_git_worktree_path_for_branch usage" 1 contract_quiet_call base_git_worktree_path_for_branch
-    contract_expect_status "base_git_list_worktree_branches usage" 1 \
+    contract_expect_status "base_git_detect_default_branch usage" 2 contract_quiet_call base_git_detect_default_branch
+    contract_expect_status "base_git_worktree_path_for_branch usage" 2 contract_quiet_call base_git_worktree_path_for_branch
+    contract_expect_status "base_git_list_worktree_branches usage" 2 \
         contract_quiet_call base_git_list_worktree_branches one two
-    contract_expect_status "base_git_branch_upstream usage" 1 contract_quiet_call base_git_branch_upstream
-    contract_expect_status "base_git_branch_merged_to_ref usage" 1 contract_quiet_call base_git_branch_merged_to_ref
-    contract_expect_status "base_git_list_remote_branches usage" 1 \
+    contract_expect_status "base_git_branch_upstream usage" 2 contract_quiet_call base_git_branch_upstream
+    contract_expect_status "base_git_branch_merged_to_ref usage" 2 contract_quiet_call base_git_branch_merged_to_ref
+    contract_expect_status "base_git_list_remote_branches usage" 2 \
         contract_quiet_call base_git_list_remote_branches one two
-    contract_expect_status "base_git_update_repo usage" 1 contract_quiet_call base_git_update_repo
-    contract_expect_status "base_git_get_current_branch usage" 1 contract_quiet_call base_git_get_current_branch
-    contract_expect_status "base_git_check_script_up_to_date usage" 1 contract_quiet_call base_git_check_script_up_to_date
+    contract_expect_status "base_git_update_repo usage" 2 contract_quiet_call base_git_update_repo
+    contract_expect_status "base_git_get_current_branch usage" 2 contract_quiet_call base_git_get_current_branch
+    contract_expect_status "base_git_check_script_up_to_date usage" 2 contract_quiet_call base_git_check_script_up_to_date
 
     base_gh_require_cli
     base_gh_auth_status_diagnostics
@@ -653,7 +653,7 @@ contract_git_gh_api_smoke() {
     contract_assert_equal "base_gh_api_with_retry replay-safe mutation count" 2 "$contract_result"
     unset CONTRACT_GH_COUNT_FILE CONTRACT_GH_FAILS_BEFORE_SUCCESS
 
-    contract_expect_status "base_gh_api_with_retry invalid retry policy" 1 contract_quiet_call \
+    contract_expect_status "base_gh_api_with_retry invalid retry policy" 2 contract_quiet_call \
         base_gh_api_with_retry --retry-policy unsafe -- repos/basefoundry/base-bash-libs
     contract_expect_status "base_gh_report_command_failure status" 7 contract_quiet_call \
         base_gh_report_command_failure 7 api contract
@@ -676,16 +676,16 @@ contract_git_gh_api_smoke() {
         contract_fail "sensitive base_gh_run exposed a protected argument"
     unset CONTRACT_GH_STATUS
 
-    contract_expect_status "base_gh_require_cli usage" 1 contract_quiet_call base_gh_require_cli one two
-    contract_expect_status "base_gh_auth_status_diagnostics usage" 1 \
+    contract_expect_status "base_gh_require_cli usage" 2 contract_quiet_call base_gh_require_cli one two
+    contract_expect_status "base_gh_auth_status_diagnostics usage" 2 \
         contract_quiet_call base_gh_auth_status_diagnostics one two
-    contract_expect_status "base_gh_report_command_failure usage" 1 \
+    contract_expect_status "base_gh_report_command_failure usage" 2 \
         contract_quiet_call base_gh_report_command_failure
-    contract_expect_status "base_gh_repo_from_remote_url usage" 1 \
+    contract_expect_status "base_gh_repo_from_remote_url usage" 2 \
         contract_quiet_call base_gh_repo_from_remote_url
-    contract_expect_status "base_gh_infer_repo_from_origin usage" 1 \
+    contract_expect_status "base_gh_infer_repo_from_origin usage" 2 \
         contract_quiet_call base_gh_infer_repo_from_origin
-    contract_expect_status "base_gh_repo_default_branch usage" 1 \
+    contract_expect_status "base_gh_repo_default_branch usage" 2 \
         contract_quiet_call base_gh_repo_default_branch
 }
 
@@ -744,8 +744,8 @@ if [[ "${1-}" == "--mode" ]]; then
     contract_mode="$2"
     shift 2
     case "$contract_mode" in
-        none | e | u | p | eu | ep | up | eup) ;;
-        *) contract_fail "unknown option mode '$contract_mode'" ;;
+    none | e | u | p | eu | ep | up | eup) ;;
+    *) contract_fail "unknown option mode '$contract_mode'" ;;
     esac
     contract_run_mode "$@"
     exit 0
