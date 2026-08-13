@@ -6,7 +6,7 @@
 [[ -n "${BASE_BASH_LIBS_FILE_LOADED:-}" ]] && return 0
 if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_file.sh requires lib_std.sh to be sourced first." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 readonly BASE_BASH_LIBS_FILE_LOADED=1
 
@@ -64,7 +64,7 @@ __base_bash_libs_file_validate_markers__() {
 __base_bash_libs_file_mode__() {
     local file_path="$1" mode
 
-    if mode=$(stat -c '%a' "$file_path" 2>/dev/null); then
+    if mode=$(stat -c '%a' "$file_path" 2> /dev/null); then
         printf '%s\n' "$mode"
         return 0
     fi
@@ -75,11 +75,11 @@ __base_bash_libs_file_mode__() {
 __base_bash_libs_file_fingerprint__() {
     local result_name="$1" file_path="$2" fingerprint
 
-    if fingerprint="$(stat -c '%d:%i:%s:%Y:%Z' -- "$file_path" 2>/dev/null)"; then
+    if fingerprint="$(stat -c '%d:%i:%s:%Y:%Z' -- "$file_path" 2> /dev/null)"; then
         printf -v "$result_name" '%s' "$fingerprint"
         return 0
     fi
-    if fingerprint="$(stat -f '%d:%i:%z:%m:%c' -- "$file_path" 2>/dev/null)"; then
+    if fingerprint="$(stat -f '%d:%i:%z:%m:%c' -- "$file_path" 2> /dev/null)"; then
         printf -v "$result_name" '%s' "$fingerprint"
         return 0
     fi
@@ -126,7 +126,7 @@ __base_bash_libs_file_make_target_temp__() {
     target_base="$(basename -- "$target_file")"
     temp_dir="$(cd -- "$target_dir" && pwd -P)" || return 1
 
-    temp_path="$(mktemp "$temp_dir/$target_base.XXXXXX" 2>/dev/null)" || return 1
+    temp_path="$(mktemp "$temp_dir/$target_base.XXXXXX" 2> /dev/null)" || return 1
     if ! base_std_register_cleanup_path "$temp_path"; then
         rm -f -- "$temp_path"
         return 1
@@ -135,41 +135,101 @@ __base_bash_libs_file_make_target_temp__() {
     printf -v "$result_name" '%s' "$temp_path"
 }
 
-__base_bash_libs_file_section_markers_ordered__() {
-    local target_file="$1" beginning_marker="$2" end_marker="$3"
+__base_bash_libs_file_section_awk__() {
+    local mode="$1" target_file="$2" beginning_marker="$3" end_marker="$4"
+    local new_content_file="${5-}"
 
-    BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
-    BASE_BASH_LIBS_FILE_END_MARKER="$end_marker" \
-    awk '
+    BASE_BASH_LIBS_FILE_MODE="$mode" \
+        BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
+        BASE_BASH_LIBS_FILE_END_MARKER="$end_marker" \
+        BASE_BASH_LIBS_FILE_NEW_CONTENT_FILE="$new_content_file" \
+        awk '
     BEGIN {
+        MODE = ENVIRON["BASE_BASH_LIBS_FILE_MODE"]
         START_M = ENVIRON["BASE_BASH_LIBS_FILE_START_MARKER"]
         END_M = ENVIRON["BASE_BASH_LIBS_FILE_END_MARKER"]
+        NEW_TEXT_FILE = ENVIRON["BASE_BASH_LIBS_FILE_NEW_CONTENT_FILE"]
         in_section = 0
-        invalid = 0
+        processed = 0
+        result = 0
     }
     $0 == START_M {
-        if (in_section == 1) {
-            invalid = 1
-            exit
+        if (MODE == "ordered") {
+            if (in_section == 1) {
+                result = 1
+                exit
+            }
+            in_section = 1
+            next
         }
-        in_section = 1
-        next
+        if (processed == 0) {
+            if (MODE == "replace") {
+                print START_M
+                while ((getline line < NEW_TEXT_FILE) > 0) {
+                    print line
+                }
+                close(NEW_TEXT_FILE)
+                in_section = 1
+                processed = 1
+                next
+            }
+            in_section = 1
+            next
+        }
     }
     $0 == END_M {
         if (in_section == 0) {
-            invalid = 1
+            if (MODE == "ordered" || processed == 0) {
+                result = 1
+                exit
+            }
+            print $0
+            next
+        }
+        if (MODE == "extract") {
+            in_section = 0
+            processed = 1
             exit
+        }
+        if (MODE == "remove") {
+            in_section = 0
+            processed = 1
+            next
+        }
+        if (MODE == "replace") {
+            print END_M
+            in_section = 0
+            processed = 2
+            next
         }
         in_section = 0
         next
     }
-    END {
-        if (in_section == 1) {
-            invalid = 1
+    {
+        if (MODE == "ordered") {
+            next
         }
-        exit invalid
+        if (MODE == "extract" && in_section == 1) {
+            print $0
+        } else if (MODE == "remove" && in_section == 0) {
+            print $0
+        } else if (MODE == "replace" && processed != 1) {
+            print $0
+        }
+    }
+    END {
+        if (in_section == 1 || (MODE == "extract" && processed == 0)) {
+            result = 1
+        }
+        exit result
     }
     ' "$target_file"
+}
+
+__base_bash_libs_file_section_markers_ordered__() {
+    local target_file="$1" beginning_marker="$2" end_marker="$3"
+
+    __base_bash_libs_file_section_awk__ ordered "$target_file" "$beginning_marker" "$end_marker"
 }
 
 __base_bash_libs_file_section_marker_counts__() {
@@ -271,32 +331,7 @@ base_file_section_needs_update() {
         return 2
     fi
 
-    if ! BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
-        BASE_BASH_LIBS_FILE_END_MARKER="$end_marker" \
-        awk '
-    BEGIN {
-        START_M = ENVIRON["BASE_BASH_LIBS_FILE_START_MARKER"]
-        END_M = ENVIRON["BASE_BASH_LIBS_FILE_END_MARKER"]
-        in_section = 0
-        processed = 0
-    }
-    $0 == START_M && processed == 0 {
-        in_section = 1
-        next
-    }
-    $0 == END_M && in_section == 1 {
-        processed = 1
-        exit
-    }
-    in_section == 1 {
-        print $0
-    }
-    END {
-        if (processed == 0) {
-            exit 1
-        }
-    }
-    ' "$target_file" > "$current_content_file"; then
+    if ! __base_bash_libs_file_section_awk__ extract "$target_file" "$beginning_marker" "$end_marker" > "$current_content_file"; then
         base_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
         __base_bash_libs_file_remove_temp_paths__ "$current_content_file" "$new_content_file"
         return 2
@@ -435,23 +470,7 @@ base_file_update_file_section() {
             return 1
         fi
 
-        if ! awk -v START_M="$beginning_marker" -v END_M="$end_marker" '
-        BEGIN {
-            in_section = 0
-            processed = 0
-        }
-        $0 == START_M && processed == 0 {
-            in_section = 1
-            next
-        }
-        $0 == END_M && in_section == 1 {
-            processed = 1
-            exit
-        }
-        in_section == 1 {
-            print $0
-        }
-        ' "$target_file" > "$current_content_file"; then
+        if ! __base_bash_libs_file_section_awk__ extract "$target_file" "$beginning_marker" "$end_marker" > "$current_content_file"; then
             base_std_log_error -l base_bash_libs.file "Failed to read existing section in '$target_file'."
             __base_bash_libs_file_remove_temp_paths__ "$current_content_file" "$new_content_file"
             return 1
@@ -483,27 +502,7 @@ base_file_update_file_section() {
 
     if [[ "$section_exists" == true ]]; then
         if [[ "$remove_section" == true ]]; then
-            if BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
-                BASE_BASH_LIBS_FILE_END_MARKER="$end_marker" \
-                awk '
-            BEGIN {
-                START_M = ENVIRON["BASE_BASH_LIBS_FILE_START_MARKER"]
-                END_M = ENVIRON["BASE_BASH_LIBS_FILE_END_MARKER"]
-                in_section = 0
-                processed = 0
-            }
-            $0 == START_M && processed == 0 { in_section = 1; next }
-            $0 == END_M && in_section == 1 {
-                in_section = 0
-                processed = 1
-                next
-            }
-            {
-                if (in_section == 0) {
-                    print $0
-                }
-            }
-            ' "$target_file" > "$temp_file"; then
+            if __base_bash_libs_file_section_awk__ remove "$target_file" "$beginning_marker" "$end_marker" > "$temp_file"; then
                 __base_bash_libs_file_commit_temp__ "$temp_file" "$target_file" "$original_fingerprint"
                 commit_status=$?
                 if ((commit_status == 0)); then
@@ -519,34 +518,7 @@ base_file_update_file_section() {
                 fi
             fi
         else
-            if BASE_BASH_LIBS_FILE_START_MARKER="$beginning_marker" \
-                BASE_BASH_LIBS_FILE_END_MARKER="$end_marker" \
-                BASE_BASH_LIBS_FILE_NEW_CONTENT_FILE="$new_content_file" \
-                awk '
-            BEGIN {
-                START_M = ENVIRON["BASE_BASH_LIBS_FILE_START_MARKER"]
-                END_M = ENVIRON["BASE_BASH_LIBS_FILE_END_MARKER"]
-                NEW_TEXT_FILE = ENVIRON["BASE_BASH_LIBS_FILE_NEW_CONTENT_FILE"]
-                processed = 0 # 0 = not yet processed, 1 = processing, 2 = done
-            }
-            $0 == START_M && processed == 0 {
-                print START_M
-                while ((getline line < NEW_TEXT_FILE) > 0) {
-                    print line
-                }
-                close(NEW_TEXT_FILE)
-                processed = 1 # We are now inside the section to be replaced
-                next
-            }
-            $0 == END_M && processed == 1 {
-                print END_M
-                processed = 2 # We are done with the replacement
-                next
-            }
-            processed != 1 { # Print the line if we are not inside the section being replaced
-                print $0
-            }
-            ' "$target_file" > "$temp_file"; then
+            if __base_bash_libs_file_section_awk__ replace "$target_file" "$beginning_marker" "$end_marker" "$new_content_file" > "$temp_file"; then
                 __base_bash_libs_file_commit_temp__ "$temp_file" "$target_file" "$original_fingerprint"
                 commit_status=$?
                 if ((commit_status == 0)); then
@@ -574,7 +546,7 @@ base_file_update_file_section() {
             return 1
         fi
 
-        if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2>/dev/null | wc -l) -eq 0 ]]; then
+        if [[ -s "$temp_file" ]] && [[ $(tail -c 1 "$temp_file" 2> /dev/null | wc -l) -eq 0 ]]; then
             if ! printf '\n' >> "$temp_file"; then
                 base_std_log_error -l base_bash_libs.file "Failed to add trailing newline to '$temp_file'."
                 __base_bash_libs_file_remove_temp_paths__ "$temp_file" "$new_content_file"
