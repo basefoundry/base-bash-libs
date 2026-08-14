@@ -90,6 +90,7 @@ statuses, and side effects are normative in the linked module README and
 - `base_std_register_cleanup_hook` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
 - `base_std_register_cleanup_path` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
 - `base_std_run` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
+- `base_std_run_or_exit` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
 - `base_std_safe_cd` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
 - `base_std_safe_mkdir` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
 - `base_std_safe_touch` — signature: see [`lib/bash/std/README.md`](../lib/bash/std/README.md).
