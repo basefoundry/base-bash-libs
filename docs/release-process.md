@@ -19,11 +19,20 @@ delegating safe operations to Base's generic release machinery.
 3. Move the relevant `Unreleased` entries in `CHANGELOG.md` into a dated
    release section. Update `VERSION` and the top release row in `README.md` to
    the same version. Ordinary pull requests do not change `VERSION`.
-4. Build the canonical release asset from the tagged commit and replace the
-   `lib/bash/base-bash-libs.release` fields in that asset with the exact
-   release version, tag commit, `dirty_state=clean`, and
-   `provenance=release-artifact`. The metadata is deliberately generated in
-   the artifact rather than committed with a self-referential commit hash.
+4. Build and verify the canonical release asset set from the tagged commit:
+
+   ```bash
+   scripts/release-artifact build --version X.Y.Z --commit <full-tag-sha> \
+     --output /private/tmp/base-bash-libs-X.Y.Z
+   scripts/release-artifact verify /private/tmp/base-bash-libs-X.Y.Z
+   ```
+
+   The output contains a deterministic archive, an SPDX 2.3 SBOM, a
+   reproducibility/provenance statement, and a checksum manifest. The archive
+   embeds `lib/bash/base-bash-libs.release` with the exact release version,
+   tag commit, `dirty_state=clean`, and `provenance=release-artifact`; this
+   metadata is generated in the artifact rather than committed with a
+   self-referential commit hash.
 5. Run the full library validation and inspect the diff:
 
    ```bash
@@ -64,9 +73,9 @@ The release contract requires the tap-owned formula
 After the GitHub Release and its verified canonical source asset exist:
 
 1. Create a tap release branch and update `Formula/base-bash-libs.rb` to the
-   canonical release-asset URL, version, SHA256, and version assertions in the
-   formula test. Do not use GitHub's automatic `archive/refs/tags/...` URL for
-   v2.
+   uploaded canonical archive URL, version, SHA256, and version assertions in
+   the formula test. Do not use GitHub's automatic `archive/refs/tags/...` URL
+   for v2.
 2. Validate the formula from the tap checkout:
 
    ```bash

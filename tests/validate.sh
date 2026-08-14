@@ -43,6 +43,7 @@ required_files=(
     .github/workflows/tests.yml
     bin/base-bash
     scripts/release
+    scripts/release-artifact
     scripts/api-manifest
     scripts/library-bundle
     scripts/vendor
@@ -122,6 +123,7 @@ check_no_strict_mode() {
     local strict_mode_files=(
         bin/base-bash
         scripts/release
+        scripts/release-artifact
         tests/fixtures/basectl-release-stub
         tests/bash-42-release-smoke.sh
         tests/bash-42-logging-smoke.sh
@@ -375,6 +377,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     scripts/library-bundle \
     scripts/vendor \
     scripts/release \
+    scripts/release-artifact \
     scripts/migrate-v2-symbols \
     tests/fixtures/basectl-release-stub \
     tests/bash-42-release-smoke.sh \
@@ -398,6 +401,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     lib/bash/tests/test_helper.sh \
     "${manifest_shellcheck_paths[@]}" \
     tests/release.bats \
+    tests/release-artifact.bats \
     tests/namespace-contract.bats \
     tests/api-manifest.bats \
     tests/consumer-kit/test_helper.bash \
@@ -421,6 +425,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
 
 bats_files=(
     tests/release.bats
+    tests/release-artifact.bats
     tests/namespace-contract.bats
     tests/api-manifest.bats
     tests/consumer-kit/tests/consumer_kit.bats

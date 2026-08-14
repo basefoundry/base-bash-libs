@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+
+# Build and verify the canonical, offline Base Bash release asset set.
+#
+# This command never publishes or mutates GitHub state. It produces a
+# deterministic archive, an SPDX SBOM, a provenance statement, and a checksum
+# manifest that can be attached to the guarded release operation.
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+
+usage() {
+    cat >&2 << 'EOF'
+Usage:
+  scripts/release-artifact build --version VERSION --output DIRECTORY [--commit SHA]
+  scripts/release-artifact verify DIRECTORY
+
+Build creates these release assets without publishing them:
+  base-bash-libs-vVERSION.tar.gz
+  base-bash-libs-vVERSION.spdx.json
+  base-bash-libs-vVERSION.provenance.json
+  base-bash-libs-vVERSION.SHA256SUMS
+EOF
+}
+
+error() {
+    printf 'Release artifact error: %s\n' "$*" >&2
+}
+
+hash_file() {
+    local path="$1"
+    if command -v sha256sum > /dev/null 2>&1; then
+        sha256sum -- "$path" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$path" | awk '{print $1}'
+    fi
+}
+
+json_escape() {
+    local value="${1-}"
+    value=${value//\\/\\\\}
+    value=${value//\"/\\\"}
+    value=${value//$'\n'/\\n}
+    value=${value//$'\r'/\\r}
+    printf '%s' "$value"
+}
+
+version_is_supported() {
+    [[ "${1-}" =~ ^2[.]0[.]0(-(alpha|beta|rc)[.]([1-9][0-9]*))?$ ]]
+}
+
+commit_is_full_sha() {
+    [[ "${1-}" =~ ^[[:xdigit:]]{40}$ ]]
+}
+
+repo_is_clean() {
+    local status
+    status="$(git -C "$repo_root" status --porcelain 2> /dev/null)" || return 1
+    [[ -z "$status" ]]
+}
+
+write_release_metadata() {
+    local root="$1" version="$2" commit="$3"
+    printf 'schema_version=1\nversion=%s\ncommit=%s\ndirty_state=clean\nprovenance=release-artifact\n' \
+        "$version" "$commit" > "$root/lib/bash/base-bash-libs.release" || return 1
+    printf '%s\n' "$version" > "$root/VERSION" || return 1
+    printf 'bundle_format=1\nsource_version=%s\nsource_commit=%s\nprovenance=release-artifact\n' \
+        "$version" "$commit" > "$root/BUNDLE.release" || return 1
+}
+
+write_hash_manifest() {
+    local root="$1" path
+    : > "$root/MANIFEST.sha256" || return 1
+    while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        printf '%s  %s\n' "$(hash_file "$root/$path")" "$path" >> "$root/MANIFEST.sha256" || return 1
+    done < <(
+        {
+            printf '%s\n' VERSION base_api_manifest.yaml
+            "$repo_root/scripts/api-manifest" artifact-paths
+        } | LC_ALL=C sort -u
+    )
+}
+
+normalize_tree_times() {
+    local root="$1" path
+    while IFS= read -r path; do
+        # USTAR cannot represent pre-epoch timestamps; 1980 is stable and
+        # within the format's portable range.
+        touch -t 198001010000 "$path" || return 1
+    done < <(find "$root" -type f -print)
+    while IFS= read -r path; do
+        touch -t 198001010000 "$path" || return 1
+    done < <(find "$root" -type d -print)
+}
+
+write_sbom() {
+    local output="$1" version="$2" commit="$3" root="$4" path relative first=1
+    {
+        printf '{\n'
+        printf '  "spdxVersion": "SPDX-2.3",\n'
+        printf '  "dataLicense": "CC0-1.0",\n'
+        printf '  "SPDXID": "SPDXRef-DOCUMENT",\n'
+        printf '  "name": "base-bash-libs-v%s-sbom",\n' "$(json_escape "$version")"
+        printf '  "documentNamespace": "https://github.com/basefoundry/base-bash-libs/releases/v%s/%s",\n' \
+            "$(json_escape "$version")" "$commit"
+        printf '  "creationInfo": {"created": "1970-01-01T00:00:00Z", "creators": ["Tool: base-bash-libs/release-artifact"]},\n'
+        printf '  "packages": [{"SPDXID": "SPDXRef-Package", "name": "base-bash-libs", "versionInfo": "%s", "downloadLocation": "https://github.com/basefoundry/base-bash-libs/releases/tag/v%s", "licenseConcluded": "Apache-2.0", "licenseDeclared": "Apache-2.0"}],\n' \
+            "$(json_escape "$version")" "$(json_escape "$version")"
+        printf '  "files": [\n'
+        while IFS= read -r path; do
+            relative="${path#"$root/"}"
+            if ((first == 0)); then
+                printf ',\n'
+            fi
+            first=0
+            printf '    {"SPDXID": "SPDXRef-File-%s", "fileName": "%s", "checksums": [{"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
+                "${relative//[^[:alnum:]]/_}" "$(json_escape "$relative")" "$(hash_file "$path")"
+        done < <(find "$root" -type f -print | LC_ALL=C sort)
+        printf '\n  ],\n'
+        printf '  "relationships": [{"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package"}]\n'
+        printf '}\n'
+    } > "$output"
+}
+
+write_provenance() {
+    local output="$1" version="$2" commit="$3" archive_name="$4" archive_sha="$5"
+    {
+        printf '{\n'
+        printf '  "_type": "https://in-toto.io/Statement/v1",\n'
+        printf '  "subject": [{"name": "%s", "digest": {"sha256": "%s"}}],\n' \
+            "$(json_escape "$archive_name")" "$archive_sha"
+        printf '  "predicateType": "https://slsa.dev/provenance/v1",\n'
+        printf '  "predicate": {\n'
+        printf '    "buildDefinition": {\n'
+        printf '      "buildType": "https://github.com/basefoundry/base-bash-libs/release-artifact/v1",\n'
+        printf '      "externalParameters": {"version": "%s", "sourceCommit": "%s", "dirtyState": "clean"},\n' \
+            "$(json_escape "$version")" "$commit"
+        printf '      "resolvedDependencies": [{"uri": "git+https://github.com/basefoundry/base-bash-libs.git", "digest": {"sha1": "%s"}}]\n' "$commit"
+        printf '    },\n'
+        printf '    "runDetails": {"builder": {"id": "base-bash-libs/release-artifact"}, "metadata": {"reproducible": true}}\n'
+        printf '  }\n'
+        printf '}\n'
+    } > "$output"
+}
+
+archive_safe() {
+    local archive="$1" root="$2" list="$3" parent tar_version
+    local -a owner_options=()
+    parent="${root%/*}"
+    (cd "$parent" && find "${root##*/}" -type f -print | LC_ALL=C sort) > "$list" || return 1
+    tar_version="$(tar --version 2> /dev/null | sed -n '1p')" || return 1
+    if [[ "$tar_version" == bsdtar\ * ]]; then
+        owner_options=(--uid 0 --gid 0 --uname root --gname root)
+    elif [[ "$tar_version" == *'GNU tar'* ]]; then
+        owner_options=(--owner=0 --group=0 --numeric-owner)
+    else
+        error "Unsupported tar implementation; deterministic ownership flags are unavailable."
+        return 1
+    fi
+    tar --format=ustar "${owner_options[@]}" \
+        -cf "${archive%.gz}.tar" -C "$parent" -T "$list" || return 1
+    gzip -n -c "${archive%.gz}.tar" > "$archive" || return 1
+    rm -f -- "${archive%.gz}.tar"
+}
+
+build_artifact() {
+    local version="" output="" commit="" argument index
+    local repo_commit temporary stage_root root_name archive archive_name sbom provenance sums
+    local archive_sha sbom_sha provenance_sha
+    local -a arguments=("$@")
+
+    index=0
+    while ((index < ${#arguments[@]})); do
+        argument="${arguments[$index]}"
+        case "$argument" in
+        --version)
+            index=$((index + 1))
+            version="${arguments[$index]-}"
+            ;;
+        --output)
+            index=$((index + 1))
+            output="${arguments[$index]-}"
+            ;;
+        --commit)
+            index=$((index + 1))
+            commit="${arguments[$index]-}"
+            ;;
+        -h | --help)
+            usage
+            return 0
+            ;;
+        *)
+            error "Unknown build option '$argument'."
+            usage
+            return 2
+            ;;
+        esac
+        index=$((index + 1))
+    done
+    version_is_supported "$version" || {
+        error "Version '$version' is outside the Base Bash v2.0.0 release line."
+        return 1
+    }
+    [[ -n "$output" ]] || {
+        error "Build requires --output DIRECTORY."
+        return 2
+    }
+    repo_is_clean || {
+        error 'The source checkout must be clean.'
+        return 1
+    }
+    repo_commit="$(git -C "$repo_root" rev-parse --verify "HEAD^{commit}" 2> /dev/null)" || {
+        error 'Unable to resolve the source commit.'
+        return 1
+    }
+    [[ -n "$commit" ]] || commit="$repo_commit"
+    commit_is_full_sha "$commit" || {
+        error 'The source commit must be a full 40-character SHA.'
+        return 1
+    }
+    git -C "$repo_root" cat-file -e "${commit}^{commit}" 2> /dev/null || {
+        error "Source commit is not available locally: $commit"
+        return 1
+    }
+    mkdir -p "$(dirname -- "$output")" || return 1
+    [[ ! -e "$output" && ! -L "$output" ]] || {
+        error "Refusing to overwrite '$output'."
+        return 2
+    }
+    temporary="$(mktemp -d "${output}.tmp.XXXXXX")" || return 1
+    stage_root="$temporary/root"
+    root_name="base-bash-libs-v$version"
+    mkdir -p "$stage_root" || return 1
+    "$repo_root/scripts/library-bundle" bundle "$stage_root/$root_name" > /dev/null || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    write_release_metadata "$stage_root/$root_name" "$version" "$commit" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    write_hash_manifest "$stage_root/$root_name" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    normalize_tree_times "$stage_root/$root_name" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    archive_name="base-bash-libs-v$version.tar.gz"
+    archive="$temporary/$archive_name"
+    archive_safe "$archive" "$stage_root/$root_name" "$temporary/archive.list" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    archive_sha="$(hash_file "$archive")"
+    sbom="$temporary/base-bash-libs-v$version.spdx.json"
+    write_sbom "$sbom" "$version" "$commit" "$stage_root/$root_name" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    provenance="$temporary/base-bash-libs-v$version.provenance.json"
+    write_provenance "$provenance" "$version" "$commit" "$archive_name" "$archive_sha" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    sbom_sha="$(hash_file "$sbom")"
+    provenance_sha="$(hash_file "$provenance")"
+    sums="$temporary/base-bash-libs-v$version.SHA256SUMS"
+    printf '%s  %s\n%s  %s\n%s  %s\n' \
+        "$archive_sha" "$archive_name" "$sbom_sha" "$(basename -- "$sbom")" \
+        "$provenance_sha" "$(basename -- "$provenance")" > "$sums" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    mkdir "$output" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    mv -- "$archive" "$sbom" "$provenance" "$sums" "$output/" || {
+        rm -rf -- "$temporary" "$output"
+        return 1
+    }
+    rm -rf -- "$temporary"
+    printf 'Created canonical release artifact set: %s\n' "$output"
+}
+
+verify_artifact() {
+    local output="${1-}" archive sums sbom provenance expected path actual temp root_name
+    [[ -d "$output" ]] || {
+        error "Artifact directory does not exist: $output"
+        return 2
+    }
+    archive="$(find "$output" -type f -name 'base-bash-libs-v*.tar.gz' -print | sed -n '1p')"
+    sbom="$(find "$output" -type f -name 'base-bash-libs-v*.spdx.json' -print | sed -n '1p')"
+    provenance="$(find "$output" -type f -name 'base-bash-libs-v*.provenance.json' -print | sed -n '1p')"
+    sums="$(find "$output" -type f -name 'base-bash-libs-v*.SHA256SUMS' -print | sed -n '1p')"
+    [[ -f "$archive" && -f "$sbom" && -f "$provenance" && -f "$sums" ]] || {
+        error 'Artifact directory must contain archive, SBOM, provenance, and checksum assets.'
+        return 1
+    }
+    while read -r expected path; do
+        [[ -n "$expected" && -n "$path" ]] || continue
+        [[ -f "$output/$path" ]] || {
+            error "Checksum entry is missing: $path"
+            return 1
+        }
+        actual="$(hash_file "$output/$path")"
+        [[ "$actual" == "$expected" ]] || {
+            error "Checksum mismatch: $path"
+            return 1
+        }
+    done < "$sums"
+    grep -F '"reproducible": true' "$provenance" > /dev/null || {
+        error 'Provenance does not declare a reproducible build.'
+        return 1
+    }
+    grep -F '"spdxVersion": "SPDX-2.3"' "$sbom" > /dev/null || {
+        error 'SBOM is not SPDX 2.3.'
+        return 1
+    }
+    temp="$(mktemp -d "${TMPDIR:-/tmp}/base-bash-release-verify.XXXXXX")" || return 1
+    if ! tar -tzf "$archive" > "$temp/list"; then
+        rm -rf -- "$temp"
+        error 'Unable to list release archive.'
+        return 1
+    fi
+    if grep -E '(^/|(^|/)\.\.?/)' "$temp/list" > /dev/null; then
+        rm -rf -- "$temp"
+        error 'Release archive contains an unsafe path.'
+        return 1
+    fi
+    root_name="$(sed -n '1s#/.*##p' "$temp/list")"
+    [[ -n "$root_name" ]] || {
+        rm -rf -- "$temp"
+        error 'Release archive has no root directory.'
+        return 1
+    }
+    tar -xzf "$archive" -C "$temp" || {
+        rm -rf -- "$temp"
+        return 1
+    }
+    "$repo_root/scripts/library-bundle" verify "$temp/$root_name" > /dev/null || {
+        rm -rf -- "$temp"
+        error 'Embedded bundle verification failed.'
+        return 1
+    }
+    rm -rf -- "$temp"
+    printf 'Canonical release artifact set verified: %s\n' "$output"
+}
+
+main() {
+    case "${1-}" in
+    build)
+        shift
+        build_artifact "$@"
+        ;;
+    verify)
+        shift
+        (($# == 1)) || {
+            usage
+            return 2
+        }
+        verify_artifact "$1"
+        ;;
+    -h | --help | help | "")
+        usage
+        return 2
+        ;;
+    *)
+        error "Unknown command '${1-}'."
+        usage
+        return 2
+        ;;
+    esac
+}
+
+main "$@"

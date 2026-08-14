@@ -11,6 +11,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Added a deterministic, offline release-artifact builder that emits the
+  canonical archive, SPDX SBOM, provenance statement, and checksum manifest;
+  verification checks the embedded bundle hashes before publication.
 - Added the v2 RC launcher contract: conventional stdout help/version commands,
   a non-mutating `base-bash check` diagnostic, explicit status classes, exact
   application argv forwarding, lifecycle/cleanup/signal coverage, and

@@ -33,6 +33,12 @@ overwritten. Consumers can vendor this directory or package it with their
 release system; behavior is equivalent because the canonical source files are
 unchanged.
 
+The release train packages the verified bundle as the canonical v2 archive
+with `scripts/release-artifact`. The same command emits a checksum manifest,
+an SPDX 2.3 SBOM, and a reproducibility/provenance statement; downstream
+channels must consume that exact archive instead of rebuilding it or using a
+mutable source-tree URL.
+
 CI runs the check and bundle tests in addition to the source, vendored, and
 consumer contract suites. A stale generated API reference, missing provenance,
 hash mismatch, duplicate symbol, or boundary violation fails validation.
