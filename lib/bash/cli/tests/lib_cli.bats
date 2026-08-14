@@ -25,6 +25,39 @@ declare_demo_model() {
     base_cli_positional demo admin/user target required=true validator=valid_target help="Target name"
 }
 
+@test "quick declaration builds an order-independent model from table rows" {
+    base_cli_declare quick <<'EOF'
+# Rows are intentionally not in engine declaration order.
+option|path=admin/user|name=verbose|type=flag|tokens=--verbose,-v|help=Verbose output
+positional|path=admin/user|name=target|required=true|validator=valid_target
+command|path=admin/user|description=Show a user|aliases=u
+command|path=admin|description=Administration|aliases=manage
+model|name=quick|version=2.0.0|description=Quick CLI
+option|path=admin/user|name=color|type=value|tokens=--color|default=blue|enum=blue,green
+EOF
+
+    base_cli_parse quick -- manage u target-name --color green --verbose
+
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = "admin/user" ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]}" = "green" ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[verbose]}" = "1" ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = "target-name" ]
+}
+
+@test "quick declaration accepts argument rows and rejects unknown row kinds" {
+    base_cli_declare args \
+        'model|name=args|version=2.0.0' \
+        'command|path=run|description=Run'
+    base_cli_parse args -- run
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = "run" ]
+
+    bats_run base_cli_declare broken \
+        'model|name=broken' \
+        'unknown|path=run'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown row kind 'unknown'"* ]]
+}
+
 @test "lib_cli can be sourced more than once" {
     source "$BASE_BASH_DIR/cli/lib_cli.sh"
 
