@@ -46,7 +46,7 @@ jobs:
             git diff --name-only "$format_base"...HEAD -- \
               '*.sh' '*.bash' 'bin/base-bash' 'scripts/api-manifest' \
               'scripts/first-party-cutover' 'scripts/library-bundle' \
-              'scripts/migrate-v2-symbols' 'scripts/release' 'scripts/vendor' \
+              'scripts/migrate-v2-symbols' 'scripts/release' 'scripts/release-artifact' 'scripts/vendor' \
               'tests/fixtures/basectl-release-stub'
           )
           ((${#format_files[@]} > 0)) || {
