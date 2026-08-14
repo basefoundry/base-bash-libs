@@ -306,6 +306,18 @@ if ! grep -F "| \`$version\` | [Apache-2.0](LICENSE) |" README.md > /dev/null; t
     exit 1
 fi
 
+release_status="$(sed -n 's/^release_status: //p' first-party-cutover.yaml | sed -n '1p')"
+if [[ "$release_status" == pending-ga-asset ]]; then
+    if ! printf '%s\n' "$readme_head" | grep -F 'v2.0.0 (planned)' > /dev/null; then
+        printf 'README.md must label the unpublished v2.0.0 release as planned.\n' >&2
+        exit 1
+    fi
+    if printf '%s\n' "$readme_head" | grep -F '/releases/tag/v2.0.0' > /dev/null; then
+        printf 'README.md must not link to the unpublished v2.0.0 release.\n' >&2
+        exit 1
+    fi
+fi
+
 if ! sed -n '1,30p' README.md | grep -F 'Requires Bash 4.2+' > /dev/null; then
     printf 'README.md must state the Bash 4.2+ requirement near the top-level entry point.\n' >&2
     exit 1
