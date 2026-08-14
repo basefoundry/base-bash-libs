@@ -32,12 +32,17 @@ maps to `base_std_` followed by the legacy name with a leading
 | `log_info_enter`, `log_debug_enter`, `log_verbose_enter`, `log_info_leave`, `log_debug_leave`, `log_verbose_leave` | `base_std_log_info_enter`, `base_std_log_debug_enter`, `base_std_log_verbose_enter`, `base_std_log_info_leave`, `base_std_log_debug_leave`, `base_std_log_verbose_leave` |
 | `print_error`, `print_warn`, `print_info`, `print_success`, `print_bold`, `print_message`, `print_tty`, `dump_trace` | `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, `base_std_print_success`, `base_std_print_bold`, `base_std_print_message`, `base_std_print_tty`, `base_std_dump_trace` |
 | `exit_if_error`, `fatal_error`, `is_dry_run`, `std_run` | `base_std_exit_if_error`, `base_std_fatal_error`, `base_std_is_dry_run`, `base_std_run` |
+
 | `safe_mkdir`, `safe_touch`, `safe_truncate`, `safe_cd`, `safe_unalias` | `base_std_safe_mkdir`, `base_std_safe_touch`, `base_std_safe_truncate`, `base_std_safe_cd`, `base_std_safe_unalias` |
 | `std_register_cleanup_hook`, `std_unregister_cleanup_hook`, `std_register_cleanup_path`, `std_unregister_cleanup_path` | `base_std_register_cleanup_hook`, `base_std_unregister_cleanup_hook`, `base_std_register_cleanup_path`, `base_std_unregister_cleanup_path` |
 | `std_make_temp_file`, `std_make_temp_dir`, `std_command_path`, `std_function_exists` | `base_std_make_temp_file`, `base_std_make_temp_dir`, `base_std_command_path`, `base_std_function_exists` |
 | `assert_variable_name`, `assert_indexed_array`, `assert_associative_array`, `assert_function_exists`, `assert_not_null` | `base_std_assert_variable_name`, `base_std_assert_indexed_array`, `base_std_assert_associative_array`, `base_std_assert_function_exists`, `base_std_assert_not_null` |
 | `assert_integer`, `assert_integer_range`, `assert_arg_count`, `assert_command_exists`, `assert_file_exists`, `assert_executable`, `assert_dir_exists` | `base_std_assert_integer`, `base_std_assert_integer_range`, `base_std_assert_arg_count`, `base_std_assert_command_exists`, `base_std_assert_file_exists`, `base_std_assert_executable`, `base_std_assert_dir_exists` |
 | `get_my_source_dir`, `ask_yes_no`, `wait_for_enter` | `base_std_get_my_source_dir`, `base_std_ask_yes_no`, `base_std_wait_for_enter` |
+
+`base_std_run` is the non-exiting v2 default. The explicit fail-fast sibling
+`base_std_run_or_exit` has no v1 alias and should be used only when termination
+is part of the caller's intended policy.
 
 ### Companion libraries
 

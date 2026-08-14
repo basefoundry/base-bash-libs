@@ -21,7 +21,8 @@ The library improves Bash-based scripting in a few practical ways:
 - **Readable failures**: fatal errors include a message and Bash stack trace
   instead of a mysterious non-zero exit.
 - **Safe command execution**: `base_std_run` preserves argument boundaries, supports
-  dry-run mode, timeout, retry, and can either exit or return a status.
+  dry-run mode, timeout, retry, and returns a status by default; use the explicit
+  `base_std_run_or_exit` wrapper when fail-fast behavior is intended.
 - **Shared dry-run behavior**: scripts do not need to reimplement "print what
   would happen" logic.
 - **Composable cleanup**: scripts can register exit cleanup without replacing
@@ -107,8 +108,10 @@ such output names are rejected before caller state is changed.
 ### Command and Error Control
 
 - `base_std_run [policy options] <command> [args...]`: runs an argument-preserving
-  command, returning or exiting with its status according to the selected
-  policy. See [Running Commands Safely](#running-commands-safely).
+  command and returns its status. See [Running Commands Safely](#running-commands-safely).
+- `base_std_run_or_exit [policy options] <command> [args...]`: runs an
+  argument-preserving command and exits the caller when it fails. Use this
+  explicit wrapper when fail-fast behavior is intentional.
 - `base_std_exit_if_error <status> [message...]`: returns for zero and exits with the
   supplied status after logging a message for nonzero status.
 - `base_std_fatal_error <message...>`: logs a fatal error, prints a trace, and exits.
@@ -434,7 +437,9 @@ itself is fine and the user simply gave invalid arguments.
 
 ## Running Commands Safely
 
-`base_std_run` is the preferred helper for external command execution:
+`base_std_run` is the preferred helper for external command execution. It
+returns the command status by default, so the caller remains in control of
+whether a failure is recoverable:
 
 ```bash
 base_std_run git status --short
@@ -449,7 +454,14 @@ It improves on ad hoc command strings because it:
 - can replace sensitive command text with a protected marker and safe label
 - can bound each attempt with `--timeout`
 - can retry transient failures with `--max-attempts` and `--retry-delay`
-- exits through `base_std_exit_if_error` by default when a command fails
+- returns the command, timeout, or supervisor status when a command fails
+
+For scripts that intentionally stop on the first failed command, use the
+explicitly named fail-fast wrapper:
+
+```bash
+base_std_run_or_exit git status --short
+```
 
 Dry-run mode:
 
@@ -507,10 +519,12 @@ Configure or redirect an executed command that may echo secrets, and disable
 tracing around sensitive invocations. Ordinary commands continue to use `%q`
 so their diagnostics retain exact, copy-pastable argument boundaries.
 
-Handle a failing command yourself with `--no-exit`:
+Handle a failing command yourself directly with `base_std_run` (the
+`--no-exit` spelling remains accepted when sharing an option list with
+`base_std_run_or_exit`):
 
 ```bash
-if ! base_std_run --no-exit grep "needle" "$file"; then
+if ! base_std_run grep "needle" "$file"; then
     base_std_log_info "needle was not present; continuing"
 fi
 ```
@@ -519,7 +533,7 @@ For expected probe failures where the caller handles the status, add `--quiet`
 to suppress the warning:
 
 ```bash
-if ! base_std_run --no-exit --quiet test -f "$optional_file"; then
+if ! base_std_run --quiet test -f "$optional_file"; then
     base_std_log_debug "Optional file is absent."
 fi
 ```
@@ -531,10 +545,10 @@ seconds:
 base_std_run --timeout 30 curl -fsSL "$health_url"
 ```
 
-Timeouts return status `124` when the caller uses `--no-exit`:
+Timeouts return status `124` to the caller:
 
 ```bash
-if ! base_std_run --no-exit --quiet --timeout 5 nc -z localhost 5432; then
+if ! base_std_run --quiet --timeout 5 nc -z localhost 5432; then
     base_std_log_warn "database port did not open within 5 seconds"
 fi
 ```

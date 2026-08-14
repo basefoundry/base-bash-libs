@@ -100,7 +100,7 @@ __base_bash_libs_std_require_supported_bash__() {
 
 # Runtime state remains passive, but loading an unsupported interpreter is a
 # deterministic contract error rather than a partially-defined library.
-__base_bash_libs_std_require_supported_bash__ || return 1 2>/dev/null || exit 1
+__base_bash_libs_std_require_supported_bash__ || return 1 2> /dev/null || exit 1
 unset -f __base_bash_libs_std_require_supported_bash__
 
 __base_bash_libs_std_resolve_file_path__() {
@@ -112,7 +112,7 @@ __base_bash_libs_std_resolve_file_path__() {
     while [[ -L "$source_path" ]]; do
         ((link_depth += 1))
         ((link_depth <= 40)) || return 1
-        link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2>/dev/null && pwd -P)" || return 1
+        link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2> /dev/null && pwd -P)" || return 1
         target="$(readlink "$source_path")" || return 1
         if [[ "$target" == /* ]]; then
             source_path="$target"
@@ -121,7 +121,7 @@ __base_bash_libs_std_resolve_file_path__() {
         fi
     done
 
-    link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2>/dev/null && pwd -P)" || return 1
+    link_dir="$(cd -P -- "$(dirname -- "$source_path")" 2> /dev/null && pwd -P)" || return 1
     printf '%s/%s\n' "$link_dir" "$(basename -- "$source_path")"
 }
 
@@ -141,7 +141,7 @@ __base_bash_libs_std_read_package_version__() {
     local source_path="${1-}" package_root version_file metadata_file version
 
     [[ -n "$source_path" ]] || return 1
-    package_root="$(cd -- "$(dirname -- "$source_path")/../../.." &>/dev/null && pwd -P)" || return 1
+    package_root="$(cd -- "$(dirname -- "$source_path")/../../.." &> /dev/null && pwd -P)" || return 1
     version_file="$package_root/VERSION"
     metadata_file="$package_root/lib/bash/base-bash-libs.release"
 
@@ -165,8 +165,8 @@ __base_bash_libs_std_read_package_version__() {
 # version is a no-op; attempting to mix versions fails before definitions are
 # replaced.
 if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_GUARD+x}" ]]; then
-    __base_bash_libs_std_requested_source_path__="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
-    __base_bash_libs_std_requested_source_version__="$(__base_bash_libs_std_read_package_version__ "$__base_bash_libs_std_requested_source_path__" 2>/dev/null || printf '%s' unknown)"
+    __base_bash_libs_std_requested_source_path__="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}" 2> /dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+    __base_bash_libs_std_requested_source_version__="$(__base_bash_libs_std_read_package_version__ "$__base_bash_libs_std_requested_source_path__" 2> /dev/null || printf '%s' unknown)"
     if [[ "${BASE_BASH_LIBS_STD_SOURCE_VERSION-}" != "$__base_bash_libs_std_requested_source_version__" ||
         "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" != "$__base_bash_libs_std_requested_source_path__" ]]; then
         if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_PATH-}" &&
@@ -178,7 +178,7 @@ if [[ -n "${BASE_BASH_LIBS_STD_SOURCE_GUARD+x}" ]]; then
         unset __base_bash_libs_std_requested_source_path__ __base_bash_libs_std_requested_source_version__
         unset -f __base_bash_libs_std_read_package_version__
         unset -f __base_bash_libs_std_read_metadata_value__
-        return 1 2>/dev/null || exit 1
+        return 1 2> /dev/null || exit 1
     fi
     unset __base_bash_libs_std_requested_source_path__ __base_bash_libs_std_requested_source_version__
     unset -f __base_bash_libs_std_read_package_version__ __base_bash_libs_std_read_metadata_value__
@@ -189,42 +189,42 @@ if [[ -n "${BASE_BASH_LIBS_VERSION+x}" || -n "${BASE_BASH_LIBS_STDLIB_LOADED+x}"
     -n "${BASE_BASH_LIBS_COMMIT+x}" || -n "${BASE_BASH_LIBS_DIRTY_STATE+x}" ||
     -n "${BASE_BASH_LIBS_PROVENANCE+x}" ]]; then
     printf '%s\n' "Error: base-bash-libs metadata names are already owned by the caller; refusing to overwrite them." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 fi
 
 BASE_BASH_LIBS_STD_SOURCE_PATH="$(__base_bash_libs_std_resolve_file_path__ "${BASH_SOURCE[0]}")" || {
     printf '%s\n' "Error: Unable to resolve base-bash-libs stdlib source path from '${BASH_SOURCE[0]}'." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 }
 readonly BASE_BASH_LIBS_STD_SOURCE_PATH
-BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &>/dev/null && pwd -P)" || {
+BASE_BASH_LIBS_STD_ROOT="$(cd -- "$(dirname -- "$BASE_BASH_LIBS_STD_SOURCE_PATH")/../../.." &> /dev/null && pwd -P)" || {
     printf '%s\n' "Error: Unable to resolve base-bash-libs root from '$BASE_BASH_LIBS_STD_SOURCE_PATH'." >&2
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 }
 readonly BASE_BASH_LIBS_STD_ROOT
 readonly BASE_BASH_LIBS_MODULE_ROOT="$BASE_BASH_LIBS_STD_ROOT/lib/bash"
 BASE_BASH_LIBS_VERSION="$(__base_bash_libs_std_read_package_version__ "$BASE_BASH_LIBS_STD_SOURCE_PATH")" || {
-    return 1 2>/dev/null || exit 1
+    return 1 2> /dev/null || exit 1
 }
 readonly BASE_BASH_LIBS_VERSION
 readonly BASE_BASH_LIBS_STD_SOURCE_VERSION="$BASE_BASH_LIBS_VERSION"
 readonly BASE_BASH_LIBS_STD_SOURCE_GUARD=1
 
 __base_bash_libs_std_metadata_file__="$BASE_BASH_LIBS_MODULE_ROOT/base-bash-libs.release"
-__base_bash_libs_std_embedded_commit__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" commit 2>/dev/null || printf '%s' unknown)"
-__base_bash_libs_std_embedded_dirty_state__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" dirty_state 2>/dev/null || printf '%s' unknown)"
-__base_bash_libs_std_embedded_provenance__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" provenance 2>/dev/null || printf '%s' source-archive)"
+__base_bash_libs_std_embedded_commit__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" commit 2> /dev/null || printf '%s' unknown)"
+__base_bash_libs_std_embedded_dirty_state__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" dirty_state 2> /dev/null || printf '%s' unknown)"
+__base_bash_libs_std_embedded_provenance__="$(__base_bash_libs_std_read_metadata_value__ "$__base_bash_libs_std_metadata_file__" provenance 2> /dev/null || printf '%s' source-archive)"
 
 BASE_BASH_LIBS_COMMIT="$__base_bash_libs_std_embedded_commit__"
 BASE_BASH_LIBS_DIRTY_STATE="$__base_bash_libs_std_embedded_dirty_state__"
 BASE_BASH_LIBS_PROVENANCE="$__base_bash_libs_std_embedded_provenance__"
-if [[ -e "$BASE_BASH_LIBS_STD_ROOT/.git" ]] && command -v git >/dev/null 2>&1; then
-    __base_bash_libs_std_git_commit__="$(git -C "$BASE_BASH_LIBS_STD_ROOT" rev-parse --verify HEAD 2>/dev/null || true)"
+if [[ -e "$BASE_BASH_LIBS_STD_ROOT/.git" ]] && command -v git > /dev/null 2>&1; then
+    __base_bash_libs_std_git_commit__="$(git -C "$BASE_BASH_LIBS_STD_ROOT" rev-parse --verify HEAD 2> /dev/null || true)"
     if [[ "$__base_bash_libs_std_git_commit__" =~ ^[[:xdigit:]]{40}$ ]]; then
         BASE_BASH_LIBS_COMMIT="$__base_bash_libs_std_git_commit__"
-        if git -C "$BASE_BASH_LIBS_STD_ROOT" diff --quiet -- . 2>/dev/null &&
-            git -C "$BASE_BASH_LIBS_STD_ROOT" diff --cached --quiet -- . 2>/dev/null &&
-            [[ -z "$(git -C "$BASE_BASH_LIBS_STD_ROOT" status --porcelain --untracked-files=all 2>/dev/null)" ]]; then
+        if git -C "$BASE_BASH_LIBS_STD_ROOT" diff --quiet -- . 2> /dev/null &&
+            git -C "$BASE_BASH_LIBS_STD_ROOT" diff --cached --quiet -- . 2> /dev/null &&
+            [[ -z "$(git -C "$BASE_BASH_LIBS_STD_ROOT" status --porcelain --untracked-files=all 2> /dev/null)" ]]; then
             BASE_BASH_LIBS_DIRTY_STATE=clean
         else
             BASE_BASH_LIBS_DIRTY_STATE=dirty
@@ -253,8 +253,8 @@ __base_bash_libs_std_version_at_least__() {
     local -a actual_parts=() minimum_parts=()
     local index max_parts actual_part minimum_part actual_number minimum_number
 
-    IFS=. read -r -a actual_parts <<<"$actual_version"
-    IFS=. read -r -a minimum_parts <<<"$minimum_version"
+    IFS=. read -r -a actual_parts <<< "$actual_version"
+    IFS=. read -r -a minimum_parts <<< "$minimum_version"
 
     max_parts="${#actual_parts[@]}"
     if ((${#minimum_parts[@]} > max_parts)); then
@@ -372,7 +372,7 @@ __base_bash_libs_std_init_validate_result_array__() {
         printf '%s\n' "base_init: result name '$result_name' uses the reserved internal namespace." >&2
         return 1
     }
-    declaration="$(declare -p "$result_name" 2>/dev/null || true)"
+    declaration="$(declare -p "$result_name" 2> /dev/null || true)"
     [[ -n "$declaration" ]] || {
         printf '%s\n' "base_init: result '$result_name' must be a caller-declared indexed array." >&2
         return 1
@@ -508,7 +508,7 @@ base_init() {
 
     source_path="${source_path:-${BASE_BASH_LIBS_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}}"
     if [[ -n "$source_path" ]]; then
-        script_dir="$(cd -- "$(dirname -- "$source_path")" &>/dev/null && pwd -P)" || {
+        script_dir="$(cd -- "$(dirname -- "$source_path")" &> /dev/null && pwd -P)" || {
             printf '%s\n' "base_init: unable to resolve source directory from '$source_path'." >&2
             return 1
         }
@@ -542,31 +542,31 @@ base_init() {
         fi
         if ((parse_config)); then
             case "$arg" in
-                --debug-wrapper)
-                    if ((configure_runtime)); then
-                        base_std_set_log_level DEBUG
-                        base_std_set_log_category_level -l base_bash_libs DEBUG
-                        export BASE_BASH_LIBS_LOG_DEBUG=1
-                    fi
-                    ;;
-                --verbose-wrapper)
-                    if ((configure_runtime)); then
-                        base_std_set_log_level VERBOSE
-                        base_std_set_log_category_level -l base_bash_libs VERBOSE
-                        export BASE_BASH_LIBS_LOG_DEBUG=1
-                    fi
-                    ;;
-                --utc-wrapper)
-                    if ((configure_runtime)); then
-                        export BASE_BASH_LIBS_LOG_UTC=1
-                    fi
-                    ;;
-                --color)
-                    color_requested=1
-                    ;;
-                *)
-                    filtered_args+=("$arg")
-                    ;;
+            --debug-wrapper)
+                if ((configure_runtime)); then
+                    base_std_set_log_level DEBUG
+                    base_std_set_log_category_level -l base_bash_libs DEBUG
+                    export BASE_BASH_LIBS_LOG_DEBUG=1
+                fi
+                ;;
+            --verbose-wrapper)
+                if ((configure_runtime)); then
+                    base_std_set_log_level VERBOSE
+                    base_std_set_log_category_level -l base_bash_libs VERBOSE
+                    export BASE_BASH_LIBS_LOG_DEBUG=1
+                fi
+                ;;
+            --utc-wrapper)
+                if ((configure_runtime)); then
+                    export BASE_BASH_LIBS_LOG_UTC=1
+                fi
+                ;;
+            --color)
+                color_requested=1
+                ;;
+            *)
+                filtered_args+=("$arg")
+                ;;
             esac
         else
             filtered_args+=("$arg")
@@ -618,7 +618,7 @@ base_std_import() {
         return 2
     }
 
-    module_root="$(cd -P -- "$BASE_BASH_LIBS_MODULE_ROOT" 2>/dev/null && pwd -P)" || {
+    module_root="$(cd -P -- "$BASE_BASH_LIBS_MODULE_ROOT" 2> /dev/null && pwd -P)" || {
         base_std_log_error -l base_bash_libs.std \
             "base_std_import: package module root '$BASE_BASH_LIBS_MODULE_ROOT' is unavailable."
         return 1
@@ -636,13 +636,13 @@ base_std_import() {
             return 2
         }
         case "$module" in
-            *'//'|/*|*/|./*|*/./*|.|..|../*|*/..|*/../*|*[^A-Za-z0-9_./-]*|*.sh/*)
-                base_std_log_error -l base_bash_libs.std \
-                    "base_std_import: refusing unsafe package-relative path '$module'."
-                return 2
-                ;;
+        *'//' | /* | */ | ./* | */./* | . | .. | ../* | */.. | */../* | *[^A-Za-z0-9_./-]* | *.sh/*)
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: refusing unsafe package-relative path '$module'."
+            return 2
+            ;;
         esac
-        IFS=/ read -r -a components <<<"$module"
+        IFS=/ read -r -a components <<< "$module"
         ((${#components[@]} > 0)) || return 2
         for component in "${components[@]}"; do
             [[ "$component" != "" && "$component" != "." && "$component" != ".." ]] || {
@@ -658,30 +658,30 @@ base_std_import() {
                 "base_std_import: module '$module' does not exist under '$module_root'."
             return 1
         }
-        canonical_path="$(__base_bash_libs_std_resolve_file_path__ "$import_path" 2>/dev/null || true)"
+        canonical_path="$(__base_bash_libs_std_resolve_file_path__ "$import_path" 2> /dev/null || true)"
         [[ -n "$canonical_path" ]] || {
             base_std_log_error -l base_bash_libs.std \
                 "base_std_import: unable to resolve module '$module'."
             return 1
         }
         case "$canonical_path" in
-            "$module_root"/*) ;;
-            *)
-                base_std_log_error -l base_bash_libs.std \
-                    "base_std_import: refusing module '$module' because its symlink resolves outside '$module_root'."
-                return 2
-                ;;
+        "$module_root"/*) ;;
+        *)
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: refusing module '$module' because its symlink resolves outside '$module_root'."
+            return 2
+            ;;
         esac
 
         case "${__base_bash_libs_std_import_state[$canonical_path]-}" in
-            loaded)
-                continue
-                ;;
-            loading)
-                base_std_log_error -l base_bash_libs.std \
-                    "base_std_import: dependency cycle detected while loading '$module'."
-                return 2
-                ;;
+        loaded)
+            continue
+            ;;
+        loading)
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_import: dependency cycle detected while loading '$module'."
+            return 2
+            ;;
         esac
 
         [[ "$canonical_path" == "$BASE_BASH_LIBS_STD_SOURCE_PATH" ||
@@ -699,18 +699,18 @@ base_std_import() {
         # declarations global while leaving function bodies and caller state
         # untouched. Preserve an intentionally caller-defined declare function.
         # shellcheck disable=SC2316
-        saved_declare="$(builtin declare -f declare 2>/dev/null || true)"
-        declare() {
+        saved_declare="$(builtin declare -f declare 2> /dev/null || true)"
+        function declare {
             case "${1-}" in
-                -p|-F|-f)
-                    builtin declare "$@"
-                    ;;
-                *)
-                    case "${1-}" in
-                        -g|--*) builtin declare "$@" ;;
-                        *) builtin declare -g "$@" ;;
-                    esac
-                    ;;
+            -p | -F | -f)
+                builtin declare "$@"
+                ;;
+            *)
+                case "${1-}" in
+                -g | --*) builtin declare "$@" ;;
+                *) builtin declare -g "$@" ;;
+                esac
+                ;;
             esac
         }
 
@@ -758,15 +758,16 @@ base_std_add_to_path() {
     local OPTIND=1
     while getopts np opt; do
         case "$opt" in
-            n)  strict=0  ;;  # don't care if directory exists or not before adding it to PATH
-            p)  prepend=1 ;;  # prepend the directory to PATH instead of appending
-            *)  base_std_log_error -l base_bash_libs.std "base_std_add_to_path: invalid option '$opt'"
-                return 1
-                ;;
+        n) strict=0 ;;  # don't care if directory exists or not before adding it to PATH
+        p) prepend=1 ;; # prepend the directory to PATH instead of appending
+        *)
+            base_std_log_error -l base_bash_libs.std "base_std_add_to_path: invalid option '$opt'"
+            return 1
+            ;;
         esac
     done
 
-    shift $((OPTIND-1))
+    shift $((OPTIND - 1))
 
     directories=("$@")
     directory_count=$#
@@ -782,7 +783,7 @@ base_std_add_to_path() {
                     break
                 fi
             done
-            if ((! in_path)); then
+            if ((!in_path)); then
                 PATH="$dir:$PATH"
             fi
         done
@@ -797,7 +798,7 @@ base_std_add_to_path() {
                     break
                 fi
             done
-            if ((! in_path)); then
+            if ((!in_path)); then
                 PATH="$PATH:$dir"
             fi
         done
@@ -956,7 +957,11 @@ __base_bash_libs_std_log_primary_sink_prepare__() {
     if [[ ! -e "$__base_bash_libs_std_log_primary_prepare_path" ]]; then
         # noclobber avoids truncating a target that appears after the
         # non-mutating eligibility check.
-        if ! (umask 077; set -o noclobber; : >"$__base_bash_libs_std_log_primary_prepare_path") 2>/dev/null; then
+        if ! (
+            umask 077
+            set -o noclobber
+            : > "$__base_bash_libs_std_log_primary_prepare_path"
+        ) 2> /dev/null; then
             [[ -e "$__base_bash_libs_std_log_primary_prepare_path" && ! -L "$__base_bash_libs_std_log_primary_prepare_path" ]] || return 1
         fi
     fi
@@ -968,7 +973,7 @@ __base_bash_libs_std_log_primary_sink_prepare__() {
     __base_bash_libs_std_log_primary_prepare_chmod_path="$__base_bash_libs_std_log_primary_prepare_path"
     [[ "$__base_bash_libs_std_log_primary_prepare_chmod_path" == -* ]] &&
         __base_bash_libs_std_log_primary_prepare_chmod_path="./$__base_bash_libs_std_log_primary_prepare_chmod_path"
-    command chmod 600 "$__base_bash_libs_std_log_primary_prepare_chmod_path" 2>/dev/null || return 1
+    command chmod 600 "$__base_bash_libs_std_log_primary_prepare_chmod_path" 2> /dev/null || return 1
 
     [[ -f "$__base_bash_libs_std_log_primary_prepare_path" && ! -L "$__base_bash_libs_std_log_primary_prepare_path" &&
         -O "$__base_bash_libs_std_log_primary_prepare_path" && -w "$__base_bash_libs_std_log_primary_prepare_path" ]]
@@ -988,18 +993,18 @@ __base_bash_libs_std_log_primary_sink_append__() {
         __base_bash_libs_std_log_primary_sink_prepare__ "$__base_bash_libs_std_log_primary_append_path" || exit 1
 
         case "$__base_bash_libs_std_log_primary_append_kind" in
-            record)
-                printf '%s\n' "$__base_bash_libs_std_log_primary_append_payload"
-                ;;
-            file)
-                command cat -- "$__base_bash_libs_std_log_primary_append_payload" || exit 1
-                printf '\n'
-                ;;
-            *)
-                exit 1
-                ;;
-        esac >>"$__base_bash_libs_std_log_primary_append_path"
-    ) 2>/dev/null
+        record)
+            printf '%s\n' "$__base_bash_libs_std_log_primary_append_payload"
+            ;;
+        file)
+            command cat -- "$__base_bash_libs_std_log_primary_append_payload" || exit 1
+            printf '\n'
+            ;;
+        *)
+            exit 1
+            ;;
+        esac >> "$__base_bash_libs_std_log_primary_append_path"
+    ) 2> /dev/null
 }
 
 #
@@ -1086,7 +1091,7 @@ base_std_set_log_level() {
             return 1
         fi
         __base_bash_libs_std_set_log_logger=$2
-        shift 2 2>/dev/null
+        shift 2 2> /dev/null
     fi
     __base_bash_libs_std_set_log_level="${1:-INFO}"
     if [[ -z "$__base_bash_libs_std_set_log_logger" ]]; then
@@ -1266,11 +1271,11 @@ __base_bash_libs_std_print_log__() {
     if ((__base_bash_libs_std_print_log_terminal_enabled || __base_bash_libs_std_print_log_persist_enabled)); then
         # Select color based on log level
         case "$__base_bash_libs_std_print_log_level" in
-            FATAL|ERROR) __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_RED";;
-            WARN)        __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_YELLOW";;
-            INFO)        __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_GREEN";;
-            DEBUG)       __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_BLUE";;
-            *)           __base_bash_libs_std_print_log_color="";; # No color for VERBOSE or others
+        FATAL | ERROR) __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_RED" ;;
+        WARN) __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_YELLOW" ;;
+        INFO) __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_GREEN" ;;
+        DEBUG) __base_bash_libs_std_print_log_color="$BASE_BASH_LIBS_STD_COLOR_BLUE" ;;
+        *) __base_bash_libs_std_print_log_color="" ;; # No color for VERBOSE or others
         esac
 
         __base_bash_libs_std_log_source_location__ __base_bash_libs_std_print_log_source_location \
@@ -1286,7 +1291,7 @@ __base_bash_libs_std_print_log__() {
 #
 # Internal helper to be called by `base_std_log_info_file`, etc.
 #
-__base_bash_libs_std_print_log_file__()   {
+__base_bash_libs_std_print_log_file__() {
     local __base_bash_libs_std_print_file_level="${1-}"
     [[ -n "$__base_bash_libs_std_print_file_level" ]] || return 1
     shift
@@ -1326,42 +1331,62 @@ __base_bash_libs_std_print_log_file__()   {
 # Public logging functions.
 # These are the primary functions scripts should use for logging.
 #
-base_std_log_fatal()   { __base_bash_libs_std_print_log__ FATAL   "$@"; }
-base_std_log_error()   { __base_bash_libs_std_print_log__ ERROR   "$@"; }
-base_std_log_warn()    { __base_bash_libs_std_print_log__ WARN    "$@"; }
-base_std_log_info()    { __base_bash_libs_std_print_log__ INFO    "$@"; }
-base_std_log_debug()   { __base_bash_libs_std_print_log__ DEBUG   "$@"; }
+base_std_log_fatal() { __base_bash_libs_std_print_log__ FATAL "$@"; }
+base_std_log_error() { __base_bash_libs_std_print_log__ ERROR "$@"; }
+base_std_log_warn() { __base_bash_libs_std_print_log__ WARN "$@"; }
+base_std_log_info() { __base_bash_libs_std_print_log__ INFO "$@"; }
+base_std_log_debug() { __base_bash_libs_std_print_log__ DEBUG "$@"; }
 # Deprecated compatibility helper; prefer base_std_log_debug.
 base_std_log_verbose() { __base_bash_libs_std_print_log__ VERBOSE "$@"; }
 
 #
 # Public functions for logging the content of a file.
 #
-base_std_log_info_file()    { __base_bash_libs_std_print_log_file__ INFO    "$@"; }
-base_std_log_debug_file()   { __base_bash_libs_std_print_log_file__ DEBUG   "$@"; }
+base_std_log_info_file() { __base_bash_libs_std_print_log_file__ INFO "$@"; }
+base_std_log_debug_file() { __base_bash_libs_std_print_log_file__ DEBUG "$@"; }
 # Deprecated compatibility helper; prefer base_std_log_debug_file.
 base_std_log_verbose_file() { __base_bash_libs_std_print_log_file__ VERBOSE "$@"; }
 
 #
 # Public functions for logging function entry and exit points.
 #
-base_std_log_info_enter()    { __base_bash_libs_std_print_log__ INFO    "Entering function ${FUNCNAME[1]:-main}"; }
-base_std_log_debug_enter()   { __base_bash_libs_std_print_log__ DEBUG   "Entering function ${FUNCNAME[1]:-main}"; }
+base_std_log_info_enter() { __base_bash_libs_std_print_log__ INFO "Entering function ${FUNCNAME[1]:-main}"; }
+base_std_log_debug_enter() { __base_bash_libs_std_print_log__ DEBUG "Entering function ${FUNCNAME[1]:-main}"; }
 # Deprecated compatibility helper; prefer base_std_log_debug_enter.
 base_std_log_verbose_enter() { __base_bash_libs_std_print_log__ VERBOSE "Entering function ${FUNCNAME[1]:-main}"; }
-base_std_log_info_leave()    { __base_bash_libs_std_print_log__ INFO    "Leaving function ${FUNCNAME[1]:-main}";  }
-base_std_log_debug_leave()   { __base_bash_libs_std_print_log__ DEBUG   "Leaving function ${FUNCNAME[1]:-main}";  }
+base_std_log_info_leave() { __base_bash_libs_std_print_log__ INFO "Leaving function ${FUNCNAME[1]:-main}"; }
+base_std_log_debug_leave() { __base_bash_libs_std_print_log__ DEBUG "Leaving function ${FUNCNAME[1]:-main}"; }
 # Deprecated compatibility helper; prefer base_std_log_debug_leave.
-base_std_log_verbose_leave() { __base_bash_libs_std_print_log__ VERBOSE "Leaving function ${FUNCNAME[1]:-main}";  }
+base_std_log_verbose_leave() { __base_bash_libs_std_print_log__ VERBOSE "Leaving function ${FUNCNAME[1]:-main}"; }
 
 #
 # Simple print routines that do not prefix messages with timestamps or levels.
 #
-base_std_print_error()   { local __base_bash_libs_std_print_error_message; __base_bash_libs_std_print_error_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bERROR: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_RED" "$__base_bash_libs_std_print_error_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-base_std_print_warn()    { local __base_bash_libs_std_print_warn_message; __base_bash_libs_std_print_warn_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bWARN: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_YELLOW" "$__base_bash_libs_std_print_warn_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-base_std_print_info()    { local __base_bash_libs_std_print_info_message; __base_bash_libs_std_print_info_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_info_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-base_std_print_success() { local __base_bash_libs_std_print_success_message; __base_bash_libs_std_print_success_message="$(__base_bash_libs_std_join_message__ "$@")"; { printf '%bSUCCESS: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_success_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2; }
-base_std_print_bold()    { local __base_bash_libs_std_print_bold_message; __base_bash_libs_std_print_bold_message="$(__base_bash_libs_std_join_message__ "$@")"; printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_BOLD" "$__base_bash_libs_std_print_bold_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; }
+base_std_print_error() {
+    local __base_bash_libs_std_print_error_message
+    __base_bash_libs_std_print_error_message="$(__base_bash_libs_std_join_message__ "$@")"
+    { printf '%bERROR: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_RED" "$__base_bash_libs_std_print_error_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2
+}
+base_std_print_warn() {
+    local __base_bash_libs_std_print_warn_message
+    __base_bash_libs_std_print_warn_message="$(__base_bash_libs_std_join_message__ "$@")"
+    { printf '%bWARN: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_YELLOW" "$__base_bash_libs_std_print_warn_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2
+}
+base_std_print_info() {
+    local __base_bash_libs_std_print_info_message
+    __base_bash_libs_std_print_info_message="$(__base_bash_libs_std_join_message__ "$@")"
+    { printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_info_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2
+}
+base_std_print_success() {
+    local __base_bash_libs_std_print_success_message
+    __base_bash_libs_std_print_success_message="$(__base_bash_libs_std_join_message__ "$@")"
+    { printf '%bSUCCESS: %s%b\n' "$BASE_BASH_LIBS_STD_COLOR_GREEN" "$__base_bash_libs_std_print_success_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"; } >&2
+}
+base_std_print_bold() {
+    local __base_bash_libs_std_print_bold_message
+    __base_bash_libs_std_print_bold_message="$(__base_bash_libs_std_join_message__ "$@")"
+    printf '%b%s%b\n' "$BASE_BASH_LIBS_STD_COLOR_BOLD" "$__base_bash_libs_std_print_bold_message" "$BASE_BASH_LIBS_STD_COLOR_OFF"
+}
 base_std_print_message() { printf '%s\n' "$@"; }
 
 #
@@ -1384,7 +1409,7 @@ base_std_print_tty() {
 base_std_dump_trace() {
     local __base_bash_libs_std_trace_frame=0 __base_bash_libs_std_trace_line __base_bash_libs_std_trace_func __base_bash_libs_std_trace_source __base_bash_libs_std_trace_caller_info
     while __base_bash_libs_std_trace_caller_info="$(caller "$__base_bash_libs_std_trace_frame")"; do
-        IFS=' ' read -r __base_bash_libs_std_trace_line __base_bash_libs_std_trace_func __base_bash_libs_std_trace_source <<<"$__base_bash_libs_std_trace_caller_info"
+        IFS=' ' read -r __base_bash_libs_std_trace_line __base_bash_libs_std_trace_func __base_bash_libs_std_trace_source <<< "$__base_bash_libs_std_trace_caller_info"
         if ((__base_bash_libs_std_trace_frame == 0)); then
             printf 'Encountered a fatal error\n'
         fi
@@ -1448,7 +1473,7 @@ base_std_exit_if_error() {
 #   [[ -f "$my_file" ]] || base_std_fatal_error "Required file '$my_file' not found."
 #
 base_std_fatal_error() {
-    local __base_bash_libs_std_fatal_status=$?                         # grab the current exit code
+    local __base_bash_libs_std_fatal_status=$?                                        # grab the current exit code
     ((__base_bash_libs_std_fatal_status == 0)) && __base_bash_libs_std_fatal_status=1 # if it is zero, set exit code to 1
     base_std_exit_if_error "$__base_bash_libs_std_fatal_status" "$@"
 }
@@ -1465,7 +1490,7 @@ base_std_is_dry_run() {
 
     __base_bash_libs_std_dry_run_value="${BASE_BASH_LIBS_DRY_RUN-}"
     case "${__base_bash_libs_std_dry_run_value,,}" in
-        true | 1 | yes | on) return 0 ;;
+    true | 1 | yes | on) return 0 ;;
     esac
     return 1
 }
@@ -1476,16 +1501,16 @@ __base_bash_libs_std_decimal_integer_value__() {
 
     [[ "$__base_bash_libs_std_decimal_value" =~ ^[-+]?[0-9]+$ ]] || return 1
     case "$__base_bash_libs_std_decimal_value" in
-        -*)
-            __base_bash_libs_std_decimal_sign="-"
-            __base_bash_libs_std_decimal_digits="${__base_bash_libs_std_decimal_value#-}"
-            ;;
-        +*)
-            __base_bash_libs_std_decimal_digits="${__base_bash_libs_std_decimal_value#+}"
-            ;;
-        *)
-            __base_bash_libs_std_decimal_digits="$__base_bash_libs_std_decimal_value"
-            ;;
+    -*)
+        __base_bash_libs_std_decimal_sign="-"
+        __base_bash_libs_std_decimal_digits="${__base_bash_libs_std_decimal_value#-}"
+        ;;
+    +*)
+        __base_bash_libs_std_decimal_digits="${__base_bash_libs_std_decimal_value#+}"
+        ;;
+    *)
+        __base_bash_libs_std_decimal_digits="$__base_bash_libs_std_decimal_value"
+        ;;
     esac
 
     while [[ "${#__base_bash_libs_std_decimal_digits}" -gt 1 && "${__base_bash_libs_std_decimal_digits:0:1}" == "0" ]]; do
@@ -1525,9 +1550,9 @@ __base_bash_libs_std_is_safe_display__() {
     __base_bash_libs_std_safe_display_allowed_ascii=$' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
 
     [[ -n "$__base_bash_libs_std_safe_display_value" && "$__base_bash_libs_std_safe_display_value" != -* ]] || return 1
-    for ((__base_bash_libs_std_safe_display_index = 0;
-        __base_bash_libs_std_safe_display_index < ${#__base_bash_libs_std_safe_display_value};
-        __base_bash_libs_std_safe_display_index++)); do
+    for ((__base_bash_libs_std_safe_display_index = 0;  \
+    __base_bash_libs_std_safe_display_index < ${#__base_bash_libs_std_safe_display_value};  \
+    __base_bash_libs_std_safe_display_index++)); do
         __base_bash_libs_std_safe_display_character="${__base_bash_libs_std_safe_display_value:__base_bash_libs_std_safe_display_index:1}"
         [[ "$__base_bash_libs_std_safe_display_allowed_ascii" == *"$__base_bash_libs_std_safe_display_character"* ]] || return 1
     done
@@ -1544,23 +1569,23 @@ __base_bash_libs_std_render_command_display__() {
     shift 4
 
     case "$__base_bash_libs_std_render_display_sensitive" in
-        1)
-            if [[ -n "$__base_bash_libs_std_render_display_safe_value" ]]; then
-                __base_bash_libs_std_is_safe_display__ "$__base_bash_libs_std_render_display_safe_value" || return 1
-                __base_bash_libs_std_render_display_value="$__base_bash_libs_std_render_display_safe_value $__base_bash_libs_std_render_display_protected_description"
-            else
-                __base_bash_libs_std_render_display_value="$__base_bash_libs_std_render_display_protected_description"
-            fi
-            ;;
-        0)
-            if (($#)); then
-                printf -v __base_bash_libs_std_render_display_value '%q ' "$@"
-                __base_bash_libs_std_render_display_value="${__base_bash_libs_std_render_display_value% }"
-            fi
-            ;;
-        *)
-            return 1
-            ;;
+    1)
+        if [[ -n "$__base_bash_libs_std_render_display_safe_value" ]]; then
+            __base_bash_libs_std_is_safe_display__ "$__base_bash_libs_std_render_display_safe_value" || return 1
+            __base_bash_libs_std_render_display_value="$__base_bash_libs_std_render_display_safe_value $__base_bash_libs_std_render_display_protected_description"
+        else
+            __base_bash_libs_std_render_display_value="$__base_bash_libs_std_render_display_protected_description"
+        fi
+        ;;
+    0)
+        if (($#)); then
+            printf -v __base_bash_libs_std_render_display_value '%q ' "$@"
+            __base_bash_libs_std_render_display_value="${__base_bash_libs_std_render_display_value% }"
+        fi
+        ;;
+    *)
+        return 1
+        ;;
     esac
 
     printf -v "$__base_bash_libs_std_render_display_result_name" '%s' "$__base_bash_libs_std_render_display_value"
@@ -1677,10 +1702,12 @@ __base_bash_libs_std_run_status_message__() {
 #   - Optional Timeout: `--timeout N` bounds each command attempt to N seconds.
 #   - Optional Retry: `--max-attempts N` retries failed commands up to N total
 #     attempts, optionally sleeping `--retry-delay N` seconds between attempts.
-#   - Exit on Failure: By default, it will exit the script if the command
-#     returns a non-zero exit code.
-#   - Optional No-Exit: If an initial argument is `--no-exit`, the function
-#     will not exit on failure, allowing the calling script to handle the error.
+#   - Return on Failure: `base_std_run` returns the command status by default,
+#     allowing the caller to decide whether a failure is recoverable.
+#   - Explicit Fail-Fast: `base_std_run_or_exit` exits the script when the
+#     command returns a non-zero status.
+#   - Optional No-Exit: If an initial argument is `--no-exit`, either helper
+#     returns on failure, allowing the calling script to handle the error.
 #   - Optional Quiet Probe: If an initial argument is `--quiet`, handled
 #     failures do not log warnings. This is intended for expected probe
 #     failures and is most useful with `--no-exit`.
@@ -1690,14 +1717,13 @@ __base_bash_libs_std_run_status_message__() {
 #
 # Usage:
 #   base_std_run [options] command [arg1] [arg2] ...
+#   base_std_run_or_exit [options] command [arg1] [arg2] ...
 #   base_std_run --sensitive [--safe-display label] [options] -- command [arg1] ...
 #
 # Options:
-#   --no-exit   If provided as an initial argument, the script will not
-#               exit if the command fails. The function will return the
-#               command's original exit code.
-#   --quiet     If provided as an initial argument with `--no-exit`, suppress
-#               the warning normally logged when the command fails.
+#   --no-exit   Override the helper's default and return the command's original
+#               exit code instead of exiting when the command fails.
+#   --quiet     Suppress the warning normally logged for a returned failure.
 #   --timeout N
 #               Bound each command attempt to N seconds.
 #   --max-attempts N
@@ -1714,8 +1740,11 @@ __base_bash_libs_std_run_status_message__() {
 #               does not begin with `-`. Valid only with `--sensitive`.
 #
 # Examples:
-#   # Run a simple command. Exits if `ls` fails.
+#   # Run a command and handle its status in the caller.
 #   base_std_run ls -l /tmp
+#
+#   # Opt into fail-fast behavior with an explicit name.
+#   base_std_run_or_exit ls -l /tmp
 #
 #   # Run a command with spaces in an argument.
 #   base_std_run touch "a file with spaces.txt"
@@ -1736,80 +1765,81 @@ __base_bash_libs_std_run_status_message__() {
 ################################################################################
 __base_bash_libs_std_run_impl__() {
     local helper_name="$1"
-    shift
-    local exit_on_failure=1 quiet=0 timeout_seconds="" timeout_path="" max_attempts=1 retry_delay=0
+    local exit_on_failure="$2"
+    shift 2
+    local quiet=0 timeout_seconds="" timeout_path="" max_attempts=1 retry_delay=0
     local sensitive=0 safe_display="" safe_display_set=0 option_terminator_seen=0
 
     # Parse optional run flags before the command.
     while (($#)); do
         case "${1-}" in
-            --no-exit)
-                exit_on_failure=0
-                shift
-                ;;
-            --quiet)
-                quiet=1
-                shift
-                ;;
-            --timeout)
-                shift
-                if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
-                    base_std_log_error -l base_bash_libs.std "$helper_name: timeout seconds must be a positive integer."
-                    return 1
-                fi
-                __base_bash_libs_std_decimal_integer_value__ timeout_seconds "$1"
-                shift
-                ;;
-            --max-attempts | --retry-attempts)
-                shift
-                if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
-                    base_std_log_error -l base_bash_libs.std "$helper_name: max attempts must be a positive integer."
-                    return 1
-                fi
-                __base_bash_libs_std_decimal_integer_value__ max_attempts "$1"
-                shift
-                ;;
-            --retry-delay)
-                shift
-                if (($# == 0)) || ! __base_bash_libs_std_is_non_negative_integer__ "${1-}"; then
-                    base_std_log_error -l base_bash_libs.std "$helper_name: retry delay seconds must be a non-negative integer."
-                    return 1
-                fi
-                __base_bash_libs_std_decimal_integer_value__ retry_delay "$1"
-                shift
-                ;;
-            --sensitive)
-                sensitive=1
-                shift
-                ;;
-            --safe-display)
-                safe_display_set=1
-                shift
-                if (($# == 0)) || [[ "${1-}" == -* ]]; then
-                    base_std_log_error -l base_bash_libs.std \
-                        "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
-                    return 1
-                fi
-                safe_display="$1"
-                shift
-                ;;
-            --)
-                option_terminator_seen=1
-                shift
-                break
-                ;;
-            *)
-                if [[ "${1-}" == --* ]]; then
-                    base_std_log_error -l base_bash_libs.std \
-                        "$helper_name: unknown runner option. Use -- before commands that begin with --."
-                    return 1
-                fi
-                break
-                ;;
+        --no-exit)
+            exit_on_failure=0
+            shift
+            ;;
+        --quiet)
+            quiet=1
+            shift
+            ;;
+        --timeout)
+            shift
+            if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
+                base_std_log_error -l base_bash_libs.std "$helper_name: timeout seconds must be a positive integer."
+                return 1
+            fi
+            __base_bash_libs_std_decimal_integer_value__ timeout_seconds "$1"
+            shift
+            ;;
+        --max-attempts | --retry-attempts)
+            shift
+            if (($# == 0)) || ! __base_bash_libs_std_is_positive_integer__ "${1-}"; then
+                base_std_log_error -l base_bash_libs.std "$helper_name: max attempts must be a positive integer."
+                return 1
+            fi
+            __base_bash_libs_std_decimal_integer_value__ max_attempts "$1"
+            shift
+            ;;
+        --retry-delay)
+            shift
+            if (($# == 0)) || ! __base_bash_libs_std_is_non_negative_integer__ "${1-}"; then
+                base_std_log_error -l base_bash_libs.std "$helper_name: retry delay seconds must be a non-negative integer."
+                return 1
+            fi
+            __base_bash_libs_std_decimal_integer_value__ retry_delay "$1"
+            shift
+            ;;
+        --sensitive)
+            sensitive=1
+            shift
+            ;;
+        --safe-display)
+            safe_display_set=1
+            shift
+            if (($# == 0)) || [[ "${1-}" == -* ]]; then
+                base_std_log_error -l base_bash_libs.std \
+                    "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
+                return 1
+            fi
+            safe_display="$1"
+            shift
+            ;;
+        --)
+            option_terminator_seen=1
+            shift
+            break
+            ;;
+        *)
+            if [[ "${1-}" == --* ]]; then
+                base_std_log_error -l base_bash_libs.std \
+                    "$helper_name: unknown runner option. Use -- before commands that begin with --."
+                return 1
+            fi
+            break
+            ;;
         esac
     done
 
-    if ((safe_display_set && ! sensitive)); then
+    if ((safe_display_set && !sensitive)); then
         base_std_log_error -l base_bash_libs.std "$helper_name: --safe-display is valid only with --sensitive."
         return 1
     fi
@@ -1818,7 +1848,7 @@ __base_bash_libs_std_run_impl__() {
             "$helper_name: --safe-display requires a non-empty printable ASCII label that does not begin with -."
         return 1
     fi
-    if ((sensitive && ! option_terminator_seen)); then
+    if ((sensitive && !option_terminator_seen)); then
         base_std_log_error -l base_bash_libs.std \
             "$helper_name: --sensitive requires -- before the command."
         return 1
@@ -1898,7 +1928,7 @@ __base_bash_libs_std_run_impl__() {
         fi
 
         if ((__base_bash_libs_std_run_attempt_number < __base_bash_libs_std_run_policy_max_attempts)); then
-            if ((! __base_bash_libs_std_run_policy_quiet)); then
+            if ((!__base_bash_libs_std_run_policy_quiet)); then
                 __base_bash_libs_std_run_status_message__ __base_bash_libs_std_run_message \
                     "$__base_bash_libs_std_run_exit_code" "$__base_bash_libs_std_run_policy_timeout_seconds" \
                     "$__base_bash_libs_std_run_outcome" \
@@ -1930,7 +1960,7 @@ __base_bash_libs_std_run_impl__() {
         if ((__base_bash_libs_std_run_policy_exit_on_failure)); then
             base_std_exit_if_error "$__base_bash_libs_std_run_exit_code" "$__base_bash_libs_std_run_message"
         else
-            if ((! __base_bash_libs_std_run_policy_quiet)); then
+            if ((!__base_bash_libs_std_run_policy_quiet)); then
                 base_std_log_warn -l base_bash_libs.std "$__base_bash_libs_std_run_message (continuing)."
             fi
             return "$__base_bash_libs_std_run_exit_code"
@@ -1941,7 +1971,11 @@ __base_bash_libs_std_run_impl__() {
 }
 
 base_std_run() {
-    __base_bash_libs_std_run_impl__ base_std_run "$@"
+    __base_bash_libs_std_run_impl__ base_std_run 0 "$@"
+}
+
+base_std_run_or_exit() {
+    __base_bash_libs_std_run_impl__ base_std_run_or_exit 1 "$@"
 }
 
 __base_bash_libs_std_sleep_interval__() {
@@ -1952,7 +1986,6 @@ __base_bash_libs_std_sleep_interval__() {
     fi
 }
 
-
 __base_bash_libs_std_timeout_candidate_is_gnu__() {
     (($# == 1)) || return 1
     local __base_bash_libs_std_timeout_candidate_path="$1"
@@ -1960,7 +1993,7 @@ __base_bash_libs_std_timeout_candidate_is_gnu__() {
 
     [[ -x "$__base_bash_libs_std_timeout_candidate_path" ]] || return 1
     __base_bash_libs_std_timeout_candidate_version="$(
-        "$__base_bash_libs_std_timeout_candidate_path" --version 2>/dev/null
+        "$__base_bash_libs_std_timeout_candidate_path" --version 2> /dev/null
     )" || return 1
     __base_bash_libs_std_timeout_candidate_first_line="${__base_bash_libs_std_timeout_candidate_version%%$'\n'*}"
     [[ "$__base_bash_libs_std_timeout_candidate_first_line" == "timeout (GNU coreutils)" ||
@@ -1998,21 +2031,21 @@ __base_bash_libs_std_timeout_wait_clock__() {
         if [[ -x /bin/dd ]]; then
             __base_bash_libs_std_timeout_clock_dd=/bin/dd
         else
-            __base_bash_libs_std_timeout_clock_dd="$(type -P dd 2>/dev/null || true)"
+            __base_bash_libs_std_timeout_clock_dd="$(type -P dd 2> /dev/null || true)"
         fi
         [[ -n "$__base_bash_libs_std_timeout_clock_dd" && -x "$__base_bash_libs_std_timeout_clock_dd" ]] ||
             return 125
         if "$__base_bash_libs_std_timeout_clock_path" --foreground --signal=KILL \
             "${__base_bash_libs_std_timeout_clock_seconds}s" "$__base_bash_libs_std_timeout_clock_dd" \
-            bs=1 count=1 <&"$__base_bash_libs_std_timeout_clock_fd" >/dev/null 2>&1; then
+            bs=1 count=1 <&"$__base_bash_libs_std_timeout_clock_fd" > /dev/null 2>&1; then
             __base_bash_libs_std_timeout_clock_status=0
         else
             __base_bash_libs_std_timeout_clock_status=$?
         fi
         case "$__base_bash_libs_std_timeout_clock_status" in
-            0) return 0 ;;
-            124 | 137) return 124 ;;
-            *) return 125 ;;
+        0) return 0 ;;
+        124 | 137) return 124 ;;
+        *) return 125 ;;
         esac
     fi
 
@@ -2031,10 +2064,10 @@ __base_bash_libs_std_timeout_latch_cancel__() {
         __base_bash_libs_std_timeout_cancel_status="$__base_bash_libs_std_timeout_latched_status"
         if [[ -n "$__base_bash_libs_std_timeout_command_pid" ]]; then
             builtin kill "-$__base_bash_libs_std_timeout_latched_signal" -- \
-                "-$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+                "-$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
         fi
     elif [[ -n "$__base_bash_libs_std_timeout_command_pid" ]]; then
-        builtin kill -KILL -- "-$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+        builtin kill -KILL -- "-$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
     fi
 }
 
@@ -2087,13 +2120,13 @@ __base_bash_libs_std_timeout_command_wrapper__() {
     fi
     __base_bash_libs_std_timeout_wrapper_child_pid=$!
     while :; do
-        if wait "$__base_bash_libs_std_timeout_wrapper_child_pid" 2>/dev/null; then
+        if wait "$__base_bash_libs_std_timeout_wrapper_child_pid" 2> /dev/null; then
             __base_bash_libs_std_timeout_wrapper_status=0
             break
         else
             __base_bash_libs_std_timeout_wrapper_status=$?
         fi
-        builtin kill -0 "$__base_bash_libs_std_timeout_wrapper_child_pid" 2>/dev/null ||
+        builtin kill -0 "$__base_bash_libs_std_timeout_wrapper_child_pid" 2> /dev/null ||
             break
     done
     ((__base_bash_libs_std_timeout_wrapper_cancel_status != 0)) &&
@@ -2104,11 +2137,11 @@ __base_bash_libs_std_timeout_command_wrapper__() {
     __base_bash_libs_std_timeout_wrapper_status_record="S$(printf '%03d' \
         "$__base_bash_libs_std_timeout_wrapper_status")"
     if ! builtin printf '%s' "$__base_bash_libs_std_timeout_wrapper_status_record" \
-        >|"$__base_bash_libs_std_timeout_status_file" 2>/dev/null; then
+        >| "$__base_bash_libs_std_timeout_status_file" 2> /dev/null; then
         return 1
     fi
     IFS= read -r -n 1 -u "$__base_bash_libs_std_timeout_status_fd" \
-        __base_bash_libs_std_timeout_wrapper_release_byte 2>/dev/null || true
+        __base_bash_libs_std_timeout_wrapper_release_byte 2> /dev/null || true
     return "$__base_bash_libs_std_timeout_wrapper_status"
 }
 
@@ -2125,24 +2158,24 @@ __base_bash_libs_std_timeout_watchdog__() {
         "$__base_bash_libs_std_timeout_watchdog_seconds" "$__base_bash_libs_std_timeout_watchdog_fd"; then
         __base_bash_libs_std_timeout_watchdog_final_status=0
         builtin printf 'T%03d' "$__base_bash_libs_std_timeout_watchdog_final_status" \
-            >|"$__base_bash_libs_std_timeout_watchdog_status_file" 2>/dev/null || true
+            >| "$__base_bash_libs_std_timeout_watchdog_status_file" 2> /dev/null || true
     else
         __base_bash_libs_std_timeout_watchdog_clock_status=$?
         case "$__base_bash_libs_std_timeout_watchdog_clock_status" in
-            124) __base_bash_libs_std_timeout_watchdog_final_status=124 ;;
-            *)   __base_bash_libs_std_timeout_watchdog_final_status=125 ;;
+        124) __base_bash_libs_std_timeout_watchdog_final_status=124 ;;
+        *) __base_bash_libs_std_timeout_watchdog_final_status=125 ;;
         esac
         # Publish the timer result before escalation. The supervisor must not
         # mistake the wrapper's signal-derived status (143/137) for the
         # deadline or clock outcome that caused the escalation.
         builtin printf 'T%03d' "$__base_bash_libs_std_timeout_watchdog_final_status" \
-            >|"$__base_bash_libs_std_timeout_watchdog_status_file" 2>/dev/null || true
+            >| "$__base_bash_libs_std_timeout_watchdog_status_file" 2> /dev/null || true
 
         builtin kill -TERM -- "-$__base_bash_libs_std_timeout_watchdog_command_pid" \
-            2>/dev/null || true
+            2> /dev/null || true
         __base_bash_libs_std_sleep_interval__ 1 || true
         builtin kill -KILL -- "-$__base_bash_libs_std_timeout_watchdog_command_pid" \
-            2>/dev/null || true
+            2> /dev/null || true
     fi
     return "$__base_bash_libs_std_timeout_watchdog_final_status"
 }
@@ -2251,16 +2284,16 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
     fi
     if ! __base_bash_libs_std_timeout_mkfifo_path__ __base_bash_libs_std_timeout_mkfifo_path ||
         ! __base_bash_libs_std_timeout_chmod_path__ __base_bash_libs_std_timeout_chmod_path ||
-        ! rm -f -- "$__base_bash_libs_std_timeout_fifo" "$__base_bash_libs_std_timeout_status_fifo" 2>/dev/null ||
+        ! rm -f -- "$__base_bash_libs_std_timeout_fifo" "$__base_bash_libs_std_timeout_status_fifo" 2> /dev/null ||
         ! "$__base_bash_libs_std_timeout_mkfifo_path" "$__base_bash_libs_std_timeout_fifo" \
             "$__base_bash_libs_std_timeout_status_fifo" \
-            2>/dev/null ||
+            2> /dev/null ||
         ! "$__base_bash_libs_std_timeout_chmod_path" 600 "$__base_bash_libs_std_timeout_fifo" \
             "$__base_bash_libs_std_timeout_status_fifo" "$__base_bash_libs_std_timeout_status_file" \
             "$__base_bash_libs_std_timeout_timer_status_file" \
-            2>/dev/null ||
-        ! exec {__base_bash_libs_std_timeout_timer_fd}<>"$__base_bash_libs_std_timeout_fifo" ||
-        ! exec {__base_bash_libs_std_timeout_status_fd}<>"$__base_bash_libs_std_timeout_status_fifo"; then
+            2> /dev/null ||
+        ! exec {__base_bash_libs_std_timeout_timer_fd}<> "$__base_bash_libs_std_timeout_fifo" ||
+        ! exec {__base_bash_libs_std_timeout_status_fd}<> "$__base_bash_libs_std_timeout_status_fifo"; then
         rm -f -- "$__base_bash_libs_std_timeout_fifo" "$__base_bash_libs_std_timeout_status_fifo" \
             "$__base_bash_libs_std_timeout_status_file" "$__base_bash_libs_std_timeout_timer_status_file"
         __base_bash_libs_std_timeout_emit_error__ "could not create the private timeout control channels."
@@ -2311,21 +2344,21 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
             __base_bash_libs_std_timeout_setup_failed=1
         else
             if ((__base_bash_libs_std_timeout_has_stdin)); then
-                __base_bash_libs_std_timeout_command_wrapper__ <&0 2>/dev/null &
+                __base_bash_libs_std_timeout_command_wrapper__ <&0 2> /dev/null &
             else
-                __base_bash_libs_std_timeout_command_wrapper__ <&- 2>/dev/null &
+                __base_bash_libs_std_timeout_command_wrapper__ <&- 2> /dev/null &
             fi
             __base_bash_libs_std_timeout_command_pid=$!
             __base_bash_libs_std_timeout_watchdog__ "$__base_bash_libs_std_timeout_seconds" \
                 "$__base_bash_libs_std_timeout_path" "$__base_bash_libs_std_timeout_timer_fd" \
                 "$__base_bash_libs_std_timeout_command_pid" \
-                "$__base_bash_libs_std_timeout_timer_status_file" 2>/dev/null &
+                "$__base_bash_libs_std_timeout_timer_status_file" 2> /dev/null &
             __base_bash_libs_std_timeout_timer_pid=$!
             # Remove the process-group sentinel from Bash's job table before
             # escalation. Its terminal status is carried by the private
             # record, so no job-table wait is needed and Bash cannot leak a
             # `Killed: 9` notification when the group is deliberately killed.
-            builtin disown "$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+            builtin disown "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
             # Both asynchronous jobs already have their isolated process
             # groups. Disable monitor notifications while they are reaped.
             set +m
@@ -2336,53 +2369,53 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
         __base_bash_libs_std_timeout_emit_error__ "could not enable isolated process-group supervision."
         if [[ -n "$__base_bash_libs_std_timeout_command_pid" ]]; then
             builtin kill -KILL -- "-$__base_bash_libs_std_timeout_command_pid" \
-                2>/dev/null || true
-            wait "$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+                2> /dev/null || true
+            wait "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
         fi
         if [[ -n "$__base_bash_libs_std_timeout_timer_pid" ]]; then
             builtin kill -KILL -- "-$__base_bash_libs_std_timeout_timer_pid" \
-                2>/dev/null || true
-            wait "$__base_bash_libs_std_timeout_timer_pid" 2>/dev/null || true
+                2> /dev/null || true
+            wait "$__base_bash_libs_std_timeout_timer_pid" 2> /dev/null || true
         fi
     else
         while [[ -z "$__base_bash_libs_std_timeout_child_status" &&
             -z "$__base_bash_libs_std_timeout_timer_early_status" &&
             "$__base_bash_libs_std_timeout_cancel_status" == 0 ]]; do
             if [[ -s "$__base_bash_libs_std_timeout_timer_status_file" ]]; then
-                __base_bash_libs_std_timeout_timer_status_record="$(<"$__base_bash_libs_std_timeout_timer_status_file")"
+                __base_bash_libs_std_timeout_timer_status_record="$(< "$__base_bash_libs_std_timeout_timer_status_file")"
                 case "$__base_bash_libs_std_timeout_timer_status_record" in
-                    T[0-9][0-9][0-9])
-                        __base_bash_libs_std_timeout_timer_early_status="$((10#${__base_bash_libs_std_timeout_timer_status_record:1}))"
-                        break
-                        ;;
+                T[0-9][0-9][0-9])
+                    __base_bash_libs_std_timeout_timer_early_status="$((10#${__base_bash_libs_std_timeout_timer_status_record:1}))"
+                    break
+                    ;;
                 esac
             fi
             if [[ -s "$__base_bash_libs_std_timeout_status_file" ]]; then
-                __base_bash_libs_std_timeout_status_record="$(<"$__base_bash_libs_std_timeout_status_file")"
+                __base_bash_libs_std_timeout_status_record="$(< "$__base_bash_libs_std_timeout_status_file")"
                 if [[ "$__base_bash_libs_std_timeout_status_record" =~ ^S[0-9]{3}$ ]]; then
                     __base_bash_libs_std_timeout_child_status="$((10#${__base_bash_libs_std_timeout_status_record:1}))"
                     break
                 fi
             fi
-            builtin kill -0 "$__base_bash_libs_std_timeout_command_pid" 2>/dev/null ||
+            builtin kill -0 "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null ||
                 break
             __base_bash_libs_std_sleep_interval__ 0.01 || true
         done
 
         if ((__base_bash_libs_std_timeout_cancel_status != 0)); then
-            { builtin printf 'x' >&"$__base_bash_libs_std_timeout_timer_fd"; } 2>/dev/null || true
-            if wait "$__base_bash_libs_std_timeout_timer_pid" 2>/dev/null; then
+            { builtin printf 'x' >&"$__base_bash_libs_std_timeout_timer_fd"; } 2> /dev/null || true
+            if wait "$__base_bash_libs_std_timeout_timer_pid" 2> /dev/null; then
                 __base_bash_libs_std_timeout_timer_status=0
             else
                 __base_bash_libs_std_timeout_timer_status=$?
             fi
             if [[ -z "$__base_bash_libs_std_timeout_child_status" &&
                 -s "$__base_bash_libs_std_timeout_status_file" ]]; then
-                __base_bash_libs_std_timeout_status_record="$(<"$__base_bash_libs_std_timeout_status_file")"
+                __base_bash_libs_std_timeout_status_record="$(< "$__base_bash_libs_std_timeout_status_file")"
                 case "$__base_bash_libs_std_timeout_status_record" in
-                    S[0-9][0-9][0-9])
-                        __base_bash_libs_std_timeout_child_status="$((10#${__base_bash_libs_std_timeout_status_record:1}))"
-                        ;;
+                S[0-9][0-9][0-9])
+                    __base_bash_libs_std_timeout_child_status="$((10#${__base_bash_libs_std_timeout_status_record:1}))"
+                    ;;
                 esac
             fi
             if [[ -z "$__base_bash_libs_std_timeout_child_status" &&
@@ -2391,24 +2424,24 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
             fi
             __base_bash_libs_std_sleep_interval__ 1 || true
             builtin kill -KILL -- "-$__base_bash_libs_std_timeout_command_pid" \
-                2>/dev/null || true
-            wait "$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+                2> /dev/null || true
+            wait "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
             __base_bash_libs_std_timeout_final_status="$__base_bash_libs_std_timeout_cancel_status"
             __base_bash_libs_std_timeout_outcome=interrupted
         else
-            { builtin printf 'x' >&"$__base_bash_libs_std_timeout_timer_fd"; } 2>/dev/null || true
-            if wait "$__base_bash_libs_std_timeout_timer_pid" 2>/dev/null; then
+            { builtin printf 'x' >&"$__base_bash_libs_std_timeout_timer_fd"; } 2> /dev/null || true
+            if wait "$__base_bash_libs_std_timeout_timer_pid" 2> /dev/null; then
                 __base_bash_libs_std_timeout_timer_status=0
             else
                 __base_bash_libs_std_timeout_timer_status=$?
             fi
             if [[ -z "$__base_bash_libs_std_timeout_child_status" &&
                 -s "$__base_bash_libs_std_timeout_status_file" ]]; then
-                __base_bash_libs_std_timeout_status_record="$(<"$__base_bash_libs_std_timeout_status_file")"
+                __base_bash_libs_std_timeout_status_record="$(< "$__base_bash_libs_std_timeout_status_file")"
                 case "$__base_bash_libs_std_timeout_status_record" in
-                    S[0-9][0-9][0-9])
-                        __base_bash_libs_std_timeout_child_status="$((10#${__base_bash_libs_std_timeout_status_record:1}))"
-                        ;;
+                S[0-9][0-9][0-9])
+                    __base_bash_libs_std_timeout_child_status="$((10#${__base_bash_libs_std_timeout_status_record:1}))"
+                    ;;
                 esac
             fi
             if [[ -z "$__base_bash_libs_std_timeout_child_status" &&
@@ -2424,53 +2457,53 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
                 # already constrained to the command's 0..255 exit range.
                 __base_bash_libs_std_timeout_run_status="$__base_bash_libs_std_timeout_child_status"
                 case "$__base_bash_libs_std_timeout_timer_status" in
-                    0)
-                        __base_bash_libs_std_timeout_final_status="$__base_bash_libs_std_timeout_run_status"
-                        __base_bash_libs_std_timeout_outcome="command"
-                        ;;
-                    124)
-                        __base_bash_libs_std_timeout_final_status=124
-                        __base_bash_libs_std_timeout_outcome=timeout
-                        ;;
-                    125)
-                        # A command that has already published a terminal
-                        # status completed before the deadline clock was
-                        # canceled.  Preserve that command result even when
-                        # an older Bash/coreutils combination reports the
-                        # canceled clock as an infrastructure failure.
-                        if ((__base_bash_libs_std_timeout_run_status == 137 ||
-                            __base_bash_libs_std_timeout_run_status == 143)); then
-                            # These are the wrapper statuses produced when an
-                            # external clock fails and escalates the group.
-                            # Do not expose the wrapper's signal status as a
-                            # natural command result.
-                            __base_bash_libs_std_timeout_final_status=125
-                            __base_bash_libs_std_timeout_outcome=infrastructure
-                        else
-                            __base_bash_libs_std_timeout_final_status="$__base_bash_libs_std_timeout_run_status"
-                            __base_bash_libs_std_timeout_outcome="command"
-                        fi
-                        ;;
-                    *)
+                0)
+                    __base_bash_libs_std_timeout_final_status="$__base_bash_libs_std_timeout_run_status"
+                    __base_bash_libs_std_timeout_outcome="command"
+                    ;;
+                124)
+                    __base_bash_libs_std_timeout_final_status=124
+                    __base_bash_libs_std_timeout_outcome=timeout
+                    ;;
+                125)
+                    # A command that has already published a terminal
+                    # status completed before the deadline clock was
+                    # canceled.  Preserve that command result even when
+                    # an older Bash/coreutils combination reports the
+                    # canceled clock as an infrastructure failure.
+                    if ((__base_bash_libs_std_timeout_run_status == 137 || \
+                        __base_bash_libs_std_timeout_run_status == 143)); then
+                        # These are the wrapper statuses produced when an
+                        # external clock fails and escalates the group.
+                        # Do not expose the wrapper's signal status as a
+                        # natural command result.
                         __base_bash_libs_std_timeout_final_status=125
                         __base_bash_libs_std_timeout_outcome=infrastructure
-                        ;;
+                    else
+                        __base_bash_libs_std_timeout_final_status="$__base_bash_libs_std_timeout_run_status"
+                        __base_bash_libs_std_timeout_outcome="command"
+                    fi
+                    ;;
+                *)
+                    __base_bash_libs_std_timeout_final_status=125
+                    __base_bash_libs_std_timeout_outcome=infrastructure
+                    ;;
                 esac
             else
                 case "$__base_bash_libs_std_timeout_timer_status" in
-                    124)
-                        __base_bash_libs_std_timeout_final_status=124
-                        __base_bash_libs_std_timeout_outcome=timeout
-                        ;;
-                    *)
-                        __base_bash_libs_std_timeout_final_status=125
-                        __base_bash_libs_std_timeout_outcome=infrastructure
-                        ;;
+                124)
+                    __base_bash_libs_std_timeout_final_status=124
+                    __base_bash_libs_std_timeout_outcome=timeout
+                    ;;
+                *)
+                    __base_bash_libs_std_timeout_final_status=125
+                    __base_bash_libs_std_timeout_outcome=infrastructure
+                    ;;
                 esac
             fi
         fi
-        { builtin printf 'x' >&"$__base_bash_libs_std_timeout_status_fd"; } 2>/dev/null || true
-        wait "$__base_bash_libs_std_timeout_command_pid" 2>/dev/null || true
+        { builtin printf 'x' >&"$__base_bash_libs_std_timeout_status_fd"; } 2> /dev/null || true
+        wait "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
     fi
 
     exec {__base_bash_libs_std_timeout_timer_fd}>&-
@@ -2515,7 +2548,7 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
         "$__base_bash_libs_std_timeout_outcome"
     if [[ -n "$__base_bash_libs_std_timeout_cancel_signal" ]]; then
         builtin kill "-$__base_bash_libs_std_timeout_cancel_signal" "$BASHPID" \
-            2>/dev/null || true
+            2> /dev/null || true
     fi
     return "$__base_bash_libs_std_timeout_final_status"
 }
@@ -2541,11 +2574,11 @@ base_std_safe_mkdir() {
 
     while getopts ":p" opt; do
         case "$opt" in
-            p) mkdir_args=(-p) ;;
-            \?)
-                base_std_log_error -l base_bash_libs.std "base_std_safe_mkdir: invalid option '-$OPTARG'"
-                return 1
-                ;;
+        p) mkdir_args=(-p) ;;
+        \?)
+            base_std_log_error -l base_bash_libs.std "base_std_safe_mkdir: invalid option '-$OPTARG'"
+            return 1
+            ;;
         esac
     done
     shift $((OPTIND - 1))
@@ -2593,7 +2626,7 @@ base_std_safe_touch() {
     for file; do
         touch_path="$file"
         [[ "$touch_path" == -* ]] && touch_path="./$touch_path"
-        if ! touch "$touch_path" 2>/dev/null; then
+        if ! touch "$touch_path" 2> /dev/null; then
             failed_files+=("$file")
         fi
     done
@@ -2633,7 +2666,7 @@ base_std_safe_truncate() {
         # The > redirection is the simplest way to truncate a file.
         # We redirect stderr to /dev/null to suppress system error messages,
         # as we will provide our own comprehensive error message.
-        if ! : > "$file" 2>/dev/null; then
+        if ! : > "$file" 2> /dev/null; then
             failed_files+=("$file")
         fi
     done
@@ -2658,16 +2691,16 @@ __base_bash_libs_std_get_trap_command__() {
     local trap_prefix="trap -- '" trap_suffix
 
     case "$signal" in
-        EXIT | DEBUG)
-            trap_name="$signal"
-            ;;
-        INT | TERM)
-            trap_name="SIG$signal"
-            ;;
-        *)
-            printf -v "$result_name" '%s' ""
-            return 1
-            ;;
+    EXIT | DEBUG)
+        trap_name="$signal"
+        ;;
+    INT | TERM)
+        trap_name="SIG$signal"
+        ;;
+    *)
+        printf -v "$result_name" '%s' ""
+        return 1
+        ;;
     esac
 
     trap_suffix="' $trap_name"
@@ -2708,11 +2741,11 @@ __base_bash_libs_std_run_saved_trap_command__() {
 __base_bash_libs_std_stat_path_identity__() {
     local result_name="$1" path="$2" stat_identity
 
-    if stat_identity="$(stat -c '%d:%i' -- "$path" 2>/dev/null)"; then
+    if stat_identity="$(stat -c '%d:%i' -- "$path" 2> /dev/null)"; then
         printf -v "$result_name" '%s' "$stat_identity"
         return 0
     fi
-    if stat_identity="$(stat -f '%d:%i' -- "$path" 2>/dev/null)"; then
+    if stat_identity="$(stat -f '%d:%i' -- "$path" 2> /dev/null)"; then
         printf -v "$result_name" '%s' "$stat_identity"
         return 0
     fi
@@ -2812,7 +2845,7 @@ __base_bash_libs_std_cleanup_debug_guard__() {
 
     ((current_debug_status)) && :
     ((__base_bash_libs_std_cleanup_dispatcher_installed)) || return 0
-    (( __base_bash_libs_std_cleanup_debug_guard_running )) && return 0
+    ((__base_bash_libs_std_cleanup_debug_guard_running)) && return 0
     __base_bash_libs_std_cleanup_debug_guard_running=1
 
     if [[ -n "$__base_bash_libs_std_original_debug_trap" ]]; then
@@ -2827,15 +2860,15 @@ __base_bash_libs_std_cleanup_signal_exit__() {
     local signal="$1" exit_status="$2"
 
     case "$signal" in
-        INT)
-            __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_int_trap" "$exit_status"
-            ;;
-        TERM)
-            __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_term_trap" "$exit_status"
-            ;;
+    INT)
+        __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_int_trap" "$exit_status"
+        ;;
+    TERM)
+        __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_term_trap" "$exit_status"
+        ;;
     esac
 
-    if (( __base_bash_libs_std_cleanup_dispatcher_running )); then
+    if ((__base_bash_libs_std_cleanup_dispatcher_running)); then
         __base_bash_libs_std_cleanup_pending_signal_status="$exit_status"
         return 0
     fi
@@ -2845,8 +2878,8 @@ __base_bash_libs_std_cleanup_signal_exit__() {
 __base_bash_libs_std_run_cleanup_hooks__() {
     local exit_status=$? entry entry_type entry_value index
 
-    (( __base_bash_libs_std_cleanup_dispatcher_finished )) && return "$exit_status"
-    (( __base_bash_libs_std_cleanup_dispatcher_running )) && return "$exit_status"
+    ((__base_bash_libs_std_cleanup_dispatcher_finished)) && return "$exit_status"
+    ((__base_bash_libs_std_cleanup_dispatcher_running)) && return "$exit_status"
     __base_bash_libs_std_cleanup_dispatcher_running=1
     trap - DEBUG
 
@@ -2854,31 +2887,31 @@ __base_bash_libs_std_run_cleanup_hooks__() {
         __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_exit_trap" "$exit_status"
     fi
 
-    for ((index=${#__base_bash_libs_std_cleanup_entries[@]} - 1; index >= 0; index--)); do
+    for ((index = ${#__base_bash_libs_std_cleanup_entries[@]} - 1; index >= 0; index--)); do
         entry="${__base_bash_libs_std_cleanup_entries[index]}"
         entry_type="${entry%%:*}"
         entry_value="${entry#*:}"
         case "$entry_type" in
-            hook)
-                if ! "$entry_value"; then
-                    base_std_log_warn -l base_bash_libs.std "Cleanup hook '$entry_value' failed."
-                fi
-                ;;
-            path)
-                __base_bash_libs_std_cleanup_delete_path__ "$entry_value" || true
-                ;;
+        hook)
+            if ! "$entry_value"; then
+                base_std_log_warn -l base_bash_libs.std "Cleanup hook '$entry_value' failed."
+            fi
+            ;;
+        path)
+            __base_bash_libs_std_cleanup_delete_path__ "$entry_value" || true
+            ;;
         esac
     done
 
-    if (( __base_bash_libs_std_cleanup_pending_signal_status )); then
+    if ((__base_bash_libs_std_cleanup_pending_signal_status)); then
         exit_status="$__base_bash_libs_std_cleanup_pending_signal_status"
     fi
     __base_bash_libs_std_cleanup_dispatcher_finished=1
     __base_bash_libs_std_cleanup_dispatcher_running=0
-    if (( __base_bash_libs_std_cleanup_pending_signal_status )); then
+    if ((__base_bash_libs_std_cleanup_pending_signal_status)); then
         exit "$exit_status"
     fi
-    return "$exit_status" 2>/dev/null || exit "$exit_status"
+    return "$exit_status" 2> /dev/null || exit "$exit_status"
 }
 
 __base_bash_libs_std_install_cleanup_dispatcher__() {
@@ -2972,7 +3005,7 @@ base_std_register_cleanup_hook() {
         base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_hook: expected exactly one function name."
         return 1
     fi
-    if ! __base_bash_libs_std_is_valid_variable_name__ "$hook" || ! declare -F "$hook" >/dev/null; then
+    if ! __base_bash_libs_std_is_valid_variable_name__ "$hook" || ! declare -F "$hook" > /dev/null; then
         base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_hook: '$hook' is not a defined cleanup function."
         return 1
     fi
@@ -3027,9 +3060,9 @@ __base_bash_libs_std_is_safe_cleanup_path__() {
     [[ "$path" == /* ]] || return 1
     [[ "$path" =~ ^/+$ ]] && return 1
     case "$path" in
-        . | .. | */.. | */../* | */. | */./*)
-            return 1
-            ;;
+    . | .. | */.. | */../* | */. | */./*)
+        return 1
+        ;;
     esac
     return 0
 }
@@ -3042,12 +3075,12 @@ __base_bash_libs_std_is_broad_cleanup_path__() {
     [[ -n "$home_dir" && "$path" == "$home_dir" ]] && return 0
     [[ -n "$tmp_dir" && "$path" == "$tmp_dir" ]] && return 0
     case "$path" in
-        /tmp | /var/tmp | /private/tmp | /private/var/tmp | \
+    /tmp | /var/tmp | /private/tmp | /private/var/tmp | \
         /bin | /bin/* | /sbin | /sbin/* | /usr | /usr/* | /etc | /etc/* | \
         /var | /System | /System/* | /Library | /Library/* | \
         /Applications | /Applications/* | /dev | /dev/*)
-            return 0
-            ;;
+        return 0
+        ;;
     esac
     return 1
 }
@@ -3099,12 +3132,12 @@ base_std_register_cleanup_path() {
             status=1
             continue
         fi
-        if (( ! unsafe )) && [[ -L "$path" ]]; then
+        if ((!unsafe)) && [[ -L "$path" ]]; then
             base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: refusing to register symlink '$path' without --unsafe."
             status=1
             continue
         fi
-        if (( ! unsafe )) && ! [[ -e "$path" ]]; then
+        if ((!unsafe)) && ! [[ -e "$path" ]]; then
             base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: path '$path' does not exist for ownership proof."
             status=1
             continue
@@ -3118,8 +3151,8 @@ base_std_register_cleanup_path() {
                 break
             fi
         done
-        if (( ! already_registered )); then
-            if (( unsafe )); then
+        if ((!already_registered)); then
+            if ((unsafe)); then
                 fingerprint=UNSAFE
             elif ! __base_bash_libs_std_capture_cleanup_path_fingerprint__ fingerprint "$path"; then
                 base_std_log_error -l base_bash_libs.std "base_std_register_cleanup_path: unable to snapshot ownership for '$path'."
@@ -3216,17 +3249,17 @@ __base_bash_libs_std_make_temp_path__() {
 
     while (($#)); do
         case "${1-}" in
-            --keep)
-                __base_bash_libs_std_temp_keep=1
-                shift
-                ;;
-            --)
-                shift
-                break
-                ;;
-            *)
-                break
-                ;;
+        --keep)
+            __base_bash_libs_std_temp_keep=1
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
         esac
     done
 
@@ -3250,7 +3283,7 @@ __base_bash_libs_std_make_temp_path__() {
 
     __base_bash_libs_std_temp_root="${TMPDIR:-/tmp}"
     if [[ "$__base_bash_libs_std_temp_root" != /* ]]; then
-        if ! __base_bash_libs_std_temp_root="$(cd -- "$__base_bash_libs_std_temp_root" 2>/dev/null && pwd -P)"; then
+        if ! __base_bash_libs_std_temp_root="$(cd -- "$__base_bash_libs_std_temp_root" 2> /dev/null && pwd -P)"; then
             base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: TMPDIR is not a directory: ${TMPDIR:-/tmp}"
             return 1
         fi
@@ -3269,18 +3302,18 @@ __base_bash_libs_std_make_temp_path__() {
         __base_bash_libs_std_temp_template="$__base_bash_libs_std_temp_root/$__base_bash_libs_std_temp_prefix.XXXXXXXXXX"
     fi
     if [[ "$__base_bash_libs_std_temp_path_kind" == "dir" ]]; then
-        __base_bash_libs_std_temp_path="$(mktemp -d "$__base_bash_libs_std_temp_template" 2>/dev/null)" || {
+        __base_bash_libs_std_temp_path="$(mktemp -d "$__base_bash_libs_std_temp_template" 2> /dev/null)" || {
             base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary directory."
             return 1
         }
     else
-        __base_bash_libs_std_temp_path="$(mktemp "$__base_bash_libs_std_temp_template" 2>/dev/null)" || {
+        __base_bash_libs_std_temp_path="$(mktemp "$__base_bash_libs_std_temp_template" 2> /dev/null)" || {
             base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: failed to create temporary file."
             return 1
         }
     fi
 
-    if ((! __base_bash_libs_std_temp_keep)); then
+    if ((!__base_bash_libs_std_temp_keep)); then
         if ! base_std_register_cleanup_path "$__base_bash_libs_std_temp_path"; then
             rm -rf -- "$__base_bash_libs_std_temp_path"
             return 1
@@ -3343,16 +3376,16 @@ __base_bash_libs_std_assert_writable_output__() {
 
     if [[ "$__base_bash_libs_std_output_name" == __* ]]; then
         case "$__base_bash_libs_std_output_function_name" in
-            __base_bash_libs_std_make_internal_temp_file__ | __base_bash_libs_std_make_internal_temp_dir__) ;;
-            *)
-                base_std_log_error -l base_bash_libs.std \
-                    "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' uses the reserved '__' internal namespace."
-                return 1
-                ;;
+        __base_bash_libs_std_make_internal_temp_file__ | __base_bash_libs_std_make_internal_temp_dir__) ;;
+        *)
+            base_std_log_error -l base_bash_libs.std \
+                "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' uses the reserved '__' internal namespace."
+            return 1
+            ;;
         esac
     fi
 
-    __base_bash_libs_std_output_declaration="$(declare -p "$__base_bash_libs_std_output_name" 2>/dev/null || true)"
+    __base_bash_libs_std_output_declaration="$(declare -p "$__base_bash_libs_std_output_name" 2> /dev/null || true)"
     [[ -n "$__base_bash_libs_std_output_declaration" ]] || return 0
     __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_declaration#declare -}"
     __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_attributes%% *}"
@@ -3384,16 +3417,16 @@ __base_bash_libs_std_preflight_temp_result_name__() {
     shift
     while (($#)); do
         case "${1-}" in
-            --keep)
-                shift
-                ;;
-            --)
-                shift
-                break
-                ;;
-            *)
-                break
-                ;;
+        --keep)
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
         esac
     done
     (($# >= 1)) || return 0
@@ -3429,7 +3462,7 @@ __base_bash_libs_std_declares_array_kind__() {
     local __base_bash_libs_std_array_variable_name="${1-}" __base_bash_libs_std_array_kind="${2-}"
     local __base_bash_libs_std_array_declaration __base_bash_libs_std_array_attributes
 
-    __base_bash_libs_std_array_declaration="$(declare -p "$__base_bash_libs_std_array_variable_name" 2>/dev/null)" || return 1
+    __base_bash_libs_std_array_declaration="$(declare -p "$__base_bash_libs_std_array_variable_name" 2> /dev/null)" || return 1
     __base_bash_libs_std_array_attributes="${__base_bash_libs_std_array_declaration#declare -}"
     __base_bash_libs_std_array_attributes="${__base_bash_libs_std_array_attributes%% *}"
     [[ "$__base_bash_libs_std_array_attributes" == *"$__base_bash_libs_std_array_kind"* ]]
@@ -3514,7 +3547,7 @@ base_std_command_path() {
     __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" || return 1
 
     if [[ -n "$__base_bash_libs_std_command_name" ]]; then
-        __base_bash_libs_std_command_resolved_path="$(type -P "$__base_bash_libs_std_command_name" 2>/dev/null || true)"
+        __base_bash_libs_std_command_resolved_path="$(type -P "$__base_bash_libs_std_command_name" 2> /dev/null || true)"
     fi
     printf -v "$__base_bash_libs_std_command_result_name" '%s' "$__base_bash_libs_std_command_resolved_path"
     [[ -n "$__base_bash_libs_std_command_resolved_path" ]]
@@ -3528,7 +3561,7 @@ base_std_function_exists() {
 
     (($# == 1)) || return 1
     __base_bash_libs_std_is_valid_variable_name__ "$function_name" || return 1
-    declare -F "$function_name" >/dev/null
+    declare -F "$function_name" > /dev/null
 }
 
 #
@@ -3708,7 +3741,7 @@ base_std_assert_arg_count() {
         fi
     else
         # Range match case
-        if ((__base_bash_libs_std_arg_count_actual_number < __base_bash_libs_std_arg_count_first_number ||
+        if ((__base_bash_libs_std_arg_count_actual_number < __base_bash_libs_std_arg_count_first_number || \
             __base_bash_libs_std_arg_count_actual_number > __base_bash_libs_std_arg_count_second_number)); then
             base_std_fatal_error "Argument count mismatch: expected between $__base_bash_libs_std_arg_count_first and $__base_bash_libs_std_arg_count_second arguments, but got $__base_bash_libs_std_arg_count_actual"
         fi
@@ -3739,7 +3772,7 @@ base_std_assert_command_exists() {
     fi
 
     for cmd; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
+        if ! command -v "$cmd" > /dev/null 2>&1; then
             missing_commands+=("$cmd")
         fi
     done
@@ -3847,7 +3880,7 @@ base_std_assert_dir_exists() {
         return 0
     fi
 
-    for dir;  do
+    for dir; do
         if [[ ! -d "$dir" ]]; then
             missing_dirs+=("$dir")
         fi
@@ -3914,7 +3947,7 @@ base_std_get_my_source_dir() {
     local __base_bash_libs_std_source_dir __base_bash_libs_std_source_path="${BASH_SOURCE[1]-}"
     # Reference: https://stackoverflow.com/a/246128/6862601
     if [[ -n "$__base_bash_libs_std_source_path" ]]; then
-        if ! __base_bash_libs_std_source_dir="$(cd "$(dirname -- "$__base_bash_libs_std_source_path")" >/dev/null 2>&1 && pwd -P)"; then
+        if ! __base_bash_libs_std_source_dir="$(cd "$(dirname -- "$__base_bash_libs_std_source_path")" > /dev/null 2>&1 && pwd -P)"; then
             base_std_log_error -l base_bash_libs.std \
                 "base_std_get_my_source_dir: unable to resolve source directory."
             return 1
@@ -3958,13 +3991,13 @@ base_std_ask_yes_no() {
     local message=$1 user_input tty_fd default="no" prompt_suffix
     if (($# == 2)); then
         case "${2,,}" in
-            yes) default="yes" ;;
-            no) default="no" ;;
-            *)
-                base_std_log_error -l base_bash_libs.std \
-                    "base_std_ask_yes_no: default must be 'yes' or 'no'."
-                return 2
-                ;;
+        yes) default="yes" ;;
+        no) default="no" ;;
+        *)
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_ask_yes_no: default must be 'yes' or 'no'."
+            return 2
+            ;;
         esac
     fi
     if [[ "$default" == yes ]]; then
@@ -3972,7 +4005,7 @@ base_std_ask_yes_no() {
     else
         prompt_suffix='[y/N]'
     fi
-    if ! exec {tty_fd}</dev/tty 2>/dev/null; then
+    if ! exec {tty_fd}< /dev/tty 2> /dev/null; then
         base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: /dev/tty is not available"
         return 1
     fi
@@ -3993,20 +4026,20 @@ base_std_ask_yes_no() {
         echo
 
         case "$user_input" in
-            [yY])
-                exec {tty_fd}<&-
-                return 0
-                ;;
-            [nN])
-                exec {tty_fd}<&-
-                return 1
-                ;;
-            $'\n' | $'\r' | '')
-                exec {tty_fd}<&-
-                [[ "$default" == yes ]]
-                return $?
-                ;;
-            *) echo "Invalid input. Please enter 'y' or 'n'.";;
+        [yY])
+            exec {tty_fd}<&-
+            return 0
+            ;;
+        [nN])
+            exec {tty_fd}<&-
+            return 1
+            ;;
+        $'\n' | $'\r' | '')
+            exec {tty_fd}<&-
+            [[ "$default" == yes ]]
+            return $?
+            ;;
+        *) echo "Invalid input. Please enter 'y' or 'n'." ;;
         esac
     done
 }
@@ -4025,7 +4058,7 @@ base_std_wait_for_enter() {
     fi
 
     local prompt=${1:-"Press Enter to continue"} tty_fd read_status
-    if ! exec {tty_fd}</dev/tty 2>/dev/null; then
+    if ! exec {tty_fd}< /dev/tty 2> /dev/null; then
         base_std_log_error -l base_bash_libs.std "base_std_wait_for_enter: /dev/tty is not available"
         return 1
     fi

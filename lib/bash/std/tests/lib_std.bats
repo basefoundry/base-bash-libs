@@ -1782,6 +1782,7 @@ EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 printf 'base_std_run=%s\n' "\$(type -t base_std_run || true)"
+printf 'base_std_run_or_exit=%s\n' "\$(type -t base_std_run_or_exit || true)"
 printf 'run=%s\n' "\$(type -t run || true)"
 printf 'std_run_with_timeout=%s\n' "\$(type -t std_run_with_timeout || true)"
 EOF
@@ -1790,6 +1791,7 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"base_std_run=function"* ]]
+    [[ "$output" == *"base_std_run_or_exit=function"* ]]
     [[ "$output" == *$'run=\n'* ]]
     [[ "$output" == *"std_run_with_timeout="* ]]
     [[ "$output" != *"std_run_with_timeout=function"* ]]
@@ -2081,13 +2083,35 @@ EOF
     [ ! -s "$stderr_file" ]
 }
 
-@test "base_std_run exits the script on failure by default" {
+@test "base_std_run returns the failure status by default" {
     local script="$TEST_TMPDIR/run-fail.sh"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-base_std_run bash -c 'exit 9'
+if base_std_run bash -c 'exit 9'; then
+    printf 'unexpected success\n'
+else
+    printf 'status=%s\n' "\$?"
+fi
+echo "after"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Command failed (exit 9)"* ]]
+    [[ "$output" == *"status=9"* ]]
+    [[ "$output" == *"after"* ]]
+}
+
+@test "base_std_run_or_exit exits the script on failure" {
+    local script="$TEST_TMPDIR/run-or-exit-fail.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+base_std_run_or_exit bash -c 'exit 9'
 echo "after"
 EOF
 
@@ -2771,7 +2795,7 @@ EOF
     done
 }
 
-@test "base_std_run protected default fatal path preserves status and hides argv" {
+@test "base_std_run_or_exit protected fatal path preserves status and hides argv" {
     local command_script="$TEST_TMPDIR/sensitive-fatal-command.sh"
     local runner_script="$TEST_TMPDIR/sensitive-fatal-runner.sh"
     local primary_log="$TEST_TMPDIR/sensitive-fatal.log"
@@ -2791,7 +2815,7 @@ command_script="$3"
 canary="$4"
 BASE_BASH_LIBS_PRIMARY_LOG="$primary_log"
 export BASE_BASH_LIBS_PRIMARY_LOG
-base_std_run --sensitive --safe-display "publish protected release" -- \
+base_std_run_or_exit --sensitive --safe-display "publish protected release" -- \
     "$command_script" "value with $canary" "--token=$canary"
 printf 'after\n'
 EOF
