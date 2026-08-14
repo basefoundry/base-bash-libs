@@ -8,6 +8,13 @@ metadata in one source of truth. It is one sourceable file and requires
 ## Public API
 
 - `base_cli_model_init MODEL [name=PROGRAM] [version=VERSION] [description=TEXT] [handler=FUNCTION]`
+- `base_cli_declare MODEL [ROW...]` builds the same model from compact,
+  pipe-delimited data rows. With no `ROW` arguments it reads rows from stdin,
+  making a quoted heredoc a convenient declaration table. Row kinds are
+  `model`, `command`, `option`, and `positional`; values may contain spaces,
+  but `|` is reserved as the field delimiter. The helper applies parent
+  commands before children, so rows may be ordered for readability, and never
+  evaluates row contents as shell code.
 - `base_cli_validate_model MODEL` checks all declared handlers after the model
   and application functions have been loaded; use it in tests or CI.
   starts or replaces a model. `MODEL` is an in-process identifier and `name`
@@ -58,6 +65,22 @@ Results are valid after a successful parse. A failed parse returns status `2`
 and may have partially inspected input, but does not claim a valid result.
 
 ## Example
+
+The quick declaration layer is useful for a small or generated command table:
+
+```bash
+base_cli_declare deploy <<'EOF'
+model|name=deploy|version=2.0.0|description=Release tooling
+command|path=release|description=Create a release|handler=deploy_release|aliases=r
+option|path=release|name=dry_run|type=flag|tokens=--dry-run,-n|help=Do not mutate
+option|path=release|name=channel|type=value|tokens=--channel|default=stable|enum=stable,canary
+positional|path=release|name=target|required=true|metavar=TARGET
+EOF
+```
+
+The lower-level calls below remain available when declarations are built
+programmatically or a caller needs full control over the order of individual
+mutations.
 
 ```bash
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"

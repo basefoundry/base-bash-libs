@@ -22,6 +22,8 @@ declare -ga __base_bash_libs_cli_option_paths=()
 declare -ga __base_bash_libs_cli_positional_names=()
 declare -ga __base_bash_libs_cli_repeat_values=()
 declare -ga __base_bash_libs_cli_completion_candidates=()
+declare -ga __base_bash_libs_cli_quick_columns=()
+declare -g __base_bash_libs_cli_quick_depth=0
 declare -ga BASE_BASH_LIBS_CLI_RESULT_POSITIONALS=()
 declare -gA BASE_BASH_LIBS_CLI_RESULT_OPTIONS=()
 declare -gA BASE_BASH_LIBS_CLI_RESULT_REPEATED=()
@@ -299,6 +301,209 @@ __base_bash_libs_cli_declaration_usage__() {
     __base_bash_libs_cli_error__ "$1"
     printf '%s\n' "See lib/bash/cli/README.md for the declarative model contract." >&2
     return 2
+}
+
+__base_bash_libs_cli_quick_parse_row__() {
+    local row="${1-}"
+
+    __base_bash_libs_cli_quick_columns=()
+    IFS='|' read -r -a __base_bash_libs_cli_quick_columns <<< "$row"
+    ((${#__base_bash_libs_cli_quick_columns[@]} >= 1)) || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: each row must start with model, command, option, or positional.'
+        return 2
+    }
+    [[ -n "${__base_bash_libs_cli_quick_columns[0]}" ]] || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: row kind cannot be empty.'
+        return 2
+    }
+    __base_bash_libs_cli_parse_attrs__ "${__base_bash_libs_cli_quick_columns[@]:1}" || return $?
+}
+
+__base_bash_libs_cli_quick_validate_keys__() {
+    local kind="$1" key
+
+    for key in "${!__base_bash_libs_cli_attrs[@]}"; do
+        case "$kind:$key" in
+        model:name | model:version | model:description | model:handler | \
+            command:path | command:description | command:handler | command:aliases | \
+            option:path | option:name | option:type | option:tokens | option:help | \
+            option:metavar | option:default | option:required | option:enum | \
+            option:validator | option:conflicts | option:sensitive | option:hidden | \
+            positional:path | positional:name | positional:help | positional:metavar | \
+            positional:default | positional:required | positional:enum | \
+            positional:validator | positional:repeatable) ;;
+        *)
+            __base_bash_libs_cli_declaration_usage__ \
+                "base_cli_declare: attribute '$key' is not valid for a $kind row."
+            return 2
+            ;;
+        esac
+    done
+}
+
+__base_bash_libs_cli_quick_path_depth__() {
+    local path="${1-}" depth=0
+
+    [[ -n "$path" ]] || {
+        __base_bash_libs_cli_quick_depth=0
+        return 0
+    }
+    while [[ "$path" == */* ]]; do
+        path="${path#*/}"
+        depth=$((depth + 1))
+    done
+    __base_bash_libs_cli_quick_depth=$((depth + 1))
+}
+
+# base_cli_declare - Build a model from compact pipe-delimited declaration rows.
+#
+# Usage: base_cli_declare MODEL [ROW...]
+#        base_cli_declare MODEL <<'EOF'
+#        model|name=tool|version=1.0.0|description=Example CLI
+#        command|path=admin|description=Administration
+#        option|path=admin|name=verbose|type=flag|tokens=--verbose,-v
+#        positional|path=admin|name=target|required=true
+#        EOF
+#
+# Rows are data, never shell code. Values may contain spaces; `|` is the field
+# delimiter. The model row is applied first and command rows are applied from
+# shallowest to deepest path, so declarations may be ordered for readability.
+# Options and positionals use the same attributes as base_cli_option and
+# base_cli_positional. Option tokens are supplied as one comma-separated
+# `tokens=` field. When ROW arguments are omitted, rows are read from stdin.
+base_cli_declare() {
+    local model="${1-}" line kind row path description name type tokens_value key depth
+    local model_row_count=0 max_depth=0 line_number=0
+    local -a rows=() model_row=() command_rows=() option_rows=() positional_rows=()
+    local -a declaration_args=() option_tokens=()
+
+    (($# >= 1)) || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: expected a model identifier and declaration rows.'
+        return 2
+    }
+    __base_bash_libs_cli_valid_model__ "$model" || {
+        __base_bash_libs_cli_declaration_usage__ "base_cli_declare: invalid model '$model'."
+        return 2
+    }
+    shift
+    if (($# > 0)); then
+        rows=("$@")
+    else
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]] && continue
+            rows+=("$line")
+        done
+    fi
+    ((${#rows[@]} > 0)) || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: at least one declaration row is required.'
+        return 2
+    }
+
+    # Parse every row before mutating the model. This catches malformed fields,
+    # unknown row kinds, and missing required table columns up front.
+    for row in "${rows[@]}"; do
+        line_number=$((line_number + 1))
+        __base_bash_libs_cli_quick_parse_row__ "$row" || {
+            __base_bash_libs_cli_error__ "base_cli_declare: invalid row $line_number."
+            return 2
+        }
+        kind="${__base_bash_libs_cli_quick_columns[0]}"
+        case "$kind" in
+        model)
+            model_row_count=$((model_row_count + 1))
+            ((model_row_count == 1)) || {
+                __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: exactly one model row is required.'
+                return 2
+            }
+            __base_bash_libs_cli_quick_validate_keys__ "$kind" || return $?
+            model_row=("${__base_bash_libs_cli_quick_columns[@]:1}")
+            ;;
+        command | option | positional)
+            __base_bash_libs_cli_quick_validate_keys__ "$kind" || return $?
+            [[ -n "${__base_bash_libs_cli_attrs[path]+set}" ]] || {
+                __base_bash_libs_cli_declaration_usage__ "base_cli_declare: $kind row requires path=."
+                return 2
+            }
+            path="${__base_bash_libs_cli_attrs[path]}"
+            if [[ "$kind" == command ]]; then
+                [[ -n "${__base_bash_libs_cli_attrs[description]+set}" ]] || {
+                    __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: command row requires description=.'
+                    return 2
+                }
+                __base_bash_libs_cli_quick_path_depth__ "$path"
+                depth="$__base_bash_libs_cli_quick_depth"
+                ((depth > max_depth)) && max_depth="$depth"
+                command_rows+=("$row")
+            elif [[ "$kind" == option ]]; then
+                for key in name type tokens; do
+                    [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] || {
+                        __base_bash_libs_cli_declaration_usage__ "base_cli_declare: option row requires $key=."
+                        return 2
+                    }
+                done
+                option_rows+=("$row")
+            else
+                [[ -n "${__base_bash_libs_cli_attrs[name]+set}" ]] || {
+                    __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: positional row requires name=.'
+                    return 2
+                }
+                positional_rows+=("$row")
+            fi
+            ;;
+        *)
+            __base_bash_libs_cli_declaration_usage__ \
+                "base_cli_declare: unknown row kind '$kind' on row $line_number."
+            return 2
+            ;;
+        esac
+    done
+    ((model_row_count == 1)) || {
+        __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: exactly one model row is required.'
+        return 2
+    }
+
+    base_cli_model_init "$model" "${model_row[@]}" || return $?
+    for ((depth = 1; depth <= max_depth; depth++)); do
+        for row in "${command_rows[@]}"; do
+            __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+            __base_bash_libs_cli_quick_path_depth__ "${__base_bash_libs_cli_attrs[path]}"
+            [[ "$__base_bash_libs_cli_quick_depth" -eq "$depth" ]] || continue
+            path="${__base_bash_libs_cli_attrs[path]}"
+            description="${__base_bash_libs_cli_attrs[description]}"
+            declaration_args=("$model" "$path" "$description")
+            [[ -n "${__base_bash_libs_cli_attrs[handler]+set}" ]] &&
+                declaration_args+=("${__base_bash_libs_cli_attrs[handler]}")
+            [[ -n "${__base_bash_libs_cli_attrs[aliases]+set}" ]] &&
+                declaration_args+=("aliases=${__base_bash_libs_cli_attrs[aliases]}")
+            base_cli_command "${declaration_args[@]}" || return $?
+        done
+    done
+    for row in "${option_rows[@]}"; do
+        __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+        path="${__base_bash_libs_cli_attrs[path]}"
+        name="${__base_bash_libs_cli_attrs[name]}"
+        type="${__base_bash_libs_cli_attrs[type]}"
+        tokens_value="${__base_bash_libs_cli_attrs[tokens]}"
+        IFS=, read -r -a option_tokens <<< "$tokens_value"
+        declaration_args=("$model" "$path" "$name" "$type" "${option_tokens[@]}")
+        for key in help metavar default required enum validator conflicts sensitive hidden; do
+            [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
+                declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
+        done
+        base_cli_option "${declaration_args[@]}" || return $?
+    done
+    for row in "${positional_rows[@]}"; do
+        __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+        path="${__base_bash_libs_cli_attrs[path]}"
+        name="${__base_bash_libs_cli_attrs[name]}"
+        declaration_args=("$model" "$path" "$name")
+        for key in help metavar default required enum validator repeatable; do
+            [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
+                declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
+        done
+        base_cli_positional "${declaration_args[@]}" || return $?
+    done
+    return 0
 }
 
 # base_cli_model_init - Starts or replaces a named declarative CLI model.

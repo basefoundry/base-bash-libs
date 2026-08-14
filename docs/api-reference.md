@@ -260,6 +260,7 @@ statuses, and side effects are normative in the linked module README and
 - `base_cli_command` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_complete` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_completion_script` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
+- `base_cli_declare` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_help` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_model_init` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
 - `base_cli_option` — signature: see [`lib/bash/cli/README.md`](../lib/bash/cli/README.md).
