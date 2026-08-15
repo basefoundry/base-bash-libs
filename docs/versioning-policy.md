@@ -36,15 +36,13 @@ mandatory entry point for every release inspection and publication attempt. It
 enforces the permitted v2 identifiers before delegating read-only operations
 and dry runs to Base's guarded release command.
 
-Prerelease publication is now available because #233 and the follow-up release
-artifact contract have landed. Maintainers must still build and verify the
+Prerelease publication became available because #233 and the follow-up
+release-artifact contract landed. The reviewed `v2.0.0-rc.1` artifact and the
+pre-GA work in #240 then validated and rehearsed the exact release candidate
+across Base, Base Demo, Homebrew, vendored, and bundled paths. The guard now
+permits `v2.0.0` GA publication; maintainers must still build and verify the
 canonical archive, checksum manifest, SBOM, and provenance from the reviewed
-commit before publishing a prerelease. Real `v2.0.0` publication remains
-locked until the engineering, policy, documentation, integration, and
-reference-application gates in #214 are complete and the pre-GA work in #240
-has validated and rehearsed the exact release candidate across Base, Base Demo,
-Homebrew, vendored, and bundled paths. The remaining #240 steps then publish
-compatible Base and Homebrew updates after the Base Bash GA asset exists.
+GA commit before publishing and completing the remaining first-party handoff.
 
 The GA lock is code-reviewed policy, not an environment-variable or
 sentinel-file override. The PR that satisfies each gate must update the guard
