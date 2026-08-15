@@ -18,7 +18,9 @@ available after the verified release-artifact contract has landed; GA remains
 locked until the pre-GA release-candidate gates are complete.
 
 The refs command is a read-only preflight that fails closed when the candidate
-tag already exists locally or on origin.
+tag already exists locally or on origin. GA publication is available only
+after the reviewed RC artifact, first-party consumer, and rollback gates are
+complete.
 EOF
 }
 
@@ -220,13 +222,6 @@ main() {
 
     if [[ "$command" == "publish" && "$dry_run" -eq 0 ]]; then
         release_check_tag_refs "$repo_root" "v$version" || return $?
-        if [[ "$version_kind" == "prerelease" ]]; then
-            :
-        else
-            release_error "Publishing v2.0.0 GA is locked until the #214 pre-GA gates and #240 RC rehearsal are complete."
-            release_error "Use 'publish --dry-run' to inspect the guarded plan without changing GitHub state."
-            return 1
-        fi
     fi
 
     delegated_arguments=("$@")

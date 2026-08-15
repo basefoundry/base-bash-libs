@@ -7,7 +7,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-## [2.0.0-rc.1] - 2026-08-15
+## [2.0.0] - 2026-08-15
+
+The v2.0.0-rc.1 candidate was published and verified before this GA release.
 
 ### Added
 
