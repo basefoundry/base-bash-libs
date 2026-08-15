@@ -10,22 +10,22 @@ has approved publication.
 
 ## Framework reference
 
-The validation below used the immutable `base-bash-libs` v2.0.0-rc.1
-candidate at commit
-`c134fb8a3397e2cfee1d90845cec44f56dacae7b`. The annotated tag
-[v2.0.0-rc.1](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0-rc.1)
-and its canonical archive, SHA256SUMS, SPDX SBOM, and provenance assets were
-downloaded and verified. This is RC evidence, not a GA support claim.
+The release gate used the immutable `base-bash-libs` v2.0.0 GA at merge commit
+`b4243765726c133499feeabdc50154f99c0fec12`. The
+[v2.0.0 release](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0)
+archive, SHA256SUMS, SPDX SBOM, and provenance assets were downloaded and
+verified. The canonical archive SHA256 is
+`73d6f92fab8f1a8ded7f3b4312ebbe51aa8ec0c16eacf18c2d8fa23fb5664333`.
 
 ## Consumer matrix
 
 | Checkout | Relationship | Reference | Deployment exercised | Result | Classification |
 | --- | --- | --- | --- | --- | --- |
-| Base | First-party direct consumer | merged [6038cba](https://github.com/basefoundry/base/commit/6038cbaf93eb21ccb26c17a612aded85deedb04b) | CI pinned to `c134fb8` (v2.0.0-rc.1) | PR [#1934](https://github.com/basefoundry/base/pull/1934): Python/pylint, integration, security, BATS, Ubuntu source-checkout, macOS smoke, and branch policy all passed | Pass; useful readiness evidence, not independent adoption evidence |
-| Base Demo | First-party representative consumer | merged [b54bf00](https://github.com/basefoundry/base-demo/commit/b54bf008a9dfb542c5c51dc919c3e10698a2f5eb) | CI pinned to `c134fb8` (v2.0.0-rc.1) | PR [#214](https://github.com/basefoundry/base-demo/pull/214): validation, Ubuntu, source-checkout, and branch policy all passed; local full validation passed with isolated caches | Pass; useful readiness evidence, not independent adoption evidence |
+| Base | First-party direct consumer | merged [6038cba](https://github.com/basefoundry/base/commit/6038cbaf93eb21ccb26c17a612aded85deedb04b) | CI currently pinned to `c134fb8` (v2.0.0-rc.1); GA pin PR pending | PR [#1934](https://github.com/basefoundry/base/pull/1934): Python/pylint, integration, security, BATS, Ubuntu source-checkout, macOS smoke, and branch policy all passed | RC pass; GA promotion pending |
+| Base Demo | First-party representative consumer | merged [b54bf00](https://github.com/basefoundry/base-demo/commit/b54bf008a9dfb542c5c51dc919c3e10698a2f5eb) | CI currently pinned to `c134fb8` (v2.0.0-rc.1); GA pin PR pending | PR [#214](https://github.com/basefoundry/base-demo/pull/214): validation, Ubuntu, source-checkout, and branch policy all passed; local full validation passed with isolated caches | RC pass; GA promotion pending |
 | BankBuddy | Adjacent repository; no direct `base-bash-libs` reference | `e32561c` | None | Repository validation: **312 passed** | Excluded from the consumer count |
 | BanyanLabs | Adjacent repository; no direct `base-bash-libs` reference | `15ef6cd` | None | Repository baseline present | Excluded from the consumer count |
-| Homebrew | First-party package-manager consumer | stable tap remains `v1.4.0` | Disposable RC tap using canonical `v2.0.0-rc.1` archive | `brew audit --new`, source build, formula smoke test, and stable restore all passed; stable tap was not changed | Pass for RC rehearsal; GA formula PR remains pending |
+| Homebrew | First-party package-manager consumer | stable tap remains `v1.4.0` | Disposable RC tap passed; GA formula PR pending | RC audit, source build, formula smoke test, and stable restore all passed | RC pass; GA promotion pending |
 
 The Base and Base Demo checkouts are controlled by the primary author. They
 are valuable first-party regression signals, but they do not satisfy the
@@ -40,11 +40,10 @@ No independent production consumer has yet supplied a reproducible run
 covering installed, vendored, and bundled deployments together.
 
 The local vendor and reference-application rollback suites pass, and the
-Homebrew RC-to-v1.4 restore was rehearsed. A true RC-to-GA upgrade still
-cannot be validated until the immutable `v2.0.0` GA asset exists. That
-remaining release prerequisite is tracked by
-[#240](https://github.com/basefoundry/base-bash-libs/issues/240) and
-[#215](https://github.com/basefoundry/base-bash-libs/issues/215).
+Homebrew RC-to-v1.4 restore was rehearsed. A true RC-to-GA upgrade is now
+reproducible against the immutable v2.0.0 asset; downstream pin and formula
+promotion remains tracked by
+[#240](https://github.com/basefoundry/base-bash-libs/issues/240).
 
 ## Findings and limitations
 
@@ -52,8 +51,7 @@ remaining release prerequisite is tracked by
   API or behavior finding.
 - The v2 release archive is a deterministic bundle, not the v1 full-source
   archive. The GA Homebrew formula must therefore install the bundle layout
-  and use the `base_` API in its smoke test; the v1.4 formula remains
-  intentionally unchanged until that GA handoff.
+  and use the `base_` API in its smoke test.
 - Base Demo local full validation passed with isolated Go and Gradle caches;
   the hosted Ubuntu and source-checkout jobs passed as well.
 - There are no permissioned public users or case studies yet, so

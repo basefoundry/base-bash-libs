@@ -1,8 +1,8 @@
 # First-party v2 cutover
 
-Issue #240 is the release handoff, not permission to publish an unverified
-dependency. The exact v2 GA asset, checksum, and provenance must exist before
-any downstream pin changes.
+Issue #240 is the first-party promotion handoff. The exact v2 GA asset,
+checksum, and provenance now exist; downstream pins and the Homebrew formula
+must still be promoted to that immutable release.
 
 ## Inventory and order
 
@@ -19,9 +19,10 @@ inventory. The release order is:
    namespaced test expectations; and
 5. verify installed, vendored, bundled, and rollback paths in every consumer.
 
-The cutover is blocked while `release_status` is `pending-ga-asset`. This is a
-deliberate fail-closed state; changing a version string before the asset exists
-would make a reproducible install impossible.
+The release asset gate is satisfied when `release_status` is `published`, the
+archive SHA256 matches the uploaded canonical bundle, and the provenance asset
+names the exact merge commit. Consumer promotion remains fail-closed until
+each pin and formula points at that same commit and passes its hosted checks.
 
 ## Verification and rollback
 
@@ -39,6 +40,6 @@ release notes, then resume from the failed consumer after a reviewed fix.
 ## Current state
 
 Base's `basectl help` integration defect is fixed in the merged issue-backed PR
-above and validated locally against the v2 API. Base Demo and Homebrew remain
-intentionally unchanged until the v2 GA artifact is published; their current
-v1.4 pins are historical inputs to the final cutover checklist.
+above and validated locally against the v2 API. Base and Base Demo currently
+retain their verified RC pins while the GA promotion PRs are prepared; the
+Homebrew stable formula remains v1.4.0 until its GA formula PR lands.
