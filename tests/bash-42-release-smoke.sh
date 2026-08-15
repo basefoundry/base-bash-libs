@@ -32,10 +32,20 @@ release_smoke_cleanup() {
     fi
 }
 
+git() {
+    if [[ "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
+        return 1
+    fi
+    if [[ "$*" == *"ls-remote --tags origin refs/tags/"* ]]; then
+        return 0
+    fi
+    printf 'Unexpected Git invocation in the Bash 4.2 release smoke: %s\n' "$*" >&2
+    return 127
+}
+
 main() {
     local expected_major="${1-}" expected_minor="${2-}" expected_patch="${3-}"
     local script_dir repo_root release_script release_driver capture_path output_path
-    local git_stub
 
     if (($# != 0 && $# != 3)); then
         release_smoke_fail "usage: $0 [expected-major expected-minor expected-patch]"
@@ -68,21 +78,7 @@ main() {
     release_driver="$repo_root/tests/fixtures/basectl-release-stub"
     capture_path="$release_smoke_dir/delegated.out"
     output_path="$release_smoke_dir/command.out"
-    git_stub="$release_smoke_dir/git"
-    printf '#!%s\n' "$BASH" >"$git_stub"
-    cat >>"$git_stub" <<'EOF'
-if [[ "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
-    exit 1
-fi
-if [[ "$*" == *"ls-remote --tags origin refs/tags/"* ]]; then
-    exit 0
-fi
-printf 'Unexpected Git invocation in the Bash 4.2 release smoke: %s\n' "$*" >&2
-exit 127
-EOF
-    chmod +x "$git_stub" || return 1
-    PATH="$release_smoke_dir:$PATH"
-    export PATH
+    export -f git
     export BASE_BASH_RELEASE_BASECTL="$release_driver"
     export BASE_BASH_RELEASE_TEST_CAPTURE="$capture_path"
 
