@@ -15,12 +15,12 @@ consumers:
     repository: basefoundry/base
     tracker: https://github.com/basefoundry/base/issues/1880
     pull_request: https://github.com/basefoundry/base/pull/1881
-    current_state: v2-api-migration-merged-pending-ga
+    current_state: rc-pin-merged-pending-ga
   - name: base-demo
     repository: basefoundry/base-demo
     tracker: base-bash-libs-240
-    current_state: pin-update-after-ga
+    current_state: rc-pin-merged-pending-ga
   - name: homebrew-base
     repository: basefoundry/homebrew-base
     formula: Formula/base-bash-libs.rb
-    current_state: formula-update-after-ga
+    current_state: rc-formula-rehearsed-stable-unchanged
