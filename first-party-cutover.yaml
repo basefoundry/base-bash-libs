@@ -13,14 +13,20 @@ publish_order:
 consumers:
   - name: base
     repository: basefoundry/base
-    tracker: https://github.com/basefoundry/base/issues/1880
-    pull_request: https://github.com/basefoundry/base/pull/1881
-    current_state: ga-published-pending-pin
+    tracker: https://github.com/basefoundry/base/issues/1935
+    pull_request: https://github.com/basefoundry/base/pull/1936
+    release: https://github.com/basefoundry/base/releases/tag/v1.8.0
+    release_commit: 26b9af5dee16efcb47e652513ce734b3ae9bc920
+    current_state: ga-pinned-and-released
   - name: base-demo
     repository: basefoundry/base-demo
-    tracker: base-bash-libs-240
-    current_state: ga-published-pending-pin
+    tracker: https://github.com/basefoundry/base-demo/issues/215
+    pull_request: https://github.com/basefoundry/base-demo/pull/217
+    current_state: ga-pinned-and-validated
   - name: homebrew-base
     repository: basefoundry/homebrew-base
     formula: Formula/base-bash-libs.rb
-    current_state: ga-published-pending-formula
+    pull_request: https://github.com/basefoundry/homebrew-base/pull/85
+    release: https://github.com/basefoundry/homebrew-base/releases/tag/base-v1.8.0
+    release_commit: 6962d0586728e6893ac42ccc100395f60ec28624
+    current_state: ga-published-and-bottled
