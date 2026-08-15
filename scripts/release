@@ -84,7 +84,6 @@ main() {
     local command="${1-}"
     local manifest_value=""
     local version=""
-    local version_kind=""
     local dry_run=0
     local index
     local release_driver="${BASE_BASH_RELEASE_BASECTL:-basectl}"
@@ -209,7 +208,7 @@ main() {
         return 2
     fi
 
-    version_kind="$(release_version_kind "$version")" || {
+    release_version_kind "$version" > /dev/null || {
         release_error "Version '$version' is outside the Base Bash v2.0.0 release line."
         release_error "Use 2.0.0-alpha.N, 2.0.0-beta.N, 2.0.0-rc.N, or 2.0.0."
         return 1
