@@ -96,8 +96,17 @@ EOF
 
     release_smoke_expect_blocked "$capture_path" "$output_path" \
         "$release_script" check --version 1.5.0 || return 1
-    release_smoke_expect_blocked "$capture_path" "$output_path" \
-        "$release_script" publish --version 2.0.0 --yes || return 1
+
+    rm -f -- "$capture_path"
+    "$release_script" publish --version 2.0.0 --yes >"$output_path" 2>&1
+    if (($? != 0)); then
+        release_smoke_fail "GA release command was not delegated."
+        return 1
+    fi
+    if [[ ! -e "$capture_path" ]]; then
+        release_smoke_fail "GA release command did not reach the delegated driver."
+        return 1
+    fi
     release_smoke_expect_blocked "$capture_path" "$output_path" \
         "$release_script" publish --version 2.0.0 --manifest --dry-run --yes || return 1
 
