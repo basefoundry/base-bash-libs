@@ -21,11 +21,11 @@ verified. The canonical archive SHA256 is
 
 | Checkout | Relationship | Reference | Deployment exercised | Result | Classification |
 | --- | --- | --- | --- | --- | --- |
-| Base | First-party direct consumer | merged [6038cba](https://github.com/basefoundry/base/commit/6038cbaf93eb21ccb26c17a612aded85deedb04b) | CI currently pinned to `c134fb8` (v2.0.0-rc.1); GA pin PR pending | PR [#1934](https://github.com/basefoundry/base/pull/1934): Python/pylint, integration, security, BATS, Ubuntu source-checkout, macOS smoke, and branch policy all passed | RC pass; GA promotion pending |
-| Base Demo | First-party representative consumer | merged [b54bf00](https://github.com/basefoundry/base-demo/commit/b54bf008a9dfb542c5c51dc919c3e10698a2f5eb) | CI currently pinned to `c134fb8` (v2.0.0-rc.1); GA pin PR pending | PR [#214](https://github.com/basefoundry/base-demo/pull/214): validation, Ubuntu, source-checkout, and branch policy all passed; local full validation passed with isolated caches | RC pass; GA promotion pending |
+| Base | First-party direct consumer | published [v1.8.0](https://github.com/basefoundry/base/releases/tag/v1.8.0), commit `26b9af5` | CI and source-checkout workflows pin GA commit `b424376` (v2.0.0) | PR [#1936](https://github.com/basefoundry/base/pull/1936) passed Python/pylint, integration, security, BATS, Ubuntu source-checkout, macOS smoke, and branch policy; v1.8.0 release preflight and publication passed | GA pin and release pass |
+| Base Demo | First-party representative consumer | merged [#217](https://github.com/basefoundry/base-demo/pull/217) at `fb7a2b6` | CI and source-checkout workflows pin GA commit `b424376` (v2.0.0) | Local full validation and hosted validate, Ubuntu, and source-checkout checks passed | GA pin and validation pass |
 | BankBuddy | Adjacent repository; no direct `base-bash-libs` reference | `e32561c` | None | Repository validation: **312 passed** | Excluded from the consumer count |
 | BanyanLabs | Adjacent repository; no direct `base-bash-libs` reference | `15ef6cd` | None | Repository baseline present | Excluded from the consumer count |
-| Homebrew | First-party package-manager consumer | stable tap remains `v1.4.0` | Disposable RC tap passed; GA formula PR pending | RC audit, source build, formula smoke test, and stable restore all passed | RC pass; GA promotion pending |
+| Homebrew | First-party package-manager consumer | merged [#85](https://github.com/basefoundry/homebrew-base/pull/85), bottle release `base-v1.8.0` | `base-bash-libs` v2.0.0 bundle and Base v1.8.0 archive are hash-pinned; both macOS bottles published | Both bottle builds and v2 API smoke tests passed; installed GA upgrade, formula tests, and rollback to Base 1.7.0/base-bash-libs 1.4.0 passed | GA formula, bottles, upgrade, and rollback pass |
 
 The Base and Base Demo checkouts are controlled by the primary author. They
 are valuable first-party regression signals, but they do not satisfy the
@@ -39,15 +39,15 @@ an installed Homebrew package and restoration to the prior stable package.
 No independent production consumer has yet supplied a reproducible run
 covering installed, vendored, and bundled deployments together.
 
-The local vendor and reference-application rollback suites pass, and the
-Homebrew RC-to-v1.4 restore was rehearsed. A true RC-to-GA upgrade is now
-reproducible against the immutable v2.0.0 asset; downstream pin and formula
-promotion remains tracked by
-[#240](https://github.com/basefoundry/base-bash-libs/issues/240).
+The local vendor and reference-application rollback suites pass. The
+Homebrew GA rehearsal upgraded Base 1.7.0/base-bash-libs 1.4.0 to the paired
+Base 1.8.0/base-bash-libs 2.0.0 bottles, ran both formula tests, and restored
+the stable pair successfully after Homebrew's normal reinstall path reported
+stale Cellar links.
 
 ## Findings and limitations
 
-- The Base and Base Demo hosted RC pin suites found no new `base-bash-libs`
+- The Base and Base Demo hosted GA pin suites found no new `base-bash-libs`
   API or behavior finding.
 - The v2 release archive is a deterministic bundle, not the v1 full-source
   archive. The GA Homebrew formula must therefore install the bundle layout
