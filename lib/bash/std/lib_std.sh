@@ -243,18 +243,23 @@ __base_bash_libs_std_import_state["$BASE_BASH_LIBS_STD_SOURCE_PATH"]=loaded
 unset __base_bash_libs_std_metadata_file__ __base_bash_libs_std_embedded_commit__ __base_bash_libs_std_embedded_dirty_state__ __base_bash_libs_std_embedded_provenance__ __base_bash_libs_std_git_commit__
 unset -f __base_bash_libs_std_read_package_version__ __base_bash_libs_std_read_metadata_value__
 
-__base_bash_libs_std_is_dotted_numeric_version__() {
-    local version="${1-}" version_re='^[0-9]+([.][0-9]+)*$'
+__base_bash_libs_std_is_supported_version__() {
+    local version="${1-}" version_re='^[0-9]+([.][0-9]+)*(-(alpha|beta|rc)[.][1-9][0-9]*)?$'
     [[ "$version" =~ $version_re ]]
 }
 
 __base_bash_libs_std_version_at_least__() {
     local actual_version="$1" minimum_version="$2"
+    local actual_core minimum_core actual_prerelease minimum_prerelease
+    local actual_phase minimum_phase actual_number minimum_number
+    local actual_rank minimum_rank index max_parts actual_part minimum_part
     local -a actual_parts=() minimum_parts=()
-    local index max_parts actual_part minimum_part actual_number minimum_number
 
-    IFS=. read -r -a actual_parts <<< "$actual_version"
-    IFS=. read -r -a minimum_parts <<< "$minimum_version"
+    IFS=- read -r actual_core actual_prerelease <<< "$actual_version"
+    IFS=- read -r minimum_core minimum_prerelease <<< "$minimum_version"
+
+    IFS=. read -r -a actual_parts <<< "$actual_core"
+    IFS=. read -r -a minimum_parts <<< "$minimum_core"
 
     max_parts="${#actual_parts[@]}"
     if ((${#minimum_parts[@]} > max_parts)); then
@@ -275,7 +280,34 @@ __base_bash_libs_std_version_at_least__() {
         fi
     done
 
-    return 0
+    # A stable release is newer than a prerelease of the same core version.
+    if [[ -z "$actual_prerelease" && -n "$minimum_prerelease" ]]; then
+        return 0
+    fi
+    if [[ -n "$actual_prerelease" && -z "$minimum_prerelease" ]]; then
+        return 1
+    fi
+    [[ -z "$actual_prerelease" && -z "$minimum_prerelease" ]] && return 0
+
+    IFS=. read -r actual_phase actual_number <<< "$actual_prerelease"
+    IFS=. read -r minimum_phase minimum_number <<< "$minimum_prerelease"
+    case "$actual_phase" in
+    alpha) actual_rank=0 ;;
+    beta) actual_rank=1 ;;
+    rc) actual_rank=2 ;;
+    esac
+    case "$minimum_phase" in
+    alpha) minimum_rank=0 ;;
+    beta) minimum_rank=1 ;;
+    rc) minimum_rank=2 ;;
+    esac
+    if ((actual_rank != minimum_rank)); then
+        ((actual_rank > minimum_rank))
+        return
+    fi
+    actual_number=$((10#$actual_number))
+    minimum_number=$((10#$minimum_number))
+    ((actual_number >= minimum_number))
 }
 
 #
@@ -293,9 +325,9 @@ base_require_version() {
         return 2
     fi
 
-    if ! __base_bash_libs_std_is_dotted_numeric_version__ "$minimum_version" ||
-        ! __base_bash_libs_std_is_dotted_numeric_version__ "$BASE_BASH_LIBS_VERSION"; then
-        base_std_log_error -l base_bash_libs.std "base_require_version expects dotted numeric versions."
+    if ! __base_bash_libs_std_is_supported_version__ "$minimum_version" ||
+        ! __base_bash_libs_std_is_supported_version__ "$BASE_BASH_LIBS_VERSION"; then
+        base_std_log_error -l base_bash_libs.std "base_require_version expects supported SemVer versions."
         return 2
     fi
 

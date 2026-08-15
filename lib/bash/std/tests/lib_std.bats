@@ -588,6 +588,25 @@ EOF
     [[ "$output" == *"loaded version is $BASE_BASH_LIBS_VERSION"* ]]
 }
 
+@test "base_require_version orders prereleases before the stable release" {
+    local script="$TEST_TMPDIR/version-prerelease.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+base_require_version "2.0.0-rc.1"
+base_require_version "2.0.0-alpha.1"
+if base_require_version "2.0.0"; then
+    exit 3
+fi
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"base-bash-libs 2.0.0 or newer is required"* ]]
+}
+
 @test "base_require_version returns status 2 for invalid version strings" {
     local script="$TEST_TMPDIR/version-invalid.sh"
 
@@ -600,7 +619,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 2 ]
-    [[ "$output" == *"base_require_version expects dotted numeric versions"* ]]
+    [[ "$output" == *"base_require_version expects supported SemVer versions"* ]]
 }
 
 @test "stdlib exposes readonly loaded marker" {

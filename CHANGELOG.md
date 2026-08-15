@@ -75,6 +75,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Unlocked guarded v2 prerelease publication after the deterministic artifact,
   checksum, SBOM, and provenance contract landed; GA publication remains locked
   until the #214 and #240 release-candidate gates pass.
+- Made `base_require_version` compare the supported v2 prerelease identifiers
+  (`alpha.N`, `beta.N`, and `rc.N`) correctly against GA and older releases.
 - Established the v2 API charter in `docs/v2-api-contract.md`: public
   functions now use the coherent `base_` namespace, ordinary failures return
   recoverable statuses, interactive defaults are explicit, and file-section
