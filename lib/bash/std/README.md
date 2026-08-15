@@ -277,9 +277,10 @@ added after the first public release:
 base_require_version 1.1.0
 ```
 
-The helper compares dotted numeric versions, returns silently when the loaded
-library is new enough, and exits with a clear fatal error when the loaded
-`BASE_BASH_LIBS_VERSION` is too old.
+The helper compares supported SemVer versions, including the v2
+`alpha.N`, `beta.N`, and `rc.N` prerelease identifiers. It returns silently
+when the loaded library is new enough and exits with a clear fatal error when
+the loaded `BASE_BASH_LIBS_VERSION` is too old.
 
 ## Logging
 
