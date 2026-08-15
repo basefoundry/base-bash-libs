@@ -3,7 +3,7 @@
 # Repository-owned release policy guard for the Base Bash v2 release line.
 
 release_usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 Usage:
   scripts/release <check|plan|notes|refs|publish> --version <version> [options]
 
@@ -13,9 +13,9 @@ Allowed release identifiers:
   2.0.0-rc.N
   2.0.0
 
-N must be a positive integer without leading zeroes. Real publication remains
-locked until the verified-artifact and pre-GA release-candidate gates are
-complete.
+N must be a positive integer without leading zeroes. Prerelease publication is
+available after the verified release-artifact contract has landed; GA remains
+locked until the pre-GA release-candidate gates are complete.
 
 The refs command is a read-only preflight that fails closed when the candidate
 tag already exists locally or on origin.
@@ -47,7 +47,7 @@ release_check_tag_refs() {
     local remote_refs=""
     local git_status
 
-    if ! command -v git >/dev/null 2>&1; then
+    if ! command -v git > /dev/null 2>&1; then
         release_error "Git is required to inspect release tag '$tag_name'."
         return 1
     fi
@@ -64,7 +64,7 @@ release_check_tag_refs() {
         fi
     fi
 
-    if ! remote_refs="$(git -C "$repo_root" ls-remote --tags origin "refs/tags/$tag_name" 2>/dev/null)"; then
+    if ! remote_refs="$(git -C "$repo_root" ls-remote --tags origin "refs/tags/$tag_name" 2> /dev/null)"; then
         release_error "Unable to inspect release tag '$tag_name' on origin; refusing to continue."
         return 1
     fi
@@ -96,17 +96,16 @@ main() {
     local seen_yes=0
 
     case "$command" in
-        check|plan|notes|refs|publish)
-            ;;
-        ""|-h|--help|help)
-            release_usage
-            return 2
-            ;;
-        *)
-            release_error "Unknown release command '$command'."
-            release_usage
-            return 2
-            ;;
+    check | plan | notes | refs | publish) ;;
+    "" | -h | --help | help)
+        release_usage
+        return 2
+        ;;
+    *)
+        release_error "Unknown release command '$command'."
+        release_usage
+        return 2
+        ;;
     esac
 
     script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || return 1
@@ -120,85 +119,85 @@ main() {
     index=1
     while ((index < ${#arguments[@]})); do
         case "${arguments[$index]}" in
-            --version)
-                if ((seen_version)); then
-                    release_error "Option '--version' may be provided only once."
-                    return 2
-                fi
-                seen_version=1
-                index=$((index + 1))
-                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
-                    release_error "Option '--version' requires an argument."
-                    return 2
-                fi
-                version="${arguments[$index]}"
-                ;;
-            --manifest)
-                if ((seen_manifest)); then
-                    release_error "Option '--manifest' may be provided only once."
-                    return 2
-                fi
-                seen_manifest=1
-                index=$((index + 1))
-                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
-                    release_error "Option '--manifest' requires an argument."
-                    return 2
-                fi
-                manifest_value="${arguments[$index]}"
-                if [[ "$manifest_value" != "base_manifest.yaml" &&
-                    "$manifest_value" != "./base_manifest.yaml" &&
-                    "$manifest_value" != "$canonical_manifest" ]]; then
-                    release_error "Release operations must use the canonical manifest at '$canonical_manifest'."
-                    return 1
-                fi
-                ;;
-            --format)
-                if [[ "$command" != "check" ]]; then
-                    release_error "Option '--format' is only supported by release check."
-                    return 2
-                fi
-                if ((seen_format)); then
-                    release_error "Option '--format' may be provided only once."
-                    return 2
-                fi
-                seen_format=1
-                index=$((index + 1))
-                if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
-                    release_error "Option '--format' requires an argument."
-                    return 2
-                fi
-                ;;
-            --dry-run)
-                if [[ "$command" != "publish" ]]; then
-                    release_error "Option '--dry-run' is only supported by release publish."
-                    return 2
-                fi
-                if ((seen_dry_run)); then
-                    release_error "Option '--dry-run' may be provided only once."
-                    return 2
-                fi
-                seen_dry_run=1
-                dry_run=1
-                ;;
-            --yes)
-                if [[ "$command" != "publish" ]]; then
-                    release_error "Option '--yes' is only supported by release publish."
-                    return 2
-                fi
-                if ((seen_yes)); then
-                    release_error "Option '--yes' may be provided only once."
-                    return 2
-                fi
-                seen_yes=1
-                ;;
-            -h|--help)
-                release_usage
-                return 0
-                ;;
-            *)
-                release_error "Unknown release $command option '${arguments[$index]}'."
+        --version)
+            if ((seen_version)); then
+                release_error "Option '--version' may be provided only once."
                 return 2
-                ;;
+            fi
+            seen_version=1
+            index=$((index + 1))
+            if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                release_error "Option '--version' requires an argument."
+                return 2
+            fi
+            version="${arguments[$index]}"
+            ;;
+        --manifest)
+            if ((seen_manifest)); then
+                release_error "Option '--manifest' may be provided only once."
+                return 2
+            fi
+            seen_manifest=1
+            index=$((index + 1))
+            if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                release_error "Option '--manifest' requires an argument."
+                return 2
+            fi
+            manifest_value="${arguments[$index]}"
+            if [[ "$manifest_value" != "base_manifest.yaml" &&
+                "$manifest_value" != "./base_manifest.yaml" &&
+                "$manifest_value" != "$canonical_manifest" ]]; then
+                release_error "Release operations must use the canonical manifest at '$canonical_manifest'."
+                return 1
+            fi
+            ;;
+        --format)
+            if [[ "$command" != "check" ]]; then
+                release_error "Option '--format' is only supported by release check."
+                return 2
+            fi
+            if ((seen_format)); then
+                release_error "Option '--format' may be provided only once."
+                return 2
+            fi
+            seen_format=1
+            index=$((index + 1))
+            if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                release_error "Option '--format' requires an argument."
+                return 2
+            fi
+            ;;
+        --dry-run)
+            if [[ "$command" != "publish" ]]; then
+                release_error "Option '--dry-run' is only supported by release publish."
+                return 2
+            fi
+            if ((seen_dry_run)); then
+                release_error "Option '--dry-run' may be provided only once."
+                return 2
+            fi
+            seen_dry_run=1
+            dry_run=1
+            ;;
+        --yes)
+            if [[ "$command" != "publish" ]]; then
+                release_error "Option '--yes' is only supported by release publish."
+                return 2
+            fi
+            if ((seen_yes)); then
+                release_error "Option '--yes' may be provided only once."
+                return 2
+            fi
+            seen_yes=1
+            ;;
+        -h | --help)
+            release_usage
+            return 0
+            ;;
+        *)
+            release_error "Unknown release $command option '${arguments[$index]}'."
+            return 2
+            ;;
         esac
         index=$((index + 1))
     done
@@ -222,12 +221,12 @@ main() {
     if [[ "$command" == "publish" && "$dry_run" -eq 0 ]]; then
         release_check_tag_refs "$repo_root" "v$version" || return $?
         if [[ "$version_kind" == "prerelease" ]]; then
-            release_error "Publishing $version is locked until verified release artifacts and provenance land in #233."
+            :
         else
             release_error "Publishing v2.0.0 GA is locked until the #214 pre-GA gates and #240 RC rehearsal are complete."
+            release_error "Use 'publish --dry-run' to inspect the guarded plan without changing GitHub state."
+            return 1
         fi
-        release_error "Use 'publish --dry-run' to inspect the guarded plan without changing GitHub state."
-        return 1
     fi
 
     delegated_arguments=("$@")

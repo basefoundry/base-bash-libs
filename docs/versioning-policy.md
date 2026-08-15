@@ -36,17 +36,20 @@ mandatory entry point for every release inspection and publication attempt. It
 enforces the permitted v2 identifiers before delegating read-only operations
 and dry runs to Base's guarded release command.
 
-Real prerelease publication remains locked until #233 provides deterministic,
-verified release assets and provenance. Real `v2.0.0` publication remains
-locked until the engineering, policy, documentation, integration, and reference
-application gates in #214 are complete and the pre-GA work in #240 has validated
-and rehearsed the exact release candidate across Base, Base Demo, Homebrew,
-vendored, and bundled paths. The remaining #240 steps then publish compatible
-Base and Homebrew updates after the Base Bash GA asset exists.
+Prerelease publication is now available because #233 and the follow-up release
+artifact contract have landed. Maintainers must still build and verify the
+canonical archive, checksum manifest, SBOM, and provenance from the reviewed
+commit before publishing a prerelease. Real `v2.0.0` publication remains
+locked until the engineering, policy, documentation, integration, and
+reference-application gates in #214 are complete and the pre-GA work in #240
+has validated and rehearsed the exact release candidate across Base, Base Demo,
+Homebrew, vendored, and bundled paths. The remaining #240 steps then publish
+compatible Base and Homebrew updates after the Base Bash GA asset exists.
 
-The lock is code-reviewed policy, not an environment-variable or sentinel-file
-override. The PR that satisfies each gate must update the guard and its tests.
-Until then, maintainers can inspect a candidate without changing GitHub state:
+The GA lock is code-reviewed policy, not an environment-variable or
+sentinel-file override. The PR that satisfies each gate must update the guard
+and its tests. Maintainers can inspect any candidate without changing GitHub
+state:
 
 ```bash
 scripts/release check --version 2.0.0-rc.1 --manifest base_manifest.yaml

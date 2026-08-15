@@ -119,12 +119,15 @@ assert_driver_not_called() {
     assert_driver_not_called
 }
 
-@test "release guard locks real prerelease publication" {
+@test "release guard delegates real prerelease publication after the artifact gate" {
     bats_run "$RELEASE_SCRIPT" publish --version 2.0.0-beta.1 --yes
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"locked until verified release artifacts and provenance land in #233"* ]]
-    assert_driver_not_called
+    [ "$status" -eq 0 ]
+    grep -Fx 'arg=<publish>' "$RELEASE_CAPTURE"
+    grep -Fx 'arg=<--version>' "$RELEASE_CAPTURE"
+    grep -Fx 'arg=<2.0.0-beta.1>' "$RELEASE_CAPTURE"
+    grep -Fx 'arg=<--yes>' "$RELEASE_CAPTURE"
+    [ -e "$RELEASE_PUBLISH_MARKER" ]
 }
 
 @test "release guard locks real v2 GA publication" {
