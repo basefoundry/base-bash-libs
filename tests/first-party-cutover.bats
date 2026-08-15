@@ -4,13 +4,13 @@ setup() {
     repo_root="$(cd "${BATS_TEST_DIRNAME}/.." && pwd -P)"
 }
 
-@test "cutover check is fail-closed before GA and inspectable in pending mode" {
+@test "cutover check accepts the published GA asset" {
     run "$repo_root/scripts/first-party-cutover" check
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"locked until"* ]]
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"structurally valid"* ]]
     run "$repo_root/scripts/first-party-cutover" check --allow-pending
     [ "$status" -eq 0 ]
-    [[ "$output" == *"PENDING release_status=pending-ga-asset"* ]]
+    [[ "$output" == *"structurally valid"* ]]
 }
 
 @test "cutover check detects legacy Base symbols" {
