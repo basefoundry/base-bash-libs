@@ -308,13 +308,20 @@ fi
 
 release_status="$(sed -n 's/^release_status: //p' first-party-cutover.yaml | sed -n '1p')"
 if [[ "$release_status" == pending-ga-asset ]]; then
-    if ! printf '%s\n' "$readme_head" | grep -F 'v2.0.0 (planned)' > /dev/null; then
-        printf 'README.md must label the unpublished v2.0.0 release as planned.\n' >&2
-        exit 1
-    fi
-    if printf '%s\n' "$readme_head" | grep -F '/releases/tag/v2.0.0' > /dev/null; then
-        printf 'README.md must not link to the unpublished v2.0.0 release.\n' >&2
-        exit 1
+    if [[ "$version" == "2.0.0" ]]; then
+        if ! printf '%s\n' "$readme_head" | grep -F 'v2.0.0 (planned)' > /dev/null; then
+            printf 'README.md must label the unpublished v2.0.0 release as planned.\n' >&2
+            exit 1
+        fi
+        if printf '%s\n' "$readme_head" | grep -F '/releases/tag/v2.0.0' > /dev/null; then
+            printf 'README.md must not link to the unpublished v2.0.0 release.\n' >&2
+            exit 1
+        fi
+    elif [[ "$version" =~ ^2[.]0[.]0-(alpha|beta|rc)[.][1-9][0-9]*$ ]]; then
+        if ! printf '%s\n' "$readme_head" | grep -F "v$version" > /dev/null; then
+            printf 'README.md must link to the published prerelease candidate v%s.\n' "$version" >&2
+            exit 1
+        fi
     fi
 fi
 
