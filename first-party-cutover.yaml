@@ -1,9 +1,9 @@
 schema_version: 1
 target_release: 2.0.0
-release_status: pending-ga-asset
+release_status: published
 required_asset:
   tag: v2.0.0
-  sha256: publish-with-ga-release
+  sha256: 73d6f92fab8f1a8ded7f3b4312ebbe51aa8ec0c16eacf18c2d8fa23fb5664333
   provenance: required
 publish_order:
   - base-bash-libs
@@ -15,12 +15,12 @@ consumers:
     repository: basefoundry/base
     tracker: https://github.com/basefoundry/base/issues/1880
     pull_request: https://github.com/basefoundry/base/pull/1881
-    current_state: rc-pin-merged-pending-ga
+    current_state: ga-published-pending-pin
   - name: base-demo
     repository: basefoundry/base-demo
     tracker: base-bash-libs-240
-    current_state: rc-pin-merged-pending-ga
+    current_state: ga-published-pending-pin
   - name: homebrew-base
     repository: basefoundry/homebrew-base
     formula: Formula/base-bash-libs.rb
-    current_state: rc-formula-rehearsed-stable-unchanged
+    current_state: ga-published-pending-formula

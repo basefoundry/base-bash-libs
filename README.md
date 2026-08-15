@@ -6,12 +6,11 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `2.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.0.0 (planned)](https://github.com/basefoundry/base-bash-libs/issues/215) |
+| `2.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0) |
 
-The v2.0.0 row describes the planned next stable release. The v2.0.0-rc.1
-candidate was verified against the same release contract before GA publication.
-Until its canonical GA asset is published and the first-party cutover is
-complete, v1.4.0 remains the current stable package.
+The v2.0.0 release is published with a deterministic bundle archive, checksum
+manifest, SPDX SBOM, and provenance statement. First-party consumer and
+Homebrew pins are being promoted to the exact GA commit as part of issue #240.
 
 Reusable Bash standard library for reliable shell scripts.
 
@@ -226,11 +225,10 @@ The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
 
-`v1.4.0` remains stable during the clean-break v2 release preparation. The
-sole next stable target is `v2.0.0`; there will be no stable v1.5.0 or version
-reset to 0.x. See the [versioning and release-line policy](docs/versioning-policy.md)
-for prerelease identifiers, the withdrawn July 2026 v2 event, immutable
-consumption, and the post-GA support contract.
+`v2.0.0` is the current stable release. It is intentionally a clean break from
+the v1 surface; SemVer compatibility guarantees apply from v2.0.0 onward. See
+the [versioning and release-line policy](docs/versioning-policy.md) for
+immutable consumption and the post-GA support contract.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
 documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
