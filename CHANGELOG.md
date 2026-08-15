@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Changed
+
+- Unlocked guarded v2 prerelease publication after the deterministic artifact,
+  checksum, SBOM, and provenance contract landed; GA publication remains locked
+  until the #214 and #240 release-candidate gates pass.
+
 ## [2.0.0] - 2026-08-06
 
 ### Added
