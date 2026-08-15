@@ -13,7 +13,7 @@ release_smoke_expect_blocked() {
     shift 2
 
     rm -f -- "$capture_path"
-    "$@" >"$output_path" 2>&1
+    "$@" > "$output_path" 2>&1
     status=$?
     if ((status == 0)); then
         release_smoke_fail "blocked release command returned success."
@@ -82,19 +82,19 @@ main() {
     export BASE_BASH_RELEASE_BASECTL="$release_driver"
     export BASE_BASH_RELEASE_TEST_CAPTURE="$capture_path"
 
-    if ! "$release_script" check --version 2.0.0-alpha.1 >"$output_path" 2>&1; then
+    if ! "$release_script" check --version 2.0.0-alpha.1 > "$output_path" 2>&1; then
         release_smoke_fail "a supported prerelease check was not delegated."
         return 1
     fi
-    grep -Fx 'arg=<release>' "$capture_path" >/dev/null || return 1
-    grep -Fx 'arg=<check>' "$capture_path" >/dev/null || return 1
-    grep -Fx "arg=<$repo_root/base_manifest.yaml>" "$capture_path" >/dev/null || return 1
+    grep -Fx 'arg=<release>' "$capture_path" > /dev/null || return 1
+    grep -Fx 'arg=<check>' "$capture_path" > /dev/null || return 1
+    grep -Fx "arg=<$repo_root/base_manifest.yaml>" "$capture_path" > /dev/null || return 1
 
     release_smoke_expect_blocked "$capture_path" "$output_path" \
         "$release_script" check --version 1.5.0 || return 1
 
     rm -f -- "$capture_path"
-    "$release_script" publish --version 2.0.0 --yes >"$output_path" 2>&1
+    "$release_script" publish --version 2.0.0 --yes > "$output_path" 2>&1
     if (($? != 0)); then
         release_smoke_fail "GA release command was not delegated."
         return 1
