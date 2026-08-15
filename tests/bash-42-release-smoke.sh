@@ -69,8 +69,8 @@ main() {
     capture_path="$release_smoke_dir/delegated.out"
     output_path="$release_smoke_dir/command.out"
     git_stub="$release_smoke_dir/git"
-    cat >"$git_stub" <<'EOF'
-#!/usr/bin/env bash
+    printf '#!%s\n' "$BASH" >"$git_stub"
+    cat >>"$git_stub" <<'EOF'
 if [[ "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
     exit 1
 fi
