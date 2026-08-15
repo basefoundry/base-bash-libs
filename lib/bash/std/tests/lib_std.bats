@@ -588,7 +588,7 @@ EOF
     [[ "$output" == *"loaded version is $BASE_BASH_LIBS_VERSION"* ]]
 }
 
-@test "base_require_version orders prereleases before the stable release" {
+@test "base_require_version orders prereleases before a newer stable release" {
     local script="$TEST_TMPDIR/version-prerelease.sh"
 
     create_script "$script" <<EOF
@@ -596,7 +596,7 @@ EOF
 source "$STDLIB_PATH"
 base_require_version "2.0.0-rc.1"
 base_require_version "2.0.0-alpha.1"
-if base_require_version "2.0.0"; then
+if base_require_version "2.0.1"; then
     exit 3
 fi
 EOF
@@ -604,7 +604,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"base-bash-libs 2.0.0 or newer is required"* ]]
+    [[ "$output" == *"base-bash-libs 2.0.1 or newer is required"* ]]
 }
 
 @test "base_require_version returns status 2 for invalid version strings" {
