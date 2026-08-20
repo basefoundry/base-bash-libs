@@ -11,8 +11,9 @@ base_init app_args --source "${BASH_SOURCE[0]}" -- "$@"
 
 base_std_import file/lib_file.sh
 
-example_file="${TMPDIR:-/tmp}/base-bash-libs-example.$$"
-trap 'rm -f "$example_file"' EXIT
+example_dir=""
+base_std_make_temp_dir example_dir base-bash-libs-example || exit $?
+example_file="$example_dir/example"
 
 printf 'example\n' > "$example_file"
 base_file_update_file_section "$example_file" "# BEGIN base-bash-libs" "# END base-bash-libs" "managed=true"

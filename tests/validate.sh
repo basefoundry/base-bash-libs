@@ -64,6 +64,7 @@ required_files=(
     examples/std-usage.sh
     examples/cookbook-cleanup-temp.sh
     examples/cookbook-args-lists-strings.sh
+    tests/examples.bats
     tests/release.bats
     tests/namespace-contract.bats
     tests/api-manifest.bats
@@ -417,6 +418,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     examples/std-usage.sh \
     examples/cookbook-cleanup-temp.sh \
     examples/cookbook-args-lists-strings.sh \
+    tests/examples.bats \
     lib/bash/tests/test_helper.sh \
     "${manifest_shellcheck_paths[@]}" \
     tests/release.bats \
@@ -451,6 +453,7 @@ bats_files=(
     tests/library-bundle.bats
     tests/vendor.bats
     tests/integrations.bats
+    tests/examples.bats
     tests/reference-apps.bats
     tests/first-party-cutover.bats
 )
