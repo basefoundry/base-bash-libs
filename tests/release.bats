@@ -22,15 +22,18 @@ setup() {
 
     cat >"$RELEASE_GIT_STUB" <<'EOF'
 #!/usr/bin/env bash
-if [[ "${BASE_BASH_RELEASE_TEST_LOCAL_TAG:-}" == present && "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
-    exit 0
+if [[ "$*" == *"show-ref --verify --quiet refs/tags/"* ]]; then
+    if [[ "${BASE_BASH_RELEASE_TEST_LOCAL_TAG:-}" == present ]]; then
+        exit 0
+    fi
+    exit 1
 fi
 if [[ "$*" == *"ls-remote --tags origin refs/tags/"* ]]; then
     if [[ "${BASE_BASH_RELEASE_TEST_REMOTE_STATUS:-ok}" == error ]]; then
         exit 2
     fi
     if [[ "${BASE_BASH_RELEASE_TEST_REMOTE_TAG:-}" == present ]]; then
-        printf 'deadbeef refs/tags/v2.0.0\n'
+        printf 'deadbeef refs/tags/%s\n' "${*##*refs/tags/}"
     fi
     exit 0
 fi
