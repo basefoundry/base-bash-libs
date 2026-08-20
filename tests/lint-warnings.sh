@@ -41,6 +41,7 @@ lint_files=(
     examples/std-usage.sh
     examples/cookbook-cleanup-temp.sh
     examples/cookbook-args-lists-strings.sh
+    tests/examples.bats
     lib/bash/std/lib_std.sh
     lib/bash/file/lib_file.sh
     lib/bash/git/lib_git.sh
