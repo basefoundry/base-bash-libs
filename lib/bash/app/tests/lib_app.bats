@@ -10,10 +10,32 @@ setup() {
     unset APP_TEST_MODE APP_TEST_SECRET
 }
 
+validate_test_label() {
+    [[ "$1" == valid ]]
+}
+
 declare_test_config() {
     base_app_init demo name=demo
     base_app_config_define demo mode enum enum=dev,prod default=dev env=APP_TEST_MODE
     base_app_config_define demo secret string required=true secret=true env=APP_TEST_SECRET
+    base_app_config_define demo label string default=valid validator=validate_test_label
+}
+
+assert_demo_snapshot() {
+    local value source
+
+    base_app_config_get demo mode value
+    [ "$value" = prod ]
+    base_app_config_provenance demo mode source
+    [ "$source" = environment ]
+    base_app_config_get demo secret value
+    [ "$value" = old-secret ]
+    base_app_config_provenance demo secret source
+    [ "$source" = environment ]
+    base_app_config_get demo label value
+    [ "$value" = valid ]
+    base_app_config_provenance demo label source
+    [ "$source" = default ]
 }
 
 @test "lib_app requires stdlib and loads cli from the package" {
@@ -56,6 +78,57 @@ declare_test_config() {
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown key 'unknown'"* ]]
     ! grep -Eq '(^|[[:space:];])eval([[:space:];]|$)' "$BASE_BASH_DIR/app/lib_app.sh"
+}
+
+@test "failed configuration loads preserve the last successful snapshot" {
+    local user_file="$TEST_TMPDIR/user.conf" project_file="$TEST_TMPDIR/project.conf"
+    declare_test_config
+    export APP_TEST_MODE=prod APP_TEST_SECRET=old-secret
+    base_app_config_load demo
+
+    printf 'mode=dev\nnot-a-record\n' >"$user_file"
+    bats_run base_app_config_load demo --user "$user_file"
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    printf 'mode=dev\nunknown=value\n' >"$project_file"
+    bats_run base_app_config_load demo --project "$project_file"
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    export APP_TEST_MODE=staging
+    bats_run base_app_config_load demo
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    export APP_TEST_MODE=prod
+    bats_run base_app_config_load demo --cli mode=dev --cli unknown=value
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    bats_run base_app_config_load demo --cli label=invalid
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    unset APP_TEST_SECRET
+    bats_run base_app_config_load demo
+    [ "$status" -eq 2 ]
+    assert_demo_snapshot
+
+    export APP_TEST_MODE=dev APP_TEST_SECRET=new-secret
+    base_app_config_load demo --cli label=valid
+    base_app_config_get demo mode value
+    [ "$value" = dev ]
+    base_app_config_provenance demo mode source
+    [ "$source" = environment ]
+    base_app_config_get demo secret value
+    [ "$value" = new-secret ]
+    base_app_config_provenance demo secret source
+    [ "$source" = environment ]
+    base_app_config_get demo label value
+    [ "$value" = valid ]
+    base_app_config_provenance demo label source
+    [ "$source" = cli ]
 }
 
 @test "missing required configuration and explicitly requested files fail clearly" {
