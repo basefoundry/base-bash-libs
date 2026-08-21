@@ -30,6 +30,11 @@ Backslashes, tabs, carriage returns, and newlines in fields are escaped as
 `\\`, `\\t`, `\\r`, and `\\n` so each record remains one safe line.
 `base_app_config_set_cli` is a programmatic equivalent of `--cli key=value`.
 
+`base_app_config_load` validates the complete candidate configuration before
+publishing it. If loading fails, the previously successful values and
+provenance remain unchanged; a successful load atomically replaces the
+model's complete effective snapshot.
+
 Supported types are `string`, `path`, `bool`, `integer`, and `enum`. Optional
 `validator=FUNCTION` callbacks receive the candidate value and must return
 zero. No configuration value is evaluated as shell code.

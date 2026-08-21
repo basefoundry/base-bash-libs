@@ -25,6 +25,8 @@ declare -gA __base_bash_libs_app_config=()
 declare -gA __base_bash_libs_app_hooks=()
 declare -gA __base_bash_libs_app_values=()
 declare -gA __base_bash_libs_app_provenance=()
+declare -gA __base_bash_libs_app_staged_values=()
+declare -gA __base_bash_libs_app_staged_provenance=()
 declare -gA __base_bash_libs_app_cli=()
 declare -ga __base_bash_libs_app_keys=()
 declare -ga __base_bash_libs_app_hook_names=()
@@ -165,11 +167,16 @@ __base_bash_libs_app_validate_value__() {
     fi
 }
 
+__base_bash_libs_app_clear_staged_config__() {
+    __base_bash_libs_app_staged_values=()
+    __base_bash_libs_app_staged_provenance=()
+}
+
 __base_bash_libs_app_set_value__() {
     local model="$1" key="$2" value="$3" source="$4"
     __base_bash_libs_app_validate_value__ "$model" "$key" "$value" || return $?
-    __base_bash_libs_app_values["$model|$key"]="$value"
-    __base_bash_libs_app_provenance["$model|$key"]="$source"
+    __base_bash_libs_app_staged_values["$model|$key"]="$value"
+    __base_bash_libs_app_staged_provenance["$model|$key"]="$source"
 }
 
 __base_bash_libs_app_set_file_values__() {
@@ -272,6 +279,12 @@ base_app_init() {
     done
     for key in "${!__base_bash_libs_app_provenance[@]}"; do
         [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_app_provenance[$key]"
+    done
+    for key in "${!__base_bash_libs_app_staged_values[@]}"; do
+        [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_app_staged_values[$key]"
+    done
+    for key in "${!__base_bash_libs_app_staged_provenance[@]}"; do
+        [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_app_staged_provenance[$key]"
     done
     for key in "${!__base_bash_libs_app_cli[@]}"; do
         [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_app_cli[$key]"
@@ -376,7 +389,7 @@ base_app_config_set_cli() {
 # base_app_config_load - Applies user, project, environment, and CLI values.
 # Precedence is CLI > environment > project > user > default.
 base_app_config_load() {
-    local model="${1-}" argument project_file="" user_file="" key value_key env_name value
+    local model="${1-}" argument project_file="" user_file="" key value_key env_name value status
     local -a cli_pairs=()
     local parse_options=1
 
@@ -385,6 +398,7 @@ base_app_config_load() {
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
+    __base_bash_libs_app_clear_staged_config__
     shift
     while (($#)); do
         argument="$1"
@@ -396,6 +410,7 @@ base_app_config_load() {
         if ((parse_options)) && [[ "$argument" == --project || "$argument" == --config ]]; then
             (($# > 0)) || {
                 __base_bash_libs_app_error__ "$argument requires a file."
+                __base_bash_libs_app_clear_staged_config__
                 return 2
             }
             project_file="$1"
@@ -405,6 +420,7 @@ base_app_config_load() {
         if ((parse_options)) && [[ "$argument" == --user ]]; then
             (($# > 0)) || {
                 __base_bash_libs_app_error__ '--user requires a file.'
+                __base_bash_libs_app_clear_staged_config__
                 return 2
             }
             user_file="$1"
@@ -414,6 +430,7 @@ base_app_config_load() {
         if ((parse_options)) && [[ "$argument" == --cli ]]; then
             (($# > 0)) || {
                 __base_bash_libs_app_error__ '--cli requires key=value.'
+                __base_bash_libs_app_clear_staged_config__
                 return 2
             }
             cli_pairs+=("$1")
@@ -421,48 +438,92 @@ base_app_config_load() {
             continue
         fi
         __base_bash_libs_app_error__ "unknown configuration load argument '$argument'."
+        __base_bash_libs_app_clear_staged_config__
         return 2
     done
 
     IFS=, read -r -a __base_bash_libs_app_keys <<< "${__base_bash_libs_app_models["$model|config-keys"]-}"
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        value_key="$model|$key"
-        unset "__base_bash_libs_app_values[$value_key]" "__base_bash_libs_app_provenance[$value_key]"
         if [[ -n "${__base_bash_libs_app_config["$model|$key|default"]+set}" ]]; then
-            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_config["$model|$key|default"]}" default || return $?
+            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_config["$model|$key|default"]}" default || {
+                status=$?
+                __base_bash_libs_app_clear_staged_config__
+                return "$status"
+            }
         fi
     done
-    [[ -z "$user_file" ]] || __base_bash_libs_app_set_file_values__ "$model" "$user_file" user || return $?
-    [[ -z "$project_file" ]] || __base_bash_libs_app_set_file_values__ "$model" "$project_file" project || return $?
+    if [[ -n "$user_file" ]]; then
+        __base_bash_libs_app_set_file_values__ "$model" "$user_file" user || {
+            status=$?
+            __base_bash_libs_app_clear_staged_config__
+            return "$status"
+        }
+    fi
+    if [[ -n "$project_file" ]]; then
+        __base_bash_libs_app_set_file_values__ "$model" "$project_file" project || {
+            status=$?
+            __base_bash_libs_app_clear_staged_config__
+            return "$status"
+        }
+    fi
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
         env_name="${__base_bash_libs_app_config["$model|$key|env"]-}"
         if [[ -n "$env_name" && -n "${!env_name+x}" ]]; then
-            __base_bash_libs_app_set_value__ "$model" "$key" "${!env_name}" environment || return $?
+            __base_bash_libs_app_set_value__ "$model" "$key" "${!env_name}" environment || {
+                status=$?
+                __base_bash_libs_app_clear_staged_config__
+                return "$status"
+            }
         fi
     done
     for argument in "${cli_pairs[@]+${cli_pairs[@]}}"; do
         [[ "$argument" == *=* ]] || {
             __base_bash_libs_app_error__ "CLI configuration '$argument' must use key=value syntax."
+            __base_bash_libs_app_clear_staged_config__
             return 2
         }
         key="${argument%%=*}"
         value="${argument#*=}"
         [[ -n "${__base_bash_libs_app_config["$model|$key|type"]+set}" ]] || {
             __base_bash_libs_app_error__ "CLI configuration contains unknown key '$key'."
+            __base_bash_libs_app_clear_staged_config__
             return 2
         }
-        __base_bash_libs_app_set_value__ "$model" "$key" "$value" cli || return $?
+        __base_bash_libs_app_set_value__ "$model" "$key" "$value" cli || {
+            status=$?
+            __base_bash_libs_app_clear_staged_config__
+            return "$status"
+        }
     done
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
         if [[ -n "${__base_bash_libs_app_cli["$model|$key"]+set}" ]]; then
-            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_cli["$model|$key"]}" cli || return $?
+            __base_bash_libs_app_set_value__ "$model" "$key" "${__base_bash_libs_app_cli["$model|$key"]}" cli || {
+                status=$?
+                __base_bash_libs_app_clear_staged_config__
+                return "$status"
+            }
         fi
-        if [[ -z "${__base_bash_libs_app_provenance["$model|$key"]-}" ]] &&
+        if [[ -z "${__base_bash_libs_app_staged_provenance["$model|$key"]-}" ]] &&
             __base_bash_libs_app_bool_true__ "${__base_bash_libs_app_config["$model|$key|required"]-false}"; then
             __base_bash_libs_app_error__ "required configuration '$key' was not provided."
+            __base_bash_libs_app_clear_staged_config__
             return 2
         fi
     done
+
+    for value_key in "${!__base_bash_libs_app_values[@]}"; do
+        [[ "$value_key" == "$model|"* ]] && unset "__base_bash_libs_app_values[$value_key]"
+    done
+    for value_key in "${!__base_bash_libs_app_provenance[@]}"; do
+        [[ "$value_key" == "$model|"* ]] && unset "__base_bash_libs_app_provenance[$value_key]"
+    done
+    for value_key in "${!__base_bash_libs_app_staged_values[@]}"; do
+        __base_bash_libs_app_values["$value_key"]="${__base_bash_libs_app_staged_values["$value_key"]}"
+    done
+    for value_key in "${!__base_bash_libs_app_staged_provenance[@]}"; do
+        __base_bash_libs_app_provenance["$value_key"]="${__base_bash_libs_app_staged_provenance["$value_key"]}"
+    done
+    __base_bash_libs_app_clear_staged_config__
     return 0
 }
 
