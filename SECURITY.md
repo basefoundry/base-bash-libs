@@ -6,9 +6,8 @@ every vendored copy as executable supply-chain input.
 
 ## Supported releases
 
-The supported release line begins at `v2.0.0` GA. Until that release exists,
-the repository's current stable line is `v1.4.0`; it is maintained only as a
-historical reference while the v2 train is completed. After v2 GA, only the
+The supported release line begins at the published `v2.0.0` GA. The former
+`v1.4.0` line is now maintained only as a historical reference. Only the
 latest supported v2 security release receives fixes. All 0.x releases and
 pre-v2 1.x releases are historical and unsupported; the withdrawn July 2026
 v2 tag/formula event was not a supported release. See

@@ -34,6 +34,6 @@ examples/reference-apps/release-rehearsal.sh \
 ```
 
 The required evidence schema and platform matrix live in
-[`release-evidence.yaml`](release-evidence.yaml). Placeholders remain marked
-`pending-ga-asset` until the canonical v2 asset, checksum, and provenance are
-published; the repository never treats a moving checkout as release evidence.
+[`release-evidence.yaml`](release-evidence.yaml). It records the verified
+canonical `v2.0.0` asset, checksum, and provenance; the repository never treats
+a moving checkout as release evidence.
