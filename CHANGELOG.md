@@ -74,9 +74,8 @@ The v2.0.0-rc.1 candidate was published and verified before this GA release.
 
 ### Changed
 
-- Unlocked guarded v2 prerelease publication after the deterministic artifact,
-  checksum, SBOM, and provenance contract landed; GA publication remains locked
-  until the #214 and #240 release-candidate gates pass.
+- Promoted the guarded v2.0.0 GA after the deterministic artifact, checksum,
+  SBOM, provenance, and #240 first-party cutover gates passed.
 - Made `base_require_version` compare the supported v2 prerelease identifiers
   (`alpha.N`, `beta.N`, and `rc.N`) correctly against GA and older releases.
 - Established the v2 API charter in `docs/v2-api-contract.md`: public

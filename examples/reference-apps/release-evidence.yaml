@@ -1,13 +1,13 @@
 schema_version: 1
 release_line: v2.0.0
-status: pending-ga-asset
+status: verified
 
-# Fill these fields only from the canonical release asset and its independently
-# verified checksum. A local checkout or a moving branch is not acceptable.
+# These identities come from the canonical release asset and its independently
+# verified provenance. A local checkout or a moving branch is not acceptable.
 candidate:
-  ref: pending-v2.0.0-rc-or-ga
-  commit: pending
-  sha256: pending
+  ref: v2.0.0
+  commit: b4243765726c133499feeabdc50154f99c0fec12
+  sha256: 73d6f92fab8f1a8ded7f3b4312ebbe51aa8ec0c16eacf18c2d8fa23fb5664333
 rollback:
   ref: v1.4.0
   commit: 2c5ef2c3a9edfbe2cf68d0645be65b920255abff

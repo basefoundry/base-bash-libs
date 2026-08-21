@@ -2,10 +2,10 @@
 
 ## Current Release Line
 
-`v1.4.0` remains the last stable Base Bash release until the verified
-`v2.0.0` GA asset is published. The release-preparation candidate is now
-`v2.0.0`; the 5/5 initiative has one stable target and will not create a
-stable `v1.5.0` or reset the version to 0.x.
+`v2.0.0` is the current stable Base Bash release, backed by its verified
+canonical GA asset. `v1.4.0` and earlier releases are historical references;
+the 5/5 initiative has one stable target and will not create a stable `v1.5.0`
+or reset the version to 0.x.
 
 Those choices would either hide breaking changes inside the current 1.x
 compatibility range or move version precedence backward.
@@ -38,11 +38,11 @@ and dry runs to Base's guarded release command.
 
 Prerelease publication became available because #233 and the follow-up
 release-artifact contract landed. The reviewed `v2.0.0-rc.1` artifact and the
-pre-GA work in #240 then validated and rehearsed the exact release candidate
-across Base, Base Demo, Homebrew, vendored, and bundled paths. The guard now
-permits `v2.0.0` GA publication; maintainers must still build and verify the
-canonical archive, checksum manifest, SBOM, and provenance from the reviewed
-GA commit before publishing and completing the remaining first-party handoff.
+pre-GA work in #240 validated and rehearsed the exact release candidate across
+Base, Base Demo, Homebrew, vendored, and bundled paths. The canonical
+`v2.0.0` archive, checksum manifest, SBOM, and provenance are now published and
+the first-party handoff is complete; future releases must preserve the same
+verified-asset contract.
 
 The GA lock is code-reviewed policy, not an environment-variable or
 sentinel-file override. The PR that satisfies each gate must update the guard
