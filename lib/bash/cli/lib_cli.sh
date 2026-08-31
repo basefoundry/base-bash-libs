@@ -1366,7 +1366,10 @@ __base_bash_libs_cli_completion_add__() {
 # base_cli_complete - Prints completion candidates, one per line.
 # Usage: base_cli_complete model -- [complete argv including the current prefix]
 base_cli_complete() {
-    local model="${1-}" current prefix path="" word token option_path name index
+    local model="${1-}" current prefix path="" word token option_path name type child_path index
+    # shellcheck disable=SC2034 # Option lookup path is intentionally unused while resolving completion state.
+    local found_name found_path found_type
+    local parse_options=1 pending_value=0 inline_value=0
     local -a words=() completed=() children=() __base_bash_libs_cli_option_tokens=()
 
     if (($# < 2)) || [[ "$2" != -- ]]; then
@@ -1379,10 +1382,39 @@ base_cli_complete() {
     if ((${#words[@]} == 0)); then prefix=""; else prefix="${words[${#words[@]} - 1]}"; fi
     if ((${#words[@]} > 1)); then completed=("${words[@]:0:${#words[@]}-1}"); fi
     for word in "${completed[@]+${completed[@]}}"; do
-        [[ "$word" == -* ]] && continue
-        token="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$word")"
-        [[ -n "$token" ]] && path="$token"
+        if ((pending_value)); then
+            pending_value=0
+            continue
+        fi
+        if ((parse_options)) && [[ "$word" == -- ]]; then
+            parse_options=0
+            continue
+        fi
+        ((parse_options)) || continue
+        if [[ "$word" == -* && "$word" != - ]]; then
+            token="$word"
+            inline_value=0
+            if [[ "$word" == --*=* ]]; then
+                token="${word%%=*}"
+                inline_value=1
+            fi
+            if __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" \
+                found_name found_path found_type; then
+                [[ "$found_type" == flag || "$inline_value" -eq 1 ]] || pending_value=1
+            fi
+            continue
+        fi
+        child_path="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$word")"
+        [[ -n "$child_path" ]] && path="$child_path"
     done
+    ((parse_options && !pending_value)) || return 0
+    if [[ "$prefix" == --*=* ]]; then
+        token="${prefix%%=*}"
+        if __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" \
+            found_name found_path found_type && [[ "$found_type" != flag ]]; then
+            return 0
+        fi
+    fi
     __base_bash_libs_cli_completion_candidates=()
     if [[ "$prefix" == -* ]]; then
         __base_bash_libs_cli_collect_options__ "$model" "$path"
