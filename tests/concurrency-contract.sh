@@ -42,7 +42,7 @@ concurrency_worker() {
     # setup while every worker is active. The watchdog must never become a
     # second job-control race for commands that finish immediately.
     for ((attempt = 1; attempt <= 4; attempt += 1)); do
-        base_std_run --no-exit --quiet --timeout 5 /usr/bin/true || return $?
+        base_std_run --no-exit --quiet --timeout 5 true || return $?
     done
     # Async function subshells do not consistently deliver inherited EXIT
     # traps on every supported Bash release. Invoke the shared dispatcher
