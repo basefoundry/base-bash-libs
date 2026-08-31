@@ -204,6 +204,32 @@ EOF
     [[ "$output" == *"complete -F _demo_complete demo"* ]]
 }
 
+@test "public CLI paths preserve caller variables that match internal scratch names" {
+    local __base_bash_libs_cli_option_name=caller-name
+    local __base_bash_libs_cli_option_path=caller-path
+    local __base_bash_libs_cli_option_type=caller-type
+    local -a __base_bash_libs_cli_enum_values=(caller-enum)
+    local -a __base_bash_libs_cli_local_option_names=(caller-options)
+    local -a __base_bash_libs_cli_local_positionals=(caller-positionals)
+    local -a __base_bash_libs_cli_children=(caller-children)
+    local -a __base_bash_libs_cli_option_tokens=(caller-tokens)
+
+    declare_demo_model
+    base_cli_help demo > "$TEST_TMPDIR/root-help.out"
+    base_cli_help demo admin/user > "$TEST_TMPDIR/child-help.out"
+    base_cli_parse demo -- admin user target-name --color green
+    base_cli_complete demo -- admin user -- > "$TEST_TMPDIR/completion.out"
+
+    [ "$__base_bash_libs_cli_option_name" = caller-name ]
+    [ "$__base_bash_libs_cli_option_path" = caller-path ]
+    [ "$__base_bash_libs_cli_option_type" = caller-type ]
+    [ "${__base_bash_libs_cli_enum_values[*]}" = caller-enum ]
+    [ "${__base_bash_libs_cli_local_option_names[*]}" = caller-options ]
+    [ "${__base_bash_libs_cli_local_positionals[*]}" = caller-positionals ]
+    [ "${__base_bash_libs_cli_children[*]}" = caller-children ]
+    [ "${__base_bash_libs_cli_option_tokens[*]}" = caller-tokens ]
+}
+
 @test "the declarative runtime contains no eval dependency" {
     ! grep -Ev '^[[:space:]]*#' "$BASE_BASH_DIR/cli/lib_cli.sh" | grep -Eq '(^|[[:space:];])eval([[:space:];]|$)'
 }

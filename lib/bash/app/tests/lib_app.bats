@@ -65,6 +65,16 @@ assert_demo_snapshot() {
     [ "$value" = cli-secret ]
 }
 
+@test "enum validation preserves a caller variable with the internal scratch name" {
+    local -a __base_bash_libs_app_enum_values=(caller-owned)
+
+    declare_test_config
+    export APP_TEST_SECRET=secret
+    base_app_config_load demo --cli mode=prod
+
+    [ "${__base_bash_libs_app_enum_values[*]}" = caller-owned ]
+}
+
 @test "configuration files are data and reject malformed or unknown records" {
     local config_file="$TEST_TMPDIR/config.conf"
     declare_test_config
