@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Made table-driven CLI declaration transactional so any late semantic error
+  restores an existing model exactly or removes a partial new model.
 - Prevented list, CLI, and application call paths from creating or overwriting
   caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised

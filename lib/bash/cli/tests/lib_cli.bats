@@ -25,6 +25,28 @@ declare_demo_model() {
     base_cli_positional demo admin/user target required=true validator=valid_target help="Target name"
 }
 
+model_registry_dump() {
+    local model="$1" key
+
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$key" == "$model|"* ]] || continue
+        printf '%q=%q\n' "$key" "${__base_bash_libs_cli_models[$key]}"
+    done | LC_ALL=C sort
+}
+
+assert_failed_declaration_preserves_demo() {
+    local before="$1" status
+    shift
+
+    if base_cli_declare demo "$@"; then
+        return 1
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "$(model_registry_dump demo)" = "$before" ]
+}
+
 @test "quick declaration builds an order-independent model from table rows" {
     base_cli_declare quick <<'EOF'
 # Rows are intentionally not in engine declaration order.
@@ -56,6 +78,63 @@ EOF
         'unknown|path=run'
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown row kind 'unknown'"* ]]
+}
+
+@test "quick declaration rolls back every late semantic failure" {
+    base_cli_model_init demo name=original version=1.0.0 description="Original model"
+    base_cli_command demo old "Original command" aliases=legacy
+    base_cli_option demo old keep value --keep default=preserved
+    local before
+    local -a __base_bash_libs_cli_previous_positionals=(caller-owned)
+    before="$(model_registry_dump demo)"
+
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=bad/name' \
+        'command|path=run|description=Run'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=missing/child|description=Missing parent'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=mode|type=invalid|tokens=--mode'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run' \
+        'positional|path=run|name=items|repeatable=true' \
+        'positional|path=run|name=after'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run|aliases=bad/alias'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=mode|type=value|tokens=--mode|enum=blue,green|default=red'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run' \
+        'positional|path=run|name=target|required=maybe'
+    assert_failed_declaration_preserves_demo "$before" \
+        'model|name=replacement' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=mode|type=value|tokens=--mode|validator=bad-name'
+    [ "${__base_bash_libs_cli_previous_positionals[*]}" = caller-owned ]
+}
+
+@test "failed quick declaration leaves no partial new model" {
+    if base_cli_declare unfinished \
+        'model|name=unfinished' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=mode|type=invalid|tokens=--mode'; then
+        false
+    else
+        [ "$?" -eq 2 ]
+    fi
+
+    if __base_bash_libs_cli_model_exists__ unfinished; then
+        false
+    fi
+    [ -z "$(model_registry_dump unfinished)" ]
 }
 
 @test "lib_cli can be sourced more than once" {
