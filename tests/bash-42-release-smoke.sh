@@ -112,6 +112,10 @@ main() {
     unset -f git
     release_artifact="$repo_root/scripts/release-artifact"
     artifact_output="$release_smoke_dir/artifact"
+    command git config --global --add safe.directory "$repo_root" > /dev/null 2>&1 || {
+        release_smoke_fail "unable to trust the read-only compatibility checkout."
+        return 1
+    }
     source_commit="$(command git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2> /dev/null)" || {
         release_smoke_fail "unable to resolve the source commit for artifact verification."
         return 1
