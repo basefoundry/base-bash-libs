@@ -257,6 +257,52 @@ assert_demo_snapshot() {
     [ "$status" -eq 7 ]
 }
 
+@test "application status is isolated across normal failure signal and never-run models" {
+    succeeds() { return 0; }
+    fails() { return 7; }
+    local alpha_status beta_status signal_status never_status
+
+    base_app_init alpha
+    base_app_init beta
+    base_app_init signaled
+    base_app_init never
+
+    base_app_status never never_status
+    [ "$never_status" -eq 0 ]
+
+    base_app_run alpha succeeds
+    base_app_status alpha alpha_status
+    base_app_status beta beta_status
+    [ "$alpha_status" -eq 0 ]
+    [ "$beta_status" -eq 0 ]
+
+    if base_app_run beta fails; then
+        false
+    else
+        [ "$?" -eq 7 ]
+    fi
+    base_app_status alpha alpha_status
+    base_app_status beta beta_status
+    [ "$alpha_status" -eq 0 ]
+    [ "$beta_status" -eq 7 ]
+    [ "$BASE_BASH_LIBS_APP_LAST_STATUS" -eq 7 ]
+
+    BASE_BASH_LIBS_APP_ACTIVE_MODEL=signaled
+    if __base_bash_libs_app_cleanup_dispatch__ 143; then
+        false
+    else
+        [ "$?" -eq 143 ]
+    fi
+    BASE_BASH_LIBS_APP_ACTIVE_MODEL=""
+    base_app_status signaled signal_status
+    base_app_status beta beta_status
+    base_app_status never never_status
+    [ "$signal_status" -eq 143 ]
+    [ "$beta_status" -eq 7 ]
+    [ "$never_status" -eq 0 ]
+    [ "$BASE_BASH_LIBS_APP_LAST_STATUS" -eq 143 ]
+}
+
 @test "source is idempotent" {
     source "$BASE_BASH_DIR/app/lib_app.sh"
     [ "$(type -t base_app_run)" = function ]
