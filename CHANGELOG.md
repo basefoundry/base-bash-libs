@@ -27,6 +27,8 @@ and versions are tracked in the repo-root `VERSION` file.
   documented context instead of silently accepting and discarding them.
 - Isolated application run status per model while retaining the process-global
   last-status value as a compatibility view of the most recently active model.
+- Added a manifest-bound lock to standalone applications' embedded vendor copy
+  so it passes the same offline vendor verification as ordinary installs.
 - Prevented list, CLI, and application call paths from creating or overwriting
   caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised
