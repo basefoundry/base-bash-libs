@@ -79,6 +79,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build Bash 4.2 release-artifact fixture
+        run: |
+          scripts/release-artifact build \
+            --version 2.0.0 \
+            --commit "$(git rev-parse --verify 'HEAD^{commit}')" \
+            --output "$RUNNER_TEMP/base-bash-42-release-artifact"
+
       - name: Run Bash 4.2 compatibility smokes
         run: |
           docker run --rm \
@@ -92,7 +99,9 @@ jobs:
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 \
             --env HOME=/tmp \
             --env TMPDIR=/tmp \
+            --env BASE_BASH_RELEASE_ARTIFACT_FIXTURE=/release-artifact \
             --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/base-bash-42-release-artifact,dst=/release-artifact,readonly" \
             --workdir /workspace \
             docker.io/library/bash@sha256:0931edd3941d0603cb3d5da1cb298cf3eb6a579e09e094c3e34e2d5e9df8cddc \
             bash -c '

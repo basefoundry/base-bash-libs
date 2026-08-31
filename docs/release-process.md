@@ -32,7 +32,13 @@ delegating safe operations to Base's generic release machinery.
    embeds `lib/bash/base-bash-libs.release` with the exact release version,
    tag commit, `dirty_state=clean`, and `provenance=release-artifact`; this
    metadata is generated in the artifact rather than committed with a
-   self-referential commit hash.
+   self-referential commit hash. Offline verification requires exactly one
+   same-version archive, SBOM, provenance statement, and checksum manifest.
+   The checksum manifest must cover every mandatory asset exactly once, while
+   the provenance subject, SBOM namespace/package, and embedded metadata must
+   agree on the archive digest, version, and full source commit. Treat any
+   missing, duplicate, traversal-bearing, or inconsistent record as a failed
+   release gate; do not choose one asset from an ambiguous directory.
 5. Run the full library validation and inspect the diff:
 
    ```bash

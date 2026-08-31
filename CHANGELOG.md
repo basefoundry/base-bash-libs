@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Security
+
+- Bound offline release verification to one complete asset set by requiring
+  strict checksum coverage and consistent archive, provenance, SBOM, version,
+  and source-commit identity.
+
 ### Fixed
 
 - Eliminated an intermittent macOS Bash process-group race in supervised
