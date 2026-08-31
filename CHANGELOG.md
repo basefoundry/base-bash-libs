@@ -19,6 +19,8 @@ and versions are tracked in the repo-root `VERSION` file.
   repeatable itself, independent of earlier fixed positional arguments.
 - Made CLI completion consume option values and stop command and option
   interpretation after `--`, matching the runtime parser's path semantics.
+- Replaced the frozen `2.0.0` release guards with one shared post-GA SemVer
+  policy for stable v2 patch/minor releases and approved prerelease channels.
 - Made table-driven CLI declaration transactional so any late semantic error
   restores an existing model exactly or removes a partial new model.
 - Rejected unreachable CLI command routes and ancestor/child option collisions,

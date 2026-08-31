@@ -10,19 +10,20 @@ or reset the version to 0.x.
 Those choices would either hide breaking changes inside the current 1.x
 compatibility range or move version precedence backward.
 
-The only planned v2 identifiers before GA are:
+Post-GA releases use one repository-owned v2 SemVer policy:
 
 ```text
-2.0.0-alpha.N
-2.0.0-beta.N
-2.0.0-rc.N
-2.0.0
+2.MINOR.PATCH
+2.MINOR.PATCH-alpha.N
+2.MINOR.PATCH-beta.N
+2.MINOR.PATCH-rc.N
 ```
 
-`N` starts at 1, increases within a phase, and has no leading zeroes. These
-identifiers use SemVer syntax, but prereleases may contain breaking changes and
+`MINOR` and `PATCH` are non-negative canonical decimal integers; `N` starts at
+1 and has no leading zeroes. Build metadata and prerelease channels other than
+`alpha`, `beta`, and `rc` are not accepted by the release workflow. Prereleases
 do not receive compatibility shims. The stable SemVer compatibility contract
-begins at `v2.0.0` GA.
+began at `v2.0.0` GA.
 
 After GA, v2 is the only supported release line. Versions through `v1.4.0`
 remain available as historical releases but no longer receive fixes or support.
@@ -33,8 +34,9 @@ requires v3 or later.
 
 The repository-owned [`scripts/release`](../scripts/release) command is the
 mandatory entry point for every release inspection and publication attempt. It
-enforces the permitted v2 identifiers before delegating read-only operations
-and dry runs to Base's guarded release command.
+sources [`scripts/release-version-policy.sh`](../scripts/release-version-policy.sh)
+before delegating read-only operations and dry runs to Base's guarded release
+command. The artifact builder and repository validation source the same policy.
 
 Prerelease publication became available because #233 and the follow-up
 release-artifact contract landed. The reviewed `v2.0.0-rc.1` artifact and the
@@ -44,15 +46,14 @@ Base, Base Demo, Homebrew, vendored, and bundled paths. The canonical
 the first-party handoff is complete; future releases must preserve the same
 verified-asset contract.
 
-The GA lock is code-reviewed policy, not an environment-variable or
-sentinel-file override. The PR that satisfies each gate must update the guard
-and its tests. Maintainers can inspect any candidate without changing GitHub
-state:
+The release policy is code reviewed, not an environment-variable or
+sentinel-file override. Maintainers can inspect any candidate without changing
+GitHub state:
 
 ```bash
-scripts/release check --version 2.0.0-rc.1 --manifest base_manifest.yaml
-scripts/release plan --version 2.0.0-rc.1 --manifest base_manifest.yaml
-scripts/release publish --version 2.0.0-rc.1 --manifest base_manifest.yaml --dry-run
+scripts/release check --version 2.1.0 --manifest base_manifest.yaml
+scripts/release plan --version 2.1.0 --manifest base_manifest.yaml
+scripts/release publish --version 2.1.0 --manifest base_manifest.yaml --dry-run
 ```
 
 The generic `basectl release` command is not a substitute for this guard. Its
@@ -62,10 +63,10 @@ artifact, provenance, or GA gates.
 Before any real publication attempt, run the repository-owned tag preflight:
 
 ```bash
-scripts/release refs --version 2.0.0-rc.1
+scripts/release refs --version 2.1.0
 ```
 
-The preflight checks both `refs/tags/v2.0.0-rc.1` in the local checkout and the
+The preflight checks both the exact candidate tag in the local checkout and the
 same tag on `origin`. It fails closed when Git cannot inspect either side or
 when the tag is already present. Published tags are immutable; a stale local
 tag may be removed only after confirming that the remote ref is absent and that
@@ -115,15 +116,16 @@ git tag -d v2.0.0
 The complete checkout, archive, Homebrew, vendored, and standalone verification
 procedure is maintained in [`pinned-consumption.md`](pinned-consumption.md).
 
-Do not install from an unpinned default-branch checkout. Until a verified v2
-asset exists, pin the current stable source to the full `v1.4.0` release commit:
+Do not install from an unpinned default-branch checkout. Use the canonical
+`v2.0.0` release asset and verify its checksum, or pin the stable source to the
+full commit resolved from the signed `v2.0.0` tag:
 
 ```bash
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs checkout --detach \
-  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+  b4243765726c133499feeabdc50154f99c0fec12
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
-  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+  b4243765726c133499feeabdc50154f99c0fec12
 ```
 
 Prerelease validation must likewise use an immutable prerelease tag resolved to

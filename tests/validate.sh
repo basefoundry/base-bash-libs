@@ -44,6 +44,7 @@ required_files=(
     bin/base-bash
     scripts/release
     scripts/release-artifact
+    scripts/release-version-policy.sh
     scripts/api-manifest
     scripts/library-bundle
     scripts/vendor
@@ -215,10 +216,12 @@ if ! printf '%s\n' "$readme_head" | grep -F "[![Bash](https://img.shields.io/bad
     exit 1
 fi
 
-if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
-    printf 'VERSION is not a SemVer-compatible version: %s\n' "$version" >&2
+# shellcheck source=../scripts/release-version-policy.sh
+source "$repo_root/scripts/release-version-policy.sh" || exit 1
+version_kind="$(base_bash_release_version_kind "$version")" || {
+    printf 'VERSION is outside the supported Base Bash v2 release policy: %s\n' "$version" >&2
     exit 1
-fi
+}
 
 version_core="${version%%[-+]*}"
 latest_tag_core="0.0.0"
@@ -318,7 +321,7 @@ if [[ "$release_status" == pending-ga-asset ]]; then
             printf 'README.md must not link to the unpublished v2.0.0 release.\n' >&2
             exit 1
         fi
-    elif [[ "$version" =~ ^2[.]0[.]0-(alpha|beta|rc)[.][1-9][0-9]*$ ]]; then
+    elif [[ "$version_kind" == prerelease ]]; then
         if ! printf '%s\n' "$readme_head" | grep -F "v$version" > /dev/null; then
             printf 'README.md must link to the published prerelease candidate v%s.\n' "$version" >&2
             exit 1

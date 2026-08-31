@@ -7,9 +7,11 @@
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || exit 1
 repo_root="$(cd -- "$script_dir/.." && pwd -P)" || exit 1
 default_manifest="$repo_root/base_api_manifest.yaml"
+# shellcheck source=release-version-policy.sh
+source "$repo_root/scripts/release-version-policy.sh" || exit 1
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 << 'EOF'
 Usage:
   scripts/api-manifest check [manifest]
   scripts/api-manifest generate [manifest] [output]
@@ -206,10 +208,16 @@ check_manifest() {
     local -A module_tests=()
     local -A module_docs=()
 
-    [[ -f "$manifest" ]] || { error "manifest not found: $manifest"; return 1; }
+    [[ -f "$manifest" ]] || {
+        error "manifest not found: $manifest"
+        return 1
+    }
     for field in schema_version manifest_kind manifest_version minimum_bash generated_reference migration_inventory; do
         value="$(manifest_value "$manifest" "$field")"
-        [[ -n "$value" ]] || { error "missing top-level field '$field'"; return 1; }
+        [[ -n "$value" ]] || {
+            error "missing top-level field '$field'"
+            return 1
+        }
     done
     [[ "$(manifest_value "$manifest" schema_version)" == 1 ]] || {
         error "schema_version must be 1"
@@ -219,8 +227,8 @@ check_manifest() {
         error "manifest_kind must be base-bash-libs-api"
         return 1
     }
-    [[ "$(manifest_value "$manifest" manifest_version)" =~ ^2[.]0[.]0([-.].*)?$ ]] || {
-        error "manifest_version must be on the v2.0.0 release line"
+    base_bash_release_version_supported "$(manifest_value "$manifest" manifest_version)" || {
+        error "manifest_version must follow the supported Base Bash v2 release policy"
         return 1
     }
     [[ "$(manifest_value "$manifest" minimum_bash)" =~ ^4[.]2$ ]] || {
@@ -241,25 +249,49 @@ check_manifest() {
     }
 
     value="$(manifest_value "$manifest" generated_reference)"
-    path_is_safe "$value" || { error "generated_reference is not a safe relative path"; return 1; }
-    [[ -f "$repo_root/$value" ]] || { error "generated reference is missing: $value"; return 1; }
+    path_is_safe "$value" || {
+        error "generated_reference is not a safe relative path"
+        return 1
+    }
+    [[ -f "$repo_root/$value" ]] || {
+        error "generated reference is missing: $value"
+        return 1
+    }
     value="$(manifest_value "$manifest" migration_inventory)"
-    path_is_safe "$value" || { error "migration_inventory is not a safe relative path"; return 1; }
-    [[ -f "$repo_root/$value" ]] || { error "migration inventory is missing: $value"; return 1; }
+    path_is_safe "$value" || {
+        error "migration_inventory is not a safe relative path"
+        return 1
+    }
+    [[ -f "$repo_root/$value" ]] || {
+        error "migration inventory is missing: $value"
+        return 1
+    }
 
     while IFS= read -r row; do
-        [[ "$row" == *'|'*'|'* ]] || { error "environment entry must be NAME|kind|description: $row"; return 1; }
+        [[ "$row" == *'|'*'|'* ]] || {
+            error "environment entry must be NAME|kind|description: $row"
+            return 1
+        }
     done < <(manifest_section_rows "$manifest" environment)
     value="$(manifest_value "$manifest" optional_commands)"
-    [[ -n "$value" ]] || { error "optional_commands must not be empty"; return 1; }
+    [[ -n "$value" ]] || {
+        error "optional_commands must not be empty"
+        return 1
+    }
     while IFS= read -r field; do
-        [[ "$field" =~ ^[a-zA-Z0-9._+-]+$ ]] || { error "invalid optional command '$field'"; return 1; }
+        [[ "$field" =~ ^[a-zA-Z0-9._+-]+$ ]] || {
+            error "invalid optional command '$field'"
+            return 1
+        }
     done < <(split_csv "$value")
 
     while IFS=$'\t' read -r -a fields; do
         [[ -n "${fields[0]-}" ]] || continue
         module_count=$((module_count + 1))
-        [[ -z "${module_names[${fields[0]}]-}" ]] || { error "duplicate module '${fields[0]}'"; return 1; }
+        [[ -z "${module_names[${fields[0]}]-}" ]] || {
+            error "duplicate module '${fields[0]}'"
+            return 1
+        }
         module_names["${fields[0]}"]=1
         module_dependencies["${fields[0]}"]="${fields[5]}"
         module_sources["${fields[0]}"]="${fields[2]}"
@@ -270,8 +302,14 @@ check_manifest() {
             return 1
         }
         for field in "${fields[2]}" "${fields[3]}" "${fields[4]}"; do
-            path_is_safe "$field" || { error "module '${fields[0]}' has an unsafe path '$field'"; return 1; }
-            [[ -f "$repo_root/$field" ]] || { error "module '${fields[0]}' path is missing: $field"; return 1; }
+            path_is_safe "$field" || {
+                error "module '${fields[0]}' has an unsafe path '$field'"
+                return 1
+            }
+            [[ -f "$repo_root/$field" ]] || {
+                error "module '${fields[0]}' path is missing: $field"
+                return 1
+            }
         done
         [[ "${fields[15]}" =~ ^2[.]0[.]0([-.].*)?$ ]] || {
             error "module '${fields[0]}' has invalid since metadata"
@@ -283,33 +321,60 @@ check_manifest() {
         }
         IFS=',' read -r -a artifacts <<< "${fields[7]}"
         for artifact in "${artifacts[@]}"; do
-            path_is_safe "$artifact" || { error "module '${fields[0]}' has an unsafe artifact '$artifact'"; return 1; }
-            [[ -f "$repo_root/$artifact" ]] || { error "module '${fields[0]}' artifact is missing: $artifact"; return 1; }
+            path_is_safe "$artifact" || {
+                error "module '${fields[0]}' has an unsafe artifact '$artifact'"
+                return 1
+            }
+            [[ -f "$repo_root/$artifact" ]] || {
+                error "module '${fields[0]}' artifact is missing: $artifact"
+                return 1
+            }
         done
-        [[ ",${fields[7]}," == *",${fields[2]},"* ]] || { error "module '${fields[0]}' does not package its source"; return 1; }
-        [[ ",${fields[7]}," == *",${fields[3]},"* ]] || { error "module '${fields[0]}' does not package its documentation"; return 1; }
-        [[ ",${fields[7]}," == *",${fields[4]},"* ]] || { error "module '${fields[0]}' does not package its tests"; return 1; }
+        [[ ",${fields[7]}," == *",${fields[2]},"* ]] || {
+            error "module '${fields[0]}' does not package its source"
+            return 1
+        }
+        [[ ",${fields[7]}," == *",${fields[3]},"* ]] || {
+            error "module '${fields[0]}' does not package its documentation"
+            return 1
+        }
+        [[ ",${fields[7]}," == *",${fields[4]},"* ]] || {
+            error "module '${fields[0]}' does not package its tests"
+            return 1
+        }
         IFS=',' read -r -a symbols <<< "${fields[8]}"
-        [[ ${#symbols[@]} -gt 0 ]] || { error "module '${fields[0]}' declares no public symbols"; return 1; }
+        [[ ${#symbols[@]} -gt 0 ]] || {
+            error "module '${fields[0]}' declares no public symbols"
+            return 1
+        }
         source_symbols_list=()
         while IFS= read -r source_symbol; do source_symbols_list+=("$source_symbol"); done < <(source_symbols "$repo_root/${fields[2]}")
         for symbol in "${symbols[@]}"; do
-            [[ "$symbol" =~ ^base_[a-zA-Z0-9_]+$ ]] || { error "invalid public symbol '$symbol'"; return 1; }
-            [[ -z "${manifest_symbols[$symbol]-}" ]] || { error "duplicate public symbol '$symbol'"; return 1; }
+            [[ "$symbol" =~ ^base_[a-zA-Z0-9_]+$ ]] || {
+                error "invalid public symbol '$symbol'"
+                return 1
+            }
+            [[ -z "${manifest_symbols[$symbol]-}" ]] || {
+                error "duplicate public symbol '$symbol'"
+                return 1
+            }
             manifest_symbols[$symbol]=${fields[0]}
-            printf '%s\n' "${source_symbols_list[@]}" | grep -Fx "$symbol" >/dev/null || {
+            printf '%s\n' "${source_symbols_list[@]}" | grep -Fx "$symbol" > /dev/null || {
                 error "manifest symbol '$symbol' is not declared in ${fields[2]}"
                 return 1
             }
         done
         for source_symbol in "${source_symbols_list[@]}"; do
-            printf '%s\n' "${symbols[@]}" | grep -Fx "$source_symbol" >/dev/null || {
+            printf '%s\n' "${symbols[@]}" | grep -Fx "$source_symbol" > /dev/null || {
                 error "public source symbol '$source_symbol' is missing from module '${fields[0]}'"
                 return 1
             }
         done
     done < <(manifest_rows "$manifest")
-    ((module_count > 0)) || { error "manifest declares no modules"; return 1; }
+    ((module_count > 0)) || {
+        error "manifest declares no modules"
+        return 1
+    }
 
     for module in "${!module_names[@]}"; do
         module_cycle_check "$module" || return 1
@@ -317,8 +382,14 @@ check_manifest() {
     while IFS= read -r row; do
         [[ -n "$row" ]] || continue
         field="${row%%|*}"
-        path_is_safe "$field" || { error "artifact entry has an unsafe path '$field'"; return 1; }
-        [[ -f "$repo_root/$field" ]] || { error "artifact entry is missing: $field"; return 1; }
+        path_is_safe "$field" || {
+            error "artifact entry has an unsafe path '$field'"
+            return 1
+        }
+        [[ -f "$repo_root/$field" ]] || {
+            error "artifact entry is missing: $field"
+            return 1
+        }
     done < <(manifest_section_rows "$manifest" artifacts)
 
     return 0
@@ -334,75 +405,78 @@ main() {
     local output=""
     local row field
     case "$command" in
-        check|generate|symbols|module-paths|source-paths|test-paths|artifact-paths)
-            shift
-            manifest="$(manifest_or_default "${1-}")"
-            [[ $# -eq 0 || $# -eq 1 || "$command" == generate ]] || { usage; return 2; }
-            ;;
-        -h|--help|help|"")
+    check | generate | symbols | module-paths | source-paths | test-paths | artifact-paths)
+        shift
+        manifest="$(manifest_or_default "${1-}")"
+        [[ $# -eq 0 || $# -eq 1 || "$command" == generate ]] || {
             usage
             return 2
-            ;;
-        *)
-            usage
-            return 2
-            ;;
+        }
+        ;;
+    -h | --help | help | "")
+        usage
+        return 2
+        ;;
+    *)
+        usage
+        return 2
+        ;;
     esac
 
     case "$command" in
-        check)
-            check_manifest "$manifest" || return $?
-            output="$(mktemp "${TMPDIR:-/tmp}/base-api-manifest.XXXXXX")" || return 1
-            if ! generate_reference "$manifest" > "$output"; then
-                rm -f "$output"
-                return 1
-            fi
-            if ! cmp -s "$output" "$repo_root/$(manifest_value "$manifest" generated_reference)"; then
-                error "generated API reference is stale; run 'scripts/api-manifest generate'"
-                rm -f "$output"
-                return 1
-            fi
+    check)
+        check_manifest "$manifest" || return $?
+        output="$(mktemp "${TMPDIR:-/tmp}/base-api-manifest.XXXXXX")" || return 1
+        if ! generate_reference "$manifest" > "$output"; then
             rm -f "$output"
-            printf 'API manifest is valid.\n'
-            ;;
-        generate)
-            output="${2-}"
-            if [[ -n "$output" ]]; then
-                generate_reference "$manifest" > "$repo_root/$output"
-            else
-                generate_reference "$manifest"
-            fi
-            ;;
-        symbols)
-            check_manifest "$manifest" || return $?
-            while IFS=$'\t' read -r -a fields; do
-                IFS=',' read -r -a symbols <<< "${fields[8]}"
-                printf '%s\n' "${symbols[@]}"
-            done < <(manifest_rows "$manifest")
-            ;;
-        module-paths)
-            check_manifest "$manifest" || return $?
-            manifest_rows "$manifest" | cut -f2,4,5
-            ;;
-        source-paths)
-            check_manifest "$manifest" || return $?
-            manifest_rows "$manifest" | cut -f3
-            ;;
-        test-paths)
-            check_manifest "$manifest" || return $?
-            manifest_rows "$manifest" | cut -f5
-            ;;
-        artifact-paths)
-            check_manifest "$manifest" || return $?
-            while IFS= read -r row; do
-                field="${row%%|*}"
-                printf '%s\n' "$field"
-            done < <(manifest_section_rows "$manifest" artifacts)
-            while IFS=$'\t' read -r -a fields; do
-                IFS=',' read -r -a artifacts <<< "${fields[7]}"
-                printf '%s\n' "${artifacts[@]}"
-            done < <(manifest_rows "$manifest")
-            ;;
+            return 1
+        fi
+        if ! cmp -s "$output" "$repo_root/$(manifest_value "$manifest" generated_reference)"; then
+            error "generated API reference is stale; run 'scripts/api-manifest generate'"
+            rm -f "$output"
+            return 1
+        fi
+        rm -f "$output"
+        printf 'API manifest is valid.\n'
+        ;;
+    generate)
+        output="${2-}"
+        if [[ -n "$output" ]]; then
+            generate_reference "$manifest" > "$repo_root/$output"
+        else
+            generate_reference "$manifest"
+        fi
+        ;;
+    symbols)
+        check_manifest "$manifest" || return $?
+        while IFS=$'\t' read -r -a fields; do
+            IFS=',' read -r -a symbols <<< "${fields[8]}"
+            printf '%s\n' "${symbols[@]}"
+        done < <(manifest_rows "$manifest")
+        ;;
+    module-paths)
+        check_manifest "$manifest" || return $?
+        manifest_rows "$manifest" | cut -f2,4,5
+        ;;
+    source-paths)
+        check_manifest "$manifest" || return $?
+        manifest_rows "$manifest" | cut -f3
+        ;;
+    test-paths)
+        check_manifest "$manifest" || return $?
+        manifest_rows "$manifest" | cut -f5
+        ;;
+    artifact-paths)
+        check_manifest "$manifest" || return $?
+        while IFS= read -r row; do
+            field="${row%%|*}"
+            printf '%s\n' "$field"
+        done < <(manifest_section_rows "$manifest" artifacts)
+        while IFS=$'\t' read -r -a fields; do
+            IFS=',' read -r -a artifacts <<< "${fields[7]}"
+            printf '%s\n' "${artifacts[@]}"
+        done < <(manifest_rows "$manifest")
+        ;;
     esac
 }
 

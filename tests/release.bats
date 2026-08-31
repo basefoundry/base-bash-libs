@@ -74,7 +74,7 @@ assert_driver_not_called() {
 @test "release guard accepts every defined prerelease phase" {
     local version
 
-    for version in 2.0.0-alpha.9 2.0.0-beta.10 2.0.0-rc.3; do
+    for version in 2.0.0-alpha.9 2.0.1-beta.10 2.1.0-rc.3; do
         rm -f "$RELEASE_CAPTURE"
         bats_run "$RELEASE_SCRIPT" plan --version "$version"
 
@@ -98,7 +98,7 @@ assert_driver_not_called() {
         bats_run "$RELEASE_SCRIPT" check --version "$version"
 
         [ "$status" -eq 1 ]
-        [[ "$output" == *"outside the Base Bash v2.0.0 release line"* ]]
+        [[ "$output" == *"outside the supported Base Bash v2 release policy"* ]]
     done
     assert_driver_not_called
 }
@@ -112,14 +112,44 @@ assert_driver_not_called() {
         2.0.0-preview.1 \
         2.0.0-alpha \
         2.0.0-alpha.1+build.1 \
-        2.0.1 \
-        2.1.0 \
+        2.00.0 \
+        2.0.01 \
+        2.01.0 \
+        2.1.0-rc.0 \
+        2.1.0-rc.01 \
+        2.1.0+build.1 \
         3.0.0; do
         bats_run "$RELEASE_SCRIPT" check --version "$version"
 
         [ "$status" -eq 1 ]
     done
     assert_driver_not_called
+}
+
+@test "release guard delegates post-GA patch and minor workflows" {
+    local version command
+
+    for version in 2.0.1 2.1.0; do
+        bats_run "$RELEASE_SCRIPT" refs --version "$version"
+        [ "$status" -eq 0 ]
+        [[ "$output" == *"v$version is absent locally and on origin"* ]]
+
+        for command in check plan notes; do
+            rm -f "$RELEASE_CAPTURE"
+            bats_run "$RELEASE_SCRIPT" "$command" --version "$version"
+            [ "$status" -eq 0 ]
+            grep -Fx "arg=<$command>" "$RELEASE_CAPTURE"
+            grep -Fx "arg=<$version>" "$RELEASE_CAPTURE"
+        done
+
+        rm -f "$RELEASE_CAPTURE"
+        bats_run "$RELEASE_SCRIPT" publish --version "$version" --dry-run
+        [ "$status" -eq 0 ]
+        grep -Fx 'arg=<publish>' "$RELEASE_CAPTURE"
+        grep -Fx "arg=<$version>" "$RELEASE_CAPTURE"
+        grep -Fx 'arg=<--dry-run>' "$RELEASE_CAPTURE"
+        [ ! -e "$RELEASE_PUBLISH_MARKER" ]
+    done
 }
 
 @test "release guard delegates real prerelease publication after the artifact gate" {

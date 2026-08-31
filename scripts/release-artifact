@@ -7,6 +7,8 @@
 # manifest that can be attached to the guarded release operation.
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+# shellcheck source=release-version-policy.sh
+source "$repo_root/scripts/release-version-policy.sh" || exit 1
 
 usage() {
     cat >&2 << 'EOF'
@@ -42,10 +44,6 @@ json_escape() {
     value=${value//$'\n'/\\n}
     value=${value//$'\r'/\\r}
     printf '%s' "$value"
-}
-
-version_is_supported() {
-    [[ "${1-}" =~ ^2[.]0[.]0(-(alpha|beta|rc)[.]([1-9][0-9]*))?$ ]]
 }
 
 commit_is_full_sha() {
@@ -211,8 +209,8 @@ build_artifact() {
         esac
         index=$((index + 1))
     done
-    version_is_supported "$version" || {
-        error "Version '$version' is outside the Base Bash v2.0.0 release line."
+    base_bash_release_version_supported "$version" || {
+        error "Version '$version' is outside the supported Base Bash v2 release policy."
         return 1
     }
     [[ -n "$output" ]] || {
@@ -335,7 +333,7 @@ verify_artifact() {
     archive_name="${archive##*/}"
     version="${archive_name#base-bash-libs-v}"
     version="${version%.tar.gz}"
-    version_is_supported "$version" || {
+    base_bash_release_version_supported "$version" || {
         error "Archive version is not supported: $version"
         return 1
     }

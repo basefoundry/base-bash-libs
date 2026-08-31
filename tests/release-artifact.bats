@@ -29,7 +29,8 @@ release_test_refresh_checksum() {
 }
 
 release_test_build() {
-    "$RELEASE_ARTIFACT" build --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$1" > /dev/null
+    local destination="$1" version="${2:-2.0.0-rc.1}"
+    "$RELEASE_ARTIFACT" build --version "$version" --commit "$RELEASE_COMMIT" --output "$destination" > /dev/null
 }
 
 @test "release artifact build creates a deterministic verified asset set" {
@@ -46,6 +47,22 @@ release_test_build() {
     diff -ru "$first" "$second"
     grep -F '"spdxVersion": "SPDX-2.3"' "$first"/*.spdx.json
     grep -F '"reproducible": true' "$first"/*.provenance.json
+}
+
+@test "release artifact build and verify support post-GA patch and minor versions" {
+    local version artifact
+
+    for version in 2.0.1 2.1.0; do
+        artifact="$TEST_TMPDIR/artifact-$version"
+        release_test_build "$artifact" "$version"
+        bats_run "$RELEASE_ARTIFACT" verify "$artifact"
+        [ "$status" -eq 0 ]
+        [[ "$output" == *"verified"* ]]
+        [ -f "$artifact/base-bash-libs-v$version.tar.gz" ]
+        [ -f "$artifact/base-bash-libs-v$version.spdx.json" ]
+        [ -f "$artifact/base-bash-libs-v$version.provenance.json" ]
+        [ -f "$artifact/base-bash-libs-v$version.SHA256SUMS" ]
+    done
 }
 
 @test "release artifact verification rejects a tampered asset" {

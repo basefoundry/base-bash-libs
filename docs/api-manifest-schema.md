@@ -15,7 +15,7 @@ The current schema is `1` and the manifest identifies itself with
 | Field | Meaning |
 | --- | --- |
 | `schema_version` | Manifest schema compatibility number. |
-| `manifest_version` | API release line represented by the manifest (`2.0.0` during v2 development). |
+| `manifest_version` | API release represented by the manifest; it follows the repository's shared post-GA v2 SemVer policy. |
 | `minimum_bash` | Minimum supported Bash runtime (`4.2`). |
 | `generated_reference` | Checked-in API reference generated from this manifest. |
 | `migration_inventory` | Normative v1-to-v2 behavior and symbol migration record. |
