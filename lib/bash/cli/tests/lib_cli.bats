@@ -269,6 +269,86 @@ EOF
     base_cli_validate_model validate
 }
 
+@test "command names and aliases remain unique in either declaration order" {
+    base_cli_model_init alias_first name=alias-first
+    base_cli_command alias_first user "User" aliases=u
+    bats_run base_cli_command alias_first u "Canonical collision"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"command name 'u' is already used"* ]]
+    base_cli_parse alias_first -- u
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = user ]
+
+    base_cli_model_init canonical_first name=canonical-first
+    base_cli_command canonical_first u "Canonical"
+    bats_run base_cli_command canonical_first user "User" aliases=u
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"alias 'u' is already used"* ]]
+
+    base_cli_model_init duplicate_alias name=duplicate-alias
+    bats_run base_cli_command duplicate_alias user "User" aliases=u,u
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"route 'u' was provided more than once"* ]]
+}
+
+@test "ancestor and child option names and tokens cannot shadow each other" {
+    base_cli_model_init ancestor_first name=ancestor-first
+    base_cli_command ancestor_first child "Child"
+    base_cli_option ancestor_first '' mode value --mode
+    bats_run base_cli_option ancestor_first child mode value --child-mode
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"option name 'mode' conflicts"* ]]
+    bats_run base_cli_option ancestor_first child child_mode value --mode
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"token '--mode' conflicts"* ]]
+
+    base_cli_model_init child_first name=child-first
+    base_cli_command child_first child "Child"
+    base_cli_command child_first sibling "Sibling"
+    base_cli_option child_first child child_mode value --mode
+    bats_run base_cli_option child_first '' child_mode value --root-mode
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"option name 'child_mode' conflicts"* ]]
+    bats_run base_cli_option child_first '' root_mode value --mode
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"token '--mode' conflicts"* ]]
+
+    base_cli_option child_first child child_only value --shared
+    base_cli_option child_first sibling sibling_only value --shared
+}
+
+@test "quick declarations apply the same route collision rules" {
+    bats_run base_cli_declare command_collision \
+        'model|name=command-collision' \
+        'command|path=user|description=User|aliases=u' \
+        'command|path=u|description=Canonical collision'
+    [ "$status" -eq 2 ]
+
+    bats_run base_cli_declare option_collision \
+        'model|name=option-collision' \
+        'command|path=child|description=Child' \
+        'option|path=child|name=child_mode|type=value|tokens=--mode' \
+        'option|path=|name=root_mode|type=value|tokens=--mode'
+    [ "$status" -eq 2 ]
+}
+
+@test "model validation detects unreachable command and option routes" {
+    base_cli_model_init routes name=routes
+    base_cli_command routes user "User" aliases=u
+    base_cli_command routes child "Child"
+    base_cli_option routes '' mode value --mode
+
+    __base_bash_libs_cli_models['routes|command|child||u']=child
+    __base_bash_libs_cli_models['routes|option|child|meta|child_mode|type']=value
+    __base_bash_libs_cli_models['routes|option|child|meta|child_mode|tokens']='--mode'
+    __base_bash_libs_cli_models['routes|option|child|token|--mode']=child_mode
+
+    bats_run base_cli_validate_model routes
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"alias:user:u"* ]]
+    [[ "$output" == *"option:child:--mode"* ]]
+}
+
 @test "completion emits aliases and a self-contained completion adapter" {
     declare_demo_model
 
