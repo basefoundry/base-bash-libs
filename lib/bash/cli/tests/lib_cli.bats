@@ -403,6 +403,66 @@ EOF
     [[ "$output" == *"complete -F _demo_complete demo"* ]]
 }
 
+@test "completion consumes option values and honors the double-dash boundary" {
+    base_cli_model_init complete name=complete
+    base_cli_command complete admin "Administration" aliases=a
+    base_cli_command complete admin/user "User" aliases=u
+    base_cli_option complete '' verbose flag --verbose -v
+    base_cli_option complete '' config value --config
+    base_cli_option complete '' tag repeatable --tag
+
+    bats_run base_cli_complete complete -- --config admin
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete complete -- --config admin ""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"admin"* ]]
+    [[ "$output" != *"user"* ]]
+
+    bats_run base_cli_complete complete -- --tag admin
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete complete -- --config=admin ""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"admin"* ]]
+    bats_run base_cli_complete complete -- --config -not-an-option
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete complete -- --config "" ""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"admin"* ]]
+
+    bats_run base_cli_complete complete -- --verbose ""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"admin"* ]]
+    bats_run base_cli_complete complete -- a u
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"user"* ]]
+    [[ "$output" == *"u"* ]]
+
+    bats_run base_cli_complete complete -- -- admin ""
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete complete -- -- ""
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "completion keeps partial candidates unique and one per line" {
+    base_cli_model_init unique_complete name=unique-complete
+    base_cli_command unique_complete admin "Administration" aliases=adm
+    base_cli_option unique_complete '' verbose flag --verbose -v
+
+    bats_run base_cli_complete unique_complete -- ad
+    [ "$status" -eq 0 ]
+    [ "$output" = $'admin\nadm' ]
+    [ "$(printf '%s\n' "$output" | LC_ALL=C sort | uniq -d)" = "" ]
+
+    bats_run base_cli_complete unique_complete -- --v
+    [ "$status" -eq 0 ]
+    [ "$output" = --verbose ]
+}
+
 @test "public CLI paths preserve caller variables that match internal scratch names" {
     local __base_bash_libs_cli_option_name=caller-name
     local __base_bash_libs_cli_option_path=caller-path
