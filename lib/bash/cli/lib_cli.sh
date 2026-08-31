@@ -110,6 +110,36 @@ __base_bash_libs_cli_validate_bool__() {
     [[ "${1-}" =~ ^(0|1|true|false|yes|no)$ ]]
 }
 
+__base_bash_libs_cli_validate_enum__() {
+    local owner="$1" enum_value item default_value matched=0
+    local -a enum_values=()
+    local -A enum_seen=()
+
+    [[ -n "${__base_bash_libs_cli_attrs[enum]+set}" ]] || return 0
+    enum_value="${__base_bash_libs_cli_attrs[enum]}"
+    IFS=, read -r -a enum_values <<< "$enum_value"
+    ((${#enum_values[@]} > 0)) && [[ "$enum_value" != ,* && "$enum_value" != *, && "$enum_value" != *',,'* ]] || {
+        __base_bash_libs_cli_declaration_usage__ "$owner: enum must contain non-empty comma-separated values."
+        return 2
+    }
+    for item in "${enum_values[@]}"; do
+        [[ -z "${enum_seen[$item]+set}" ]] || {
+            __base_bash_libs_cli_declaration_usage__ "$owner: enum value '$item' was provided more than once."
+            return 2
+        }
+        enum_seen["$item"]=1
+    done
+    [[ -n "${__base_bash_libs_cli_attrs[default]+set}" ]] || return 0
+    default_value="${__base_bash_libs_cli_attrs[default]}"
+    for item in "${enum_values[@]}"; do
+        [[ "$default_value" == "$item" ]] && matched=1
+    done
+    ((matched)) || {
+        __base_bash_libs_cli_declaration_usage__ "$owner: default must be one of the declared enum values."
+        return 2
+    }
+}
+
 __base_bash_libs_cli_validate_attrs__() {
     local key value
 
@@ -361,6 +391,20 @@ __base_bash_libs_cli_quick_path_depth__() {
     __base_bash_libs_cli_quick_depth=$((depth + 1))
 }
 
+__base_bash_libs_cli_restore_declared_model__() {
+    local model="$1" key
+
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_cli_models[$key]"
+    done
+    # The snapshot is a local owned by base_cli_declare. Bash dynamic scope
+    # keeps the rollback path compatible with Bash 4.2 without eval or namerefs.
+    # shellcheck disable=SC2154
+    for key in "${!__base_bash_libs_cli_declare_snapshot[@]}"; do
+        __base_bash_libs_cli_models["$key"]="${__base_bash_libs_cli_declare_snapshot[$key]}"
+    done
+}
+
 # base_cli_declare - Build a model from compact pipe-delimited declaration rows.
 #
 # Usage: base_cli_declare MODEL [ROW...]
@@ -378,10 +422,11 @@ __base_bash_libs_cli_quick_path_depth__() {
 # base_cli_positional. Option tokens are supplied as one comma-separated
 # `tokens=` field. When ROW arguments are omitted, rows are read from stdin.
 base_cli_declare() {
-    local model="${1-}" line kind row path description name type tokens_value key depth
+    local model="${1-}" line kind row path description name type tokens_value key depth status
     local model_row_count=0 max_depth=0 line_number=0
     local -a rows=() model_row=() command_rows=() option_rows=() positional_rows=()
     local -a declaration_args=() option_tokens=()
+    local -A __base_bash_libs_cli_declare_snapshot=()
 
     (($# >= 1)) || {
         __base_bash_libs_cli_declaration_usage__ 'base_cli_declare: expected a model identifier and declaration rows.'
@@ -468,10 +513,24 @@ base_cli_declare() {
         return 2
     }
 
-    base_cli_model_init "$model" "${model_row[@]}" || return $?
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        if [[ "$key" == "$model|"* ]]; then
+            __base_bash_libs_cli_declare_snapshot["$key"]="${__base_bash_libs_cli_models[$key]}"
+        fi
+    done
+
+    base_cli_model_init "$model" "${model_row[@]}" || {
+        status=$?
+        __base_bash_libs_cli_restore_declared_model__ "$model"
+        return "$status"
+    }
     for ((depth = 1; depth <= max_depth; depth++)); do
         for row in "${command_rows[@]}"; do
-            __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+            __base_bash_libs_cli_quick_parse_row__ "$row" || {
+                status=$?
+                __base_bash_libs_cli_restore_declared_model__ "$model"
+                return "$status"
+            }
             __base_bash_libs_cli_quick_path_depth__ "${__base_bash_libs_cli_attrs[path]}"
             [[ "$__base_bash_libs_cli_quick_depth" -eq "$depth" ]] || continue
             path="${__base_bash_libs_cli_attrs[path]}"
@@ -481,11 +540,19 @@ base_cli_declare() {
                 declaration_args+=("${__base_bash_libs_cli_attrs[handler]}")
             [[ -n "${__base_bash_libs_cli_attrs[aliases]+set}" ]] &&
                 declaration_args+=("aliases=${__base_bash_libs_cli_attrs[aliases]}")
-            base_cli_command "${declaration_args[@]}" || return $?
+            base_cli_command "${declaration_args[@]}" || {
+                status=$?
+                __base_bash_libs_cli_restore_declared_model__ "$model"
+                return "$status"
+            }
         done
     done
     for row in "${option_rows[@]}"; do
-        __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+        __base_bash_libs_cli_quick_parse_row__ "$row" || {
+            status=$?
+            __base_bash_libs_cli_restore_declared_model__ "$model"
+            return "$status"
+        }
         path="${__base_bash_libs_cli_attrs[path]}"
         name="${__base_bash_libs_cli_attrs[name]}"
         type="${__base_bash_libs_cli_attrs[type]}"
@@ -496,10 +563,18 @@ base_cli_declare() {
             [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
                 declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
         done
-        base_cli_option "${declaration_args[@]}" || return $?
+        base_cli_option "${declaration_args[@]}" || {
+            status=$?
+            __base_bash_libs_cli_restore_declared_model__ "$model"
+            return "$status"
+        }
     done
     for row in "${positional_rows[@]}"; do
-        __base_bash_libs_cli_quick_parse_row__ "$row" || return $?
+        __base_bash_libs_cli_quick_parse_row__ "$row" || {
+            status=$?
+            __base_bash_libs_cli_restore_declared_model__ "$model"
+            return "$status"
+        }
         path="${__base_bash_libs_cli_attrs[path]}"
         name="${__base_bash_libs_cli_attrs[name]}"
         declaration_args=("$model" "$path" "$name")
@@ -507,7 +582,11 @@ base_cli_declare() {
             [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
                 declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
         done
-        base_cli_positional "${declaration_args[@]}" || return $?
+        base_cli_positional "${declaration_args[@]}" || {
+            status=$?
+            __base_bash_libs_cli_restore_declared_model__ "$model"
+            return "$status"
+        }
     done
     return 0
 }
@@ -725,6 +804,7 @@ base_cli_option() {
     __base_bash_libs_cli_parse_attrs__ "${attrs[@]+${attrs[@]}}" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
     __base_bash_libs_cli_restrict_attrs__ 'help,metavar,default,required,enum,validator,conflicts,sensitive,hidden' || return $?
+    __base_bash_libs_cli_validate_enum__ base_cli_option || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[repeatable]+set}" ]]; then
         __base_bash_libs_cli_declaration_usage__ "base_cli_option: repeatable is selected by the option type, not an attribute."
         return 2
@@ -799,6 +879,7 @@ base_cli_option() {
 # Usage: base_cli_positional model command_path name [required=true] [repeatable=true] ...
 base_cli_positional() {
     local model="${1-}" path="${2-}" name="${3-}" key names
+    local -a __base_bash_libs_cli_previous_positionals=()
 
     if (($# < 3)); then
         __base_bash_libs_cli_declaration_usage__ 'base_cli_positional: expected model, command path, and name.'
@@ -827,6 +908,7 @@ base_cli_positional() {
     __base_bash_libs_cli_parse_attrs__ "$@" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
     __base_bash_libs_cli_restrict_attrs__ 'help,metavar,default,required,enum,validator,repeatable' || return $?
+    __base_bash_libs_cli_validate_enum__ base_cli_positional || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[validator]+set}" ]]; then
         if [[ ! "${__base_bash_libs_cli_attrs[validator]}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_positional: validator must be a Bash function name."
