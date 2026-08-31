@@ -258,6 +258,7 @@ __base_bash_libs_app_cleanup_dispatch__() {
     *) __base_bash_libs_app_hook_dispatch__ "$model" fatal "$status" ;;
     esac
     __base_bash_libs_app_hook_dispatch__ "$model" cleanup "$status"
+    __base_bash_libs_app_models["$model|last-status"]="$status"
     BASE_BASH_LIBS_APP_LAST_STATUS="$status"
     return "$status"
 }
@@ -310,6 +311,7 @@ base_app_init() {
     __base_bash_libs_app_models["$model|name"]="${__base_bash_libs_app_attrs[name]-$model}"
     __base_bash_libs_app_models["$model|description"]="${__base_bash_libs_app_attrs[description]-}"
     __base_bash_libs_app_models["$model|config-keys"]=""
+    __base_bash_libs_app_models["$model|last-status"]=0
     for key in normal fatal int term hup cleanup; do
         __base_bash_libs_app_models["$model|hooks|$key"]=""
     done
@@ -720,19 +722,21 @@ base_app_run() {
     __base_bash_libs_app_cleanup_dispatch__ "$status"
     base_std_unregister_cleanup_hook __base_bash_libs_app_cleanup_dispatch__ || true
     BASE_BASH_LIBS_APP_ACTIVE_MODEL=""
+    __base_bash_libs_app_models["$model|last-status"]="$status"
+    # shellcheck disable=SC2034 # Published compatibility status for callers.
     BASE_BASH_LIBS_APP_LAST_STATUS="$status"
     return "$status"
 }
 
-# base_app_status - Copies the last application status.
+# base_app_status - Copies the model's last run status; never-run models are 0.
 base_app_status() {
-    local result_name="${2-}"
+    local model="${1-}" result_name="${2-}"
     (($# == 2)) || {
         __base_bash_libs_app_error__ 'base_app_status: usage: base_app_status MODEL RESULT_VARIABLE'
         return 2
     }
     __base_bash_libs_std_assert_public_variable_names__ base_app_status "$result_name" || return 1
     __base_bash_libs_std_assert_writable_output__ base_app_status "$result_name" || return 1
-    __base_bash_libs_app_model_exists__ "$1" || return 1
-    printf -v "$result_name" '%s' "$BASE_BASH_LIBS_APP_LAST_STATUS"
+    __base_bash_libs_app_model_exists__ "$model" || return 1
+    printf -v "$result_name" '%s' "${__base_bash_libs_app_models["$model|last-status"]-0}"
 }

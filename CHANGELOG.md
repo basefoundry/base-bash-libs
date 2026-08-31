@@ -25,6 +25,8 @@ and versions are tracked in the repo-root `VERSION` file.
   including canonical-name, alias, option-name, and option-token conflicts.
 - Rejected application declaration attributes outside each public API's
   documented context instead of silently accepting and discarding them.
+- Isolated application run status per model while retaining the process-global
+  last-status value as a compatibility view of the most recently active model.
 - Prevented list, CLI, and application call paths from creating or overwriting
   caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised
