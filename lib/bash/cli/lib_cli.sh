@@ -311,6 +311,12 @@ __base_bash_libs_cli_option_declared_for_path__() {
     return 1
 }
 
+__base_bash_libs_cli_paths_overlap__() {
+    local left="${1-}" right="${2-}"
+
+    [[ -z "$left" || -z "$right" || "$left" == "$right" || "$left" == "$right/"* || "$right" == "$left/"* ]]
+}
+
 __base_bash_libs_cli_collect_positionals__() {
     local model="$1" path="$2" name
     local -a __base_bash_libs_cli_local_positionals=()
@@ -634,14 +640,17 @@ base_cli_model_init() {
     return 0
 }
 
-# base_cli_validate_model - Verify that every declared command handler exists.
+# base_cli_validate_model - Verify handler wiring and declared route reachability.
 #
 # Declaration remains order-independent: callers may declare a model before
 # defining its handlers. Call this explicitly from tests or CI after all
-# handlers have been loaded to fail early on wiring mistakes.
+# handlers have been loaded to fail early on wiring or registry mistakes.
 base_cli_validate_model() {
-    local model="${1-}" key path handler
-    local -a missing_handlers=()
+    local model="${1-}" key path handler parent name aliases_value alias route token
+    # shellcheck disable=SC2034 # Required output slot for the shared option lookup helper.
+    local found_name found_path found_type
+    local -a missing_handlers=() unreachable_routes=()
+    local -a command_aliases=()
 
     (($# == 1)) || {
         __base_bash_libs_cli_declaration_usage__ 'base_cli_validate_model: expected a model identifier.'
@@ -665,8 +674,40 @@ base_cli_validate_model() {
             missing_handlers+=("$path:$handler")
         fi
     done
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$key" == "$model|command|exists|"* ]] || continue
+        path="${key#"$model|command|exists|"}"
+        [[ -n "$path" ]] || continue
+        parent="${__base_bash_libs_cli_models["$model|command|parent|$path"]-}"
+        name="${__base_bash_libs_cli_models["$model|command|name|$path"]-}"
+        if [[ -z "$name" || "${__base_bash_libs_cli_models["$model|command|child|$parent|$name"]-}" != "$path" ]]; then
+            unreachable_routes+=("command:$path:$name")
+        fi
+        aliases_value="${__base_bash_libs_cli_models["$model|command|aliases|$path"]-}"
+        IFS=, read -r -a command_aliases <<< "$aliases_value"
+        for alias in "${command_aliases[@]+${command_aliases[@]}}"; do
+            if [[ "${__base_bash_libs_cli_models["$model|command|child|$parent|$alias"]-}" != "$path" ]]; then
+                unreachable_routes+=("alias:$path:$alias")
+            fi
+        done
+    done
+    for key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$key" == "$model|option|"*'|token|'* ]] || continue
+        route="${key#"$model|option|"}"
+        path="${route%%|token|*}"
+        token="${route#*|token|}"
+        name="${__base_bash_libs_cli_models[$key]}"
+        if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
+            [[ "$found_name" != "$name" || "$found_path" != "$path" ]]; then
+            unreachable_routes+=("option:$path:$token")
+        fi
+    done
     if ((${#missing_handlers[@]} > 0)); then
         __base_bash_libs_cli_declaration_usage__ "base_cli_validate_model: handlers are not defined: ${missing_handlers[*]}"
+        return 2
+    fi
+    if ((${#unreachable_routes[@]} > 0)); then
+        __base_bash_libs_cli_declaration_usage__ "base_cli_validate_model: routes are unreachable: ${unreachable_routes[*]}"
         return 2
     fi
     return 0
@@ -677,6 +718,7 @@ base_cli_validate_model() {
 base_cli_command() {
     local model="${1-}" path="${2-}" description="${3-}" handler="" parent name alias child_list
     local -a command_aliases=()
+    local -A command_route_seen=()
 
     (($# >= 3)) || {
         __base_bash_libs_cli_declaration_usage__ 'base_cli_command: expected model, path, and description.'
@@ -723,15 +765,25 @@ base_cli_command() {
     if [[ -n "${__base_bash_libs_cli_attrs[aliases]+set}" ]]; then
         IFS=, read -r -a command_aliases <<< "${__base_bash_libs_cli_attrs[aliases]}"
     fi
+    if [[ -n "${__base_bash_libs_cli_models["$model|command|child|$parent|$name"]+set}" ]]; then
+        __base_bash_libs_cli_declaration_usage__ "base_cli_command: command name '$name' is already used by '$parent'."
+        return 2
+    fi
+    command_route_seen["$name"]=1
     for alias in "${command_aliases[@]+${command_aliases[@]}}"; do
         if ! __base_bash_libs_cli_valid_segment__ "$alias"; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_command: invalid alias '$alias'."
+            return 2
+        fi
+        if [[ -n "${command_route_seen[$alias]+set}" ]]; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_command: command route '$alias' was provided more than once."
             return 2
         fi
         if [[ -n "${__base_bash_libs_cli_models["$model|command|child|$parent|$alias"]+set}" ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_command: alias '$alias' is already used by '$parent'."
             return 2
         fi
+        command_route_seen["$alias"]=1
     done
     __base_bash_libs_cli_models["$model|command|exists|$path"]=1
     __base_bash_libs_cli_models["$model|command|name|$path"]="$name"
@@ -763,6 +815,7 @@ base_cli_command() {
 # Usage: base_cli_option model command_path name type token... [key=value]
 base_cli_option() {
     local model="${1-}" path="${2-}" name="${3-}" type="${4-}" token argument key option_names
+    local existing_key existing_path route_prefix route_suffix
     local -a tokens=() attrs=()
     local -A token_seen=()
 
@@ -793,6 +846,17 @@ base_cli_option() {
         __base_bash_libs_cli_declaration_usage__ "base_cli_option: option '$name' is already declared on '$path'."
         return 2
     fi
+    route_prefix="$model|option|"
+    route_suffix="|meta|$name|type"
+    for existing_key in "${!__base_bash_libs_cli_models[@]}"; do
+        [[ "$existing_key" == "$route_prefix"*"$route_suffix" ]] || continue
+        existing_path="${existing_key#"$route_prefix"}"
+        existing_path="${existing_path%"$route_suffix"}"
+        if __base_bash_libs_cli_paths_overlap__ "$path" "$existing_path"; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_option: option name '$name' conflicts across '$path' and '$existing_path'."
+            return 2
+        fi
+    done
     shift 4
     for argument; do
         if [[ "$argument" == *=* ]]; then attrs+=("$argument"); else tokens+=("$argument"); fi
@@ -826,6 +890,16 @@ base_cli_option() {
             __base_bash_libs_cli_declaration_usage__ "base_cli_option: option token '$token' was repeated."
             return 2
         fi
+        route_suffix="|token|$token"
+        for existing_key in "${!__base_bash_libs_cli_models[@]}"; do
+            [[ "$existing_key" == "$route_prefix"*"$route_suffix" ]] || continue
+            existing_path="${existing_key#"$route_prefix"}"
+            existing_path="${existing_path%"$route_suffix"}"
+            if __base_bash_libs_cli_paths_overlap__ "$path" "$existing_path"; then
+                __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' conflicts across '$path' and '$existing_path'."
+                return 2
+            fi
+        done
         token_seen["$token"]=1
     done
     if [[ "$type" == flag && -n "${__base_bash_libs_cli_attrs[default]+set}" ]]; then
