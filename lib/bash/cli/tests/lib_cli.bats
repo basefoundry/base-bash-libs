@@ -239,6 +239,46 @@ EOF
     [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = "--looks-like-option" ]
 }
 
+@test "required repeatable positionals count only their own consumed values" {
+    base_cli_model_init direct_repeat name=direct-repeat
+    base_cli_command direct_repeat run "Run"
+    base_cli_positional direct_repeat run target required=true
+    base_cli_positional direct_repeat run files required=true repeatable=true
+
+    bats_run base_cli_parse direct_repeat -- run target-only
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required positional 'files' was not provided"* ]]
+    base_cli_parse direct_repeat -- run target one
+    base_cli_parse direct_repeat -- run target one two
+
+    base_cli_model_init root_repeat name=root-repeat
+    base_cli_positional root_repeat '' items required=true repeatable=true
+    bats_run base_cli_parse root_repeat --
+    [ "$status" -eq 2 ]
+    base_cli_parse root_repeat -- one
+    base_cli_parse root_repeat -- one two
+
+    base_cli_model_init optional_repeat name=optional-repeat
+    base_cli_command optional_repeat run "Run"
+    base_cli_positional optional_repeat run target required=true
+    base_cli_positional optional_repeat run files repeatable=true
+    base_cli_parse optional_repeat -- run target-only
+}
+
+@test "quick declarations enforce required repeatable positional tails" {
+    base_cli_declare table_repeat \
+        'model|name=table-repeat' \
+        'command|path=run|description=Run' \
+        'positional|path=run|name=target|required=true' \
+        'positional|path=run|name=files|required=true|repeatable=true'
+
+    bats_run base_cli_parse table_repeat -- run target-only
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required positional 'files' was not provided"* ]]
+    base_cli_parse table_repeat -- run target one
+    base_cli_parse table_repeat -- run target one two
+}
+
 @test "run invokes handlers but help and version do not" {
     local handler_calls=0
     demo_handler() {

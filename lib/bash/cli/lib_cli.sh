@@ -1175,7 +1175,7 @@ __base_bash_libs_cli_apply_defaults_and_validate__() {
 }
 
 __base_bash_libs_cli_apply_positionals__() {
-    local model="$1" path="$2" value name index repeatable required default
+    local model="$1" path="$2" value name index repeatable required default repeat_start
 
     __base_bash_libs_cli_collect_positionals__ "$model" "$path"
     if ((${#__base_bash_libs_cli_positional_names[@]} == 0)); then
@@ -1191,12 +1191,13 @@ __base_bash_libs_cli_apply_positionals__() {
         required="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" required)"
         default="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" default)"
         if [[ "$repeatable" =~ ^(1|true|yes)$ ]]; then
+            repeat_start="$index"
             while ((index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})); do
                 value="${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[index]}"
                 __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?
                 ((index++))
             done
-            if ((index == 0)) && [[ "$required" =~ ^(1|true|yes)$ ]]; then
+            if ((index == repeat_start)) && [[ "$required" =~ ^(1|true|yes)$ ]]; then
                 __base_bash_libs_cli_error__ "required positional '$name' was not provided."
                 return $?
             fi
