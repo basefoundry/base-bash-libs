@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
   restores an existing model exactly or removes a partial new model.
 - Rejected unreachable CLI command routes and ancestor/child option collisions,
   including canonical-name, alias, option-name, and option-token conflicts.
+- Rejected application declaration attributes outside each public API's
+  documented context instead of silently accepting and discarding them.
 - Prevented list, CLI, and application call paths from creating or overwriting
   caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised

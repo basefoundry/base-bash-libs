@@ -141,6 +141,50 @@ assert_demo_snapshot() {
     [ "$source" = cli ]
 }
 
+@test "application declaration APIs accept only their documented attributes" {
+    base_app_init alpha name=alpha-app description="Alpha application"
+    [ "${__base_bash_libs_app_models[alpha\|name]}" = alpha-app ]
+    [ "${__base_bash_libs_app_models[alpha\|description]}" = "Alpha application" ]
+
+    base_app_config_define alpha mode string \
+        env=APP_TEST_MODE default=dev required=true secret=true \
+        enum=dev,prod validator=validate_test_label help="Execution mode"
+    [ "${__base_bash_libs_app_config[alpha\|mode\|env]}" = APP_TEST_MODE ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|default]}" = dev ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|required]}" = true ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|secret]}" = true ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|enum]}" = dev,prod ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|validator]}" = validate_test_label ]
+    [ "${__base_bash_libs_app_config[alpha\|mode\|help]}" = "Execution mode" ]
+}
+
+@test "cross-context application attributes fail before model mutation" {
+    base_app_init alpha name=original description="Original model"
+    base_app_config_define alpha existing string default=preserved
+    local before_keys="${__base_bash_libs_app_models[alpha\|config-keys]}"
+
+    if base_app_init alpha env=IGNORED; then
+        false
+    else
+        [ "$?" -eq 2 ]
+    fi
+    [ "${__base_bash_libs_app_models[alpha\|name]}" = original ]
+    [ "${__base_bash_libs_app_models[alpha\|description]}" = "Original model" ]
+    [ "${__base_bash_libs_app_config[alpha\|existing\|default]}" = preserved ]
+
+    if base_app_config_define alpha ignored string name=discarded; then
+        false
+    else
+        [ "$?" -eq 2 ]
+    fi
+    [ -z "${__base_bash_libs_app_config[alpha\|ignored\|type]+set}" ]
+    [ "${__base_bash_libs_app_models[alpha\|config-keys]}" = "$before_keys" ]
+
+    bats_run base_app_config_define alpha another string description=discarded
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"attribute 'description' is not valid"* ]]
+}
+
 @test "missing required configuration and explicitly requested files fail clearly" {
     declare_test_config
     bats_run base_app_config_load demo
