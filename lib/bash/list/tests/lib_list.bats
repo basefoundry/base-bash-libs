@@ -110,6 +110,16 @@ create_script() {
     [ "${values[1]}" = "gamma" ]
 }
 
+@test "base_list_remove preserves a caller scratch variable with the loop-item name" {
+    local __base_bash_libs_list_item=caller-owned
+    local -a values=(alpha beta)
+
+    base_list_remove values alpha
+
+    [ "$__base_bash_libs_list_item" = caller-owned ]
+    [ "${values[*]}" = beta ]
+}
+
 @test "base_list_contains checks membership without printing" {
     local -a values=("alpha" "beta gamma" "")
     local stdout_file="$TEST_TMPDIR/list-contains.out"

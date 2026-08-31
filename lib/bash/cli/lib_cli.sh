@@ -160,17 +160,20 @@ __base_bash_libs_cli_ancestors_for__() {
 }
 
 __base_bash_libs_cli_option_lookup__() {
-    local model="$1" path="$2" token="$3" ancestor
+    local model="$1" path="$2" token="$3"
+    local name_result="$4" path_result="$5" type_result="$6" ancestor found_name
 
-    __base_bash_libs_cli_option_name=""
-    __base_bash_libs_cli_option_path=""
-    __base_bash_libs_cli_option_type=""
+    printf -v "$name_result" '%s' ''
+    printf -v "$path_result" '%s' ''
+    printf -v "$type_result" '%s' ''
     __base_bash_libs_cli_ancestors_for__ "$path"
     for ancestor in "${__base_bash_libs_cli_ancestors[@]}"; do
         if [[ -n "${__base_bash_libs_cli_models["$model|option|$ancestor|token|$token"]+set}" ]]; then
-            __base_bash_libs_cli_option_name="${__base_bash_libs_cli_models["$model|option|$ancestor|token|$token"]}"
-            __base_bash_libs_cli_option_path="$ancestor"
-            __base_bash_libs_cli_option_type="${__base_bash_libs_cli_models["$model|option|$ancestor|meta|$__base_bash_libs_cli_option_name|type"]}"
+            found_name="${__base_bash_libs_cli_models["$model|option|$ancestor|token|$token"]}"
+            printf -v "$name_result" '%s' "$found_name"
+            printf -v "$path_result" '%s' "$ancestor"
+            printf -v "$type_result" '%s' \
+                "${__base_bash_libs_cli_models["$model|option|$ancestor|meta|$found_name|type"]}"
             return 0
         fi
     done
@@ -209,6 +212,7 @@ __base_bash_libs_cli_add_repeat__() {
 __base_bash_libs_cli_validate_value__() {
     local model="$1" path="$2" kind="$3" name="$4" value="$5"
     local enum validator item matched=0
+    local -a __base_bash_libs_cli_enum_values=()
 
     enum=""
     validator=""
@@ -246,6 +250,7 @@ __base_bash_libs_cli_validate_value__() {
 
 __base_bash_libs_cli_collect_options__() {
     local model="$1" path="$2" ancestor name seen_key
+    local -a __base_bash_libs_cli_local_option_names=()
 
     __base_bash_libs_cli_option_names=()
     __base_bash_libs_cli_option_paths=()
@@ -278,6 +283,7 @@ __base_bash_libs_cli_option_declared_for_path__() {
 
 __base_bash_libs_cli_collect_positionals__() {
     local model="$1" path="$2" name
+    local -a __base_bash_libs_cli_local_positionals=()
 
     __base_bash_libs_cli_positional_names=()
     IFS=, read -r -a __base_bash_libs_cli_local_positionals <<< "${__base_bash_libs_cli_models["$model|command|positionals|$path"]-}"
@@ -867,7 +873,7 @@ __base_bash_libs_cli_usage_line__() {
 base_cli_help() {
     local model="${1-}" path="${2-}" child_list child description name alias handler
     local label help_label_width=0 index option_path tokens help metavar required default sensitive
-    local -a help_labels=() help_descriptions=() help_sections=()
+    local -a help_labels=() help_descriptions=() help_sections=() __base_bash_libs_cli_children=()
     local has_commands=0 has_arguments=0
 
     if (($# > 2)); then
@@ -1065,7 +1071,9 @@ __base_bash_libs_cli_apply_positionals__() {
 # base_cli_parse - Parses a model and publishes results in BASE_BASH_LIBS_CLI_RESULT_*.
 # Usage: base_cli_parse model -- [argv...]
 base_cli_parse() {
-    local model="${1-}" current path="" token option_value name type child_path
+    local model="${1-}" current path="" token option_value name type child_path option_path
+    # shellcheck disable=SC2034 # Pass-by-name outputs used only to probe whether an option token is registered.
+    local probe_name probe_path probe_type
     local parse_options=1
 
     if (($# < 2)) || [[ "$2" != -- ]]; then
@@ -1109,12 +1117,10 @@ base_cli_parse() {
                 token="${current%%=*}"
                 option_value="${current#*=}"
             fi
-            if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token"; then
+            if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" name option_path type; then
                 __base_bash_libs_cli_usage_error__ "$model" "$path" "unknown option '$token'."
                 return 2
             fi
-            name="$__base_bash_libs_cli_option_name"
-            type="$__base_bash_libs_cli_option_type"
             if [[ "$type" == flag ]]; then
                 if [[ -n "$option_value" ]]; then
                     __base_bash_libs_cli_usage_error__ "$model" "$path" "flag '$token' does not accept a value."
@@ -1131,13 +1137,14 @@ base_cli_parse() {
                 option_value="$1"
                 shift
                 if [[ "$option_value" != -- && "$option_value" == -* ]]; then
-                    if __base_bash_libs_cli_option_lookup__ "$model" "$path" "$option_value"; then
+                    if __base_bash_libs_cli_option_lookup__ "$model" "$path" "$option_value" \
+                        probe_name probe_path probe_type; then
                         __base_bash_libs_cli_usage_error__ "$model" "$path" "option '$token' requires a value before '$option_value'."
                         return 2
                     fi
                 fi
             fi
-            if ! __base_bash_libs_cli_validate_value__ "$model" "$__base_bash_libs_cli_option_path" option "$name" "$option_value"; then
+            if ! __base_bash_libs_cli_validate_value__ "$model" "$option_path" option "$name" "$option_value"; then
                 __base_bash_libs_cli_usage_error__ "$model" "$path" "invalid value for option '$name'."
                 return 2
             fi
@@ -1203,7 +1210,7 @@ __base_bash_libs_cli_completion_add__() {
 # Usage: base_cli_complete model -- [complete argv including the current prefix]
 base_cli_complete() {
     local model="${1-}" current prefix path="" word token option_path name index
-    local -a words=() completed=() children=()
+    local -a words=() completed=() children=() __base_bash_libs_cli_option_tokens=()
 
     if (($# < 2)) || [[ "$2" != -- ]]; then
         __base_bash_libs_cli_error__ 'base_cli_complete: usage: base_cli_complete <model> -- [words...]'

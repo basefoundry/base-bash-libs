@@ -69,7 +69,7 @@ base_list_prepend() {
 base_list_remove() {
     base_std_assert_arg_count "$#" 2
     __base_bash_libs_std_assert_public_variable_names__ base_list_remove "${1-}" || return 1
-    local __base_bash_libs_list_array_name="$1" __base_bash_libs_list_needle="$2"
+    local __base_bash_libs_list_array_name="$1" __base_bash_libs_list_needle="$2" __base_bash_libs_list_item
     local -a __base_bash_libs_list_current=() __base_bash_libs_list_filtered=()
 
     base_std_assert_variable_name "$__base_bash_libs_list_array_name"

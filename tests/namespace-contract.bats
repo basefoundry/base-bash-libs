@@ -68,6 +68,44 @@ setup() {
     [[ "$output" == *"collision-safe=yes"* ]]
 }
 
+@test "representative public calls do not create undeclared internal scratch globals" {
+    run env -i PATH="$PATH" bash --noprofile --norc -c '
+        source "$1/std/lib_std.sh"
+        declare -a init_args=()
+        base_init init_args --source "$1/tests/namespace-contract.bats" --
+        base_std_import list/lib_list.sh cli/lib_cli.sh app/lib_app.sh
+
+        before="$(compgen -A variable | LC_ALL=C sort | grep "^__base_bash_libs_" || true)"
+
+        declare -a values=(alpha beta)
+        base_list_remove values alpha
+
+        base_cli_model_init scope name=scope
+        base_cli_command scope admin "Administration"
+        base_cli_command scope admin/user "User"
+        base_cli_option scope admin/user color value --color enum=blue,green
+        base_cli_positional scope admin/user target required=true
+        base_cli_help scope >/dev/null
+        base_cli_help scope admin/user >/dev/null
+        base_cli_parse scope -- admin user target --color green
+        base_cli_complete scope -- admin user -- >/dev/null
+
+        base_app_init app
+        base_app_config_define app mode enum enum=dev,prod default=dev
+        base_app_config_load app
+
+        after="$(compgen -A variable | LC_ALL=C sort | grep "^__base_bash_libs_" || true)"
+        if [[ "$after" != "$before" ]]; then
+            printf "internal scratch variable set changed:\n"
+            diff <(printf "%s\n" "$before") <(printf "%s\n" "$after") || true
+            exit 1
+        fi
+    ' bash "$BASE_BASH_DIR"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == "" ]]
+}
+
 @test "source files contain no legacy generic function definitions or guards" {
     run bash -c '
         for file in "$1"/*/lib_*.sh; do

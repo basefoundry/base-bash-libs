@@ -112,6 +112,7 @@ __base_bash_libs_app_trim__() {
 
 __base_bash_libs_app_validate_value__() {
     local model="$1" key="$2" value="$3" type enum validator item
+    local -a __base_bash_libs_app_enum_values=()
     type="${__base_bash_libs_app_config["$model|$key|type"]-}"
     enum="${__base_bash_libs_app_config["$model|$key|enum"]-}"
     validator="${__base_bash_libs_app_config["$model|$key|validator"]-}"

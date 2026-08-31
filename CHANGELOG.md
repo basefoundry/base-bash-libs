@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Prevented list, CLI, and application call paths from creating or overwriting
+  caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised
   commands by limiting job-control setup to the caller command rather than its
   short-lived timeout watchdog.
