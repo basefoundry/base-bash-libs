@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Enforced required repeatable positional tails based on values consumed by the
+  repeatable itself, independent of earlier fixed positional arguments.
 - Made table-driven CLI declaration transactional so any late semantic error
   restores an existing model exactly or removes a partial new model.
 - Rejected unreachable CLI command routes and ancestor/child option collisions,
