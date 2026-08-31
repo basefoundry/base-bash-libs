@@ -52,6 +52,20 @@ commit_is_full_sha() {
     [[ "${1-}" =~ ^[[:xdigit:]]{40}$ ]]
 }
 
+file_contains_once() {
+    local path="$1" value="$2" count
+    count="$(LC_ALL=C grep -oF -- "$value" "$path" | wc -l | tr -d '[:space:]')"
+    [[ "$count" == 1 ]]
+}
+
+metadata_value() {
+    local path="$1" key="$2"
+    local -a values=()
+    mapfile -t values < <(sed -n "s/^${key}=//p" "$path")
+    ((${#values[@]} == 1)) || return 1
+    printf '%s' "${values[0]}"
+}
+
 repo_is_clean() {
     local status
     status="$(git -C "$repo_root" status --porcelain 2> /dev/null)" || return 1
@@ -286,21 +300,75 @@ build_artifact() {
 }
 
 verify_artifact() {
-    local output="${1-}" archive sums sbom provenance expected path actual temp root_name
+    local output="${1-}" archive sums sbom provenance version
+    local archive_name sums_name sbom_name provenance_name selected
+    local expected path actual line checksum_pattern line_number=0 temp root_name entry
+    local provenance_subject provenance_parameters provenance_dependency provenance_reproducible
+    local sbom_name_record sbom_namespace sbom_package
+    local embedded_version bundle_version bundle_commit release_version release_commit archive_sha
+    local -a archives=() sums_files=() sboms=() provenances=() required_paths=()
+    local -A checksum_seen=()
     [[ -d "$output" ]] || {
         error "Artifact directory does not exist: $output"
         return 2
     }
-    archive="$(find "$output" -type f -name 'base-bash-libs-v*.tar.gz' -print | sed -n '1p')"
-    sbom="$(find "$output" -type f -name 'base-bash-libs-v*.spdx.json' -print | sed -n '1p')"
-    provenance="$(find "$output" -type f -name 'base-bash-libs-v*.provenance.json' -print | sed -n '1p')"
-    sums="$(find "$output" -type f -name 'base-bash-libs-v*.SHA256SUMS' -print | sed -n '1p')"
-    [[ -f "$archive" && -f "$sbom" && -f "$provenance" && -f "$sums" ]] || {
-        error 'Artifact directory must contain archive, SBOM, provenance, and checksum assets.'
+    output="$(cd -- "$output" && pwd -P)" || return 2
+    mapfile -t archives < <(find "$output" -name 'base-bash-libs-v*.tar.gz' -print)
+    mapfile -t sboms < <(find "$output" -name 'base-bash-libs-v*.spdx.json' -print)
+    mapfile -t provenances < <(find "$output" -name 'base-bash-libs-v*.provenance.json' -print)
+    mapfile -t sums_files < <(find "$output" -name 'base-bash-libs-v*.SHA256SUMS' -print)
+    if ((${#archives[@]} != 1 || ${#sboms[@]} != 1 || ${#provenances[@]} != 1 || ${#sums_files[@]} != 1)); then
+        error 'Artifact directory must contain exactly one archive, SBOM, provenance, and checksum asset.'
+        return 1
+    fi
+    archive="${archives[0]}"
+    sbom="${sboms[0]}"
+    provenance="${provenances[0]}"
+    sums="${sums_files[0]}"
+    for selected in "$archive" "$sbom" "$provenance" "$sums"; do
+        [[ "${selected%/*}" == "$output" && ! -L "$selected" ]] || {
+            error 'Canonical release assets must be regular files in the artifact directory root.'
+            return 1
+        }
+    done
+
+    archive_name="${archive##*/}"
+    version="${archive_name#base-bash-libs-v}"
+    version="${version%.tar.gz}"
+    version_is_supported "$version" || {
+        error "Archive version is not supported: $version"
         return 1
     }
-    while read -r expected path; do
-        [[ -n "$expected" && -n "$path" ]] || continue
+    sbom_name="base-bash-libs-v$version.spdx.json"
+    provenance_name="base-bash-libs-v$version.provenance.json"
+    sums_name="base-bash-libs-v$version.SHA256SUMS"
+    [[ "${sbom##*/}" == "$sbom_name" && "${provenance##*/}" == "$provenance_name" && "${sums##*/}" == "$sums_name" ]] || {
+        error 'Archive, SBOM, provenance, and checksum filenames do not identify the same version.'
+        return 1
+    }
+
+    required_paths=("$archive_name" "$sbom_name" "$provenance_name")
+    checksum_pattern='^([0-9a-f]{64})  ([^[:space:]/]+)$'
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line_number=$((line_number + 1))
+        [[ "$line" =~ $checksum_pattern ]] || {
+            error "Malformed checksum entry at line $line_number."
+            return 1
+        }
+        expected="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[2]}"
+        case "$path" in
+        "$archive_name" | "$sbom_name" | "$provenance_name") ;;
+        *)
+            error "Unexpected or unsafe checksum entry: $path"
+            return 1
+            ;;
+        esac
+        [[ -z "${checksum_seen[$path]+present}" ]] || {
+            error "Duplicate checksum entry: $path"
+            return 1
+        }
+        checksum_seen[$path]=1
         [[ -f "$output/$path" ]] || {
             error "Checksum entry is missing: $path"
             return 1
@@ -311,12 +379,50 @@ verify_artifact() {
             return 1
         }
     done < "$sums"
-    grep -F '"reproducible": true' "$provenance" > /dev/null || {
-        error 'Provenance does not declare a reproducible build.'
+    for path in "${required_paths[@]}"; do
+        [[ -n "${checksum_seen[$path]+present}" ]] || {
+            error "Checksum manifest does not cover mandatory asset: $path"
+            return 1
+        }
+    done
+    ((${#checksum_seen[@]} == ${#required_paths[@]})) || {
+        error 'Checksum manifest does not describe exactly the mandatory release assets.'
         return 1
     }
-    grep -F '"spdxVersion": "SPDX-2.3"' "$sbom" > /dev/null || {
-        error 'SBOM is not SPDX 2.3.'
+
+    archive_sha="$(hash_file "$archive")" || return 1
+    provenance_subject="  \"subject\": [{\"name\": \"$archive_name\", \"digest\": {\"sha256\": \"$archive_sha\"}}],"
+    provenance_parameters="      \"externalParameters\": {\"version\": \"$version\", \"sourceCommit\": \""
+    provenance_dependency='      "resolvedDependencies": [{"uri": "git+https://github.com/basefoundry/base-bash-libs.git", "digest": {"sha1": "'
+    provenance_reproducible='    "runDetails": {"builder": {"id": "base-bash-libs/release-artifact"}, "metadata": {"reproducible": true}}'
+    file_contains_once "$provenance" "$provenance_subject" || {
+        error 'Provenance subject does not bind to the selected archive and digest.'
+        return 1
+    }
+    file_contains_once "$provenance" "$provenance_parameters" || {
+        error 'Provenance does not identify the selected release version exactly once.'
+        return 1
+    }
+    file_contains_once "$provenance" '"sourceCommit":' || {
+        error 'Provenance source commit is missing or ambiguous.'
+        return 1
+    }
+    file_contains_once "$provenance" "$provenance_dependency" || {
+        error 'Provenance source dependency is missing or ambiguous.'
+        return 1
+    }
+    file_contains_once "$provenance" "$provenance_reproducible" || {
+        error 'Provenance does not declare one canonical reproducible build.'
+        return 1
+    }
+
+    sbom_name_record="  \"name\": \"base-bash-libs-v$version-sbom\","
+    file_contains_once "$sbom" '"spdxVersion": "SPDX-2.3"' || {
+        error 'SBOM does not identify one SPDX 2.3 document.'
+        return 1
+    }
+    file_contains_once "$sbom" "$sbom_name_record" || {
+        error 'SBOM name does not identify the selected release version.'
         return 1
     }
     temp="$(mktemp -d "${TMPDIR:-/tmp}/base-bash-release-verify.XXXXXX")" || return 1
@@ -325,24 +431,115 @@ verify_artifact() {
         error 'Unable to list release archive.'
         return 1
     fi
-    if grep -E '(^/|(^|/)\.\.?/)' "$temp/list" > /dev/null; then
+    if ! tar -tvzf "$archive" > "$temp/verbose-list" || grep -Ev '^-' "$temp/verbose-list" > /dev/null; then
+        rm -rf -- "$temp"
+        error 'Release archive must contain only regular files.'
+        return 1
+    fi
+    if grep -E '(^/|(^|/)\.\.?(/|$))' "$temp/list" > /dev/null; then
         rm -rf -- "$temp"
         error 'Release archive contains an unsafe path.'
         return 1
     fi
     root_name="$(sed -n '1s#/.*##p' "$temp/list")"
-    [[ -n "$root_name" ]] || {
+    [[ "$root_name" == "base-bash-libs-v$version" ]] || {
         rm -rf -- "$temp"
-        error 'Release archive has no root directory.'
+        error 'Release archive root does not identify the selected version.'
         return 1
     }
+    while IFS= read -r entry || [[ -n "$entry" ]]; do
+        [[ "$entry" == "$root_name/"* ]] || {
+            rm -rf -- "$temp"
+            error 'Release archive contains more than one root or an unsafe member.'
+            return 1
+        }
+    done < "$temp/list"
+    if [[ -n "$(LC_ALL=C sort "$temp/list" | uniq -d | sed -n '1p')" ]]; then
+        rm -rf -- "$temp"
+        error 'Release archive contains a duplicate member.'
+        return 1
+    fi
     tar -xzf "$archive" -C "$temp" || {
         rm -rf -- "$temp"
+        return 1
+    }
+    [[ -d "$temp/$root_name" && ! -L "$temp/$root_name" ]] || {
+        rm -rf -- "$temp"
+        error 'Release archive root is not a regular directory.'
         return 1
     }
     "$repo_root/scripts/library-bundle" verify "$temp/$root_name" > /dev/null || {
         rm -rf -- "$temp"
         error 'Embedded bundle verification failed.'
+        return 1
+    }
+    [[ -f "$temp/$root_name/VERSION" ]] || {
+        rm -rf -- "$temp"
+        error 'Embedded release version metadata is missing.'
+        return 1
+    }
+    embedded_version="$(< "$temp/$root_name/VERSION")"
+    bundle_version="$(metadata_value "$temp/$root_name/BUNDLE.release" source_version)" || bundle_version=''
+    bundle_commit="$(metadata_value "$temp/$root_name/BUNDLE.release" source_commit)" || bundle_commit=''
+    release_version="$(metadata_value "$temp/$root_name/lib/bash/base-bash-libs.release" version)" || release_version=''
+    release_commit="$(metadata_value "$temp/$root_name/lib/bash/base-bash-libs.release" commit)" || release_commit=''
+    [[ "$embedded_version" == "$version" && "$bundle_version" == "$version" && "$release_version" == "$version" ]] || {
+        rm -rf -- "$temp"
+        error 'Version identity disagrees across filenames and embedded release metadata.'
+        return 1
+    }
+    [[ -n "$bundle_commit" && "$bundle_commit" == "$release_commit" ]] || {
+        rm -rf -- "$temp"
+        error 'Source commit identity disagrees across embedded release metadata.'
+        return 1
+    }
+    commit_is_full_sha "$bundle_commit" || {
+        rm -rf -- "$temp"
+        error 'Embedded source commit is not a full SHA.'
+        return 1
+    }
+    provenance_parameters="${provenance_parameters}${bundle_commit}\", \"dirtyState\": \"clean\"},"
+    provenance_dependency="${provenance_dependency}${bundle_commit}\"}}]"
+    file_contains_once "$provenance" "$provenance_parameters" || {
+        rm -rf -- "$temp"
+        error 'Provenance version and source commit disagree with embedded release metadata.'
+        return 1
+    }
+    file_contains_once "$provenance" "$provenance_dependency" || {
+        rm -rf -- "$temp"
+        error 'Provenance dependency digest disagrees with embedded release metadata.'
+        return 1
+    }
+    sbom_namespace="  \"documentNamespace\": \"https://github.com/basefoundry/base-bash-libs/releases/v$version/$bundle_commit\","
+    sbom_package="  \"packages\": [{\"SPDXID\": \"SPDXRef-Package\", \"name\": \"base-bash-libs\", \"versionInfo\": \"$version\", \"downloadLocation\": \"https://github.com/basefoundry/base-bash-libs/releases/tag/v$version\", \"licenseConcluded\": \"Apache-2.0\", \"licenseDeclared\": \"Apache-2.0\"}],"
+    file_contains_once "$sbom" "$sbom_namespace" || {
+        rm -rf -- "$temp"
+        error 'SBOM namespace disagrees with the release version or source commit.'
+        return 1
+    }
+    file_contains_once "$sbom" "$sbom_package" || {
+        rm -rf -- "$temp"
+        error 'SBOM package identity disagrees with the selected release version.'
+        return 1
+    }
+    write_provenance "$temp/expected.provenance.json" "$version" "$bundle_commit" "$archive_name" "$archive_sha" || {
+        rm -rf -- "$temp"
+        error 'Unable to reconstruct canonical release provenance.'
+        return 1
+    }
+    cmp -s -- "$provenance" "$temp/expected.provenance.json" || {
+        rm -rf -- "$temp"
+        error 'Provenance statement is not the canonical record for the selected artifact.'
+        return 1
+    }
+    write_sbom "$temp/expected.spdx.json" "$version" "$bundle_commit" "$temp/$root_name" || {
+        rm -rf -- "$temp"
+        error 'Unable to reconstruct the canonical release SBOM.'
+        return 1
+    }
+    cmp -s -- "$sbom" "$temp/expected.spdx.json" || {
+        rm -rf -- "$temp"
+        error 'SBOM is not the canonical record for the selected artifact.'
         return 1
     }
     rm -rf -- "$temp"
