@@ -22,7 +22,7 @@ concurrency_fail() {
 
 concurrency_worker() {
     local worker_id="$1"
-    local worker_dir output expected
+    local worker_dir output expected attempt
     trap - EXIT
     # shellcheck disable=SC2034 # base_init publishes into this caller-owned array by name.
     local -a init_args=()
@@ -38,6 +38,12 @@ concurrency_worker() {
     expected="worker-$worker_id"
     [[ "$output" == "$expected" ]] || return 1
     [[ -d "$worker_dir" ]] || return 1
+    # Repeated short-lived supervised commands stress Bash's process-group
+    # setup while every worker is active. The watchdog must never become a
+    # second job-control race for commands that finish immediately.
+    for ((attempt = 1; attempt <= 4; attempt += 1)); do
+        base_std_run --no-exit --quiet --timeout 5 true || return $?
+    done
     # Async function subshells do not consistently deliver inherited EXIT
     # traps on every supported Bash release. Invoke the shared dispatcher
     # explicitly so the cleanup assertion remains portable and deterministic.

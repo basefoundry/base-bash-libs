@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Eliminated an intermittent macOS Bash process-group race in supervised
+  commands by limiting job-control setup to the caller command rather than its
+  short-lived timeout watchdog.
+
 ## [2.0.0] - 2026-08-15
 
 The v2.0.0-rc.1 candidate was published and verified before this GA release.

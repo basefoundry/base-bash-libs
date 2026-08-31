@@ -2381,19 +2381,21 @@ __base_bash_libs_std_run_with_timeout_supervisor__() {
                 __base_bash_libs_std_timeout_command_wrapper__ <&- 2> /dev/null &
             fi
             __base_bash_libs_std_timeout_command_pid=$!
-            __base_bash_libs_std_timeout_watchdog__ "$__base_bash_libs_std_timeout_seconds" \
-                "$__base_bash_libs_std_timeout_path" "$__base_bash_libs_std_timeout_timer_fd" \
-                "$__base_bash_libs_std_timeout_command_pid" \
-                "$__base_bash_libs_std_timeout_timer_status_file" 2> /dev/null &
-            __base_bash_libs_std_timeout_timer_pid=$!
             # Remove the process-group sentinel from Bash's job table before
             # escalation. Its terminal status is carried by the private
             # record, so no job-table wait is needed and Bash cannot leak a
             # `Killed: 9` notification when the group is deliberately killed.
             builtin disown "$__base_bash_libs_std_timeout_command_pid" 2> /dev/null || true
-            # Both asynchronous jobs already have their isolated process
-            # groups. Disable monitor notifications while they are reaped.
+            # Only caller argv needs an isolated process group. Disable monitor
+            # mode before starting the short-lived watchdog so Bash does not
+            # race its exit while assigning an unnecessary second process
+            # group on macOS.
             set +m
+            __base_bash_libs_std_timeout_watchdog__ "$__base_bash_libs_std_timeout_seconds" \
+                "$__base_bash_libs_std_timeout_path" "$__base_bash_libs_std_timeout_timer_fd" \
+                "$__base_bash_libs_std_timeout_command_pid" \
+                "$__base_bash_libs_std_timeout_timer_status_file" 2> /dev/null &
+            __base_bash_libs_std_timeout_timer_pid=$!
         fi
     fi
 
