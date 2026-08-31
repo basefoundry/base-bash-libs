@@ -95,6 +95,21 @@ __base_bash_libs_app_attr_allowed__() {
     esac
 }
 
+__base_bash_libs_app_restrict_attrs__() {
+    local owner="$1" allowed="$2" key
+
+    for key in "${!__base_bash_libs_app_attrs[@]}"; do
+        __base_bash_libs_app_attr_allowed__ "$key" || return $?
+        case ",$allowed," in
+        *,"$key",*) ;;
+        *)
+            __base_bash_libs_app_error__ "$owner: attribute '$key' is not valid for this declaration."
+            return 2
+            ;;
+        esac
+    done
+}
+
 __base_bash_libs_app_validate_bool__() {
     [[ "${1-}" =~ ^(0|1|true|false|yes|no|on|off)$ ]]
 }
@@ -248,6 +263,7 @@ __base_bash_libs_app_cleanup_dispatch__() {
 }
 
 # base_app_init - Initializes an optional application policy model.
+# Usage: base_app_init MODEL [name=APP_KEY] [description=TEXT]
 base_app_init() {
     local model="${1-}" key
 
@@ -261,9 +277,7 @@ base_app_init() {
     }
     shift
     __base_bash_libs_app_parse_attrs__ "$@" || return $?
-    for key in "${!__base_bash_libs_app_attrs[@]}"; do
-        __base_bash_libs_app_attr_allowed__ "$key" || return $?
-    done
+    __base_bash_libs_app_restrict_attrs__ base_app_init 'name,description' || return $?
     if [[ -n "${__base_bash_libs_app_attrs[name]+set}" ]] &&
         ! __base_bash_libs_app_valid_key__ "${__base_bash_libs_app_attrs[name]}"; then
         __base_bash_libs_app_error__ 'base_app_init: name must be a lowercase application key.'
@@ -304,6 +318,9 @@ base_app_init() {
 }
 
 # base_app_config_define - Defines one typed configuration value.
+# Usage: base_app_config_define MODEL KEY TYPE [env=NAME] [default=VALUE]
+#        [required=BOOL] [secret=BOOL] [enum=A,B] [validator=FUNCTION]
+#        [help=TEXT]
 base_app_config_define() {
     local model="${1-}" key="${2-}" type="${3-}" argument config_key
     local -a attrs=()
@@ -333,9 +350,8 @@ base_app_config_define() {
     shift 3
     for argument; do attrs+=("$argument"); done
     __base_bash_libs_app_parse_attrs__ "${attrs[@]+${attrs[@]}}" || return $?
-    for argument in "${!__base_bash_libs_app_attrs[@]}"; do
-        __base_bash_libs_app_attr_allowed__ "$argument" || return $?
-    done
+    __base_bash_libs_app_restrict_attrs__ base_app_config_define \
+        'env,default,required,secret,enum,validator,help' || return $?
     if [[ -n "${__base_bash_libs_app_attrs[env]+set}" ]] &&
         ! __base_bash_libs_app_valid_identifier__ "${__base_bash_libs_app_attrs[env]}"; then
         __base_bash_libs_app_error__ "configuration '$key' has an invalid environment variable name."

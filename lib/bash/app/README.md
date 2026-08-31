@@ -11,6 +11,12 @@ unknown, or explicitly requested missing file is an error.
 
 ## Configuration
 
+`base_app_init MODEL` accepts only `name=APP_KEY` and `description=TEXT`.
+`base_app_config_define MODEL KEY TYPE` accepts `env=NAME`, `default=VALUE`,
+`required=BOOL`, `secret=BOOL`, `enum=A,B`, `validator=FUNCTION`, and
+`help=TEXT`. Attributes from one declaration context are rejected in the
+other with usage status `2`.
+
 ```bash
 base_app_init deploy name=deploy description="Example application"
 base_app_config_define deploy channel enum \
