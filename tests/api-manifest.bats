@@ -50,3 +50,20 @@ setup() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"dependency cycle"* ]]
 }
+
+@test "manifest version uses the shared post-GA v2 release policy" {
+    local manifest="$TEST_TMPDIR/manifest.yaml"
+
+    sed 's/manifest_version: 2.0.0/manifest_version: 2.1.0/' \
+        "$BASE_REPO_ROOT/base_api_manifest.yaml" > "$manifest"
+    run "$BASE_REPO_ROOT/scripts/api-manifest" check "$manifest"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"generated API reference is stale"* ]]
+    [[ "$output" != *"supported Base Bash v2 release policy"* ]]
+
+    sed 's/manifest_version: 2.0.0/manifest_version: 2.01.0/' \
+        "$BASE_REPO_ROOT/base_api_manifest.yaml" > "$manifest"
+    run "$BASE_REPO_ROOT/scripts/api-manifest" check "$manifest"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"supported Base Bash v2 release policy"* ]]
+}

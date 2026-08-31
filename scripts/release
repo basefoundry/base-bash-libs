@@ -2,45 +2,32 @@
 
 # Repository-owned release policy guard for the Base Bash v2 release line.
 
+release_script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || exit 1
+# shellcheck source=release-version-policy.sh
+source "$release_script_dir/release-version-policy.sh" || exit 1
+
 release_usage() {
     cat >&2 << 'EOF'
 Usage:
   scripts/release <check|plan|notes|refs|publish> --version <version> [options]
 
 Allowed release identifiers:
-  2.0.0-alpha.N
-  2.0.0-beta.N
-  2.0.0-rc.N
-  2.0.0
+  2.MINOR.PATCH
+  2.MINOR.PATCH-alpha.N
+  2.MINOR.PATCH-beta.N
+  2.MINOR.PATCH-rc.N
 
-N must be a positive integer without leading zeroes. Prerelease publication is
-available after the verified release-artifact contract has landed; GA remains
-locked until the pre-GA release-candidate gates are complete.
+MINOR and PATCH are non-negative integers without leading zeroes. N is a
+positive integer without leading zeroes. Stable and approved prerelease
+publication use the same verified-artifact and immutable-tag gates.
 
 The refs command is a read-only preflight that fails closed when the candidate
-tag already exists locally or on origin. GA publication is available only
-after the reviewed RC artifact, first-party consumer, and rollback gates are
-complete.
+tag already exists locally or on origin. Published tags are immutable.
 EOF
 }
 
 release_error() {
     printf 'ERROR: %s\n' "$*" >&2
-}
-
-release_version_kind() {
-    local version="${1-}"
-    local prerelease_re='^2[.]0[.]0-(alpha|beta|rc)[.]([1-9][0-9]*)$'
-
-    if [[ "$version" == "2.0.0" ]]; then
-        printf 'ga\n'
-        return 0
-    fi
-    if [[ "$version" =~ $prerelease_re ]]; then
-        printf 'prerelease\n'
-        return 0
-    fi
-    return 1
 }
 
 release_check_tag_refs() {
@@ -208,9 +195,9 @@ main() {
         return 2
     fi
 
-    release_version_kind "$version" > /dev/null || {
-        release_error "Version '$version' is outside the Base Bash v2.0.0 release line."
-        release_error "Use 2.0.0-alpha.N, 2.0.0-beta.N, 2.0.0-rc.N, or 2.0.0."
+    base_bash_release_version_supported "$version" || {
+        release_error "Version '$version' is outside the supported Base Bash v2 release policy."
+        release_error "Use 2.MINOR.PATCH or an approved alpha.N, beta.N, or rc.N prerelease."
         return 1
     }
 
