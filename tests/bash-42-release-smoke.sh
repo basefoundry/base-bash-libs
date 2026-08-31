@@ -45,7 +45,8 @@ git() {
 
 main() {
     local expected_major="${1-}" expected_minor="${2-}" expected_patch="${3-}"
-    local script_dir repo_root release_script release_driver capture_path output_path
+    local script_dir repo_root release_script release_driver release_artifact
+    local capture_path output_path artifact_output source_commit
 
     if (($# != 0 && $# != 3)); then
         release_smoke_fail "usage: $0 [expected-major expected-minor expected-patch]"
@@ -94,8 +95,7 @@ main() {
         "$release_script" check --version 1.5.0 || return 1
 
     rm -f -- "$capture_path"
-    "$release_script" publish --version 2.0.0 --yes > "$output_path" 2>&1
-    if (($? != 0)); then
+    if ! "$release_script" publish --version 2.0.0 --yes > "$output_path" 2>&1; then
         release_smoke_fail "GA release command was not delegated."
         return 1
     fi
@@ -106,7 +106,27 @@ main() {
     release_smoke_expect_blocked "$capture_path" "$output_path" \
         "$release_script" publish --version 2.0.0 --manifest --dry-run --yes || return 1
 
-    printf 'Bash release-guard smoke passed on Bash %s.\n' "$BASH_VERSION"
+    # The release-artifact verifier is part of the minimum-Bash trust boundary,
+    # not only a modern-host validation path. Remove the release-driver Git
+    # seam before building and verifying a canonical offline fixture.
+    unset -f git
+    release_artifact="$repo_root/scripts/release-artifact"
+    artifact_output="$release_smoke_dir/artifact"
+    source_commit="$(command git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2> /dev/null)" || {
+        release_smoke_fail "unable to resolve the source commit for artifact verification."
+        return 1
+    }
+    if ! "$release_artifact" build --version 2.0.0 --commit "$source_commit" \
+        --output "$artifact_output" > "$output_path" 2>&1; then
+        release_smoke_fail "canonical artifact build failed on Bash $BASH_VERSION."
+        return 1
+    fi
+    if ! "$release_artifact" verify "$artifact_output" > "$output_path" 2>&1; then
+        release_smoke_fail "canonical artifact verification failed on Bash $BASH_VERSION."
+        return 1
+    fi
+
+    printf 'Bash release and artifact smoke passed on Bash %s.\n' "$BASH_VERSION"
     return 0
 }
 
