@@ -156,8 +156,10 @@ rollback_bundle() {
 }
 
 verify_destination() {
-    local destination="$1" expected path actual lock_hash
-    [[ -f "$destination/base-bash-libs.lock" && -f "$destination/MANIFEST.sha256" ]] || {
+    local destination="$1" expected path actual lock_hash lock_version lock_commit
+    local bundle_version bundle_commit
+    [[ -f "$destination/base-bash-libs.lock" && -f "$destination/MANIFEST.sha256" &&
+        -f "$destination/BUNDLE.release" ]] || {
         error "vendor destination lacks lock or hash metadata: $destination"
         return 1
     }
@@ -176,6 +178,18 @@ verify_destination() {
     lock_hash="$(sed -n 's/^manifest_sha256=//p' "$destination/base-bash-libs.lock" | sed -n '1p')"
     [[ "$lock_hash" == "$(hash_file "$destination/MANIFEST.sha256")" ]] || {
         error 'vendor lock does not match MANIFEST.sha256'
+        return 1
+    }
+    lock_version="$(sed -n 's/^version=//p' "$destination/base-bash-libs.lock" | sed -n '1p')"
+    lock_commit="$(sed -n 's/^source_commit=//p' "$destination/base-bash-libs.lock" | sed -n '1p')"
+    bundle_version="$(sed -n 's/^source_version=//p' "$destination/BUNDLE.release" | sed -n '1p')"
+    bundle_commit="$(sed -n 's/^source_commit=//p' "$destination/BUNDLE.release" | sed -n '1p')"
+    [[ -n "$lock_version" && "$lock_version" == "$bundle_version" ]] || {
+        error 'vendor lock version does not match BUNDLE.release'
+        return 1
+    }
+    [[ -n "$lock_commit" && "$lock_commit" == "$bundle_commit" ]] || {
+        error 'vendor lock source commit does not match BUNDLE.release'
         return 1
     }
     printf 'Vendor lock and hashes are valid: %s\n' "$destination"
@@ -202,10 +216,11 @@ standalone_bundle() {
     fi
     # Put the verified framework at the standalone root so the copied
     # launcher resolves lib/bash without ambient environment variables, and
-    # retain an explicit vendor copy for provenance/audit consumers.
+    # retain an independently locked vendor copy for provenance/audit consumers.
     if ! copy_tree "$framework_bundle" "$temporary" ||
         ! mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
         ! copy_tree "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
+        ! write_lock "$temporary/vendor/base-bash-libs" "$framework_bundle" standalone ||
         ! cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" ||
         ! chmod +x "$temporary/bin/base-bash" "$temporary/bin/app"; then
         rm -rf -- "$temporary"

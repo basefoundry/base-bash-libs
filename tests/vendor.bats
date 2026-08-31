@@ -48,7 +48,14 @@ setup() {
     [ "$status" -eq 0 ]
     [ -x "$standalone/bin/base-bash" ]
     [ -x "$standalone/bin/app" ]
-    [ -f "$standalone/vendor/base-bash-libs/base-bash-libs.lock" ] || true
+    [ -f "$standalone/vendor/base-bash-libs/base-bash-libs.lock" ]
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" verify "$standalone/vendor/base-bash-libs"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Vendor lock and hashes are valid"* ]]
+    [ "$(sed -n 's/^version=//p' "$standalone/vendor/base-bash-libs/base-bash-libs.lock")" = \
+        "$(sed -n 's/^source_version=//p' "$standalone/vendor/base-bash-libs/BUNDLE.release")" ]
+    [ "$(sed -n 's/^source_commit=//p' "$standalone/vendor/base-bash-libs/base-bash-libs.lock")" = \
+        "$(sed -n 's/^source_commit=//p' "$standalone/vendor/base-bash-libs/BUNDLE.release")" ]
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/app" run
     [ "$status" -eq 0 ]
     [[ "$output" == *"hello=world"* ]]

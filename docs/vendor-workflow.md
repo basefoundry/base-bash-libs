@@ -28,8 +28,18 @@ scripts/vendor standalone . /tmp/base-bash-libs-v2 dist/app
 PATH="$PWD/dist/app/bin:$PATH" dist/app/bin/app --help
 ```
 
-The standalone payload contains the verified launcher and framework under its
-own root plus an auditable vendor copy and `BASE_BASH_STANDALONE.release`. The
-launcher resolves its colocated `lib/bash` tree, so runtime network access and
-ambient `BASE_BASH_LIBS_DIR` are unnecessary. No command downloads, executes,
-or evaluates remote content.
+The standalone payload contains two deterministic copies of the same verified
+framework bundle. The root copy is the authoritative runtime layout and is
+bound by `BASE_BASH_STANDALONE.release`; the launcher resolves its colocated
+`lib/bash` tree without ambient `BASE_BASH_LIBS_DIR`. The
+`vendor/base-bash-libs` copy is the authoritative audit/vendor layout and has
+its own `base-bash-libs.lock`, so consumers can verify it independently:
+
+```bash
+scripts/vendor verify dist/app/vendor/base-bash-libs
+```
+
+Both copies carry the same `MANIFEST.sha256`, version, and source commit from
+the input bundle. Standalone creation stages the complete payload and its lock
+before one atomic move. No command downloads, executes, or evaluates remote
+content.
