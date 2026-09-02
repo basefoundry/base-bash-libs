@@ -19,6 +19,8 @@ and versions are tracked in the repo-root `VERSION` file.
   requirements, consumer project metadata, framework pins, and release gates.
 - Preserved application lifecycle frames across nested and same-model runs,
   including inner-to-outer exit and signal cleanup.
+- Made Git worktree discovery NUL-safe, added exact named path output, and
+  escaped control characters in tabular listings.
 - Made ordinary named-output, string, list, argument, Git, and GitHub APIs
   return status `2` for recoverable caller-contract errors instead of invoking
   fail-fast assertion boundaries.

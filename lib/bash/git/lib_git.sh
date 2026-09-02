@@ -68,44 +68,101 @@ base_git_detect_default_branch() {
     return 1
 }
 
+__base_bash_libs_git_capture_worktree_records__() {
+    local repo_dir="$1" result_name="$2"
+    local __base_bash_libs_git_captured_records_file
+    local -a git_cmd=(git)
+
+    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
+    # This helper is commonly reached through command substitution. Keep the
+    # capture out of the shared EXIT dispatcher so a subshell cannot run the
+    # caller's composed EXIT trap; every return path removes it eagerly below.
+    __base_bash_libs_std_make_internal_temp_file__ --keep \
+        __base_bash_libs_git_captured_records_file worktree-records || return 1
+    if ! "${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain -z \
+        > "$__base_bash_libs_git_captured_records_file" 2> /dev/null; then
+        rm -f -- "$__base_bash_libs_git_captured_records_file" || true
+        return 1
+    fi
+    printf -v "$result_name" '%s' "$__base_bash_libs_git_captured_records_file"
+}
+
+__base_bash_libs_git_release_worktree_records__() {
+    local records_file="$1"
+
+    rm -f -- "$records_file"
+}
+
+__base_bash_libs_git_escape_record_field__() {
+    local value="${1-}"
+
+    value="${value//\\/\\\\}"
+    value="${value//$'\t'/\\t}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    printf '%s' "$value"
+}
+
 base_git_worktree_path_for_branch() {
+    local __base_bash_libs_git_worktree_result_name=""
+
+    if [[ "${1-}" == --result ]]; then
+        (($# >= 2)) || {
+            base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch [--result VAR] <branch> [repo_dir]"
+            return 2
+        }
+        __base_bash_libs_git_worktree_result_name="$2"
+        shift 2
+    fi
     if (($# < 1 || $# > 2)); then
-        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch [--result VAR] <branch> [repo_dir]"
         return 2
     fi
 
-    local branch="$1"
-    local repo_dir="${2:-}"
-    local target_ref="refs/heads/$branch"
-    local line path="" ref output
-    local -a git_cmd=(git)
+    local __base_bash_libs_git_worktree_branch="$1"
+    local __base_bash_libs_git_worktree_repo_dir="${2:-}"
+    local __base_bash_libs_git_worktree_target_ref="refs/heads/$__base_bash_libs_git_worktree_branch"
+    local __base_bash_libs_git_worktree_record __base_bash_libs_git_worktree_path=""
+    local __base_bash_libs_git_worktree_ref __base_bash_libs_git_worktree_matched_path=""
+    local __base_bash_libs_git_worktree_records_file
 
-    [[ -n "$branch" ]] || {
-        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch <branch> [repo_dir]"
+    [[ -n "$__base_bash_libs_git_worktree_branch" ]] || {
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_for_branch [--result VAR] <branch> [repo_dir]"
         return 2
     }
+    if [[ -n "$__base_bash_libs_git_worktree_result_name" ]]; then
+        __base_bash_libs_std_validate_variable_names__ base_git_worktree_path_for_branch "$__base_bash_libs_git_worktree_result_name" || return 2
+        __base_bash_libs_std_assert_writable_output__ base_git_worktree_path_for_branch "$__base_bash_libs_git_worktree_result_name" || return 2
+    fi
 
-    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
-    if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
+    if ! __base_bash_libs_git_capture_worktree_records__ \
+        "$__base_bash_libs_git_worktree_repo_dir" \
+        __base_bash_libs_git_worktree_records_file; then
         base_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
-    while IFS= read -r line; do
-        case "$line" in
+    while IFS= read -r -d '' __base_bash_libs_git_worktree_record; do
+        case "$__base_bash_libs_git_worktree_record" in
         "worktree "*)
-            path="${line#worktree }"
+            __base_bash_libs_git_worktree_path="${__base_bash_libs_git_worktree_record#worktree }"
             ;;
         "branch "*)
-            ref="${line#branch }"
-            if [[ "$ref" == "$target_ref" ]]; then
-                printf '%s\n' "$path"
-                return 0
+            __base_bash_libs_git_worktree_ref="${__base_bash_libs_git_worktree_record#branch }"
+            if [[ "$__base_bash_libs_git_worktree_ref" == "$__base_bash_libs_git_worktree_target_ref" ]]; then
+                __base_bash_libs_git_worktree_matched_path="$__base_bash_libs_git_worktree_path"
+                break
             fi
             ;;
         esac
-    done <<< "$output"
+    done < "$__base_bash_libs_git_worktree_records_file"
+    __base_bash_libs_git_release_worktree_records__ "$__base_bash_libs_git_worktree_records_file"
 
-    return 1
+    [[ -n "$__base_bash_libs_git_worktree_matched_path" ]] || return 1
+    if [[ -n "$__base_bash_libs_git_worktree_result_name" ]]; then
+        printf -v "$__base_bash_libs_git_worktree_result_name" '%s' "$__base_bash_libs_git_worktree_matched_path"
+    else
+        printf '%s\n' "$__base_bash_libs_git_worktree_matched_path"
+    fi
 }
 
 base_git_list_worktree_branches() {
@@ -115,34 +172,33 @@ base_git_list_worktree_branches() {
     fi
 
     local repo_dir="${1:-}"
-    local line path="" branch="" output
-    local -a git_cmd=(git)
+    local record path="" branch="" records_file escaped_path
 
-    [[ -z "$repo_dir" ]] || git_cmd=(git -C "$repo_dir")
-    if ! output="$("${git_cmd[@]+"${git_cmd[@]}"}" worktree list --porcelain 2>&1)"; then
+    if ! __base_bash_libs_git_capture_worktree_records__ "$repo_dir" records_file; then
         base_std_log_error -l base_bash_libs.git "Unable to list Git worktrees."
         return 1
     fi
-    output+=$'\n'
 
-    while IFS= read -r line; do
-        case "$line" in
+    while IFS= read -r -d '' record; do
+        case "$record" in
         "")
             if [[ -n "$path" && -n "$branch" ]]; then
                 branch="${branch#refs/heads/}"
-                printf '%s\t%s\n' "$path" "$branch"
+                escaped_path="$(__base_bash_libs_git_escape_record_field__ "$path")"
+                printf '%s\t%s\n' "$escaped_path" "$branch"
             fi
             path=""
             branch=""
             ;;
         "worktree "*)
-            path="${line#worktree }"
+            path="${record#worktree }"
             ;;
         "branch "*)
-            branch="${line#branch }"
+            branch="${record#branch }"
             ;;
         esac
-    done <<< "$output"
+    done < "$records_file"
+    __base_bash_libs_git_release_worktree_records__ "$records_file"
 }
 
 base_git_branch_upstream() {
