@@ -398,6 +398,7 @@ __base_bash_libs_git_pull_with_retry__() {
 #
 base_git_update_repo() {
     if (($# < 1 || $# > 3)); then
+        base_std_log_error -l base_bash_libs.git "Invalid argument count."
         base_std_log_info -l base_bash_libs.git "Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"
         return 2
     fi

@@ -534,6 +534,7 @@ setup() {
     capture_command base_git_update_repo
 
     [ "$status" -eq 2 ]
+    [[ "$output" == *"Invalid argument count."* ]]
     [[ "$output" == *"Usage: base_git_update_repo /path/to/repo [allowed_dirty_path] [expected_branch]"* ]]
     [[ "$output" != *"Usage: update_repo"* ]]
 }
