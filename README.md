@@ -9,8 +9,9 @@
 | `2.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0) |
 
 The v2.0.0 release is published with a deterministic bundle archive, checksum
-manifest, SPDX SBOM, and provenance statement. First-party consumer and
-Homebrew pins are being promoted to the exact GA commit as part of issue #240.
+manifest, SPDX SBOM, and provenance statement. First-party consumers and
+Homebrew are pinned to the exact GA commit; the coordinated cutover is recorded
+in the completed issue #240.
 
 Reusable Bash standard library for reliable shell scripts.
 
@@ -151,11 +152,12 @@ Pin the checkout to the full current release commit instead of consuming the
 moving default branch:
 
 ```bash
+mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs checkout --detach \
-  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+  b4243765726c133499feeabdc50154f99c0fec12
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
-  2c5ef2c3a9edfbe2cf68d0645be65b920255abff
+  b4243765726c133499feeabdc50154f99c0fec12
 ```
 
 Source the stdlib from that checkout:
