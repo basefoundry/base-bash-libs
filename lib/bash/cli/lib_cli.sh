@@ -1479,8 +1479,8 @@ base_cli_result_get() {
         __base_bash_libs_cli_error__ 'base_cli_result_get: usage: base_cli_result_get <key> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_cli_result_get "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_get "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_get "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_get "$result_name" || return 2
     [[ -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$key]+set}" ]] || return 1
     printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$key]}"
 }
@@ -1493,8 +1493,8 @@ base_cli_result_get_positional() {
         __base_bash_libs_cli_error__ 'base_cli_result_get_positional: usage: base_cli_result_get_positional <index> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_cli_result_get_positional "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_get_positional "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_get_positional "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_get_positional "$result_name" || return 2
     ((index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})) || return 1
     printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[index]}"
 }
@@ -1507,7 +1507,7 @@ base_cli_result_count() {
         __base_bash_libs_cli_error__ 'base_cli_result_count: usage: base_cli_result_count <key> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_cli_result_count "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_count "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_count "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_count "$result_name" || return 2
     printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_REPEATABLE_COUNTS[$key]-0}"
 }

@@ -102,7 +102,7 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"result variable 'options' is readonly"* ]]
 }
 
@@ -135,7 +135,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${__base_bash_libs_arg_options[sentinel]}" = "keep" ]
     [ "${__base_bash_libs_arg_positionals[0]}" = "sentinel" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
@@ -156,7 +156,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${actual_options[sentinel]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
@@ -167,7 +167,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${actual_options[sentinel]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
     [ "${__base_bash_libs_arg_repeatable_name[0]}" = "saved" ]
@@ -186,7 +186,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
 
     if base_arg_parse options positionals options -- --verbose 2>/dev/null; then
@@ -194,7 +194,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
 
@@ -203,7 +203,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
     [ "${specs[0]}" = "verbose|flag|--verbose|-v" ]
@@ -221,7 +221,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
     [ "${include[0]}" = "saved" ]
 
@@ -231,7 +231,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${options[existing]}" = "keep" ]
     [ "${positionals[0]}" = "old" ]
     [ "${include[0]}" = "include|repeatable|--include" ]
@@ -400,12 +400,12 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_arg_parse: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
-@test "base_arg_parse asserts caller-owned array declarations" {
+@test "base_arg_parse validates caller-owned array declarations without exiting" {
     local script="$TEST_TMPDIR/arg-invalid-array-vars.sh"
 
     create_script "$script" <<EOF
@@ -420,8 +420,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Variable 'options' must be an associative array declared by the caller."* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"variable 'options' must be a caller-declared associative array."* ]]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
@@ -435,8 +435,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Variable 'positionals' must be an indexed array declared by the caller."* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"variable 'positionals' must be a caller-declared indexed array."* ]]
 }
 
 @test "base_arg_parse rejects malformed specs" {

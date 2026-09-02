@@ -70,12 +70,14 @@ create_script() {
                 declare -a app_args=()
                 base_init app_args --
                 source "$3"
-                "$4"
-                exit $?
+                if "$4"; then status=0; else status=$?; fi
+                printf "after\n"
+                exit "$status"
             ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/str/lib_str.sh" "$function_name"
 
-            [ "$status" -eq 1 ]
+            [ "$status" -eq 2 ]
             [[ "$output" != *"unbound variable"* ]]
+            [[ "$output" == *"after"* ]]
         done
     done
 }
@@ -123,7 +125,7 @@ create_script() {
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$value" = "Alpha" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'value' is readonly"* ]]
 }
@@ -141,14 +143,14 @@ create_script() {
             readonly "$3"
             base_str_lower "$3"
             case $? in
-                1) ;;
+                2) ;;
                 *) exit 99 ;;
             esac
             printf "value=%s\n" "${!3}"
-            exit 1
+            exit 2
         ' bash "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/str/lib_str.sh" "$candidate"
 
-        [ "$status" -eq 1 ]
+        [ "$status" -eq 2 ]
         [[ "$output" == *"result variable '$candidate' is readonly"* ]]
         [[ "$output" == *"value=MiXeD"* ]]
         [[ "$output" != *"readonly variable"* ]]
@@ -169,8 +171,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_trim: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -201,16 +203,16 @@ source "$BASE_BASH_DIR/str/lib_str.sh"
 EOF
 
     bats_run bash "$script" base_str_contains "needle-only"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Argument count mismatch: expected 2 but got 1 arguments"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_contains: usage"* ]]
 
     bats_run bash "$script" base_str_starts_with "value" "prefix" "extra"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Argument count mismatch: expected 2 but got 3 arguments"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_starts_with: usage"* ]]
 
     bats_run bash "$script" base_str_ends_with
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Argument count mismatch: expected 2 but got 0 arguments"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_ends_with: usage"* ]]
 }
 
 @test "base_str_split stores delimited fields in a named array" {
@@ -260,8 +262,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_split: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -297,7 +299,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${#values[@]}" -eq 2 ]
     [ "${values[0]}" = "alpha" ]
     [ "${values[1]}" = "beta" ]
@@ -333,7 +335,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$__base_bash_libs_str_var_name" = "Mixed Case" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
 }
@@ -353,7 +355,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$actual" = "Mixed Case" ]
 
     if base_str_join __base_bash_libs_str_join_result_name , values 2>"$stderr_file"; then
@@ -361,7 +363,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$joined" = "keep" ]
 
     if base_str_join joined , __base_bash_libs_str_join_values 2>"$stderr_file"; then
@@ -369,7 +371,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$joined" = "keep" ]
     [ "${__base_bash_libs_str_join_values[*]}" = "alpha beta" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
@@ -389,8 +391,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_join: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 
     script="$TEST_TMPDIR/str-join-invalid-result.sh"
@@ -405,8 +407,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_str_join: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -427,8 +429,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
@@ -441,7 +443,7 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
 
 }

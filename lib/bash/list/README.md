@@ -52,8 +52,8 @@ caller state.
 For `base_list_unique` and `base_list_length`, the result and source variable names must
 be distinct. An alias is rejected before the source is changed.
 
-Append and prepend usage errors return status `2`; validation and operational
-failures return without terminating the caller.
+Usage and caller-contract errors return status `2`. Predicate misses and
+operational failures return `1`; validation never terminates the caller.
 
 ## Tests
 

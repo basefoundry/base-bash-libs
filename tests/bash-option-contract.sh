@@ -246,6 +246,9 @@ contract_std_api_smoke() {
     contract_quiet_success "base_std_print_message" base_std_print_message "expected output"
     base_std_print_tty "non-interactive output"
 
+    contract_expect_status "base_std_command_path invalid output" 2 \
+        contract_quiet_call base_std_command_path not-valid bash
+
     base_std_run --no-exit --quiet "$BASH" -c 'exit 0'
     contract_expect_status "base_std_run recoverable failure" 7 \
         contract_quiet_call base_std_run --no-exit --quiet "$BASH" -c 'exit 7'
@@ -388,7 +391,9 @@ contract_str_api_smoke() {
     contract_assert_equal "base_str_join" "alpha||omega|" "$contract_joined"
     base_str_join contract_joined "|" contract_empty_parts
     contract_assert_equal "base_str_join empty array" "" "$contract_joined"
-    contract_expect_status "base_str_lower usage" 1 contract_quiet_subshell base_str_lower
+    contract_expect_status "base_str_lower usage" 2 contract_quiet_call base_str_lower
+    contract_expect_status "base_str_lower invalid output" 2 \
+        contract_quiet_call base_str_lower not-valid
 }
 
 contract_list_api_smoke() {
@@ -413,6 +418,10 @@ contract_list_api_smoke() {
     base_list_length contract_length contract_empty
     contract_assert_equal "base_list_length empty array" 0 "$contract_length"
     contract_expect_status "base_list_append usage" 2 contract_quiet_subshell base_list_append
+    # shellcheck disable=SC2034 # List validation consumes this scalar by name.
+    local contract_not_an_array=unchanged
+    contract_expect_status "base_list_append caller contract" 2 \
+        contract_quiet_call base_list_append contract_not_an_array value
 }
 
 contract_arg_api_smoke() {
@@ -467,7 +476,7 @@ contract_file_api_smoke() {
     contract_expect_status "base_file_section_exists usage" 2 contract_quiet_call base_file_section_exists
     contract_expect_status "base_file_section_needs_update usage" 2 \
         contract_quiet_call base_file_section_needs_update
-    contract_expect_status "base_file_update_file_section usage" 1 contract_quiet_call base_file_update_file_section
+    contract_expect_status "base_file_update_file_section usage" 2 contract_quiet_call base_file_update_file_section
 }
 
 contract_git_stub() {
@@ -574,6 +583,8 @@ contract_git_gh_api_smoke() {
         base_git_check_script_up_to_date "$contract_tmp/missing-script"
 
     contract_expect_status "base_git_detect_default_branch usage" 2 contract_quiet_call base_git_detect_default_branch
+    contract_expect_status "base_git_detect_default_branch caller contract" 2 \
+        contract_quiet_call base_git_detect_default_branch /contract/repo not-valid
     contract_expect_status "base_git_worktree_path_for_branch usage" 2 contract_quiet_call base_git_worktree_path_for_branch
     contract_expect_status "base_git_list_worktree_branches usage" 2 \
         contract_quiet_call base_git_list_worktree_branches one two
@@ -683,6 +694,8 @@ contract_git_gh_api_smoke() {
         contract_quiet_call base_gh_report_command_failure
     contract_expect_status "base_gh_repo_from_remote_url usage" 2 \
         contract_quiet_call base_gh_repo_from_remote_url
+    contract_expect_status "base_gh_repo_from_remote_url caller contract" 2 \
+        contract_quiet_call base_gh_repo_from_remote_url owner/repo not-valid
     contract_expect_status "base_gh_infer_repo_from_origin usage" 2 \
         contract_quiet_call base_gh_infer_repo_from_origin
     contract_expect_status "base_gh_repo_default_branch usage" 2 \

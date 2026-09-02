@@ -419,7 +419,7 @@ EOF
     bats_run base_git_get_current_branch "$repo" "bad-name"
 
     [ "$status" -eq 2 ]
-    [[ "$output" == *"base_git_get_current_branch: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" == *"base_git_get_current_branch: one or more variable names are invalid"* ]]
     [[ "$output" != *"invalid variable name"* ]]
 }
 

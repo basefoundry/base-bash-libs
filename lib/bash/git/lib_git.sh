@@ -48,7 +48,7 @@ base_git_detect_default_branch() {
         base_std_log_error -l base_bash_libs.git "Usage: base_git_detect_default_branch <repo_dir> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_git_detect_default_branch "${2-}" || return 2
+    __base_bash_libs_std_validate_variable_names__ base_git_detect_default_branch "${2-}" || return 2
 
     local __base_bash_libs_git_detect_repo_dir="$1"
     local __base_bash_libs_git_detect_result_name="$2"
@@ -58,7 +58,6 @@ base_git_detect_default_branch() {
         base_std_log_error -l base_bash_libs.git "Usage: base_git_detect_default_branch <repo_dir> <result_variable_name>"
         return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_git_detect_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_git_detect_default_branch "$__base_bash_libs_git_detect_result_name" || return 2
 
     if __base_bash_libs_git_detect_branch="$(__base_bash_libs_git_detect_default_branch__ "$__base_bash_libs_git_detect_repo_dir")"; then
@@ -455,7 +454,7 @@ base_git_get_current_branch() {
         base_std_log_error -l base_bash_libs.git "Usage: base_git_get_current_branch <directory> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_git_get_current_branch "${2-}" || return 2
+    __base_bash_libs_std_validate_variable_names__ base_git_get_current_branch "${2-}" || return 2
 
     local __base_bash_libs_git_branch_target_dir="$1"
     local __base_bash_libs_git_branch_result_name="$2"
