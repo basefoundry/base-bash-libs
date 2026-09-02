@@ -422,7 +422,7 @@ EOF
     [ "$status" -eq 2 ]
 
     capture_command base_file_update_file_section "$target" "# BEGIN" $'# END\nextra' "new"
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [ "$(cat "$target")" = $'plain\ncontent' ]
 }
 
