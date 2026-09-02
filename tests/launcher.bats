@@ -16,6 +16,14 @@ create_script() {
     chmod +x "$script_path"
 }
 
+launcher_file_mode() {
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
+}
+
 @test "base-bash shebang preloads stdlib and calls main with filtered args" {
     local script_dir="$TEST_TMPDIR/scripts"
     local script="$script_dir/tool"
@@ -113,6 +121,96 @@ SCRIPT
     printf 'user edit\n' >> "$project_dir/README.md"
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
     [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing to overwrite existing file"* ]]
+}
+
+@test "base-bash init reconciles minimal scaffold modes under restrictive umask" {
+    local project_dir="$TEST_TMPDIR/generated"
+    local previous_umask
+
+    mkdir -p "$project_dir"
+    previous_umask="$(umask)"
+    umask 077
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    umask "$previous_umask"
+    [ "$status" -eq 0 ]
+    [ "$(launcher_file_mode "$project_dir/bin/app")" = 755 ]
+    [ "$(launcher_file_mode "$project_dir/tests/app.bats")" = 755 ]
+    [ "$(launcher_file_mode "$project_dir/README.md")" = 644 ]
+
+    chmod 0644 "$project_dir/bin/app" "$project_dir/tests/app.bats"
+    chmod 0755 "$project_dir/README.md"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+
+    [ "$status" -eq 0 ]
+    [ "$(launcher_file_mode "$project_dir/bin/app")" = 755 ]
+    [ "$(launcher_file_mode "$project_dir/tests/app.bats")" = 755 ]
+    [ "$(launcher_file_mode "$project_dir/README.md")" = 644 ]
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
+    [ "$status" -eq 0 ]
+}
+
+@test "base-bash init reconciles standard profile executable modes" {
+    local project_dir="$TEST_TMPDIR/generated" path
+    local -a executable_paths=(bin/app tests/app.bats tests/run.sh tools/shfmt-check.sh)
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    chmod 0644 "${executable_paths[@]/#/$project_dir/}"
+    chmod 0755 "$project_dir/Makefile"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
+
+    [ "$status" -eq 0 ]
+    for path in "${executable_paths[@]}"; do
+        [ "$(launcher_file_mode "$project_dir/$path")" = 755 ]
+    done
+    [ "$(launcher_file_mode "$project_dir/Makefile")" = 644 ]
+}
+
+@test "base-bash init keeps failed new-file chmod atomic and recoverable" {
+    local project_dir="$TEST_TMPDIR/generated"
+    local stub_dir="$TEST_TMPDIR/stub-bin"
+    local real_chmod
+
+    mkdir -p "$project_dir" "$stub_dir"
+    real_chmod="$(command -v chmod)"
+    cat >"$stub_dir/chmod" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${2-}" == */bin/app.base-bash-init.* ]]; then
+    exit 9
+fi
+exec "${REAL_CHMOD:?}" "$@"
+EOF
+    chmod +x "$stub_dir/chmod"
+
+    bats_run env REAL_CHMOD="$real_chmod" PATH="$stub_dir:$PATH" BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" \
+        "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+
+    [ "$status" -eq 1 ]
+    [ ! -e "$project_dir/bin/app" ]
+    [ -z "$(find "$project_dir/bin" -name 'app.base-bash-init.*' -print -quit)" ]
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    [ "$(launcher_file_mode "$project_dir/bin/app")" = 755 ]
+}
+
+@test "base-bash init still refuses matching symlink targets" {
+    local project_dir="$TEST_TMPDIR/generated"
+    local target="$TEST_TMPDIR/README.target"
+
+    mkdir -p "$project_dir"
+    "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    mv "$project_dir/README.md" "$target"
+    ln -s "$target" "$project_dir/README.md"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+
+    [ "$status" -eq 2 ]
+    [ -L "$project_dir/README.md" ]
     [[ "$output" == *"refusing to overwrite existing file"* ]]
 }
 
