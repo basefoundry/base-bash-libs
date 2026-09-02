@@ -1231,7 +1231,7 @@ base_cli_parse() {
     local model="${1-}" current path="" token option_value name type child_path option_path
     # shellcheck disable=SC2034 # Pass-by-name outputs used only to probe whether an option token is registered.
     local probe_name probe_path probe_type
-    local parse_options=1
+    local parse_options=1 parse_commands=1
 
     if (($# < 2)) || [[ "$2" != -- ]]; then
         __base_bash_libs_cli_error__ 'base_cli_parse: usage: base_cli_parse <model> -- [args...]'
@@ -1249,6 +1249,7 @@ base_cli_parse() {
         shift
         if ((parse_options)) && [[ "$current" == -- ]]; then
             parse_options=0
+            parse_commands=0
             continue
         fi
         if ((parse_options)) && [[ "$current" == -h || "$current" == --help ]]; then
@@ -1312,12 +1313,15 @@ base_cli_parse() {
             fi
             continue
         fi
-        child_path="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$current")"
-        if [[ -n "$child_path" ]]; then
-            path="$child_path"
-            continue
+        if ((parse_commands)); then
+            child_path="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$current")"
+            if [[ -n "$child_path" ]]; then
+                path="$child_path"
+                continue
+            fi
         fi
         BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$current")
+        parse_commands=0
     done
     BASE_BASH_LIBS_CLI_RESULT_COMMAND="$path"
     if [[ -n "${__base_bash_libs_cli_models["$model|command|children|$path"]-}" &&

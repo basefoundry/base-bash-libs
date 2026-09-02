@@ -19,6 +19,7 @@ base_bashly_run() {
     shift
 
     [[ "$model" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || return 2
+    [[ "${1-}" == -- ]] && shift
     base_cli_run "$model" -- "$@"
 }
 

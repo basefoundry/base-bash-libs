@@ -239,6 +239,37 @@ EOF
     [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = "--looks-like-option" ]
 }
 
+@test "double dash keeps command names and aliases as root positionals" {
+    base_cli_model_init boundary name=boundary
+    base_cli_command boundary run "Run" aliases=r
+    base_cli_positional boundary '' target required=true repeatable=true
+
+    base_cli_parse boundary -- -- run
+
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = "" ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = run ]
+
+    base_cli_parse boundary -- literal r
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = "" ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 2 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = literal ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = r ]
+}
+
+@test "positional collection closes command resolution before later command-like words" {
+    base_cli_model_init positional_boundary name=positional-boundary
+    base_cli_command positional_boundary run "Run"
+    base_cli_positional positional_boundary '' target required=true repeatable=true
+
+    base_cli_parse positional_boundary -- literal run
+
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = "" ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 2 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = literal ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = run ]
+}
+
 @test "required repeatable positionals count only their own consumed values" {
     base_cli_model_init direct_repeat name=direct-repeat
     base_cli_command direct_repeat run "Run"
