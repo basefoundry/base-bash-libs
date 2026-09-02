@@ -21,6 +21,8 @@ and versions are tracked in the repo-root `VERSION` file.
   including inner-to-outer exit and signal cleanup.
 - Made Git worktree discovery NUL-safe, added exact named path output, and
   escaped control characters in tabular listings.
+- Made repeated project scaffolding restore every expected file mode and stage
+  new-file permissions before the atomic move into place.
 - Made ordinary named-output, string, list, argument, Git, and GitHub APIs
   return status `2` for recoverable caller-contract errors instead of invoking
   fail-fast assertion boundaries.

@@ -451,10 +451,21 @@ __base_bash_libs_launcher_init_emit__() {
             return 2
         fi
         rm -f -- "$temporary"
+        if ! chmod "$mode" "$output_path"; then
+            printf 'ERROR: unable to set mode %s on existing file %s\n' "$mode" "$output_path" >&2
+            return 1
+        fi
         return 0
     fi
-    mv -- "$temporary" "$output_path" || return 1
-    chmod "$mode" "$output_path" || return 1
+    if ! chmod "$mode" "$temporary"; then
+        rm -f -- "$temporary"
+        printf 'ERROR: unable to set mode %s for new file %s\n' "$mode" "$output_path" >&2
+        return 1
+    fi
+    if ! mv -- "$temporary" "$output_path"; then
+        rm -f -- "$temporary"
+        return 1
+    fi
 }
 
 base_launcher_init() {
