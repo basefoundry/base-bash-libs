@@ -476,6 +476,7 @@ __base_bash_libs_std_initialize_runtime_state__() {
     declare -g __base_bash_libs_std_cleanup_dispatcher_installed=0
     declare -g __base_bash_libs_std_cleanup_dispatcher_running=0
     declare -g __base_bash_libs_std_cleanup_dispatcher_finished=0
+    declare -g __base_bash_libs_std_cleanup_status=0
     declare -g __base_bash_libs_std_cleanup_pending_signal_status=0
     declare -g __base_bash_libs_std_cleanup_debug_guard_running=0
     declare -g __base_bash_libs_std_original_exit_trap=""
@@ -2917,6 +2918,7 @@ __base_bash_libs_std_run_cleanup_hooks__() {
     ((__base_bash_libs_std_cleanup_dispatcher_finished)) && return "$exit_status"
     ((__base_bash_libs_std_cleanup_dispatcher_running)) && return "$exit_status"
     __base_bash_libs_std_cleanup_dispatcher_running=1
+    __base_bash_libs_std_cleanup_status="$exit_status"
     trap - DEBUG
 
     if [[ -n "${__base_bash_libs_std_original_exit_trap:-}" ]]; then
