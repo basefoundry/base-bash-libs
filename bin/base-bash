@@ -219,6 +219,8 @@ BASE_BASH_LIBS_DIR=/path/to/base-bash-libs/lib/bash ./bin/app run --dry-run
 The generated executable demonstrates declarative help/version handling,
 subcommands, typed configuration, safe diagnostics, dry-run behavior, and
 exactly-once cleanup hooks. It never evaluates configuration files as shell.
+`VERSION` is the application's user-visible version; `BASE_BASH_LIBS_PIN` and
+the `status` command report the separately pinned framework identity.
 
 Run the local checks with `./tests/run.sh` (standard profile) or inspect the
 single-file application module in `lib/app.sh`.
@@ -281,7 +283,15 @@ __base_bash_libs_launcher_init_write_app_module__() {
 
 base_launcher_import_base_bash_lib cli/lib_cli.sh app/lib_app.sh
 
-base_cli_model_init demo name=demo version=2.0.0 description="Professional Bash application" handler=demo_dispatch
+__base_bash_generated_app_version=""
+# shellcheck disable=SC2154 # bin/app publishes the generated project root.
+__base_bash_generated_app_version="$(sed -n '1p' "$app_project_root/VERSION" || true)"
+if [[ -z "$__base_bash_generated_app_version" ]]; then
+    printf 'ERROR: unable to read the application version from %s\n' "$app_project_root/VERSION" >&2
+    return 1
+fi
+base_cli_model_init demo name=demo version="$__base_bash_generated_app_version" description="Professional Bash application" handler=demo_dispatch
+unset __base_bash_generated_app_version
 base_cli_command demo status "Show application status" handler=demo_dispatch
 base_cli_command demo run "Run the application" handler=demo_dispatch
 base_cli_command demo fail "Exercise failure handling" handler=demo_dispatch
@@ -354,12 +364,28 @@ setup() {
 }
 
 @test "generated application exposes help and version" {
+    local expected_version
+
+    IFS= read -r expected_version <"$project_root/VERSION"
     run "$project_root/bin/app" --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Usage: demo"* ]]
     run "$project_root/bin/app" --version
     [ "$status" -eq 0 ]
-    [[ "$output" == *"2.0.0"* ]]
+    [ "$output" = "demo $expected_version" ]
+}
+
+@test "generated application follows a project version update" {
+    local updated_root="$BATS_TEST_TMPDIR/updated-project"
+
+    mkdir -p "$updated_root"
+    cp -R "$project_root/." "$updated_root"
+    printf '0.2.0\n' >"$updated_root/VERSION"
+
+    run "$updated_root/bin/app" --version
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "demo 0.2.0" ]
 }
 
 @test "generated application runs a subcommand and dry-run" {
@@ -800,6 +826,19 @@ base_launcher_check_project() {
             __base_bash_libs_launcher_project_record__ "$format" OK version "$version"
         else
             __base_bash_libs_launcher_project_record__ "$format" ERROR version "invalid VERSION '$version'"
+            check_status=1
+        fi
+    fi
+    if [[ -r "$project_dir/lib/app.sh" ]]; then
+        # Validate the generated binding statically; project conformance does
+        # not need to execute the application merely to compare its version.
+        if grep -Fqx '__base_bash_generated_app_version="$(sed -n '\''1p'\'' "$app_project_root/VERSION" || true)"' \
+            "$project_dir/lib/app.sh" &&
+            grep -Eq '^base_cli_model_init[[:space:]]+[^[:space:]]+.*[[:space:]]version="[$]__base_bash_generated_app_version"([[:space:]]|$)' \
+                "$project_dir/lib/app.sh"; then
+            __base_bash_libs_launcher_project_record__ "$format" OK application-version "CLI is bound to VERSION ${version:-unknown}"
+        else
+            __base_bash_libs_launcher_project_record__ "$format" ERROR application-version "lib/app.sh is not bound to project VERSION"
             check_status=1
         fi
     fi

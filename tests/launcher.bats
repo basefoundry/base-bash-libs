@@ -115,6 +115,10 @@ SCRIPT
     [ "$status" -eq 0 ]
     [[ "$output" == *"hello=world"* ]]
 
+    bats_run env PATH="$BASE_REPO_ROOT/bin:$PATH" BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$project_dir/bin/app" --version
+    [ "$status" -eq 0 ]
+    [ "$output" = "demo 0.1.0" ]
+
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$project_dir"
     [ "$status" -eq 0 ]
 
@@ -226,6 +230,7 @@ EOF
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
     [ "$status" -eq 0 ]
     [[ "$output" == *"OK project/framework-pin: 2.0.0"* ]]
+    [[ "$output" == *"OK project/application-version: CLI is bound to VERSION 0.1.0"* ]]
     [[ "$output" == *"OK project/namespace:"* ]]
 
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir" --format json
@@ -269,6 +274,28 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"ERROR project/version: invalid VERSION '01.0.0'"* ]]
     [[ "$output" == *"ERROR project/framework-pin: requires a v2 pin, found '2.not-a-version'"* ]]
+}
+
+@test "generated application version follows VERSION and project check detects static divergence" {
+    local project_dir="$TEST_TMPDIR/generated-version"
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    printf '1.2.3-rc.1\n' > "$project_dir/VERSION"
+
+    bats_run env PATH="$BASE_REPO_ROOT/bin:$PATH" BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$project_dir/bin/app" --version
+    [ "$status" -eq 0 ]
+    [ "$output" = "demo 1.2.3-rc.1" ]
+
+    sed 's/version="\$__base_bash_generated_app_version"/version=2.0.0/' \
+        "$project_dir/lib/app.sh" > "$project_dir/lib/app.sh.new"
+    mv "$project_dir/lib/app.sh.new" "$project_dir/lib/app.sh"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir" --format json
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"status":"ERROR","check":"application-version"'* ]]
+    [[ "$output" == *"lib/app.sh is not bound to project VERSION"* ]]
 }
 
 @test "consumer check rejects legacy v1 symbols without executing them" {
