@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Added the isolated Base Bash Demo as an immutable released-package consumer
+  and pinned downstream compatibility canary while keeping independent
+  adoption evidence separate.
+
 ### Security
 
 - Made generated framework provenance fail closed for purported immutable pins

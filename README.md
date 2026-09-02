@@ -63,6 +63,11 @@ provided by [`scripts/library-bundle`](scripts/library-bundle).
 Production-shaped reference applications and transparent startup benchmarks
 are in [`examples/reference-apps`](examples/reference-apps) and
 [`benchmarks/reference-apps.sh`](benchmarks/reference-apps.sh).
+The isolated first-party
+[`base-bash-libs-demo`](https://github.com/basefoundry/base-bash-libs-demo)
+repository consumes the canonical release bundle and runs its Beacon
+application as a downstream compatibility canary. It is regression evidence,
+not an independent-adoption claim.
 For the rest of the documentation, use the map near the end of this README.
 
 ## When to reach for Base Bash
