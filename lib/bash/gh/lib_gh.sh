@@ -831,6 +831,19 @@ __base_bash_libs_gh_api_can_inject_include__() {
     printf -v "$__base_bash_libs_gh_inject_result_name" '%s' "$__base_bash_libs_gh_inject_value"
 }
 
+__base_bash_libs_gh_api_forced_terminal_env__() {
+    local result_name="$1" result=""
+
+    if [[ -n "${GH_FORCE_TTY-}" ]]; then
+        result=GH_FORCE_TTY
+    elif [[ -n "${CLICOLOR_FORCE-}" ]]; then
+        result=CLICOLOR_FORCE
+    elif [[ -n "${FORCE_COLOR-}" ]]; then
+        result=FORCE_COLOR
+    fi
+    printf -v "$result_name" '%s' "$result"
+}
+
 __base_bash_libs_gh_api_unstructured_transport_is_safe__() {
     local __base_bash_libs_gh_transport_result_name="$1" __base_bash_libs_gh_transport_value=1
     local __base_bash_libs_gh_transport_token
@@ -943,7 +956,7 @@ __base_bash_libs_gh_api_call_hook__() {
     # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
     local __base_bash_libs_gh_api_can_inject __base_bash_libs_gh_api_transport_syntax_safe __base_bash_libs_gh_api_transport_allowed
     # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
-    local __base_bash_libs_gh_api_structured_metadata __base_bash_libs_gh_api_metadata_include
+    local __base_bash_libs_gh_api_structured_metadata __base_bash_libs_gh_api_metadata_include __base_bash_libs_gh_api_forced_terminal_env
     # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
     local __base_bash_libs_gh_api_probe_status __base_bash_libs_gh_api_probe_retry
     # shellcheck disable=SC2034 # Deliberate dynamic-scope collision shields.
@@ -1590,6 +1603,7 @@ __base_bash_libs_gh_api_with_retry_impl__() {
     local __base_bash_libs_gh_api_suppress_stdout=0 __base_bash_libs_gh_api_can_inject=0
     local __base_bash_libs_gh_api_transport_syntax_safe=0 __base_bash_libs_gh_api_transport_allowed=0
     local __base_bash_libs_gh_api_structured_metadata=1 __base_bash_libs_gh_api_metadata_include=0
+    local __base_bash_libs_gh_api_forced_terminal_env=""
     local __base_bash_libs_gh_api_stdout="" __base_bash_libs_gh_api_stderr="" __base_bash_libs_gh_api_display=""
     local __base_bash_libs_gh_api_capture_workspace=""
     local __base_bash_libs_gh_api_timeout_path="" __base_bash_libs_gh_api_attempt=1 __base_bash_libs_gh_api_status=0
@@ -1636,11 +1650,15 @@ __base_bash_libs_gh_api_with_retry_impl__() {
 
     __base_bash_libs_gh_api_attempt_argv=("$@")
     if ((__base_bash_libs_gh_api_retry_authorized && !__base_bash_libs_gh_api_include && !__base_bash_libs_gh_api_ambiguous)); then
+        __base_bash_libs_gh_api_forced_terminal_env__ __base_bash_libs_gh_api_forced_terminal_env
         __base_bash_libs_gh_api_can_inject_include__ __base_bash_libs_gh_api_can_inject "$@"
         if ((__base_bash_libs_gh_api_can_inject)); then
             __base_bash_libs_gh_api_injected_include=1
             __base_bash_libs_gh_api_include=1
             __base_bash_libs_gh_api_attempt_argv=(--include "$@")
+        elif [[ -n "$__base_bash_libs_gh_api_forced_terminal_env" ]]; then
+            base_std_log_warn -l base_bash_libs.gh \
+                "base_gh_api_with_retry: $__base_bash_libs_gh_api_forced_terminal_env is set; structured retry metadata is unavailable."
         fi
     fi
     __base_bash_libs_gh_api_unstructured_transport_is_safe__ __base_bash_libs_gh_api_transport_syntax_safe "$@"
