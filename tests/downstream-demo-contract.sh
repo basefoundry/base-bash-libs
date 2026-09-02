@@ -11,11 +11,11 @@ contract_fail() {
 
 grep -Fq 'https://github.com/basefoundry/base-bash-libs-demo' \
     "$contract_root/README.md" || contract_fail "README link is missing"
-grep -Fq '| Base Bash Demo |' "$contract_root/docs/consumer-validation-status.md" || \
+grep -Fq '| Base Bash Demo |' "$contract_root/docs/consumer-validation-status.md" ||
     contract_fail "consumer ledger entry is missing"
-grep -Fq 'repository: basefoundry/base-bash-libs-demo' "$contract_workflow" || \
+grep -Fq 'repository: basefoundry/base-bash-libs-demo' "$contract_workflow" ||
     contract_fail "workflow repository is missing"
-grep -Fq "ref: $contract_pin" "$contract_workflow" || \
+grep -Fq "ref: $contract_pin" "$contract_workflow" ||
     contract_fail "workflow must pin the reviewed demo commit"
 grep -Fq '.downstream/base-bash-libs-demo/tests/candidate-smoke.sh' \
     "$contract_workflow" || contract_fail "candidate smoke invocation is missing"
