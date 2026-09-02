@@ -30,6 +30,9 @@ declare -gA __base_bash_libs_app_staged_provenance=()
 declare -gA __base_bash_libs_app_cli=()
 declare -ga __base_bash_libs_app_keys=()
 declare -ga __base_bash_libs_app_hook_names=()
+declare -ga __base_bash_libs_app_run_models=()
+declare -ga __base_bash_libs_app_run_dispatched=()
+declare -ga __base_bash_libs_app_run_previous_active_models=()
 declare -g BASE_BASH_LIBS_APP_ACTIVE_MODEL=""
 declare -g BASE_BASH_LIBS_APP_LAST_STATUS=0
 declare -g BASE_BASH_LIBS_APP_DRY_RUN=0
@@ -241,15 +244,16 @@ __base_bash_libs_app_hook_dispatch__() {
     done
 }
 
-__base_bash_libs_app_cleanup_dispatch__() {
-    local entry_status=$?
-    local status="${1-}" model="${BASE_BASH_LIBS_APP_ACTIVE_MODEL-}"
-    if [[ -z "$status" ]]; then
-        status=$entry_status
-    fi
+__base_bash_libs_app_run_frame_dispatch__() {
+    local frame_index="$1" status="$2"
+    local model="${__base_bash_libs_app_run_models[$frame_index]-}"
+    local previous_active_model="${BASE_BASH_LIBS_APP_ACTIVE_MODEL-}"
+
     [[ -n "$model" ]] || return "$status"
-    [[ "${__base_bash_libs_app_models["$model|cleanup-dispatched"]-0}" == 1 ]] && return "$status"
+    [[ "${__base_bash_libs_app_run_dispatched[$frame_index]-0}" == 1 ]] && return "$status"
+    __base_bash_libs_app_run_dispatched[$frame_index]=1
     __base_bash_libs_app_models["$model|cleanup-dispatched"]=1
+    BASE_BASH_LIBS_APP_ACTIVE_MODEL="$model"
     case "$status" in
     0) __base_bash_libs_app_hook_dispatch__ "$model" normal "$status" ;;
     129) __base_bash_libs_app_hook_dispatch__ "$model" hup "$status" ;;
@@ -260,6 +264,47 @@ __base_bash_libs_app_cleanup_dispatch__() {
     __base_bash_libs_app_hook_dispatch__ "$model" cleanup "$status"
     __base_bash_libs_app_models["$model|last-status"]="$status"
     BASE_BASH_LIBS_APP_LAST_STATUS="$status"
+    BASE_BASH_LIBS_APP_ACTIVE_MODEL="$previous_active_model"
+    return "$status"
+}
+
+__base_bash_libs_app_cleanup_dispatch__() {
+    local entry_status=$?
+    local status="${1-}" model frame_index
+
+    if [[ -z "$status" ]]; then
+        if [[ "${__base_bash_libs_std_cleanup_dispatcher_running-0}" == 1 ]]; then
+            status="${__base_bash_libs_std_cleanup_status-$entry_status}"
+        else
+            status=$entry_status
+        fi
+    fi
+    if ((${#__base_bash_libs_app_run_models[@]} > 0)); then
+        for ((frame_index = ${#__base_bash_libs_app_run_models[@]} - 1; frame_index >= 0; frame_index--)); do
+            if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
+                :
+            else
+                :
+            fi
+        done
+        return "$status"
+    fi
+
+    # Retain the internal dispatcher fallback used by existing integrations
+    # that set the active model before invoking the shared cleanup boundary.
+    model="${BASE_BASH_LIBS_APP_ACTIVE_MODEL-}"
+    [[ -n "$model" ]] || return "$status"
+    [[ "${__base_bash_libs_app_models["$model|cleanup-dispatched"]-0}" == 1 ]] && return "$status"
+    __base_bash_libs_app_run_models+=("$model")
+    __base_bash_libs_app_run_dispatched+=(0)
+    frame_index=$((${#__base_bash_libs_app_run_models[@]} - 1))
+    if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
+        :
+    else
+        :
+    fi
+    unset '__base_bash_libs_app_run_models[frame_index]'
+    unset '__base_bash_libs_app_run_dispatched[frame_index]'
     return "$status"
 }
 
@@ -701,7 +746,7 @@ base_app_hook() {
 
 # base_app_run - Runs an application handler with exactly-once lifecycle hooks.
 base_app_run() {
-    local model="${1-}" handler="${2-}" status
+    local model="${1-}" handler="${2-}" status frame_index outermost=0
 
     (($# >= 2)) || {
         __base_bash_libs_app_error__ 'base_app_run: usage: base_app_run MODEL HANDLER [ARGS...]'
@@ -713,18 +758,36 @@ base_app_run() {
         __base_bash_libs_app_error__ "base_app_run: handler '$handler' is not defined."
         return 1
     }
+    ((${#__base_bash_libs_app_run_models[@]} == 0)) && outermost=1
+    __base_bash_libs_app_run_previous_active_models+=("${BASE_BASH_LIBS_APP_ACTIVE_MODEL-}")
+    __base_bash_libs_app_run_models+=("$model")
+    __base_bash_libs_app_run_dispatched+=(0)
+    frame_index=$((${#__base_bash_libs_app_run_models[@]} - 1))
     BASE_BASH_LIBS_APP_ACTIVE_MODEL="$model"
+    # shellcheck disable=SC2034 # Published compatibility status for callers.
     BASE_BASH_LIBS_APP_LAST_STATUS=0
     __base_bash_libs_app_models["$model|cleanup-dispatched"]=0
-    base_std_register_cleanup_hook __base_bash_libs_app_cleanup_dispatch__ || return 1
+    if ((outermost)) && ! base_std_register_cleanup_hook __base_bash_libs_app_cleanup_dispatch__; then
+        BASE_BASH_LIBS_APP_ACTIVE_MODEL="${__base_bash_libs_app_run_previous_active_models[$frame_index]-}"
+        unset '__base_bash_libs_app_run_models[frame_index]'
+        unset '__base_bash_libs_app_run_dispatched[frame_index]'
+        unset '__base_bash_libs_app_run_previous_active_models[frame_index]'
+        return 1
+    fi
     "$handler" "${@:3}"
     status=$?
-    __base_bash_libs_app_cleanup_dispatch__ "$status"
-    base_std_unregister_cleanup_hook __base_bash_libs_app_cleanup_dispatch__ || true
-    BASE_BASH_LIBS_APP_ACTIVE_MODEL=""
-    __base_bash_libs_app_models["$model|last-status"]="$status"
-    # shellcheck disable=SC2034 # Published compatibility status for callers.
-    BASE_BASH_LIBS_APP_LAST_STATUS="$status"
+    if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
+        :
+    else
+        :
+    fi
+    BASE_BASH_LIBS_APP_ACTIVE_MODEL="${__base_bash_libs_app_run_previous_active_models[$frame_index]-}"
+    unset '__base_bash_libs_app_run_models[frame_index]'
+    unset '__base_bash_libs_app_run_dispatched[frame_index]'
+    unset '__base_bash_libs_app_run_previous_active_models[frame_index]'
+    if ((outermost)); then
+        base_std_unregister_cleanup_hook __base_bash_libs_app_cleanup_dispatch__ || true
+    fi
     return "$status"
 }
 

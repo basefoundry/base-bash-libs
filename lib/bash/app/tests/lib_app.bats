@@ -257,6 +257,151 @@ assert_demo_snapshot() {
     [ "$status" -eq 7 ]
 }
 
+@test "different-model nested runs restore outer scope and dispatch in completion order" {
+    local events=() outer_status inner_status
+    outer_hook() { events+=("outer:$1:$2"); }
+    inner_hook() { events+=("inner:$1:$2"); }
+    inner_handler() { events+=("inner:handler:$BASE_BASH_LIBS_APP_ACTIVE_MODEL"); }
+    outer_handler() {
+        events+=("outer:before:$BASE_BASH_LIBS_APP_ACTIVE_MODEL")
+        base_app_run inner inner_handler
+        base_app_status inner inner_status
+        events+=("outer:after:$BASE_BASH_LIBS_APP_ACTIVE_MODEL:$BASE_BASH_LIBS_APP_LAST_STATUS:$inner_status")
+    }
+    base_app_init outer
+    base_app_init inner
+    base_app_hook outer normal normal outer_hook
+    base_app_hook outer cleanup cleanup outer_hook
+    base_app_hook inner normal normal inner_hook
+    base_app_hook inner cleanup cleanup inner_hook
+
+    base_app_run outer outer_handler
+    base_app_status outer outer_status
+
+    [ "${events[*]}" = "outer:before:outer inner:handler:inner inner:normal:0 inner:cleanup:0 outer:after:outer:0:0 outer:normal:0 outer:cleanup:0" ]
+    [ "$outer_status" -eq 0 ]
+    [ "$BASE_BASH_LIBS_APP_LAST_STATUS" -eq 0 ]
+    [ -z "$BASE_BASH_LIBS_APP_ACTIVE_MODEL" ]
+    [ "${#__base_bash_libs_app_run_models[@]}" -eq 0 ]
+}
+
+@test "nested failures retain each logical run status and outer lifecycle" {
+    local events=() outer_status inner_status
+    outer_hook() { events+=("outer:$1:$2"); }
+    inner_hook() { events+=("inner:$1:$2"); }
+    inner_handler() { return 7; }
+    outer_handler() {
+        if base_app_run inner inner_handler; then
+            return 99
+        else
+            inner_status=$?
+        fi
+        events+=("outer:after:$BASE_BASH_LIBS_APP_ACTIVE_MODEL:$BASE_BASH_LIBS_APP_LAST_STATUS:$inner_status")
+        return 9
+    }
+    base_app_init outer
+    base_app_init inner
+    base_app_hook outer fatal fatal outer_hook
+    base_app_hook outer cleanup cleanup outer_hook
+    base_app_hook inner fatal fatal inner_hook
+    base_app_hook inner cleanup cleanup inner_hook
+
+    if base_app_run outer outer_handler; then
+        false
+    else
+        [ "$?" -eq 9 ]
+    fi
+    base_app_status outer outer_status
+    base_app_status inner inner_status
+
+    [ "${events[*]}" = "inner:fatal:7 inner:cleanup:7 outer:after:outer:7:7 outer:fatal:9 outer:cleanup:9" ]
+    [ "$inner_status" -eq 7 ]
+    [ "$outer_status" -eq 9 ]
+    [ "$BASE_BASH_LIBS_APP_LAST_STATUS" -eq 9 ]
+    [ -z "$BASE_BASH_LIBS_APP_ACTIVE_MODEL" ]
+}
+
+@test "same-model recursion dispatches one lifecycle per frame" {
+    local events=() model_status
+    same_hook() { events+=("$1:$2:$BASE_BASH_LIBS_APP_ACTIVE_MODEL"); }
+    same_handler() {
+        local depth="$1"
+        events+=("handler:$depth:$BASE_BASH_LIBS_APP_ACTIVE_MODEL")
+        if [[ "$depth" == 0 ]]; then
+            base_app_run same same_handler 1
+            events+=("resumed:$BASE_BASH_LIBS_APP_ACTIVE_MODEL:$BASE_BASH_LIBS_APP_LAST_STATUS")
+        fi
+    }
+    base_app_init same
+    base_app_hook same normal normal same_hook
+    base_app_hook same cleanup cleanup same_hook
+
+    base_app_run same same_handler 0
+    base_app_status same model_status
+
+    [ "${events[*]}" = "handler:0:same handler:1:same normal:0:same cleanup:0:same resumed:same:0 normal:0:same cleanup:0:same" ]
+    [ "$model_status" -eq 0 ]
+    [ -z "$BASE_BASH_LIBS_APP_ACTIVE_MODEL" ]
+}
+
+@test "nested process exit and signal unwind every lifecycle frame inner first" {
+    local script="$TEST_TMPDIR/nested-termination.sh"
+    local events_file="$TEST_TMPDIR/events" mode expected_status expected_phase
+
+    cat >"$script" <<'EOF'
+#!/usr/bin/env bash
+stdlib_path="$1"
+cli_path="$2"
+app_path="$3"
+events_file="$4"
+mode="$5"
+source "$stdlib_path"
+source "$cli_path"
+source "$app_path"
+declare -a init_args=()
+base_init init_args --
+outer_hook() { printf 'outer:%s:%s\n' "$1" "$2" >>"$events_file"; }
+inner_hook() { printf 'inner:%s:%s\n' "$1" "$2" >>"$events_file"; }
+inner_handler() {
+    if [[ "$mode" == exit ]]; then
+        exit 7
+    fi
+    kill -TERM "$$"
+}
+outer_handler() { base_app_run inner inner_handler; }
+base_app_init outer
+base_app_init inner
+base_app_hook outer fatal fatal outer_hook
+base_app_hook outer term term outer_hook
+base_app_hook outer cleanup cleanup outer_hook
+base_app_hook inner fatal fatal inner_hook
+base_app_hook inner term term inner_hook
+base_app_hook inner cleanup cleanup inner_hook
+base_app_run outer outer_handler
+EOF
+    chmod +x "$script"
+
+    for mode in exit term; do
+        : >"$events_file"
+        if [[ "$mode" == exit ]]; then
+            expected_status=7
+            expected_phase=fatal
+        else
+            expected_status=143
+            expected_phase=term
+        fi
+
+        bats_run bash "$script" \
+            "$BASE_BASH_DIR/std/lib_std.sh" \
+            "$BASE_BASH_DIR/cli/lib_cli.sh" \
+            "$BASE_BASH_DIR/app/lib_app.sh" \
+            "$events_file" "$mode"
+
+        [ "$status" -eq "$expected_status" ]
+        [ "$(<"$events_file")" = $'inner:'"$expected_phase:$expected_status"$'\ninner:cleanup:'"$expected_status"$'\nouter:'"$expected_phase:$expected_status"$'\nouter:cleanup:'"$expected_status" ]
+    done
+}
+
 @test "application status is isolated across normal failure signal and never-run models" {
     succeeds() { return 0; }
     fails() { return 7; }

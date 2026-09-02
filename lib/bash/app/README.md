@@ -70,10 +70,19 @@ dispatched at most once per `base_app_run`, and the application status is
 preserved even if a hook fails. `INT`, `TERM`, and `HUP` map to statuses
 130, 143, and 129 respectively.
 
+Runs may nest, including recursive runs of the same model. Each logical run
+owns a separate lifecycle frame. A normally returning inner run dispatches
+before the outer handler resumes; process exit or a signal unwinds every
+active frame from inner to outer with the terminating status.
+
 `base_app_status MODEL RESULT_VARIABLE` returns that model's most recent run or
 signal-derived status. A newly initialized model that has not run reports `0`.
 `BASE_BASH_LIBS_APP_LAST_STATUS` remains the compatibility view of the most
-recently active model, but model-aware callers should use `base_app_status`.
+recently completed logical run, but model-aware callers should use
+`base_app_status`. While handlers run, `BASE_BASH_LIBS_APP_ACTIVE_MODEL` names
+the innermost model and is restored to the outer model when a nested run
+returns. For same-model recursion, the inner status is visible until the outer
+run completes and replaces that model's last status.
 
 The policy module owns no global trap or shell-code strings itself. It uses
 the stdlib's shared cleanup dispatcher and can therefore coexist with other
