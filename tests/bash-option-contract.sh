@@ -496,7 +496,7 @@ contract_git_stub() {
         return 0
         ;;
     worktree)
-        printf 'worktree /contract/worktree\nHEAD 0123456789\nbranch refs/heads/main\n\n'
+        printf 'worktree /contract/worktree\0HEAD 0123456789\0branch refs/heads/main\0\0'
         ;;
     for-each-ref)
         printf 'origin/main\n'

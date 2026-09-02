@@ -15,10 +15,13 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
 - `base_git_detect_default_branch <repo> <result_var>`
   Detect a repository's default branch from its remote HEAD and standard local
   fallbacks.
-- `base_git_worktree_path_for_branch <branch> [repo]`
-  Print the worktree path attached to a local branch.
+- `base_git_worktree_path_for_branch [--result VAR] <branch> [repo]`
+  Print the worktree path attached to a local branch, or store its exact value
+  in `VAR` when it can contain trailing newlines.
 - `base_git_list_worktree_branches [repo]`
-  Print tab-separated worktree path and branch rows.
+  Print tab-separated worktree path and branch rows. Backslash, tab, newline,
+  and carriage-return bytes in paths are escaped as `\\`, `\t`, `\n`, and
+  `\r`, respectively; ordinary paths retain their existing output.
 - `base_git_branch_upstream <repo> <branch>`
   Print the configured upstream ref for a local branch.
 - `base_git_branch_merged_to_ref <repo> <branch> <ref>`
@@ -46,6 +49,9 @@ base_std_import git/lib_git.sh
 branch=""
 base_git_get_current_branch "$PWD" branch
 base_std_log_info "Current branch: $branch"
+
+worktree_path=""
+base_git_worktree_path_for_branch --result worktree_path feature/topic "$PWD"
 ```
 
 ## Behavior Notes
@@ -60,6 +66,9 @@ base_std_log_info "Current branch: $branch"
   `shopt`, `IFS`, `OPTIND`, cwd, umask, traps, or positional parameters.
   Parsing that requires field splitting uses a command-scoped `IFS`, so a
   caller-defined value is preserved.
+- Worktree helpers parse Git's NUL-delimited porcelain format. Use the lookup
+  helper's `--result` form whenever a path may end in one or more newlines;
+  command substitution necessarily strips those bytes from stdout.
 - `base_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
 - `base_git_update_repo` retries `git pull --ff-only` twice by default. Set
   `BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS` to a positive integer to change the retry count.
