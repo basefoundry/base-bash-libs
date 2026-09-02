@@ -24,6 +24,26 @@ launcher_file_mode() {
     fi
 }
 
+copy_launcher_package() {
+    local package_root="$1"
+
+    mkdir -p "$package_root/bin" "$package_root/lib/bash"
+    cp "$BASE_REPO_ROOT/bin/base-bash" "$package_root/bin/base-bash"
+    cp "$BASE_REPO_ROOT/VERSION" "$package_root/VERSION"
+    cp "$BASE_REPO_ROOT/lib/bash/base-bash-libs.release" "$package_root/lib/bash/base-bash-libs.release"
+    chmod +x "$package_root/bin/base-bash"
+}
+
+commit_launcher_package() {
+    local package_root="$1"
+
+    git -C "$package_root" init -q
+    git -C "$package_root" add .
+    env GIT_AUTHOR_NAME=fixture GIT_AUTHOR_EMAIL=fixture@example.invalid \
+        GIT_COMMITTER_NAME=fixture GIT_COMMITTER_EMAIL=fixture@example.invalid \
+        git -C "$package_root" commit -qm fixture
+}
+
 @test "base-bash shebang preloads stdlib and calls main with filtered args" {
     local script_dir="$TEST_TMPDIR/scripts"
     local script="$script_dir/tool"
@@ -229,7 +249,7 @@ EOF
 
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"OK project/framework-pin: 2.0.0"* ]]
+    [[ "$output" == *"project/framework-pin: 2.0.0@"* ]]
     [[ "$output" == *"OK project/application-version: CLI is bound to VERSION 0.1.0"* ]]
     [[ "$output" == *"OK project/namespace:"* ]]
 
@@ -240,6 +260,94 @@ EOF
 
     after="$(find "$project_dir" -type f -exec shasum {} + | sort)"
     [ "$before" = "$after" ]
+}
+
+@test "base-bash init pins clean and detached source checkouts to exact HEAD" {
+    local package_root="$TEST_TMPDIR/package"
+    local project_root="$TEST_TMPDIR/project"
+    local detached_project_root="$TEST_TMPDIR/detached-project"
+    local expected_commit
+
+    copy_launcher_package "$package_root"
+    commit_launcher_package "$package_root"
+    expected_commit="$(git -C "$package_root" rev-parse HEAD)"
+    mkdir -p "$project_root" "$detached_project_root"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" init --dir "$project_root"
+    [ "$status" -eq 0 ]
+    grep -Fx "source_commit=$expected_commit" "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'dirty_state=clean' "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'verification=pin-and-verify-before-update' "$project_root/BASE_BASH_LIBS_PIN"
+
+    git -C "$package_root" checkout --detach -q
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" init --dir "$detached_project_root"
+    [ "$status" -eq 0 ]
+    grep -Fx "source_commit=$expected_commit" "$detached_project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'dirty_state=clean' "$detached_project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'verification=pin-and-verify-before-update' "$detached_project_root/BASE_BASH_LIBS_PIN"
+}
+
+@test "base-bash init marks dirty source checkout provenance as development-unverified" {
+    local package_root="$TEST_TMPDIR/package"
+    local project_root="$TEST_TMPDIR/project"
+    local expected_commit
+
+    copy_launcher_package "$package_root"
+    commit_launcher_package "$package_root"
+    expected_commit="$(git -C "$package_root" rev-parse HEAD)"
+    printf 'dirty\n' > "$package_root/untracked"
+    mkdir -p "$project_root"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" init --dir "$project_root"
+
+    [ "$status" -eq 0 ]
+    grep -Fx "source_commit=$expected_commit" "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'dirty_state=dirty' "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'verification=development-unverified' "$project_root/BASE_BASH_LIBS_PIN"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" check --project "$project_root"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN project/framework-pin:"*"development-unverified"* ]]
+}
+
+@test "base-bash init retains verified release artifact provenance" {
+    local package_root="$TEST_TMPDIR/package"
+    local project_root="$TEST_TMPDIR/project"
+    local expected_commit=1111111111111111111111111111111111111111
+
+    copy_launcher_package "$package_root"
+    printf 'schema_version=1\nversion=2.0.0\ncommit=%s\ndirty_state=clean\nprovenance=release-artifact\n' \
+        "$expected_commit" > "$package_root/lib/bash/base-bash-libs.release"
+    mkdir -p "$project_root"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" init --dir "$project_root"
+
+    [ "$status" -eq 0 ]
+    grep -Fx "source_commit=$expected_commit" "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'dirty_state=clean' "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'verification=pin-and-verify-before-update' "$project_root/BASE_BASH_LIBS_PIN"
+}
+
+@test "base-bash init makes missing identity explicit and project check rejects a false immutable claim" {
+    local package_root="$TEST_TMPDIR/package"
+    local project_root="$TEST_TMPDIR/project"
+
+    copy_launcher_package "$package_root"
+    mkdir -p "$project_root"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" init --dir "$project_root"
+
+    [ "$status" -eq 0 ]
+    grep -Fx 'source_commit=unknown' "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'dirty_state=unknown' "$project_root/BASE_BASH_LIBS_PIN"
+    grep -Fx 'verification=development-unverified' "$project_root/BASE_BASH_LIBS_PIN"
+
+    sed 's/verification=development-unverified/verification=pin-and-verify-before-update/' \
+        "$project_root/BASE_BASH_LIBS_PIN" > "$project_root/BASE_BASH_LIBS_PIN.new"
+    mv "$project_root/BASE_BASH_LIBS_PIN.new" "$project_root/BASE_BASH_LIBS_PIN"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$package_root/bin/base-bash" check --project "$project_root"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ERROR project/framework-pin: inconsistent verification, commit, or dirty-state metadata"* ]]
 }
 
 @test "consumer check accepts canonical application and v2 pin prereleases" {
@@ -256,7 +364,7 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"OK project/version: 10.20.30-rc.7"* ]]
-    [[ "$output" == *"OK project/framework-pin: 2.1.0-beta.3"* ]]
+    [[ "$output" == *"project/framework-pin: 2.1.0-beta.3@"* ]]
 }
 
 @test "consumer check rejects noncanonical application versions and framework pins" {
@@ -273,7 +381,7 @@ EOF
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"ERROR project/version: invalid VERSION '01.0.0'"* ]]
-    [[ "$output" == *"ERROR project/framework-pin: requires a v2 pin, found '2.not-a-version'"* ]]
+    [[ "$output" == *"ERROR project/framework-pin: requires a canonical v2 version, found '2.not-a-version'"* ]]
 }
 
 @test "generated application version follows VERSION and project check detects static divergence" {
