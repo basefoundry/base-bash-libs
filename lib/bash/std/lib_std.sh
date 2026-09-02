@@ -244,8 +244,10 @@ unset __base_bash_libs_std_metadata_file__ __base_bash_libs_std_embedded_commit_
 unset -f __base_bash_libs_std_read_package_version__ __base_bash_libs_std_read_metadata_value__
 
 __base_bash_libs_std_is_supported_version__() {
-    local version="${1-}" version_re='^[0-9]+([.][0-9]+)*(-(alpha|beta|rc)[.][1-9][0-9]*)?$'
-    [[ "$version" =~ $version_re ]]
+    local version="${1-}"
+    local canonical_semver_re='^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(-(alpha|beta|rc)[.]([1-9][0-9]*))?$'
+
+    [[ "$version" =~ $canonical_semver_re ]]
 }
 
 __base_bash_libs_std_version_at_least__() {

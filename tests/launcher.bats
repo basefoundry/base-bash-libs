@@ -139,6 +139,40 @@ SCRIPT
     [ "$before" = "$after" ]
 }
 
+@test "consumer check accepts canonical application and v2 pin prereleases" {
+    local project_dir="$TEST_TMPDIR/generated"
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    printf '10.20.30-rc.7\n' >"$project_dir/VERSION"
+    sed 's/^version=.*/version=2.1.0-beta.3/' "$project_dir/BASE_BASH_LIBS_PIN" >"$project_dir/BASE_BASH_LIBS_PIN.new"
+    mv "$project_dir/BASE_BASH_LIBS_PIN.new" "$project_dir/BASE_BASH_LIBS_PIN"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK project/version: 10.20.30-rc.7"* ]]
+    [[ "$output" == *"OK project/framework-pin: 2.1.0-beta.3"* ]]
+}
+
+@test "consumer check rejects noncanonical application versions and framework pins" {
+    local project_dir="$TEST_TMPDIR/generated"
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    printf '01.0.0\n' >"$project_dir/VERSION"
+    sed 's/^version=.*/version=2.not-a-version/' "$project_dir/BASE_BASH_LIBS_PIN" >"$project_dir/BASE_BASH_LIBS_PIN.new"
+    mv "$project_dir/BASE_BASH_LIBS_PIN.new" "$project_dir/BASE_BASH_LIBS_PIN"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ERROR project/version: invalid VERSION '01.0.0'"* ]]
+    [[ "$output" == *"ERROR project/framework-pin: requires a v2 pin, found '2.not-a-version'"* ]]
+}
+
 @test "consumer check rejects legacy v1 symbols without executing them" {
     local project_dir="$TEST_TMPDIR/legacy"
 

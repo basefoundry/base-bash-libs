@@ -277,10 +277,12 @@ added after the first public release:
 base_require_version 1.1.0
 ```
 
-The helper compares supported SemVer versions, including the v2
-`alpha.N`, `beta.N`, and `rc.N` prerelease identifiers. It returns silently
-when the loaded library is new enough and exits with a clear fatal error when
-the loaded `BASE_BASH_LIBS_VERSION` is too old.
+The helper accepts exactly three canonical decimal core components (for
+example, `1.4.0` or `2.0.0`) with no leading zeroes except the value `0`.
+It also compares the supported `alpha.N`, `beta.N`, and `rc.N` prerelease
+identifiers, where `N` is a positive canonical decimal integer. It returns
+silently when the loaded library is new enough, returns `1` when it is too old,
+and returns `2` when either version is malformed.
 
 ## Logging
 
