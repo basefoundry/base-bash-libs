@@ -1,4 +1,5 @@
 version=2.0.0
 source_commit=unknown
+dirty_state=unknown
 artifact=base-bash-libs
-verification=pin-and-verify-before-update
+verification=development-unverified

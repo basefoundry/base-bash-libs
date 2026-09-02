@@ -41,6 +41,13 @@ The generated app demonstrates declarative commands, typed data-only config,
 redacted diagnostics, dry-run behavior, lifecycle hooks, and status-preserving
 cleanup. It does not evaluate configuration as shell code.
 
+`BASE_BASH_LIBS_PIN` records the exact framework commit when initialization
+runs from a clean checkout or verified release artifact. A dirty checkout or a
+source tree without verifiable identity is recorded as
+`verification=development-unverified`; do not release the generated
+application until that record has been regenerated from a clean, verified
+framework source.
+
 ## 3. Check, test, and bundle
 
 ```bash

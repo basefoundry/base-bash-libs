@@ -9,6 +9,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Security
 
+- Made generated framework provenance fail closed for purported immutable pins
+  while representing dirty or identity-less inputs as explicitly unverified
+  development state.
 - Bound offline release verification to one complete asset set by requiring
   strict checksum coverage and consistent archive, provenance, SBOM, version,
   and source-commit identity.
