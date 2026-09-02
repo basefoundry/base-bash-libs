@@ -568,8 +568,74 @@ EOF
 
     base_require_version "$BASE_BASH_LIBS_VERSION" >"$stdout_file"
     base_require_version "0.1.0" >>"$stdout_file"
+    base_require_version "1.4.0-alpha.1" >>"$stdout_file"
 
     [ ! -s "$stdout_file" ]
+}
+
+@test "canonical SemVer policy agrees across runtime and release boundaries" {
+    local version runtime_status release_status
+    local -a valid_versions=(
+        0.0.0
+        1.4.0
+        1.4.0-alpha.1
+        1.4.0-beta.20
+        1.4.0-rc.3
+        2.0.0
+        10.20.30
+    )
+    local -a invalid_versions=(
+        ""
+        2
+        2.0
+        2.0.0.0
+        02.0.0
+        2.00.0
+        2.0.00
+        2.0.0-alpha.0
+        2.0.0-alpha.01
+        2.0.0-preview.1
+        2.0.0+build.1
+    )
+
+    # shellcheck source=../../../../scripts/release-version-policy.sh
+    source "$BASE_REPO_ROOT/scripts/release-version-policy.sh"
+
+    for version in "${valid_versions[@]}"; do
+        __base_bash_libs_std_is_supported_version__ "$version"
+        base_bash_semver_supported "$version"
+    done
+    for version in "${invalid_versions[@]}"; do
+        runtime_status=0
+        release_status=0
+        __base_bash_libs_std_is_supported_version__ "$version" || runtime_status=$?
+        base_bash_semver_supported "$version" || release_status=$?
+        [ "$runtime_status" -eq 1 ]
+        [ "$release_status" -eq 1 ]
+    done
+}
+
+@test "canonical SemVer precedence covers historical v1 and supported v2 prereleases" {
+    local row actual minimum expected actual_status
+    local -a rows=(
+        '1.4.0|1.3.9|0'
+        '1.4.0-alpha.1|1.4.0-alpha.2|1'
+        '1.4.0-beta.1|1.4.0-alpha.99|0'
+        '1.4.0-rc.1|1.4.0-beta.99|0'
+        '1.4.0|1.4.0-rc.99|0'
+        '2.0.0-alpha.2|2.0.0-alpha.10|1'
+        '2.0.0-beta.1|2.0.0-alpha.99|0'
+        '2.0.0-rc.1|2.0.0-beta.99|0'
+        '2.0.0|2.0.0-rc.99|0'
+        '2.0.0|2.0.1-alpha.1|1'
+    )
+
+    for row in "${rows[@]}"; do
+        IFS='|' read -r actual minimum expected <<<"$row"
+        actual_status=0
+        __base_bash_libs_std_version_at_least__ "$actual" "$minimum" || actual_status=$?
+        [ "$actual_status" -eq "$expected" ]
+    done
 }
 
 @test "base_require_version returns status 1 when the loaded version is too old" {
@@ -607,13 +673,41 @@ EOF
     [[ "$output" == *"base-bash-libs 2.0.1 or newer is required"* ]]
 }
 
-@test "base_require_version returns status 2 for invalid version strings" {
+@test "base_require_version returns status 2 for malformed minimum versions" {
     local script="$TEST_TMPDIR/version-invalid.sh"
+    local -a invalid_versions=(2 2.0 2.0.0.0 02.00.00 2.0.0-alpha.0 2.0.0-alpha.01)
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
-base_require_version "1.two.0"
+for version in "\$@"; do
+    if base_require_version "\$version"; then
+        exit 9
+    elif [[ \$? -ne 2 ]]; then
+        exit 8
+    fi
+done
+EOF
+
+    bats_run bash "$script" "${invalid_versions[@]}"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"base_require_version expects supported SemVer versions"* ]]
+}
+
+@test "base_require_version returns status 2 for a malformed loaded package version" {
+    local package_root="$TEST_TMPDIR/package"
+    local script="$TEST_TMPDIR/loaded-version-invalid.sh"
+
+    mkdir -p "$package_root/lib/bash/std"
+    cp "$STDLIB_PATH" "$package_root/lib/bash/std/lib_std.sh"
+    printf '02.0.0\n' >"$package_root/VERSION"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$package_root/lib/bash/std/lib_std.sh"
+declare -a package_args=()
+base_init package_args --
+base_require_version 1.0.0
 EOF
 
     bats_run bash "$script"

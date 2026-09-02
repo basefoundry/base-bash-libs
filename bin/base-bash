@@ -743,6 +743,13 @@ __base_bash_libs_launcher_project_record__() {
     fi
 }
 
+__base_bash_libs_launcher_is_supported_version__() {
+    local version="${1-}"
+    local canonical_semver_re='^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(-(alpha|beta|rc)[.]([1-9][0-9]*))?$'
+
+    [[ "$version" =~ $canonical_semver_re ]]
+}
+
 base_launcher_check_project() {
     local project_dir="${1:-}" format="${2:-human}" path file version pin_version
     local check_status=0 shellcheck_path shfmt_path bats_path mode
@@ -778,7 +785,7 @@ base_launcher_check_project() {
 
     if [[ -r "$project_dir/VERSION" ]]; then
         IFS= read -r version < "$project_dir/VERSION" || true
-        if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if __base_bash_libs_launcher_is_supported_version__ "$version"; then
             __base_bash_libs_launcher_project_record__ "$format" OK version "$version"
         else
             __base_bash_libs_launcher_project_record__ "$format" ERROR version "invalid VERSION '$version'"
@@ -787,7 +794,8 @@ base_launcher_check_project() {
     fi
     if [[ -r "$project_dir/BASE_BASH_LIBS_PIN" ]]; then
         pin_version="$(sed -n 's/^version=//p' "$project_dir/BASE_BASH_LIBS_PIN" | sed -n '1p')"
-        if [[ "$pin_version" == 2.* ]]; then
+        if __base_bash_libs_launcher_is_supported_version__ "$pin_version" &&
+            [[ "$pin_version" == 2.* ]]; then
             __base_bash_libs_launcher_project_record__ "$format" OK framework-pin "$pin_version"
         else
             __base_bash_libs_launcher_project_record__ "$format" ERROR framework-pin "requires a v2 pin, found '$pin_version'"

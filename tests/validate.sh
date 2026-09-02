@@ -223,6 +223,25 @@ version_kind="$(base_bash_release_version_kind "$version")" || {
     exit 1
 }
 
+release_semver_re="$(
+    sed -n "s/^[[:space:]]*local canonical_semver_re='\([^']*\)'[[:space:]]*$/\1/p" \
+        scripts/release-version-policy.sh
+)"
+[[ -n "$release_semver_re" && "$release_semver_re" != *$'\n'* ]] || {
+    printf 'Release version policy must declare exactly one canonical SemVer grammar.\n' >&2
+    exit 1
+}
+for semver_mirror in lib/bash/std/lib_std.sh bin/base-bash; do
+    mirrored_semver_re="$(
+        sed -n "s/^[[:space:]]*local canonical_semver_re='\([^']*\)'[[:space:]]*$/\1/p" \
+            "$semver_mirror"
+    )"
+    [[ "$mirrored_semver_re" == "$release_semver_re" ]] || {
+        printf 'Canonical SemVer grammar drifted in %s.\n' "$semver_mirror" >&2
+        exit 1
+    }
+done
+
 version_core="${version%%[-+]*}"
 latest_tag_core="0.0.0"
 while IFS= read -r tag; do
