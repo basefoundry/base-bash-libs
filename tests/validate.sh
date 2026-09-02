@@ -101,6 +101,7 @@ required_files=(
     docs/first-party-cutover.md
     scripts/first-party-cutover
     tests/first-party-cutover.bats
+    tests/downstream-demo-contract.sh
 )
 
 cd "$repo_root" || exit 1
@@ -142,6 +143,7 @@ check_no_strict_mode() {
         tests/release-invariants.sh
         tests/validate.sh
         tests/lint-warnings.sh
+        tests/downstream-demo-contract.sh
         scripts/migrate-v2-symbols
         examples/*.sh
         lib/bash/*/lib_*.sh
@@ -464,7 +466,8 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/reference-apps.bats \
     tests/community-contract.sh \
     scripts/first-party-cutover \
-    tests/first-party-cutover.bats
+    tests/first-party-cutover.bats \
+    tests/downstream-demo-contract.sh
 
 bats_files=(
     tests/release.bats
@@ -506,5 +509,6 @@ run_stage "Bashly integration example" integrations/bashly/example.sh candidate 
 run_stage "reference application smoke" examples/reference-apps/verify.sh > /dev/null || exit $?
 run_stage "community contract" tests/community-contract.sh > /dev/null || exit $?
 run_stage "first-party cutover pending check" scripts/first-party-cutover check --allow-pending > /dev/null || exit $?
+run_stage "downstream demo contract" tests/downstream-demo-contract.sh > /dev/null || exit $?
 
 printf 'Bash library validation passed.\n'

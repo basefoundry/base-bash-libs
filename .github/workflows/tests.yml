@@ -188,3 +188,24 @@ jobs:
 
       - name: Verify deterministic release invariants
         run: ./tests/release-invariants.sh
+
+  downstream-demo:
+    name: Downstream demo (Beacon)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: basefoundry/base-bash-libs-demo
+          ref: 90c0efbd980766027ff38f2d2ff6be4c96bbee97
+          path: .downstream/base-bash-libs-demo
+          persist-credentials: false
+      - name: Exercise the current framework through Beacon
+        run: |
+          framework_commit="$(git rev-parse --verify 'HEAD^{commit}')"
+          .downstream/base-bash-libs-demo/tests/candidate-smoke.sh \
+            "$GITHUB_WORKSPACE" "$(< VERSION)" "$framework_commit"
