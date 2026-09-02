@@ -3997,8 +3997,8 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"base_std_make_temp_file: result variable name must be a valid Bash variable name."* ]]
+    [ "$rc" -eq 2 ]
+    [[ "$(cat "$stderr_file")" == *"base_std_make_temp_file: one or more variable names are invalid."* ]]
 
     if base_std_make_temp_dir "also-not-valid" 2>"$stderr_file"; then
         rc=0
@@ -4006,8 +4006,8 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"base_std_make_temp_dir: result variable name must be a valid Bash variable name."* ]]
+    [ "$rc" -eq 2 ]
+    [[ "$(cat "$stderr_file")" == *"base_std_make_temp_dir: one or more variable names are invalid."* ]]
 }
 
 @test "named output helpers reject readonly variables before side effects" {
@@ -4024,7 +4024,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$output" = "unchanged" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
 
@@ -4034,7 +4034,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
 }
@@ -4053,7 +4053,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$output" = "unchanged" ]
     [ "$logger" = "caller-logger" ]
     [ "$color" = "caller-color" ]
@@ -4079,7 +4079,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$command_target" = "keep-command" ]
 
     if TMPDIR="$temp_root" base_std_make_temp_file --keep __base_bash_libs_std_temp_result_name reserved 2>"$stderr_file"; then
@@ -4087,7 +4087,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$temp_target" = "keep-temp" ]
     [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
 
@@ -4096,7 +4096,7 @@ EOF
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$source_target" = "keep-source" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
     [[ "$(cat "$stderr_file")" != *"readonly variable"* ]]
@@ -4115,14 +4115,14 @@ EOF
             readonly "$2"
             base_std_command_path "$2" bash
             case $? in
-                1) ;;
+                2) ;;
                 *) exit 99 ;;
             esac
             printf "value=%s\n" "${!2}"
-            exit 1
+            exit 2
         ' bash "$STDLIB_PATH" "$candidate"
 
-        [ "$status" -eq 1 ]
+        [ "$status" -eq 2 ]
         [[ "$output" == *"result variable '$candidate' is readonly"* ]]
         [[ "$output" == *"value=unchanged"* ]]
         [[ "$output" != *"readonly variable"* ]]
@@ -4169,8 +4169,8 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
-    [[ "$(cat "$stderr_file")" == *"base_std_command_path: result variable name must be a valid Bash variable name."* ]]
+    [ "$rc" -eq 2 ]
+    [[ "$(cat "$stderr_file")" == *"base_std_command_path: one or more variable names are invalid."* ]]
 }
 
 @test "base_std_function_exists checks defined Bash functions" {
@@ -4752,7 +4752,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"base_std_get_my_source_dir: result variable name must be a valid Bash variable name"* ]]
+    [[ "$output" == *"base_std_get_my_source_dir: one or more variable names are invalid"* ]]
     [[ "$output" != *"invalid variable name"* ]]
     [[ "$output" == *"after"* ]]
 }

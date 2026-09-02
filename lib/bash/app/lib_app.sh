@@ -554,8 +554,8 @@ base_app_config_get() {
         __base_bash_libs_app_error__ 'base_app_config_get: usage: base_app_config_get MODEL KEY RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_assert_public_variable_names__ base_app_config_get "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_app_config_get "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_app_config_get "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_config_get "$result_name" || return 2
     [[ -n "${__base_bash_libs_app_values["$model|$key"]+set}" ]] || return 1
     printf -v "$result_name" '%s' "${__base_bash_libs_app_values["$model|$key"]}"
 }
@@ -568,8 +568,8 @@ base_app_config_provenance() {
         __base_bash_libs_app_error__ 'base_app_config_provenance: usage: base_app_config_provenance MODEL KEY RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_assert_public_variable_names__ base_app_config_provenance "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_app_config_provenance "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_app_config_provenance "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_config_provenance "$result_name" || return 2
     [[ -n "${__base_bash_libs_app_provenance["$model|$key"]+set}" ]] || return 1
     printf -v "$result_name" '%s' "${__base_bash_libs_app_provenance["$model|$key"]}"
 }
@@ -735,8 +735,8 @@ base_app_status() {
         __base_bash_libs_app_error__ 'base_app_status: usage: base_app_status MODEL RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_assert_public_variable_names__ base_app_status "$result_name" || return 1
-    __base_bash_libs_std_assert_writable_output__ base_app_status "$result_name" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_app_status "$result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_status "$result_name" || return 2
     __base_bash_libs_app_model_exists__ "$model" || return 1
     printf -v "$result_name" '%s' "${__base_bash_libs_app_models["$model|last-status"]-0}"
 }

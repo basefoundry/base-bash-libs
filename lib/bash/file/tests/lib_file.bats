@@ -110,18 +110,19 @@ source "$BASE_BASH_DIR/std/lib_std.sh"
 declare -a app_args=()
 base_init app_args --source "\${BASH_SOURCE[0]}" -- "\$@"
 source "$BASE_BASH_DIR/file/lib_file.sh"
-base_file_update_file_section
+if base_file_update_file_section; then status=0; else status=\$?; fi
 printf 'after\n'
+exit "\$status"
 EOF
     chmod +x "$script"
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Insufficient arguments."* ]]
     [[ "$output" == *"Usage: base_file_update_file_section"* ]]
     [[ "$output" != *"unbound variable"* ]]
-    [[ "$output" != *"after"* ]]
+    [[ "$output" == *"after"* ]]
 }
 
 @test "base_file_update_file_section accepts empty content under strict options" {
@@ -622,7 +623,7 @@ EOF
 
     bats_run base_file_update_file_section -r "$target" "# BEGIN" "# END" "unexpected"
 
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"When -r flag is used"* ]]
 }
 

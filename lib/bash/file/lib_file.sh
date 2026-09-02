@@ -393,7 +393,7 @@ base_file_update_file_section() {
         else
             base_std_log_info -l base_bash_libs.file "Usage: base_file_update_file_section <target_file> <beginning_marker> <end_marker> [new_lines...]"
         fi
-        return 1
+        return 2
     fi
 
     local target_file="$1" beginning_marker="$2" end_marker="$3"
@@ -402,7 +402,7 @@ base_file_update_file_section() {
         if [[ $# -gt 0 ]]; then
             base_std_log_error -l base_bash_libs.file "When -r flag is used, no content arguments should be provided."
             base_std_log_info -l base_bash_libs.file "Usage: base_file_update_file_section -r <target_file> <beginning_marker> <end_marker>"
-            return 1
+            return 2
         fi
     else
         new_content_array=("$@") # Capture remaining arguments as new_lines

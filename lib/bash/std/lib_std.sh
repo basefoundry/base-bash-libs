@@ -3299,7 +3299,7 @@ __base_bash_libs_std_make_temp_path__() {
 
     if (($# < 1 || $# > 2)); then
         base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: usage: $__base_bash_libs_std_temp_helper_name [--keep] <result_variable_name> [prefix]"
-        return 1
+        return 2
     fi
 
     __base_bash_libs_std_temp_result_name="$1"
@@ -3307,12 +3307,12 @@ __base_bash_libs_std_make_temp_path__() {
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_temp_result_name"; then
         base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: result variable name must be a valid Bash variable name."
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ "$__base_bash_libs_std_temp_helper_name" "$__base_bash_libs_std_temp_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ "$__base_bash_libs_std_temp_helper_name" "$__base_bash_libs_std_temp_result_name" || return 2
     if [[ -z "$__base_bash_libs_std_temp_prefix" || "$__base_bash_libs_std_temp_prefix" == */* ]]; then
         base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
-        return 1
+        return 2
     fi
 
     __base_bash_libs_std_temp_root="${TMPDIR:-/tmp}"
@@ -3367,7 +3367,7 @@ __base_bash_libs_std_make_temp_path__() {
 #   base_std_make_temp_file [--keep] <result_variable_name> [prefix]
 #
 base_std_make_temp_file() {
-    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_file "$@" || return 1
+    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_file "$@" || return 2
     __base_bash_libs_std_make_temp_path__ base_std_make_temp_file file "$@"
 }
 
@@ -3386,7 +3386,7 @@ __base_bash_libs_std_make_internal_temp_file__() {
 #   base_std_make_temp_dir [--keep] <result_variable_name> [prefix]
 #
 base_std_make_temp_dir() {
-    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_dir "$@" || return 1
+    __base_bash_libs_std_preflight_temp_result_name__ base_std_make_temp_dir "$@" || return 2
     __base_bash_libs_std_make_temp_path__ base_std_make_temp_dir dir "$@"
 }
 
@@ -3446,6 +3446,50 @@ __base_bash_libs_std_assert_public_variable_names__() {
     return 0
 }
 
+# Non-fatal validation for ordinary public APIs. Assertions below intentionally
+# terminate the caller; reusable helpers must instead diagnose contract errors
+# and return status 2 from their public boundary.
+__base_bash_libs_std_validate_variable_names__() {
+    (($# >= 2)) || return 1
+    local __base_bash_libs_std_validate_operation="$1" __base_bash_libs_std_validate_name
+    shift
+
+    for __base_bash_libs_std_validate_name in "$@"; do
+        if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_validate_name"; then
+            base_std_log_error -l base_bash_libs.std \
+                "$__base_bash_libs_std_validate_operation: one or more variable names are invalid."
+            return 1
+        fi
+        if [[ "$__base_bash_libs_std_validate_name" == __* ]]; then
+            base_std_log_error -l base_bash_libs.std \
+                "$__base_bash_libs_std_validate_operation: variable '$__base_bash_libs_std_validate_name' uses the reserved '__' internal namespace."
+            return 1
+        fi
+    done
+    return 0
+}
+
+__base_bash_libs_std_validate_array_kind__() {
+    (($# >= 3)) || return 1
+    local __base_bash_libs_std_validate_array_operation="$1" __base_bash_libs_std_validate_array_kind="$2"
+    local __base_bash_libs_std_validate_array_name __base_bash_libs_std_validate_array_label=indexed
+    shift 2
+
+    [[ "$__base_bash_libs_std_validate_array_kind" == "A" ]] &&
+        __base_bash_libs_std_validate_array_label=associative
+    __base_bash_libs_std_validate_variable_names__ \
+        "$__base_bash_libs_std_validate_array_operation" "$@" || return 1
+    for __base_bash_libs_std_validate_array_name in "$@"; do
+        if ! __base_bash_libs_std_declares_array_kind__ \
+            "$__base_bash_libs_std_validate_array_name" "$__base_bash_libs_std_validate_array_kind"; then
+            base_std_log_error -l base_bash_libs.std \
+                "$__base_bash_libs_std_validate_array_operation: variable '$__base_bash_libs_std_validate_array_name' must be a caller-declared $__base_bash_libs_std_validate_array_label array."
+            return 1
+        fi
+    done
+    return 0
+}
+
 __base_bash_libs_std_preflight_temp_result_name__() {
     (($# >= 1)) || return 1
     shift
@@ -3464,7 +3508,7 @@ __base_bash_libs_std_preflight_temp_result_name__() {
         esac
     done
     (($# >= 1)) || return 0
-    __base_bash_libs_std_assert_public_variable_names__ "${FUNCNAME[1]}" "${1-}"
+    __base_bash_libs_std_validate_variable_names__ "${FUNCNAME[1]}" "${1-}"
 }
 
 #
@@ -3569,16 +3613,16 @@ base_std_assert_associative_array() {
 base_std_command_path() {
     if (($# != 2)); then
         base_std_log_error -l base_bash_libs.std "base_std_command_path: usage: base_std_command_path <result_variable_name> <command_name>"
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_std_command_path "${1-}" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_std_command_path "${1-}" || return 2
     local __base_bash_libs_std_command_result_name="$1" __base_bash_libs_std_command_name="$2" __base_bash_libs_std_command_resolved_path=""
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_command_result_name"; then
         base_std_log_error -l base_bash_libs.std "base_std_command_path: result variable name must be a valid Bash variable name."
-        return 1
+        return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" || return 2
 
     if [[ -n "$__base_bash_libs_std_command_name" ]]; then
         __base_bash_libs_std_command_resolved_path="$(type -P "$__base_bash_libs_std_command_name" 2> /dev/null || true)"
@@ -3969,7 +4013,7 @@ base_std_get_my_source_dir() {
             "base_std_get_my_source_dir: no result variable name provided."
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_std_get_my_source_dir "${1-}" || return 1
+    __base_bash_libs_std_validate_variable_names__ base_std_get_my_source_dir "${1-}" || return 2
     local __base_bash_libs_std_source_result_name="$1"
 
     if ! __base_bash_libs_std_is_valid_variable_name__ "$__base_bash_libs_std_source_result_name"; then
@@ -3977,7 +4021,7 @@ base_std_get_my_source_dir() {
             "base_std_get_my_source_dir: result variable name must be a valid Bash variable name."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" || return 1
+    __base_bash_libs_std_assert_writable_output__ base_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" || return 2
     local __base_bash_libs_std_source_dir __base_bash_libs_std_source_path="${BASH_SOURCE[1]-}"
     # Reference: https://stackoverflow.com/a/246128/6862601
     if [[ -n "$__base_bash_libs_std_source_path" ]]; then

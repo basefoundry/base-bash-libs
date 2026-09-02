@@ -15,6 +15,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Made ordinary named-output, string, list, argument, Git, and GitHub APIs
+  return status `2` for recoverable caller-contract errors instead of invoking
+  fail-fast assertion boundaries.
 - Enforced required repeatable positional tails based on values consumed by the
   repeatable itself, independent of earlier fixed positional arguments.
 - Made CLI completion consume option values and stop command and option

@@ -66,16 +66,14 @@ create_script() {
                 declare -a app_args=()
                 base_init app_args --
                 source "$3"
-                "$4"
-                exit $?
+                if "$4"; then status=0; else status=$?; fi
+                printf "after\n"
+                exit "$status"
             ' bash "$mode" "$BASE_BASH_DIR/std/lib_std.sh" "$BASE_BASH_DIR/list/lib_list.sh" "$function_name"
 
-            if [[ "$function_name" == base_list_append || "$function_name" == base_list_prepend ]]; then
-                [ "$status" -eq 2 ]
-            else
-                [ "$status" -eq 1 ]
-            fi
+            [ "$status" -eq 2 ]
             [[ "$output" != *"unbound variable"* ]]
+            [[ "$output" == *"after"* ]]
         done
     done
 }
@@ -154,7 +152,7 @@ create_script() {
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${#values[@]}" -eq 3 ]
     [ "${values[0]}" = "alpha" ]
     [ "${values[1]}" = "alpha" ]
@@ -165,7 +163,7 @@ create_script() {
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${#values[@]}" -eq 3 ]
     [ "${values[0]}" = "alpha" ]
     [ "${values[1]}" = "alpha" ]
@@ -186,7 +184,7 @@ create_script() {
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${actual[*]}" = "keep" ]
 
     if base_list_contains alpha __base_bash_libs_list_current 2>"$stderr_file"; then
@@ -194,14 +192,14 @@ create_script() {
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
 
     if base_list_unique result __base_bash_libs_list_current 2>"$stderr_file"; then
         rc=0
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${result[*]}" = "saved" ]
 
     if base_list_length count __base_bash_libs_list_current 2>"$stderr_file"; then
@@ -209,7 +207,7 @@ create_script() {
     else
         rc=$?
     fi
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "$count" = "saved" ]
     [ "${__base_bash_libs_list_current[*]}" = "alpha beta" ]
     [[ "$(cat "$stderr_file")" == *"uses the reserved '__' internal namespace"* ]]
@@ -263,7 +261,7 @@ EOF
         rc=$?
     fi
 
-    [ "$rc" -eq 1 ]
+    [ "$rc" -eq 2 ]
     [ "${values[*]}" = "alpha" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'values' is readonly"* ]]
 }
@@ -281,8 +279,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"base_std_assert_variable_name expects valid Bash variable names"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"base_list_append: one or more variable names are invalid"* ]]
     [[ "$output" != *"not-valid"* ]]
 }
 
@@ -299,8 +297,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
@@ -312,8 +310,8 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
@@ -325,6 +323,6 @@ EOF
 
     bats_run bash "$script"
 
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"must be an indexed array declared by the caller"* ]]
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
 }

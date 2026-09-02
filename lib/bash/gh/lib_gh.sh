@@ -269,7 +269,7 @@ base_gh_repo_from_remote_url() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_from_remote_url <remote_url> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_from_remote_url "${2-}" || return 2
+    __base_bash_libs_std_validate_variable_names__ base_gh_repo_from_remote_url "${2-}" || return 2
 
     local __base_bash_libs_gh_remote_url="$1"
     local __base_bash_libs_gh_result_name="$2"
@@ -279,7 +279,6 @@ base_gh_repo_from_remote_url() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_from_remote_url <remote_url> <result_variable_name>"
         return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_gh_repo_from_remote_url "$__base_bash_libs_gh_result_name" || return 2
 
     __base_bash_libs_gh_parse_repo_from_remote_url__ "$__base_bash_libs_gh_remote_url" __base_bash_libs_gh_parsed_repo || return 2
@@ -291,7 +290,7 @@ base_gh_infer_repo_from_origin() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_infer_repo_from_origin "${2-}" || return 2
+    __base_bash_libs_std_validate_variable_names__ base_gh_infer_repo_from_origin "${2-}" || return 2
 
     local __base_bash_libs_gh_infer_repo_dir="$1"
     local __base_bash_libs_gh_infer_result_name="$2"
@@ -302,7 +301,6 @@ base_gh_infer_repo_from_origin() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_infer_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_gh_infer_repo_from_origin "$__base_bash_libs_gh_infer_result_name" || return 2
 
     if [[ "${3:-}" == "--optional" ]]; then
@@ -328,7 +326,7 @@ base_gh_repo_default_branch() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_public_variable_names__ base_gh_repo_default_branch "${2-}" || return 2
+    __base_bash_libs_std_validate_variable_names__ base_gh_repo_default_branch "${2-}" || return 2
 
     local __base_bash_libs_gh_repo="$1"
     local __base_bash_libs_gh_repo_result_name="$2"
@@ -338,7 +336,6 @@ base_gh_repo_default_branch() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 2
     fi
-    base_std_assert_variable_name "$__base_bash_libs_gh_repo_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_gh_repo_default_branch "$__base_bash_libs_gh_repo_result_name" || return 2
 
     base_gh_require_cli || return 1
