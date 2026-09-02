@@ -1,4 +1,4 @@
 #!/usr/bin/env base-bash
 # shellcheck shell=bash
-project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "$project_root/lib/app.sh"
+app_project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "$app_project_root/lib/app.sh"
