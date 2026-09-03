@@ -341,7 +341,37 @@ assert_demo_snapshot() {
 
     [ "${events[*]}" = "handler:0:same handler:1:same normal:0:same cleanup:0:same resumed:same:0 normal:0:same cleanup:0:same" ]
     [ "$model_status" -eq 0 ]
-    [ -z "$BASE_BASH_LIBS_APP_ACTIVE_MODEL" ]
+   [ -z "$BASE_BASH_LIBS_APP_ACTIVE_MODEL" ]
+}
+
+@test "base_app_init rejects reinitialization during an active run without losing state" {
+    local events=()
+    reinit_handler() {
+        if base_app_init demo name=replaced; then
+            events+=(same-unexpected-success)
+        else
+            events+=("same:$?")
+        fi
+        if base_app_init other name=replaced; then
+            events+=(different-unexpected-success)
+        else
+            events+=("different:$?")
+        fi
+    }
+    noop_handler() { :; }
+    cleanup_hook() { events+=("cleanup:$2"); }
+
+    base_app_init demo name=original
+    base_app_init other name=other
+    base_app_hook demo cleanup cleanup cleanup_hook
+
+    base_app_run demo reinit_handler
+    [ "${events[*]}" = "same:2 different:2 cleanup:0" ]
+    [ "${__base_bash_libs_app_models[demo|name]}" = original ]
+    [ "${__base_bash_libs_app_models[other|name]}" = other ]
+
+    base_app_run demo noop_handler
+    [ "${events[*]}" = "same:2 different:2 cleanup:0 cleanup:0" ]
 }
 
 @test "nested process exit and signal unwind every lifecycle frame inner first" {

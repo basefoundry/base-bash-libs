@@ -281,11 +281,7 @@ __base_bash_libs_app_cleanup_dispatch__() {
     fi
     if ((${#__base_bash_libs_app_run_models[@]} > 0)); then
         for ((frame_index = ${#__base_bash_libs_app_run_models[@]} - 1; frame_index >= 0; frame_index--)); do
-            if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
-                :
-            else
-                :
-            fi
+            __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status" || true
         done
         return "$status"
     fi
@@ -298,11 +294,7 @@ __base_bash_libs_app_cleanup_dispatch__() {
     __base_bash_libs_app_run_models+=("$model")
     __base_bash_libs_app_run_dispatched+=(0)
     frame_index=$((${#__base_bash_libs_app_run_models[@]} - 1))
-    if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
-        :
-    else
-        :
-    fi
+    __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status" || true
     unset '__base_bash_libs_app_run_models[frame_index]'
     unset '__base_bash_libs_app_run_dispatched[frame_index]'
     return "$status"
@@ -327,6 +319,10 @@ base_app_init() {
     if [[ -n "${__base_bash_libs_app_attrs[name]+set}" ]] &&
         ! __base_bash_libs_app_valid_key__ "${__base_bash_libs_app_attrs[name]}"; then
         __base_bash_libs_app_error__ 'base_app_init: name must be a lowercase application key.'
+        return 2
+    fi
+    if ((${#__base_bash_libs_app_run_models[@]} > 0)); then
+        __base_bash_libs_app_error__ "base_app_init: cannot reinitialize model '$model' while an application run is active."
         return 2
     fi
     for key in "${!__base_bash_libs_app_models[@]}"; do
@@ -776,11 +772,7 @@ base_app_run() {
     fi
     "$handler" "${@:3}"
     status=$?
-    if __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status"; then
-        :
-    else
-        :
-    fi
+    __base_bash_libs_app_run_frame_dispatch__ "$frame_index" "$status" || true
     BASE_BASH_LIBS_APP_ACTIVE_MODEL="${__base_bash_libs_app_run_previous_active_models[$frame_index]-}"
     unset '__base_bash_libs_app_run_models[frame_index]'
     unset '__base_bash_libs_app_run_dispatched[frame_index]'
