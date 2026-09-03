@@ -840,12 +840,45 @@ __base_bash_libs_launcher_check__() {
     return "$check_status"
 }
 
+__base_bash_libs_launcher_json_escape__() {
+    local result_name="$1" value="$2" character byte escaped
+    local LC_ALL=C
+    local result=""
+
+    while [[ -n "$value" ]]; do
+        character="${value%"${value#?}"}"
+        value="${value#?}"
+        case "$character" in
+        \\) result+='\\' ;;
+        '"') result+='\"' ;;
+        $'\b') result+='\b' ;;
+        $'\f') result+='\f' ;;
+        $'\n') result+='\n' ;;
+        $'\r') result+='\r' ;;
+        $'\t') result+='\t' ;;
+        *)
+            printf -v byte '%d' "'$character"
+            if ((byte < 32)); then
+                printf -v escaped '%s%04x' '\u' "$byte"
+                result+="$escaped"
+            else
+                result+="$character"
+            fi
+            ;;
+        esac
+    done
+    printf -v "$result_name" '%s' "$result"
+}
+
 __base_bash_libs_launcher_project_record__() {
     local format="$1" status="$2" check="$3" detail="$4"
+    local escaped_status escaped_check escaped_detail
     if [[ "$format" == json ]]; then
-        detail="${detail//\\/\\\\}"
-        detail="${detail//\"/\\\"}"
-        printf '{"status":"%s","check":"%s","detail":"%s"}\n' "$status" "$check" "$detail"
+        __base_bash_libs_launcher_json_escape__ escaped_status "$status"
+        __base_bash_libs_launcher_json_escape__ escaped_check "$check"
+        __base_bash_libs_launcher_json_escape__ escaped_detail "$detail"
+        printf '{"status":"%s","check":"%s","detail":"%s"}\n' \
+            "$escaped_status" "$escaped_check" "$escaped_detail"
     else
         printf '%s project/%s: %s\n' "${status^^}" "$check" "$detail"
     fi

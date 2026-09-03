@@ -262,6 +262,27 @@ EOF
     [ "$before" = "$after" ]
 }
 
+@test "base-bash check emits parseable JSON for control characters in paths" {
+    local project_dir="$TEST_TMPDIR/generated"
+    local control_file="$project_dir/lib/line"$'\n'"break.sh"
+    local missing_project="$TEST_TMPDIR/missing"$'\n'"project"
+
+    mkdir -p "$project_dir"
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
+    [ "$status" -eq 0 ]
+    printf '%s\n' ':' >"$control_file"
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir" --format json
+    [ "$status" -eq 0 ]
+    jq -e . >/dev/null <<<"$output"
+    [[ "$output" == *$'syntax:lib/line\\nbreak.sh'* ]]
+
+    bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$missing_project" --format json
+    [ "$status" -eq 1 ]
+    jq -e . >/dev/null <<<"$output"
+    [[ "$output" == *$'missing\\nproject'* ]]
+}
+
 @test "base-bash init pins clean and detached source checkouts to exact HEAD" {
     local package_root="$TEST_TMPDIR/package"
     local project_root="$TEST_TMPDIR/project"
