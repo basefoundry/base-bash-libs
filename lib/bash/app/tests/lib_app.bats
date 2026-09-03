@@ -7,7 +7,7 @@ setup() {
     source "$BASE_BASH_DIR/std/lib_std.sh"
     source "$BASE_BASH_DIR/cli/lib_cli.sh"
     source "$BASE_BASH_DIR/app/lib_app.sh"
-    unset APP_TEST_MODE APP_TEST_SECRET
+    unset APP_TEST_MODE APP_TEST_SECRET APP_TEST_TIMEOUT
 }
 
 validate_test_label() {
@@ -63,6 +63,21 @@ assert_demo_snapshot() {
     [ "$source" = cli ]
     base_app_config_get demo secret value
     [ "$value" = cli-secret ]
+}
+
+@test "empty environment bindings do not override file configuration" {
+    local project_file="$TEST_TMPDIR/project.conf" value source
+
+    base_app_init empty_env name=empty-env
+    base_app_config_define empty_env timeout integer default=10 env=APP_TEST_TIMEOUT
+    printf 'timeout=30\n' > "$project_file"
+    export APP_TEST_TIMEOUT=
+
+    base_app_config_load empty_env --project "$project_file"
+    base_app_config_get empty_env timeout value
+    base_app_config_provenance empty_env timeout source
+    [ "$value" -eq 30 ]
+    [ "$source" = project ]
 }
 
 @test "enum validation preserves a caller variable with the internal scratch name" {
