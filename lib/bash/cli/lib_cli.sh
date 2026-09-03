@@ -953,6 +953,7 @@ base_cli_option() {
 # Usage: base_cli_positional model command_path name [required=true] [repeatable=true] ...
 base_cli_positional() {
     local model="${1-}" path="${2-}" name="${3-}" key names
+    local previous previous_required
     local -a __base_bash_libs_cli_previous_positionals=()
 
     if (($# < 3)); then
@@ -991,11 +992,22 @@ base_cli_positional() {
     fi
     if [[ -n "$names" ]]; then
         IFS=, read -r -a __base_bash_libs_cli_previous_positionals <<< "$names"
-        local previous="${__base_bash_libs_cli_previous_positionals[${#__base_bash_libs_cli_previous_positionals[@]} - 1]}"
+        previous="${__base_bash_libs_cli_previous_positionals[${#__base_bash_libs_cli_previous_positionals[@]} - 1]}"
         if [[ "$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$previous" repeatable)" =~ ^(1|true|yes)$ ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_positional: cannot declare '$name' after repeatable positional '$previous'."
             return 2
         fi
+    fi
+    if [[ "${__base_bash_libs_cli_attrs[required]-}" =~ ^(1|true|yes)$ && -n "$names" ]]; then
+        for previous in "${__base_bash_libs_cli_previous_positionals[@]}"; do
+            previous_required="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$previous" required)"
+            if [[ ! "$previous_required" =~ ^(1|true|yes)$ ||
+                -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$previous|default"]+set}" ]]; then
+                __base_bash_libs_cli_declaration_usage__ \
+                    "base_cli_positional: cannot declare required positional '$name' after optional positional '$previous'."
+                return 2
+            fi
+        done
     fi
     if [[ -n "$names" ]]; then names="$names,$name"; else names="$name"; fi
     __base_bash_libs_cli_models["$model|command|positionals|$path"]="$names"
