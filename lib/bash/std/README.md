@@ -473,9 +473,12 @@ BASE_BASH_LIBS_DRY_RUN=true
 base_std_run brew install jq
 ```
 
-`BASE_BASH_LIBS_DRY_RUN` and `BASE_BASH_LIBS_DRY_RUN` both accept `true`, `1`, `yes`, and `on`. Use
-`base_std_is_dry_run` when a script needs to branch on the same normalized dry-run state
-without executing a command through `base_std_run`.
+`BASE_BASH_LIBS_DRY_RUN` accepts `true`, `1`, `yes`, and `on`. The application
+policy exposes its normalized `0`/`1` state separately as
+`BASE_BASH_LIBS_APP_DRY_RUN`; application code can inspect that value, while
+the stdlib uses only `BASE_BASH_LIBS_DRY_RUN`. Use `base_std_is_dry_run` when a
+script needs to branch on the stdlib's normalized dry-run state without
+executing a command through `base_std_run`.
 
 Protect framework-generated diagnostics for a command whose arguments contain
 credentials or other sensitive values with `--sensitive`. Protected calls must

@@ -66,7 +66,7 @@
 #   assert_* utilities           # Validation helpers (base_std_assert_not_null / base_std_assert_integer / ...).
 #
 # Patterns:
-#   base_std_run some_cmd             # exits on failure; BASE_BASH_LIBS_DRY_RUN=true/1/yes/on prints instead.
+#   base_std_run some_cmd             # returns on failure; BASE_BASH_LIBS_DRY_RUN=true/1/yes/on prints instead.
 #   base_std_run --timeout 30 some_cmd
 #                                # bounds the command attempt to 30 seconds.
 #   base_std_run --max-attempts 3 --retry-delay 2 some_cmd
@@ -1732,7 +1732,7 @@ __base_bash_libs_std_run_status_message__() {
 # Features:
 #   - Secure: Does not use `eval`, preventing arbitrary code execution.
 #   - Argument Safe: Correctly handles spaces and special characters in arguments.
-#   - Dry-Run Mode: If the global variable BASE_BASH_LIBS_DRY_RUN (or BASE_BASH_LIBS_DRY_RUN) is truthy, it
+#   - Dry-Run Mode: If the global variable BASE_BASH_LIBS_DRY_RUN is truthy, it
 #     prints the command instead of running it.
 #   - Optional Timeout: `--timeout N` bounds each command attempt to N seconds.
 #   - Optional Retry: `--max-attempts N` retries failed commands up to N total

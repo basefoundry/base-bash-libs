@@ -6,14 +6,13 @@ checks, tests, and a deterministic bundle.
 
 ## 1. Select a verified release
 
-During v2 validation, copy the exact `v2.0.0-rc.N` tag and full commit from the
-release notes. After GA, use the `v2.0.0` tag and its published SHA-256 asset
-instead. The reference is intentionally required rather than defaulting to a
-moving branch:
+Use the published `v2.0.0` tag and its verified commit. The reference is
+intentionally required rather than defaulting to a moving branch:
 
 ```bash
-export BASE_BASH_LIBS_REF='v2.0.0-rc.1'       # replace with the verified release ref
-export BASE_BASH_LIBS_COMMIT='<full verified commit SHA>'
+export BASE_BASH_LIBS_REF='v2.0.0'
+export BASE_BASH_LIBS_COMMIT='b4243765726c133499feeabdc50154f99c0fec12'
+mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs fetch --tags origin "$BASE_BASH_LIBS_REF"
 git -C vendor/base-bash-libs checkout --detach "$BASE_BASH_LIBS_REF"
@@ -21,8 +20,8 @@ test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$BASE_BASH_LIBS_COMMIT"
 ```
 
 Do not replace the ref with `main`, a short SHA, or an automatically generated
-archive URL. Before the first v2 RC exists, use the full commit and checksum
-from the current release process for internal validation only.
+archive URL. Verify the published checksum asset before distributing a
+consumer application.
 
 ## 2. Generate and run an application
 
@@ -30,7 +29,8 @@ The launcher creates a deterministic scaffold. The application module is one
 physical file, as required by `STANDARDS.md`:
 
 ```bash
-vendor/base-bash-libs/bin/base-bash init --profile standard --project demo
+mkdir -p demo
+vendor/base-bash-libs/bin/base-bash init --profile standard --dir demo
 cd demo
 BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" ./bin/app --help
 BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" ./bin/app status

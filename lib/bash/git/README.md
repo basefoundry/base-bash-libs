@@ -87,7 +87,7 @@ base_git_worktree_path_for_branch --result worktree_path feature/topic "$PWD"
 - `base_git_check_script_up_to_date <script>` compares `HEAD` with the local remote-tracking upstream ref. It does not fetch by default, so the result reflects the freshness of local refs.
 - `base_git_check_script_up_to_date --fetch <script>` runs `git fetch --quiet` first,
   then compares against the refreshed upstream ref. If fetch fails, the helper
-  returns status `5`; it never reports freshness from an unverified comparison.
+  returns status `1`; it never reports freshness from an unverified comparison.
 
 ### `base_git_check_script_up_to_date` statuses
 
