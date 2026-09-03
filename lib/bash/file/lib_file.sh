@@ -409,7 +409,7 @@ base_file_update_file_section() {
     fi
 
     __base_bash_libs_file_literal_path__ target_file "$target_file"
-    __base_bash_libs_file_validate_markers__ "$beginning_marker" "$end_marker" || return 1
+    __base_bash_libs_file_validate_markers__ "$beginning_marker" "$end_marker" || return $?
     if [[ ! -f "$target_file" ]]; then
         base_std_log_debug -l base_bash_libs.file "Target file '$target_file' does not exist."
         return 0
