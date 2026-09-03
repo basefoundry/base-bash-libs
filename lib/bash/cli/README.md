@@ -64,6 +64,13 @@ After a successful run parse:
 Results are valid after a successful parse. A failed parse returns status `2`
 and may have partially inspected input, but does not claim a valid result.
 
+Parsing treats a standalone `--` as the end of options and command/alias
+resolution; every following word is positional data, including a command name,
+alias, or option-looking value. As in `lib_arg.sh`, a standalone `--` consumed
+immediately as the value of a value option is treated as that literal value;
+only a `--` encountered while the parser is looking for the next option acts as
+the positional boundary.
+
 ## Example
 
 The quick declaration layer is useful for a small or generated command table:
