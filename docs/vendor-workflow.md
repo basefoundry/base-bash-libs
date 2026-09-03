@@ -18,7 +18,11 @@ scripts/vendor verify vendor/base-bash-libs
 hash, and verification mode. `scripts/vendor update` stages a complete new
 tree, writes its lock, and swaps it atomically; the previous tree remains at
 `vendor/base-bash-libs.previous` until a deliberate
-`scripts/vendor rollback`.
+`scripts/vendor rollback`. A successful rollback restores that previous tree
+and permanently discards the displaced current tree; the command reports this
+cleanup and does not retain a roll-forward copy. A failed move restores the
+original destination when possible and leaves the rollback directory in place
+for inspection, so disk usage and recovery remain explicit.
 
 For an application that must run without a framework checkout, assemble a
 standalone directory:

@@ -41,6 +41,44 @@ setup() {
     [ "$status" -eq 0 ]
     "$BASE_REPO_ROOT/scripts/vendor" rollback "$vendor_tree"
     [ "$(<"$vendor_tree/base-bash-libs.lock")" = "$first_lock" ]
+    [ ! -e "$vendor_tree.previous" ]
+    [ -z "$(find "${vendor_tree}.failed."* -maxdepth 0 -print -quit 2>/dev/null)" ]
+}
+
+@test "vendor rollback preserves both trees when either move fails" {
+    local second_bundle="$TEST_TMPDIR/framework-bundle-2"
+    "$BASE_REPO_ROOT/scripts/library-bundle" bundle "$second_bundle" >/dev/null
+    local mv_stub="$TEST_TMPDIR/mv"
+    local real_mv fail_on destination mv_count
+    real_mv="$(command -v mv)"
+    cat >"$mv_stub" <<'SCRIPT'
+#!/usr/bin/env bash
+count=0
+[[ -s "${VENDOR_TEST_MV_COUNT:?}" ]] && count="$(<"$VENDOR_TEST_MV_COUNT")"
+count=$((count + 1))
+printf '%s\n' "$count" >"$VENDOR_TEST_MV_COUNT"
+[[ "$count" -eq "${VENDOR_TEST_MV_FAIL_ON:?}" ]] && exit 1
+exec "${VENDOR_TEST_REAL_MV:?}" "$@"
+SCRIPT
+    chmod +x "$mv_stub"
+
+    for fail_on in 1 2; do
+        destination="$TEST_TMPDIR/vendor/failure-$fail_on"
+        "$BASE_REPO_ROOT/scripts/vendor" create "$framework_bundle" "$destination"
+        "$BASE_REPO_ROOT/scripts/vendor" update "$second_bundle" "$destination"
+        mv_count="$TEST_TMPDIR/mv-count-$fail_on"
+        : >"$mv_count"
+
+        bats_run env PATH="$TEST_TMPDIR:$BASE_TEST_ORIG_PATH" \
+            VENDOR_TEST_MV_COUNT="$mv_count" VENDOR_TEST_MV_FAIL_ON="$fail_on" \
+            VENDOR_TEST_REAL_MV="$real_mv" \
+            "$BASE_REPO_ROOT/scripts/vendor" rollback "$destination"
+
+        [ "$status" -eq 1 ]
+        [ -d "$destination" ]
+        [ -d "$destination.previous" ]
+        [ -z "$(find "${destination}.failed."* -maxdepth 0 -print -quit 2>/dev/null)" ]
+    done
 }
 
 @test "standalone bundle contains its own launcher and vendored framework" {

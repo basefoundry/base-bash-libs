@@ -152,7 +152,11 @@ rollback_bundle() {
         rmdir -- "$temporary" 2> /dev/null || true
         return 1
     fi
-    printf 'Rolled back vendor tree: %s\n' "$destination"
+    if ! rm -rf -- "$temporary"; then
+        error "rollback restored '$destination' but could not discard the displaced tree: $temporary/current"
+        return 1
+    fi
+    printf 'Rolled back vendor tree: %s (discarded displaced tree)\n' "$destination"
 }
 
 verify_destination() {
