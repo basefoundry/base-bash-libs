@@ -1147,6 +1147,28 @@ EOF
     [[ "$output" == *"CLICOLOR_FORCE is set; structured retry metadata is unavailable"* ]]
 }
 
+@test "base_gh_api_with_retry reports forced terminal metadata degradation for explicit include and mutations" {
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\r\n\r\nbody\n'
+    base_std_set_log_level DEBUG
+    export CLICOLOR_FORCE=1
+
+    capture_command base_gh_api_with_retry repos/owner/repo --include
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [[ "$output" == *"CLICOLOR_FORCE is set; structured retry metadata is unavailable"* ]]
+
+    install_gh_api_retry_fixture
+    TEST_GH_API_SUCCESS_AFTER=99
+    TEST_GH_API_FAILURE_STDOUT=$'HTTP/2.0 503 Service Unavailable\r\nRetry-After: 0\r\n\r\nbody\n'
+    capture_command base_gh_api_with_retry repos/owner/repo --method POST
+    [ "$status" -eq 1 ]
+    [ "$(gh_api_retry_observed attempts)" -eq 1 ]
+    [[ "$output" == *"CLICOLOR_FORCE is set; structured retry metadata is unavailable"* ]]
+    unset CLICOLOR_FORCE
+}
+
 @test "base_gh_api_with_retry does not retry auth cancellation certificate or gh usage failures" {
     local failure_status failure_text
 
