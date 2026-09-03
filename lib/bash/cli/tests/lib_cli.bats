@@ -80,6 +80,28 @@ EOF
     [[ "$output" == *"unknown row kind 'unknown'"* ]]
 }
 
+@test "imperative and quick declarations share attribute allowlists" {
+    base_cli_model_init imperative name=imperative version=2.0.0 description=Imperative handler=valid_target
+    base_cli_command imperative run Run valid_target aliases=r
+    base_cli_option imperative run other value --other help=Other
+    base_cli_option imperative run target value --target help=Target metavar=TARGET default=blue \
+        required=true enum=blue,green validator=valid_target conflicts=other sensitive=true hidden=true
+    base_cli_positional imperative run item help=Item metavar=ITEM default=blue required=true \
+        enum=blue,green validator=valid_target repeatable=true
+
+    base_cli_declare quick_attrs \
+        'model|name=quick-attrs|version=2.0.0|description=Quick|handler=valid_target' \
+        'command|path=run|description=Run|handler=valid_target|aliases=r' \
+        'option|path=run|name=other|type=value|tokens=--other|help=Other' \
+        'option|path=run|name=target|type=value|tokens=--target|help=Target|metavar=TARGET|default=blue|required=true|enum=blue,green|validator=valid_target|conflicts=other|sensitive=true|hidden=true' \
+        'positional|path=run|name=item|help=Item|metavar=ITEM|default=blue|required=true|enum=blue,green|validator=valid_target|repeatable=true'
+
+    base_cli_parse imperative -- run --target blue blue
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = run ]
+    base_cli_parse quick_attrs -- run --target blue blue
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = run ]
+}
+
 @test "quick declaration rolls back every late semantic failure" {
     base_cli_model_init demo name=original version=1.0.0 description="Original model"
     base_cli_command demo old "Original command" aliases=legacy

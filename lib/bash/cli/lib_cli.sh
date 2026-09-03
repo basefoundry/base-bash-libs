@@ -16,6 +16,15 @@ readonly BASE_BASH_LIBS_CLI_LOADED=1
 declare -gA __base_bash_libs_cli_models=()
 declare -gA __base_bash_libs_cli_attrs=()
 declare -gA __base_bash_libs_cli_seen=()
+# Keep the allowlists in one indexed table. Indexed arrays avoid the
+# Bash-4.2 associative-subscript parsing differences that affect generated
+# applications while preserving a single source of truth for every kind.
+declare -ga __base_bash_libs_cli_allowed_attrs=(
+    'name,version,description,handler'
+    'path,description,handler,aliases'
+    'path,name,type,tokens,help,metavar,default,required,enum,validator,conflicts,sensitive,hidden'
+    'path,name,help,metavar,default,required,enum,validator,repeatable'
+)
 declare -ga __base_bash_libs_cli_ancestors=()
 declare -ga __base_bash_libs_cli_option_names=()
 declare -ga __base_bash_libs_cli_option_paths=()
@@ -93,17 +102,32 @@ __base_bash_libs_cli_parse_attrs__() {
     done
 }
 
-__base_bash_libs_cli_attr_allowed__() {
-    local key="${1-}"
-    case "$key" in
-    name | version | description | handler | aliases | help | metavar | default | required | enum | validator | conflicts | sensitive | hidden | repeatable)
-        return 0
-        ;;
-    *)
-        __base_bash_libs_cli_error__ "unknown declaration attribute '$key'."
-        return $?
-        ;;
+__base_bash_libs_cli_kind_has_attr__() {
+    local kind="${1-}" key="${2-}" allowed index
+
+    case "$kind" in
+    model) index=0 ;;
+    command) index=1 ;;
+    option) index=2 ;;
+    positional) index=3 ;;
+    *) return 1 ;;
     esac
+    allowed="${__base_bash_libs_cli_allowed_attrs[$index]-}"
+    [[ -n "$allowed" ]] || return 1
+    case ",$allowed," in
+    *,"$key",*) return 0 ;;
+    esac
+    return 1
+}
+
+__base_bash_libs_cli_attr_allowed__() {
+    local key="${1-}" kind
+
+    for kind in model command option positional; do
+        __base_bash_libs_cli_kind_has_attr__ "$kind" "$key" && return 0
+    done
+    __base_bash_libs_cli_error__ "unknown declaration attribute '$key'."
+    return $?
 }
 
 __base_bash_libs_cli_validate_bool__() {
@@ -158,17 +182,21 @@ __base_bash_libs_cli_validate_attrs__() {
 }
 
 __base_bash_libs_cli_restrict_attrs__() {
-    local allowed="$1" key
+    local kind="$1" key
 
     for key in "${!__base_bash_libs_cli_attrs[@]}"; do
-        case ",$allowed," in
-        *,"$key",*) ;;
-        *)
+        if ! __base_bash_libs_cli_kind_has_attr__ "$kind" "$key"; then
             __base_bash_libs_cli_error__ "attribute '$key' is not valid for this declaration."
             return 2
-            ;;
-        esac
+        fi
     done
+}
+
+__base_bash_libs_cli_attr_is_runtime__() {
+    case "${1-}" in
+    path | name | type | tokens) return 1 ;;
+    *) return 0 ;;
+    esac
 }
 
 __base_bash_libs_cli_ancestors_for__() {
@@ -365,21 +393,11 @@ __base_bash_libs_cli_quick_validate_keys__() {
     local kind="$1" key
 
     for key in "${!__base_bash_libs_cli_attrs[@]}"; do
-        case "$kind:$key" in
-        model:name | model:version | model:description | model:handler | \
-            command:path | command:description | command:handler | command:aliases | \
-            option:path | option:name | option:type | option:tokens | option:help | \
-            option:metavar | option:default | option:required | option:enum | \
-            option:validator | option:conflicts | option:sensitive | option:hidden | \
-            positional:path | positional:name | positional:help | positional:metavar | \
-            positional:default | positional:required | positional:enum | \
-            positional:validator | positional:repeatable) ;;
-        *)
+        if ! __base_bash_libs_cli_kind_has_attr__ "$kind" "$key"; then
             __base_bash_libs_cli_declaration_usage__ \
                 "base_cli_declare: attribute '$key' is not valid for a $kind row."
             return 2
-            ;;
-        esac
+        fi
     done
 }
 
@@ -565,7 +583,10 @@ base_cli_declare() {
         tokens_value="${__base_bash_libs_cli_attrs[tokens]}"
         IFS=, read -r -a option_tokens <<< "$tokens_value"
         declaration_args=("$model" "$path" "$name" "$type" "${option_tokens[@]}")
-        for key in help metavar default required enum validator conflicts sensitive hidden; do
+        local -a allowed_attrs=()
+        IFS=, read -r -a allowed_attrs <<< "${__base_bash_libs_cli_allowed_attrs[2]}"
+        for key in "${allowed_attrs[@]+${allowed_attrs[@]}}"; do
+            __base_bash_libs_cli_attr_is_runtime__ "$key" || continue
             [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
                 declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
         done
@@ -584,7 +605,10 @@ base_cli_declare() {
         path="${__base_bash_libs_cli_attrs[path]}"
         name="${__base_bash_libs_cli_attrs[name]}"
         declaration_args=("$model" "$path" "$name")
-        for key in help metavar default required enum validator repeatable; do
+        local -a allowed_attrs=()
+        IFS=, read -r -a allowed_attrs <<< "${__base_bash_libs_cli_allowed_attrs[3]}"
+        for key in "${allowed_attrs[@]+${allowed_attrs[@]}}"; do
+            __base_bash_libs_cli_attr_is_runtime__ "$key" || continue
             [[ -n "${__base_bash_libs_cli_attrs[$key]+set}" ]] &&
                 declaration_args+=("$key=${__base_bash_libs_cli_attrs[$key]}")
         done
@@ -614,7 +638,7 @@ base_cli_model_init() {
     shift
     __base_bash_libs_cli_parse_attrs__ "$@" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
-    __base_bash_libs_cli_restrict_attrs__ 'name,version,description,handler' || return $?
+    __base_bash_libs_cli_restrict_attrs__ model || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[name]+set}" ]] &&
         ! __base_bash_libs_cli_valid_segment__ "${__base_bash_libs_cli_attrs[name]}"; then
         __base_bash_libs_cli_declaration_usage__ "base_cli_model_init: name must be a single command segment."
@@ -750,7 +774,7 @@ base_cli_command() {
     fi
     __base_bash_libs_cli_parse_attrs__ "$@" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
-    __base_bash_libs_cli_restrict_attrs__ 'handler,aliases' || return $?
+    __base_bash_libs_cli_restrict_attrs__ command || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[handler]+set}" ]]; then
         [[ -z "$handler" ]] || {
             __base_bash_libs_cli_declaration_usage__ "base_cli_command: handler was provided twice."
@@ -867,7 +891,7 @@ base_cli_option() {
     fi
     __base_bash_libs_cli_parse_attrs__ "${attrs[@]+${attrs[@]}}" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
-    __base_bash_libs_cli_restrict_attrs__ 'help,metavar,default,required,enum,validator,conflicts,sensitive,hidden' || return $?
+    __base_bash_libs_cli_restrict_attrs__ option || return $?
     __base_bash_libs_cli_validate_enum__ base_cli_option || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[repeatable]+set}" ]]; then
         __base_bash_libs_cli_declaration_usage__ "base_cli_option: repeatable is selected by the option type, not an attribute."
@@ -981,7 +1005,7 @@ base_cli_positional() {
     shift 3
     __base_bash_libs_cli_parse_attrs__ "$@" || return $?
     __base_bash_libs_cli_validate_attrs__ || return $?
-    __base_bash_libs_cli_restrict_attrs__ 'help,metavar,default,required,enum,validator,repeatable' || return $?
+    __base_bash_libs_cli_restrict_attrs__ positional || return $?
     __base_bash_libs_cli_validate_enum__ base_cli_positional || return $?
     if [[ -n "${__base_bash_libs_cli_attrs[validator]+set}" ]]; then
         if [[ ! "${__base_bash_libs_cli_attrs[validator]}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
