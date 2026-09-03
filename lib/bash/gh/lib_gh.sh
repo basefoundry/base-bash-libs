@@ -1649,22 +1649,22 @@ __base_bash_libs_gh_api_with_retry_impl__() {
     esac
 
     __base_bash_libs_gh_api_attempt_argv=("$@")
+    __base_bash_libs_gh_api_forced_terminal_env__ __base_bash_libs_gh_api_forced_terminal_env
     if ((__base_bash_libs_gh_api_retry_authorized && !__base_bash_libs_gh_api_include && !__base_bash_libs_gh_api_ambiguous)); then
-        __base_bash_libs_gh_api_forced_terminal_env__ __base_bash_libs_gh_api_forced_terminal_env
         __base_bash_libs_gh_api_can_inject_include__ __base_bash_libs_gh_api_can_inject "$@"
         if ((__base_bash_libs_gh_api_can_inject)); then
             __base_bash_libs_gh_api_injected_include=1
             __base_bash_libs_gh_api_include=1
             __base_bash_libs_gh_api_attempt_argv=(--include "$@")
-        elif [[ -n "$__base_bash_libs_gh_api_forced_terminal_env" ]]; then
-            base_std_log_warn -l base_bash_libs.gh \
-                "base_gh_api_with_retry: $__base_bash_libs_gh_api_forced_terminal_env is set; structured retry metadata is unavailable."
         fi
     fi
     __base_bash_libs_gh_api_unstructured_transport_is_safe__ __base_bash_libs_gh_api_transport_syntax_safe "$@"
     ((__base_bash_libs_gh_api_ambiguous == 0)) || __base_bash_libs_gh_api_transport_syntax_safe=0
-    [[ -z "${GH_FORCE_TTY-}${CLICOLOR_FORCE-}${FORCE_COLOR-}" ]] ||
+    if [[ -n "$__base_bash_libs_gh_api_forced_terminal_env" ]]; then
         __base_bash_libs_gh_api_structured_metadata=0
+        base_std_log_warn -l base_bash_libs.gh \
+            "base_gh_api_with_retry: $__base_bash_libs_gh_api_forced_terminal_env is set; structured retry metadata is unavailable."
+    fi
 
     if ((__base_bash_libs_gh_api_sensitive)); then
         if ! __base_bash_libs_std_render_command_display__ __base_bash_libs_gh_api_display 1 "$__base_bash_libs_gh_api_safe_display" \
