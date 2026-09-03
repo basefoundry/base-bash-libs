@@ -1414,97 +1414,32 @@ __base_bash_libs_gh_api_cleanup_workspace__() {
     command rmdir -- "$__base_bash_libs_gh_workspace_dir" 2> /dev/null || true
 }
 
+__base_bash_libs_gh_api_guardian_cleanup__() {
+    local __base_bash_libs_gh_guardian_reason="${1-}"
+    local __base_bash_libs_gh_guardian_workspace="${2-}"
+
+    # The standard guardian removes the FIFO and readiness marker first, then
+    # this adapter removes the capture files and containing workspace.
+    : "$__base_bash_libs_gh_guardian_reason"
+    __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_guardian_workspace"
+}
+
 __base_bash_libs_gh_api_start_capture_guardian__() {
     local __base_bash_libs_gh_guard_pid_name="$1" __base_bash_libs_gh_guard_fd_name="$2"
     local __base_bash_libs_gh_guard_owner_pid="$3" __base_bash_libs_gh_guard_workspace="$4"
-    local __base_bash_libs_gh_guard_pid __base_bash_libs_gh_guard_fd __base_bash_libs_gh_guard_monitor_was_enabled=0
-    local __base_bash_libs_gh_guard_probe
 
-    if ! exec {__base_bash_libs_gh_guard_fd}<> "$__base_bash_libs_gh_guard_workspace/guardian"; then
-        return 1
-    fi
-    [[ $- == *m* ]] && __base_bash_libs_gh_guard_monitor_was_enabled=1
-    set +m
-    (
-        local __base_bash_libs_gh_guard_command="" __base_bash_libs_gh_guard_read_fd __base_bash_libs_gh_guard_read_status=0
-        local __base_bash_libs_gh_guard_parent_pid="" __base_bash_libs_gh_guard_self_pid="$BASHPID"
-        trap - EXIT
-        trap '' HUP INT QUIT TERM
-        # Descendants of the owner can inherit its FIFO descriptor. The
-        # guardian therefore combines the normal stop/EOF channel with the
-        # actual parent relationship reported for its own BASHPID. A recycled
-        # owner PID cannot impersonate that relationship after reparenting.
-        exec {__base_bash_libs_gh_guard_fd}>&-
-        if ! exec {__base_bash_libs_gh_guard_read_fd}< "$__base_bash_libs_gh_guard_workspace/guardian"; then
-            __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_guard_workspace"
-            exit 1
-        fi
-        : > "$__base_bash_libs_gh_guard_workspace/guardian.ready" || exit 1
-        while :; do
-            if IFS= read -r -t 1 -u "$__base_bash_libs_gh_guard_read_fd" __base_bash_libs_gh_guard_command; then
-                break
-            else
-                __base_bash_libs_gh_guard_read_status=$?
-            fi
-            # EOF or a descriptor error means that no usable owner control
-            # channel remains. A timeout is the only reason to keep polling.
-            ((__base_bash_libs_gh_guard_read_status > 128)) || break
-            __base_bash_libs_gh_guard_parent_pid=""
-            if [[ -x /bin/ps ]]; then
-                __base_bash_libs_gh_guard_parent_pid="$(
-                    LC_ALL=C /bin/ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2> /dev/null
-                )" || __base_bash_libs_gh_guard_parent_pid=""
-            else
-                __base_bash_libs_gh_guard_parent_pid="$(
-                    LC_ALL=C command ps -o ppid= -p "$__base_bash_libs_gh_guard_self_pid" 2> /dev/null
-                )" || __base_bash_libs_gh_guard_parent_pid=""
-            fi
-            __base_bash_libs_gh_guard_parent_pid="${__base_bash_libs_gh_guard_parent_pid//[[:space:]]/}"
-            if [[ "$__base_bash_libs_gh_guard_parent_pid" =~ ^[1-9][0-9]*$ ]]; then
-                [[ "$__base_bash_libs_gh_guard_parent_pid" == "$__base_bash_libs_gh_guard_owner_pid" ]] || break
-            elif ! kill -0 "$__base_bash_libs_gh_guard_owner_pid" 2> /dev/null; then
-                break
-            fi
-        done
-        __base_bash_libs_gh_api_cleanup_workspace__ "$__base_bash_libs_gh_guard_workspace"
-    ) < /dev/null > /dev/null 2>&1 &
-    __base_bash_libs_gh_guard_pid=$!
-    if ((__base_bash_libs_gh_guard_monitor_was_enabled)); then
-        set -m
-    else
-        set +m
-    fi
-    for ((__base_bash_libs_gh_guard_probe = 0; __base_bash_libs_gh_guard_probe < 100; __base_bash_libs_gh_guard_probe++)); do
-        [[ -e "$__base_bash_libs_gh_guard_workspace/guardian.ready" ]] && break
-        kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null || break
-        __base_bash_libs_std_sleep_interval__ 0.01 || break
-    done
-    if [[ ! -e "$__base_bash_libs_gh_guard_workspace/guardian.ready" ]]; then
-        kill -KILL "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
-        wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
-        exec {__base_bash_libs_gh_guard_fd}>&-
-        return 1
-    fi
-    printf -v "$__base_bash_libs_gh_guard_pid_name" '%s' "$__base_bash_libs_gh_guard_pid"
-    printf -v "$__base_bash_libs_gh_guard_fd_name" '%s' "$__base_bash_libs_gh_guard_fd"
+    __base_bash_libs_std_start_owner_guardian__ \
+        "$__base_bash_libs_gh_guard_pid_name" \
+        "$__base_bash_libs_gh_guard_fd_name" \
+        "$__base_bash_libs_gh_guard_owner_pid" \
+        "$__base_bash_libs_gh_guard_workspace/guardian" \
+        "$__base_bash_libs_gh_guard_workspace/guardian.ready" \
+        __base_bash_libs_gh_api_guardian_cleanup__ \
+        "$__base_bash_libs_gh_guard_workspace"
 }
 
 __base_bash_libs_gh_api_stop_capture_guardian__() {
-    local __base_bash_libs_gh_guard_pid="${1-}" __base_bash_libs_gh_guard_fd="${2-}"
-
-    if [[ "$__base_bash_libs_gh_guard_fd" =~ ^[1-9][0-9]*$ ]]; then
-        { printf 'stop\n' 1>&"$__base_bash_libs_gh_guard_fd"; } 2> /dev/null || true
-        exec {__base_bash_libs_gh_guard_fd}>&-
-    fi
-    if [[ "$__base_bash_libs_gh_guard_pid" =~ ^[1-9][0-9]*$ ]]; then
-        # `wait` can reap only this shell's child, so a guardian that has
-        # already exited can never turn a recycled PID into a signal target.
-        while kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null; do
-            wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null && break
-            kill -0 "$__base_bash_libs_gh_guard_pid" 2> /dev/null || break
-        done
-        wait "$__base_bash_libs_gh_guard_pid" 2> /dev/null || true
-    fi
+    __base_bash_libs_std_stop_owner_guardian__ "$@"
 }
 
 __base_bash_libs_gh_api_trap_is_ignored__() {

@@ -2021,6 +2021,159 @@ __base_bash_libs_std_sleep_interval__() {
     fi
 }
 
+# Internal owner-guardian primitive used by asynchronous supervisors. The
+# guardian owns a private FIFO, accepts an explicit stop message, and polls
+# the real parent relationship of its BASHPID so a recycled owner PID cannot
+# keep a detached helper alive. Cleanup runs only after the channel is closed,
+# which lets callers remove the containing workspace safely.
+__base_bash_libs_std_guardian_owner_alive__() {
+    (($# == 2)) || return 1
+    local __base_bash_libs_std_guardian_owner_pid="$1"
+    local __base_bash_libs_std_guardian_self_pid="$2"
+    local __base_bash_libs_std_guardian_parent_pid=""
+
+    [[ "$__base_bash_libs_std_guardian_owner_pid" =~ ^[1-9][0-9]*$ &&
+        "$__base_bash_libs_std_guardian_self_pid" =~ ^[1-9][0-9]*$ ]] || return 1
+    if [[ -x /bin/ps ]]; then
+        __base_bash_libs_std_guardian_parent_pid="$(
+            LC_ALL=C /bin/ps -o ppid= -p "$__base_bash_libs_std_guardian_self_pid" 2> /dev/null
+        )" || __base_bash_libs_std_guardian_parent_pid=""
+    else
+        __base_bash_libs_std_guardian_parent_pid="$(
+            LC_ALL=C command ps -o ppid= -p "$__base_bash_libs_std_guardian_self_pid" 2> /dev/null
+        )" || __base_bash_libs_std_guardian_parent_pid=""
+    fi
+    __base_bash_libs_std_guardian_parent_pid="${__base_bash_libs_std_guardian_parent_pid//[[:space:]]/}"
+    if [[ "$__base_bash_libs_std_guardian_parent_pid" =~ ^[1-9][0-9]*$ ]]; then
+        [[ "$__base_bash_libs_std_guardian_parent_pid" == "$__base_bash_libs_std_guardian_owner_pid" ]]
+    else
+        kill -0 "$__base_bash_libs_std_guardian_owner_pid" 2> /dev/null
+    fi
+}
+
+__base_bash_libs_std_start_owner_guardian__() {
+    (($# >= 6)) || return 1
+    local __base_bash_libs_std_guardian_pid_name="$1"
+    local __base_bash_libs_std_guardian_fd_name="$2"
+    local __base_bash_libs_std_guardian_owner_pid="$3"
+    local __base_bash_libs_std_guardian_control_path="$4"
+    local __base_bash_libs_std_guardian_ready_path="$5"
+    local __base_bash_libs_std_guardian_cleanup_fn="$6"
+    shift 6
+    local -a __base_bash_libs_std_guardian_cleanup_args=("$@")
+    local __base_bash_libs_std_guardian_pid __base_bash_libs_std_guardian_fd
+    local __base_bash_libs_std_guardian_monitor_was_enabled=0
+    local __base_bash_libs_std_guardian_probe
+
+    [[ "$__base_bash_libs_std_guardian_owner_pid" =~ ^[1-9][0-9]*$ ]] || return 1
+    [[ -p "$__base_bash_libs_std_guardian_control_path" ]] || return 1
+    [[ -n "$__base_bash_libs_std_guardian_ready_path" ]] || return 1
+    if [[ -n "$__base_bash_libs_std_guardian_cleanup_fn" ]] &&
+        ! base_std_function_exists "$__base_bash_libs_std_guardian_cleanup_fn"; then
+        return 1
+    fi
+    if ! exec {__base_bash_libs_std_guardian_fd}<> "$__base_bash_libs_std_guardian_control_path"; then
+        return 1
+    fi
+
+    [[ $- == *m* ]] && __base_bash_libs_std_guardian_monitor_was_enabled=1
+    set +m
+    (
+        local __base_bash_libs_std_guardian_read_fd
+        local __base_bash_libs_std_guardian_read_status=0
+        local __base_bash_libs_std_guardian_command=""
+        local __base_bash_libs_std_guardian_reason=channel
+        local __base_bash_libs_std_guardian_self_pid="$BASHPID"
+
+        trap - EXIT
+        trap '' HUP INT QUIT TERM
+        exec {__base_bash_libs_std_guardian_fd}>&-
+        if ! exec {__base_bash_libs_std_guardian_read_fd}< "$__base_bash_libs_std_guardian_control_path"; then
+            rm -f -- "$__base_bash_libs_std_guardian_control_path" "$__base_bash_libs_std_guardian_ready_path"
+            [[ -z "$__base_bash_libs_std_guardian_cleanup_fn" ]] ||
+                "$__base_bash_libs_std_guardian_cleanup_fn" error \
+                    "${__base_bash_libs_std_guardian_cleanup_args[@]}" || true
+            exit 1
+        fi
+        if ! : > "$__base_bash_libs_std_guardian_ready_path"; then
+            exec {__base_bash_libs_std_guardian_read_fd}<&-
+            rm -f -- "$__base_bash_libs_std_guardian_control_path" "$__base_bash_libs_std_guardian_ready_path"
+            [[ -z "$__base_bash_libs_std_guardian_cleanup_fn" ]] ||
+                "$__base_bash_libs_std_guardian_cleanup_fn" error \
+                    "${__base_bash_libs_std_guardian_cleanup_args[@]}" || true
+            exit 1
+        fi
+        while :; do
+            if IFS= read -r -t 1 -u "$__base_bash_libs_std_guardian_read_fd" \
+                __base_bash_libs_std_guardian_command; then
+                __base_bash_libs_std_guardian_reason=stop
+                break
+            else
+                __base_bash_libs_std_guardian_read_status=$?
+            fi
+            ((__base_bash_libs_std_guardian_read_status > 128)) || break
+            if ! __base_bash_libs_std_guardian_owner_alive__ \
+                "$__base_bash_libs_std_guardian_owner_pid" "$__base_bash_libs_std_guardian_self_pid"; then
+                __base_bash_libs_std_guardian_reason=owner-gone
+                break
+            fi
+        done
+        exec {__base_bash_libs_std_guardian_read_fd}<&-
+        # Remove the channel before caller cleanup so a callback can safely
+        # remove its containing directory.
+        rm -f -- "$__base_bash_libs_std_guardian_control_path" "$__base_bash_libs_std_guardian_ready_path"
+        [[ -z "$__base_bash_libs_std_guardian_cleanup_fn" ]] ||
+            "$__base_bash_libs_std_guardian_cleanup_fn" \
+                "$__base_bash_libs_std_guardian_reason" \
+                "${__base_bash_libs_std_guardian_cleanup_args[@]}" || true
+    ) < /dev/null > /dev/null 2>&1 &
+    __base_bash_libs_std_guardian_pid=$!
+    if ((__base_bash_libs_std_guardian_monitor_was_enabled)); then
+        set -m
+    else
+        set +m
+    fi
+    for ((__base_bash_libs_std_guardian_probe = 0; __base_bash_libs_std_guardian_probe < 100; __base_bash_libs_std_guardian_probe++)); do
+        [[ -e "$__base_bash_libs_std_guardian_ready_path" ]] && break
+        kill -0 "$__base_bash_libs_std_guardian_pid" 2> /dev/null || break
+        __base_bash_libs_std_sleep_interval__ 0.01 || break
+    done
+    if [[ ! -e "$__base_bash_libs_std_guardian_ready_path" ]]; then
+        kill -KILL "$__base_bash_libs_std_guardian_pid" 2> /dev/null || true
+        wait "$__base_bash_libs_std_guardian_pid" 2> /dev/null || true
+        exec {__base_bash_libs_std_guardian_fd}>&-
+        return 1
+    fi
+    printf -v "$__base_bash_libs_std_guardian_pid_name" '%s' "$__base_bash_libs_std_guardian_pid"
+    printf -v "$__base_bash_libs_std_guardian_fd_name" '%s' "$__base_bash_libs_std_guardian_fd"
+}
+
+__base_bash_libs_std_stop_owner_guardian__() {
+    local __base_bash_libs_std_guardian_pid="${1-}" __base_bash_libs_std_guardian_fd="${2-}"
+    local __base_bash_libs_std_guardian_probe=0
+
+    if [[ "$__base_bash_libs_std_guardian_fd" =~ ^[1-9][0-9]*$ ]]; then
+        { printf 'stop\n' 1>&"$__base_bash_libs_std_guardian_fd"; } 2> /dev/null || true
+        exec {__base_bash_libs_std_guardian_fd}>&-
+    fi
+    if [[ "$__base_bash_libs_std_guardian_pid" =~ ^[1-9][0-9]*$ ]]; then
+        # A detached guardian can become unreapable if the caller is already
+        # unwinding a signal trap. Bound the wait so teardown cannot turn a
+        # failed cleanup helper into an unbounded hang.
+        while ((__base_bash_libs_std_guardian_probe < 200)) &&
+            kill -0 "$__base_bash_libs_std_guardian_pid" 2> /dev/null; do
+            wait "$__base_bash_libs_std_guardian_pid" 2> /dev/null && break
+            kill -0 "$__base_bash_libs_std_guardian_pid" 2> /dev/null || break
+            __base_bash_libs_std_sleep_interval__ 0.01 || true
+            __base_bash_libs_std_guardian_probe=$((__base_bash_libs_std_guardian_probe + 1))
+        done
+        if kill -0 "$__base_bash_libs_std_guardian_pid" 2> /dev/null; then
+            kill -KILL "$__base_bash_libs_std_guardian_pid" 2> /dev/null || true
+        fi
+        wait "$__base_bash_libs_std_guardian_pid" 2> /dev/null || true
+    fi
+}
+
 __base_bash_libs_std_timeout_candidate_is_gnu__() {
     (($# == 1)) || return 1
     local __base_bash_libs_std_timeout_candidate_path="$1"
@@ -2192,20 +2345,19 @@ __base_bash_libs_std_timeout_watchdog__() {
     if __base_bash_libs_std_timeout_wait_clock__ "$__base_bash_libs_std_timeout_watchdog_path" \
         "$__base_bash_libs_std_timeout_watchdog_seconds" "$__base_bash_libs_std_timeout_watchdog_fd"; then
         __base_bash_libs_std_timeout_watchdog_final_status=0
-        builtin printf 'T%03d' "$__base_bash_libs_std_timeout_watchdog_final_status" \
-            >| "$__base_bash_libs_std_timeout_watchdog_status_file" 2> /dev/null || true
     else
         __base_bash_libs_std_timeout_watchdog_clock_status=$?
         case "$__base_bash_libs_std_timeout_watchdog_clock_status" in
         124) __base_bash_libs_std_timeout_watchdog_final_status=124 ;;
         *) __base_bash_libs_std_timeout_watchdog_final_status=125 ;;
         esac
-        # Publish the timer result before escalation. The supervisor must not
-        # mistake the wrapper's signal-derived status (143/137) for the
-        # deadline or clock outcome that caused the escalation.
-        builtin printf 'T%03d' "$__base_bash_libs_std_timeout_watchdog_final_status" \
-            >| "$__base_bash_libs_std_timeout_watchdog_status_file" 2> /dev/null || true
-
+    fi
+    # Publish the timer result before escalation. The supervisor must not
+    # mistake the wrapper's signal-derived status (143/137) for the deadline
+    # or clock outcome that caused the escalation.
+    builtin printf 'T%03d' "$__base_bash_libs_std_timeout_watchdog_final_status" \
+        >| "$__base_bash_libs_std_timeout_watchdog_status_file" 2> /dev/null || true
+    if ((__base_bash_libs_std_timeout_watchdog_final_status != 0)); then
         builtin kill -TERM -- "-$__base_bash_libs_std_timeout_watchdog_command_pid" \
             2> /dev/null || true
         __base_bash_libs_std_sleep_interval__ 1 || true
