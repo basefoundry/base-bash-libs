@@ -296,6 +296,33 @@ EOF
     base_cli_parse optional_repeat -- run target-only
 }
 
+@test "required positionals cannot follow optional or defaulted positionals" {
+    base_cli_model_init ordering name=ordering
+    base_cli_command ordering run "Run"
+    base_cli_positional ordering run context
+
+    bats_run base_cli_positional ordering run target required=true
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"cannot declare required positional 'target' after optional positional 'context'"* ]]
+    [ "${__base_bash_libs_cli_models[ordering\|command\|positionals\|run]}" = context ]
+
+    base_cli_model_init defaulted_order name=defaulted-order
+    base_cli_command defaulted_order run "Run"
+    base_cli_positional defaulted_order run context default=working
+
+    bats_run base_cli_positional defaulted_order run target required=true
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"cannot declare required positional 'target' after optional positional 'context'"* ]]
+
+    base_cli_model_init valid_order name=valid-order
+    base_cli_command valid_order run "Run"
+    base_cli_positional valid_order run target required=true
+    base_cli_positional valid_order run context default=working
+    base_cli_parse valid_order -- run target-value
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = target-value ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = working ]
+}
+
 @test "quick declarations enforce required repeatable positional tails" {
     base_cli_declare table_repeat \
         'model|name=table-repeat' \
