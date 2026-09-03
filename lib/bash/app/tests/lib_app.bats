@@ -233,6 +233,38 @@ assert_demo_snapshot() {
     ! base_app_should_prompt policy
 }
 
+@test "base_app_prompt validates usage and applies the prompt policy contract" {
+    local prompt_calls=()
+    base_app_init prompt
+
+    bats_run base_app_prompt
+    [ "$status" -eq 2 ]
+    bats_run base_app_prompt prompt
+    [ "$status" -eq 2 ]
+    bats_run base_app_prompt prompt message extra fourth
+    [ "$status" -eq 2 ]
+
+    base_std_ask_yes_no() {
+        prompt_calls+=("$1|$2")
+        return 0
+    }
+    base_std_is_interactive() { return 0; }
+
+    BASE_BASH_LIBS_APP_NONINTERACTIVE=1
+    if base_app_prompt prompt "Denied"; then
+        false
+    else
+        [ "$?" -eq 1 ]
+    fi
+    [ "${#prompt_calls[@]}" -eq 0 ]
+
+    BASE_BASH_LIBS_APP_NONINTERACTIVE=0
+    base_app_prompt prompt "Default no"
+    base_app_prompt prompt "Default yes" yes
+    base_app_prompt prompt "Explicit no" no
+    [ "${prompt_calls[*]}" = "Default no|no Default yes|yes Explicit no|no" ]
+}
+
 @test "lifecycle hooks run LIFO exactly once and preserve handler status" {
     local events=()
     first_hook() { events+=("$1:$2:first"); }
