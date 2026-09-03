@@ -528,7 +528,7 @@ base_app_config_load() {
     fi
     for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
         env_name="${__base_bash_libs_app_config["$model|$key|env"]-}"
-        if [[ -n "$env_name" && -n "${!env_name+x}" ]]; then
+        if [[ -n "$env_name" && -n "${!env_name-}" ]]; then
             __base_bash_libs_app_set_value__ "$model" "$key" "${!env_name}" environment || {
                 status=$?
                 __base_bash_libs_app_clear_staged_config__
