@@ -65,6 +65,23 @@ modules:
     stability: stable
     since: 2.0.0
     deprecated: false
+  - name: process
+    kind: sourceable-library
+    source: lib/bash/process/lib_process.sh
+    documentation: lib/bash/process/README.md
+    tests: lib/bash/process/tests/lib_process.bats
+    dependencies: std
+    optional_commands: ps,rm,sleep
+    artifacts: lib/bash/process/lib_process.sh,lib/bash/process/README.md,lib/bash/process/tests/lib_process.bats
+    public_symbols: base_process_owner_alive
+    signature_source: lib/bash/process/README.md
+    inputs: documented per symbol in the module README and API charter
+    outputs: documented per symbol; no caller-owned outputs
+    statuses: usage and contract errors return 2; a false owner relationship returns 1
+    side_effects: documented per symbol; sourcing is passive
+    stability: stable
+    since: 2.0.0
+    deprecated: false
   - name: file
     kind: sourceable-library
     source: lib/bash/file/lib_file.sh
@@ -104,7 +121,7 @@ modules:
     source: lib/bash/gh/lib_gh.sh
     documentation: lib/bash/gh/README.md
     tests: lib/bash/gh/tests/lib_gh.bats
-    dependencies: std
+    dependencies: std,process
     optional_commands: gh,awk,grep,mktemp,rm,sleep,timeout,gtimeout
     artifacts: lib/bash/gh/lib_gh.sh,lib/bash/gh/README.md,lib/bash/gh/tests/lib_gh.bats
     public_symbols: base_gh_api_with_retry,base_gh_auth_status_diagnostics,base_gh_infer_repo_from_origin,base_gh_repo_default_branch,base_gh_repo_from_remote_url,base_gh_report_command_failure,base_gh_require_cli,base_gh_run

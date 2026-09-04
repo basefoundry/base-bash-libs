@@ -98,6 +98,10 @@ artifact's version; unknown values are explicit rather than inferred from cwd.
 Loading a second stdlib from another major version is rejected with migration
 guidance. v1 inputs are never fallback-loaded into a v2 module graph.
 
+The optional `process` module depends on `std` and must be imported only after
+the stdlib. The stdlib does not import `process`; existing `base_std_run*`
+callers therefore retain their current source and API contract.
+
 ## 5. Interactive behavior
 
 `base_std_ask_yes_no MESSAGE [yes|no]` defaults to `no` and displays `[y/N]`;
@@ -188,6 +192,7 @@ signature/effects reference; this table makes coverage auditable.
 | std predicates and setup | `base_std_is_interactive`, `base_std_check_bash_version`, `base_std_import`, `base_std_add_to_path`, `base_std_dedupe_path`, `base_std_print_path`, `base_std_set_log_level`, `base_std_set_log_category_level`, `base_std_log_is_enabled` | Predicates return `0/1`; package-relative import and configuration return `0/1/2`; imports are idempotent, dependency-aware, cycle-safe, cwd-independent, and reject traversal/package-root escape; PATH and log settings intentionally mutate their documented state. |
 | std logging and display | `base_std_log_fatal`, `base_std_log_error`, `base_std_log_warn`, `base_std_log_info`, `base_std_log_debug`, `base_std_log_verbose`, `base_std_log_info_file`, `base_std_log_debug_file`, `base_std_log_verbose_file`, `base_std_log_info_enter`, `base_std_log_debug_enter`, `base_std_log_verbose_enter`, `base_std_log_info_leave`, `base_std_log_debug_leave`, `base_std_log_verbose_leave`, `base_std_print_error`, `base_std_print_warn`, `base_std_print_info`, `base_std_print_success`, `base_std_print_bold`, `base_std_print_message`, `base_std_print_tty`, `base_std_dump_trace` | Diagnostics use stderr; explicit print/data helpers use stdout as documented; logging itself does not terminate. |
 | std process/error | `base_std_exit_if_error`, `base_std_fatal_error`, `base_std_is_dry_run`, `base_std_run`, `base_std_run_or_exit` | Explicitly named fatal helpers and `base_std_run_or_exit` terminate; dry-run is a predicate; `base_std_run` returns command/timeout/supervisor status and never hides diagnostics. |
+| process | `base_process_owner_alive` | The predicate returns `0` for a directly parented owner/guardian relationship, `1` for a false relationship, and `2` for malformed PID inputs; it does not signal or mutate caller state. |
 | std filesystem/cleanup | `base_std_safe_mkdir`, `base_std_safe_touch`, `base_std_safe_truncate`, `base_std_register_cleanup_hook`, `base_std_unregister_cleanup_hook`, `base_std_register_cleanup_path`, `base_std_unregister_cleanup_path`, `base_std_make_temp_file`, `base_std_make_temp_dir` | Mutators return recoverable failures; cleanup/temp APIs mutate only their documented registry and owned paths. |
 | std validation/reflection | `base_std_assert_variable_name`, `base_std_assert_indexed_array`, `base_std_assert_associative_array`, `base_std_command_path`, `base_std_function_exists`, `base_std_assert_function_exists`, `base_std_assert_not_null`, `base_std_assert_integer`, `base_std_assert_integer_range`, `base_std_assert_arg_count`, `base_std_assert_command_exists`, `base_std_assert_file_exists`, `base_std_assert_executable`, `base_std_assert_dir_exists` | Predicates return status; explicit `assert_*` APIs are intentional fail-fast precondition checks; named outputs are validated before writes. |
 | std miscellaneous | `base_std_safe_cd`, `base_std_safe_unalias`, `base_std_get_my_source_dir`, `base_std_ask_yes_no`, `base_std_wait_for_enter` | `safe_cd` changes `PWD`; source-dir writes one validated output; interactive functions return recoverable EOF/non-TTY statuses. |

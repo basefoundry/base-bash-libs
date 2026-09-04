@@ -117,6 +117,10 @@ such output names are rejected before caller state is changed.
 - `base_std_fatal_error <message...>`: logs a fatal error, prints a trace, and exits.
 - `base_std_is_dry_run`: returns zero when `BASE_BASH_LIBS_DRY_RUN` is truthy.
 
+New asynchronous process-supervision primitives belong to the optional
+`process` module; the stdlib remains the owner of the stable command-runner
+APIs above.
+
 ### PATH and Filesystem Helpers
 
 - `base_std_add_to_path [-p] [-n] <directory...>`: prepends or appends existing PATH

@@ -361,6 +361,14 @@ contract_std_api_smoke() {
         contract_quiet_subshell base_std_fatal_error "expected contract failure"
 }
 
+contract_process_api_smoke() {
+    local contract_owner_pid="$BASHPID"
+
+    (
+        base_process_owner_alive "$contract_owner_pid" "$BASHPID"
+    )
+}
+
 contract_str_api_smoke() {
     local contract_value="  Mixed Case  " contract_joined=""
     # shellcheck disable=SC2034 # base_str_join consumes the empty array by name.
@@ -706,6 +714,7 @@ contract_run_mode() {
     local module
     local -a modules=(
         "$contract_repo_root/lib/bash/std/lib_std.sh"
+        "$contract_repo_root/lib/bash/process/lib_process.sh"
         "$contract_repo_root/lib/bash/file/lib_file.sh"
         "$contract_repo_root/lib/bash/git/lib_git.sh"
         "$contract_repo_root/lib/bash/gh/lib_gh.sh"
@@ -741,6 +750,7 @@ contract_run_mode() {
     base_init contract_init_args --source "$contract_script_dir/bash-option-contract.sh" --
 
     contract_run_api_smoke std contract_std_api_smoke
+    contract_run_api_smoke process contract_process_api_smoke
     contract_run_api_smoke str contract_str_api_smoke
     contract_run_api_smoke list contract_list_api_smoke
     contract_run_api_smoke arg contract_arg_api_smoke

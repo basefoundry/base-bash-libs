@@ -13,6 +13,10 @@ base_init app_args --source "${BASH_SOURCE[0]}" --
 base_std_import gh/lib_gh.sh
 ```
 
+Loading `gh/lib_gh.sh` also imports the optional `process` module because the
+retry-capture path uses its owner-guardian lifecycle. GitHub-specific capture
+and workspace cleanup remain local to this module.
+
 ## Public Functions
 
 - `base_gh_require_cli [install_hint]`

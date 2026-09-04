@@ -7,6 +7,8 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
 - `std/`
   Foundation library with logging, error handling, PATH helpers, and other
   shared Bash primitives.
+- `process/`
+  Optional process-supervision primitives layered on top of the stdlib.
 - `git/`
   Git-related helpers built on top of the stdlib.
 - `gh/`
@@ -102,7 +104,7 @@ package-relative API:
 
 ```bash
 source "/path/to/base-bash-libs/lib/bash/std/lib_std.sh"
-base_std_import str/lib_str.sh file/lib_file.sh
+base_std_import process/lib_process.sh str/lib_str.sh file/lib_file.sh
 ```
 
 `base_std_import` resolves paths from the loaded package's `lib/bash` root, so
