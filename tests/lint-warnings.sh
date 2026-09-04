@@ -43,6 +43,7 @@ lint_files=(
     examples/cookbook-args-lists-strings.sh
     tests/examples.bats
     lib/bash/std/lib_std.sh
+    lib/bash/process/lib_process.sh
     lib/bash/file/lib_file.sh
     lib/bash/git/lib_git.sh
     lib/bash/gh/lib_gh.sh

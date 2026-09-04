@@ -30,6 +30,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   Foundation helpers for logging, error handling, command execution, PATH
   updates, assertions, prompts, imports, and the public
   `BASE_BASH_LIBS_VERSION` constant.
+- [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
+  Optional process-supervision primitives for owner-guardian liveness and
+  asynchronous cleanup, layered on the stdlib.
 - [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
   File editing helpers built on the stdlib, including idempotent
   marker-delimited file section updates.
