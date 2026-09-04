@@ -67,3 +67,24 @@ setup() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"supported Base Bash v2 release policy"* ]]
 }
+
+@test "preview modules use explicit unreleased metadata" {
+    run "$BASE_REPO_ROOT/scripts/api-manifest" check
+    [ "$status" -eq 0 ]
+    grep -F '### `process`' "$BASE_REPO_ROOT/docs/api-reference.md"
+    grep -F -- '- Stability: `preview`; since `unreleased`; deprecated: `false`' \
+        "$BASE_REPO_ROOT/docs/api-reference.md"
+
+    invalid_metadata="$TEST_TMPDIR/invalid-release-metadata.yaml"
+    perl -0pe 's/(  - name: process\n.*?    stability: )preview/$1stable/s' \
+        "$BASE_REPO_ROOT/base_api_manifest.yaml" > "$invalid_metadata"
+    run "$BASE_REPO_ROOT/scripts/api-manifest" check "$invalid_metadata"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"may use since: unreleased only with preview stability"* ]]
+}
+
+@test "release-check verifies stable APIs in the immutable GA tree" {
+    run "$BASE_REPO_ROOT/scripts/api-manifest" release-check v2.0.0
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Stable API release reference is valid: v2.0.0"* ]]
+}

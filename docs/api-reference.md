@@ -110,7 +110,7 @@ statuses, and side effects are normative in the linked module README and
 - Tests: [`lib/bash/process/tests/lib_process.bats`](../lib/bash/process/tests/lib_process.bats)
 - Dependencies: `std`
 - Optional commands: `ps,rm,sleep`
-- Stability: `stable`; since `2.0.0`; deprecated: `false`
+- Stability: `preview`; since `unreleased`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter
 - Outputs: documented per symbol; no caller-owned outputs
 - Statuses: usage and contract errors return 2; a false owner relationship returns 1

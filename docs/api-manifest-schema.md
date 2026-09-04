@@ -39,9 +39,12 @@ metadata:
 - `signature_source` points to the README or charter containing call-specific
   signatures and examples. `inputs`, `outputs`, `statuses`, and `side_effects`
   provide the module-level contract inherited by each listed symbol.
-- `stability`, `since`, and `deprecated` are required release metadata. A
-  future deprecation must add a migration-inventory entry before changing the
-  symbol.
+- `stability`, `since`, and `deprecated` are required release metadata. Stable
+  modules must name a supported `2.x` release in `since`; a post-GA module on
+  the moving branch uses `stability: preview` and `since: unreleased` until a
+  release containing it is published. The checker rejects `since: unreleased`
+  for stable modules. A future deprecation must add a migration-inventory
+  entry before changing the symbol.
 
 The artifact list makes packaging membership reviewable. Every module must
 package its source, documentation, and tests. Generated files are checked for
@@ -63,7 +66,10 @@ scripts/api-manifest artifact-paths
 
 `check` validates schema and metadata, module/file existence, duplicate symbols,
 source/manifest drift, dependency cycles, unsafe paths, packaging membership,
-and the generated API reference. The repository validation suite obtains its
+and the generated API reference. `release-check RELEASE_REF` additionally
+verifies that every stable module and public symbol in the current manifest is
+present in the local Git release tree named by `RELEASE_REF`; preview modules
+are intentionally excluded until they are promoted. The repository validation suite obtains its
 module source, test, and artifact paths from these commands instead of keeping
 another hardcoded module list.
 

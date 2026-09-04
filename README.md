@@ -31,8 +31,9 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   updates, assertions, prompts, imports, and the public
   `BASE_BASH_LIBS_VERSION` constant.
 - [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
-  Optional process-supervision primitives for owner-guardian liveness and
-  asynchronous cleanup, layered on the stdlib.
+  Preview-only process-supervision primitives for owner-guardian liveness and
+  asynchronous cleanup, layered on the stdlib. This post-GA module is on
+  `main` but is not included in the immutable `v2.0.0` release.
 - [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
   File editing helpers built on the stdlib, including idempotent
   marker-delimited file section updates.
@@ -239,6 +240,10 @@ are validated against that file.
 the v1 surface; SemVer compatibility guarantees apply from v2.0.0 onward. See
 the [versioning and release-line policy](docs/versioning-policy.md) for
 immutable consumption and the post-GA support contract.
+
+The `process` module is a preview addition on `main` and remains unreleased;
+the `v2.0.0` pin above does not contain it. Do not import that module from a
+v2.0.0 checkout until a release that contains it is published.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
 documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
