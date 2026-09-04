@@ -23,6 +23,10 @@ Do not replace the ref with `main`, a short SHA, or an automatically generated
 archive URL. Verify the published checksum asset before distributing a
 consumer application.
 
+The preview `process` module is not present in this v2.0.0 checkout. Follow
+the next release's documentation after a release containing that module is
+published; do not import it from this pinned tree.
+
 ## 2. Generate and run an application
 
 The launcher creates a deterministic scaffold. The application module is one

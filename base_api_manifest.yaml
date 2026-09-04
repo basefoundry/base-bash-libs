@@ -79,8 +79,8 @@ modules:
     outputs: documented per symbol; no caller-owned outputs
     statuses: usage and contract errors return 2; a false owner relationship returns 1
     side_effects: documented per symbol; sourcing is passive
-    stability: stable
-    since: 2.0.0
+    stability: preview
+    since: unreleased
     deprecated: false
   - name: file
     kind: sourceable-library

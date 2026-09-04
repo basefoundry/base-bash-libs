@@ -14,6 +14,7 @@ usage() {
     cat >&2 << 'EOF'
 Usage:
   scripts/api-manifest check [manifest]
+  scripts/api-manifest release-check RELEASE_REF [manifest]
   scripts/api-manifest generate [manifest] [output]
   scripts/api-manifest symbols [manifest]
   scripts/api-manifest module-paths [manifest]
@@ -311,10 +312,24 @@ check_manifest() {
                 return 1
             }
         done
-        [[ "${fields[15]}" =~ ^2[.]0[.]0([-.].*)?$ ]] || {
-            error "module '${fields[0]}' has invalid since metadata"
+        case "${fields[14]}" in
+        stable | preview) ;;
+        *)
+            error "module '${fields[0]}' has invalid stability metadata"
             return 1
-        }
+            ;;
+        esac
+        if [[ "${fields[15]}" == unreleased ]]; then
+            [[ "${fields[14]}" == preview ]] || {
+                error "module '${fields[0]}' may use since: unreleased only with preview stability"
+                return 1
+            }
+        else
+            base_bash_release_version_supported "${fields[15]}" || {
+                error "module '${fields[0]}' has invalid since metadata"
+                return 1
+            }
+        fi
         [[ "${fields[16]}" == true || "${fields[16]}" == false ]] || {
             error "module '${fields[0]}' deprecated metadata must be true or false"
             return 1
@@ -395,6 +410,37 @@ check_manifest() {
     return 0
 }
 
+check_release_tree() {
+    local manifest="$1"
+    local release_ref="$2"
+    local symbol release_path
+    local -a fields=()
+    local -a symbols=()
+
+    git -C "$repo_root" rev-parse --verify "${release_ref}^{commit}" > /dev/null 2>&1 || {
+        error "release reference is not a local commit: $release_ref"
+        return 1
+    }
+    while IFS=$'\t' read -r -a fields; do
+        [[ -n "${fields[0]-}" && "${fields[14]}" == stable ]] || continue
+        for release_path in "${fields[2]}" "${fields[3]}" "${fields[4]}"; do
+            git -C "$repo_root" cat-file -e "${release_ref}:${release_path}" 2> /dev/null || {
+                error "stable module '${fields[0]}' path '$release_path' is absent from release reference '$release_ref'"
+                return 1
+            }
+        done
+        IFS=',' read -r -a symbols <<< "${fields[8]}"
+        for symbol in "${symbols[@]}"; do
+            git -C "$repo_root" cat-file blob "${release_ref}:${fields[2]}" |
+                grep -E "^${symbol}[[:space:]]*\(\)" > /dev/null || {
+                error "stable symbol '$symbol' is absent from release reference '$release_ref'"
+                return 1
+            }
+        done
+    done < <(manifest_rows "$manifest")
+    printf 'Stable API release reference is valid: %s\n' "$release_ref"
+}
+
 manifest_or_default() {
     if [[ -n "${1-}" ]]; then printf '%s\n' "$1"; else printf '%s\n' "$default_manifest"; fi
 }
@@ -403,12 +449,22 @@ main() {
     local command="${1-}"
     local manifest=""
     local output=""
+    local release_ref=""
     local row field
     case "$command" in
     check | generate | symbols | module-paths | source-paths | test-paths | artifact-paths)
         shift
         manifest="$(manifest_or_default "${1-}")"
         [[ $# -eq 0 || $# -eq 1 || "$command" == generate ]] || {
+            usage
+            return 2
+        }
+        ;;
+    release-check)
+        shift
+        release_ref="${1:-}"
+        manifest="${2:-$default_manifest}"
+        [[ -n "$release_ref" && $# -le 2 ]] || {
             usage
             return 2
         }
@@ -438,6 +494,10 @@ main() {
         fi
         rm -f "$output"
         printf 'API manifest is valid.\n'
+        ;;
+    release-check)
+        check_manifest "$manifest" || return $?
+        check_release_tree "$manifest" "$release_ref"
         ;;
     generate)
         output="${2-}"

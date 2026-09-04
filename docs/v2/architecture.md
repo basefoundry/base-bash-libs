@@ -11,7 +11,7 @@ the caller's working directory is not a dependency.
 | --- | --- | --- |
 | launcher | Bash selection, package identity, checks, scaffold, script boundary | [`bin/base-bash`](../../bin/base-bash) |
 | std | logging, statuses, command execution, PATH, prompts, temp/cleanup, imports | [`lib/bash/std/README.md`](../../lib/bash/std/README.md) |
-| process | reusable owner-guardian and process-supervision primitives layered on std | [`lib/bash/process/README.md`](../../lib/bash/process/README.md) |
+| process (preview) | unreleased owner-guardian and process-supervision primitives layered on std; not in v2.0.0 | [`lib/bash/process/README.md`](../../lib/bash/process/README.md) |
 | modules | file, Git, GitHub, string, argument, list helpers | [`base_api_manifest.yaml`](../../base_api_manifest.yaml) |
 | application | CLI schema, config, standard options, lifecycle and dispatch | generated `lib/app.sh` and `docs/v2-api-contract.md` |
 

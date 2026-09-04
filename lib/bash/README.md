@@ -8,7 +8,9 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   Foundation library with logging, error handling, PATH helpers, and other
   shared Bash primitives.
 - `process/`
-  Optional process-supervision primitives layered on top of the stdlib.
+  Preview-only process-supervision primitives layered on top of the stdlib;
+  this module is present on `main` but is not included in the `v2.0.0` GA
+  release.
 - `git/`
   Git-related helpers built on top of the stdlib.
 - `gh/`

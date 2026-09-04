@@ -19,6 +19,8 @@ invariant_fail() {
 
 cd "$invariant_repo_root" || invariant_fail "unable to enter repository"
 scripts/api-manifest check > /dev/null || invariant_fail "API manifest check failed"
+scripts/api-manifest release-check "${BASE_BASH_LIBS_RELEASE_REF:-v2.0.0}" > /dev/null ||
+    invariant_fail "stable API is not present in the referenced release tree"
 scripts/library-bundle check > /dev/null || invariant_fail "library bundle check failed"
 scripts/library-bundle bundle "$invariant_tmp/bundle" > /dev/null || invariant_fail "bundle creation failed"
 scripts/library-bundle verify "$invariant_tmp/bundle" > /dev/null || invariant_fail "bundle verification failed"
