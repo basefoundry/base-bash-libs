@@ -146,7 +146,7 @@ statuses, and side effects are normative in the linked module README and
 - Source: [`lib/bash/git/lib_git.sh`](../lib/bash/git/lib_git.sh)
 - Documentation: [`lib/bash/git/README.md`](../lib/bash/git/README.md)
 - Tests: [`lib/bash/git/tests/lib_git.bats`](../lib/bash/git/tests/lib_git.bats)
-- Dependencies: `std`
+- Dependencies: `std,str`
 - Optional commands: `git,awk,grep,mktemp,rm,sleep`
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter
@@ -296,7 +296,7 @@ statuses, and side effects are normative in the linked module README and
 - Source: [`lib/bash/app/lib_app.sh`](../lib/bash/app/lib_app.sh)
 - Documentation: [`lib/bash/app/README.md`](../lib/bash/app/README.md)
 - Tests: [`lib/bash/app/tests/lib_app.bats`](../lib/bash/app/tests/lib_app.bats)
-- Dependencies: `std,cli`
+- Dependencies: `std,cli,str`
 - Optional commands: `none`
 - Stability: `stable`; since `2.0.0`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter

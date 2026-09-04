@@ -10,6 +10,21 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly BASE_BASH_LIBS_STR_LOADED=1
 
+# __base_bash_libs_str_escape_tsv_field__ - Escape one value for a TSV record.
+#
+# This internal primitive is shared by modules that publish line-oriented
+# tab-delimited records. Backslashes are escaped first so the control-character
+# escapes cannot be re-escaped.
+__base_bash_libs_str_escape_tsv_field__() {
+    local value="${1-}"
+
+    value="${value//\\/\\\\}"
+    value="${value//$'\t'/\\t}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    printf '%s' "$value"
+}
+
 base_str_lower() {
     (($# == 1)) || {
         base_std_log_error -l base_bash_libs.str "base_str_lower: usage: base_str_lower <variable_name>"

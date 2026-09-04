@@ -104,7 +104,7 @@ modules:
     source: lib/bash/git/lib_git.sh
     documentation: lib/bash/git/README.md
     tests: lib/bash/git/tests/lib_git.bats
-    dependencies: std
+    dependencies: std,str
     optional_commands: git,awk,grep,mktemp,rm,sleep
     artifacts: lib/bash/git/lib_git.sh,lib/bash/git/README.md,lib/bash/git/tests/lib_git.bats
     public_symbols: base_git_branch_merged_to_ref,base_git_branch_upstream,base_git_check_script_up_to_date,base_git_detect_default_branch,base_git_get_current_branch,base_git_list_remote_branches,base_git_list_worktree_branches,base_git_update_repo,base_git_worktree_path_for_branch
@@ -206,7 +206,7 @@ modules:
     source: lib/bash/app/lib_app.sh
     documentation: lib/bash/app/README.md
     tests: lib/bash/app/tests/lib_app.bats
-    dependencies: std,cli
+    dependencies: std,cli,str
     optional_commands: none
     artifacts: lib/bash/app/lib_app.sh,lib/bash/app/README.md,lib/bash/app/tests/lib_app.bats
     public_symbols: base_app_add_standard_options,base_app_apply_standard_options,base_app_config_define,base_app_config_get,base_app_config_load,base_app_config_provenance,base_app_config_report,base_app_config_set_cli,base_app_hook,base_app_init,base_app_prompt,base_app_run,base_app_should_prompt,base_app_status

@@ -113,6 +113,16 @@ create_script() {
     [ ! -s "$stdout_file" ]
 }
 
+@test "shared TSV field escaping preserves ordinary values and encodes delimiters" {
+    local value=$'ordinary\\value\twith-tab\nwith-newline\rwith-carriage'
+    local escaped expected
+
+    escaped="$(__base_bash_libs_str_escape_tsv_field__ "$value")"
+    expected=$'ordinary\\\\value\\twith-tab\\nwith-newline\\rwith-carriage'
+
+    [ "$escaped" = "$expected" ]
+}
+
 @test "string mutators reject readonly output variables" {
     local value="Alpha"
     local stderr_file="$TEST_TMPDIR/string-readonly.err"
