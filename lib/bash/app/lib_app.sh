@@ -14,6 +14,12 @@ if [[ "${BASE_BASH_LIBS_CLI_LOADED:-}" != "1" ]]; then
         return 1 2> /dev/null || exit 1
     fi
 fi
+if [[ "${BASE_BASH_LIBS_STR_LOADED:-}" != "1" ]]; then
+    if ! base_std_import str/lib_str.sh; then
+        printf '%s\n' "Error: lib_app.sh requires lib_str.sh to be available in the loaded package." >&2
+        return 1 2> /dev/null || exit 1
+    fi
+fi
 readonly BASE_BASH_LIBS_APP_LOADED=1
 
 # Application policy is deliberately optional. The core stdlib owns process
@@ -615,15 +621,6 @@ base_app_config_provenance() {
     printf -v "$result_name" '%s' "${__base_bash_libs_app_provenance["$model|$key"]}"
 }
 
-__base_bash_libs_app_escape_report_field__() {
-    local value="${1-}"
-    value="${value//\\/\\\\}"
-    value="${value//$'\t'/\\t}"
-    value="${value//$'\n'/\\n}"
-    value="${value//$'\r'/\\r}"
-    printf '%s' "$value"
-}
-
 # base_app_config_report - Emits deterministic, secret-redacted effective data.
 base_app_config_report() {
     local model="${1-}" key value source secret
@@ -640,9 +637,9 @@ base_app_config_report() {
         secret="${__base_bash_libs_app_config["$model|$key|secret"]-false}"
         __base_bash_libs_app_bool_true__ "$secret" && value='<redacted>'
         printf '%s\t%s\t%s\n' \
-            "$(__base_bash_libs_app_escape_report_field__ "$key")" \
-            "$(__base_bash_libs_app_escape_report_field__ "$source")" \
-            "$(__base_bash_libs_app_escape_report_field__ "$value")"
+            "$(__base_bash_libs_str_escape_tsv_field__ "$key")" \
+            "$(__base_bash_libs_str_escape_tsv_field__ "$source")" \
+            "$(__base_bash_libs_str_escape_tsv_field__ "$value")"
     done
 }
 

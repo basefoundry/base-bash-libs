@@ -1,8 +1,10 @@
 # Application policy (`app`)
 
-`lib_app.sh` is an optional policy layer for applications that use the `std`
-and `cli` modules. It keeps configuration and lifecycle policy out of the
+`lib_app.sh` is an optional policy layer for applications that use the `std`,
+`cli`, and `str` modules. It keeps configuration and lifecycle policy out of the
 foundation module while giving applications one small, composable contract.
+The library imports `lib/bash/str/lib_str.sh` automatically for the shared TSV
+field-escaping contract used by configuration reports.
 
 The module is one sourceable file, is safe to source repeatedly, and never
 executes configuration data. Configuration files contain only trimmed
@@ -33,7 +35,8 @@ The deterministic precedence is `CLI > environment > project > user >
 default`. `base_app_config_report` prints `key`, source, and effective value
 as tab-separated records and redacts values declared with `secret=true`.
 Backslashes, tabs, carriage returns, and newlines in fields are escaped as
-`\\`, `\\t`, `\\r`, and `\\n` so each record remains one safe line.
+`\\`, `\\t`, `\\r`, and `\\n` so each record remains one safe line. See the
+[shared TSV field escaping contract](../str/README.md#shared-tsv-field-escaping).
 `base_app_config_set_cli` is a programmatic equivalent of `--cli key=value`.
 
 `base_app_config_load` validates the complete candidate configuration before

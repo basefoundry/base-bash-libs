@@ -4,7 +4,7 @@ Git helpers for Bash commands that need lightweight repository inspection or upd
 
 ## Dependency
 
-Source `lib/bash/std/lib_std.sh` before this library so logging and shared error handling are available.
+Source `lib/bash/std/lib_std.sh` before this library so logging and shared error handling are available. The library automatically imports `lib/bash/str/lib_str.sh` for its shared TSV field-escaping primitive.
 
 ## Public API
 
@@ -21,7 +21,8 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
 - `base_git_list_worktree_branches [repo]`
   Print tab-separated worktree path and branch rows. Backslash, tab, newline,
   and carriage-return bytes in paths are escaped as `\\`, `\t`, `\n`, and
-  `\r`, respectively; ordinary paths retain their existing output.
+  `\r`, respectively; ordinary paths retain their existing output. See the
+  [shared TSV field escaping contract](../str/README.md#shared-tsv-field-escaping).
 - `base_git_branch_upstream <repo> <branch>`
   Print the configured upstream ref for a local branch.
 - `base_git_branch_merged_to_ref <repo> <branch> <ref>`

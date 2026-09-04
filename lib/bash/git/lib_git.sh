@@ -8,6 +8,12 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
     printf '%s\n' "Error: lib_git.sh requires lib_std.sh to be sourced first." >&2
     return 1 2> /dev/null || exit 1
 fi
+if [[ "${BASE_BASH_LIBS_STR_LOADED:-}" != "1" ]]; then
+    if ! base_std_import str/lib_str.sh; then
+        printf '%s\n' "Error: lib_git.sh requires lib_str.sh to be available in the loaded package." >&2
+        return 1 2> /dev/null || exit 1
+    fi
+fi
 readonly BASE_BASH_LIBS_GIT_LOADED=1
 
 __base_bash_libs_git_detect_default_branch__() {
@@ -93,16 +99,6 @@ __base_bash_libs_git_release_worktree_records__() {
     rm -f -- "$records_file"
 }
 
-__base_bash_libs_git_escape_record_field__() {
-    local value="${1-}"
-
-    value="${value//\\/\\\\}"
-    value="${value//$'\t'/\\t}"
-    value="${value//$'\n'/\\n}"
-    value="${value//$'\r'/\\r}"
-    printf '%s' "$value"
-}
-
 base_git_worktree_path_for_branch() {
     local __base_bash_libs_git_worktree_result_name=""
 
@@ -184,7 +180,7 @@ base_git_list_worktree_branches() {
         "")
             if [[ -n "$path" && -n "$branch" ]]; then
                 branch="${branch#refs/heads/}"
-                escaped_path="$(__base_bash_libs_git_escape_record_field__ "$path")"
+                escaped_path="$(__base_bash_libs_str_escape_tsv_field__ "$path")"
                 printf '%s\t%s\n' "$escaped_path" "$branch"
             fi
             path=""
