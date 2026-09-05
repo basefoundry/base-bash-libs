@@ -16,6 +16,12 @@ readonly BASE_BASH_LIBS_CLI_LOADED=1
 declare -gA __base_bash_libs_cli_models=()
 declare -gA __base_bash_libs_cli_attrs=()
 declare -gA __base_bash_libs_cli_seen=()
+# Declaration-time collision indexes. Values are comma-separated command
+# paths; paths are validated to exclude commas. This avoids scanning the full
+# model registry for every option while retaining the canonical model records
+# used by parsing and validation.
+declare -gA __base_bash_libs_cli_option_name_index=()
+declare -gA __base_bash_libs_cli_option_token_index=()
 # Keep the allowlists in one indexed table. Indexed arrays avoid the
 # Bash-4.2 associative-subscript parsing differences that affect generated
 # applications while preserving a single source of truth for every kind.
@@ -345,6 +351,39 @@ __base_bash_libs_cli_paths_overlap__() {
     [[ -z "$left" || -z "$right" || "$left" == "$right" || "$left" == "$right/"* || "$right" == "$left/"* ]]
 }
 
+__base_bash_libs_cli_index_append__() {
+    local result_name="$1" key="$2" value="$3" current
+    case "$result_name" in
+    name) current="${__base_bash_libs_cli_option_name_index[$key]-}" ;;
+    token) current="${__base_bash_libs_cli_option_token_index[$key]-}" ;;
+    *) return 2 ;;
+    esac
+    if [[ -n "$current" ]]; then
+        if [[ "$result_name" == name ]]; then
+            __base_bash_libs_cli_option_name_index["$key"]="$current,$value"
+        else
+            __base_bash_libs_cli_option_token_index["$key"]="$current,$value"
+        fi
+    else
+        if [[ "$result_name" == name ]]; then
+            __base_bash_libs_cli_option_name_index["$key"]="$value"
+        else
+            __base_bash_libs_cli_option_token_index["$key"]="$value"
+        fi
+    fi
+}
+
+__base_bash_libs_cli_index_has_overlap__() {
+    local index_value="$1" path="$2" existing
+    local -a indexed_paths=()
+    IFS=, read -r -a indexed_paths <<< "$index_value"
+    for existing in "${indexed_paths[@]+${indexed_paths[@]}}"; do
+        [[ "$existing" == . ]] && existing=""
+        __base_bash_libs_cli_paths_overlap__ "$path" "$existing" && return 0
+    done
+    return 1
+}
+
 __base_bash_libs_cli_collect_positionals__() {
     local model="$1" path="$2" name
     local -a __base_bash_libs_cli_local_positionals=()
@@ -652,6 +691,12 @@ base_cli_model_init() {
     for key in "${!__base_bash_libs_cli_models[@]}"; do
         [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_cli_models[$key]"
     done
+    for key in "${!__base_bash_libs_cli_option_name_index[@]}"; do
+        [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_cli_option_name_index[$key]"
+    done
+    for key in "${!__base_bash_libs_cli_option_token_index[@]}"; do
+        [[ "$key" == "$model|"* ]] && unset "__base_bash_libs_cli_option_token_index[$key]"
+    done
     __base_bash_libs_cli_models["$model|meta|name"]="${__base_bash_libs_cli_attrs[name]-$model}"
     __base_bash_libs_cli_models["$model|meta|version"]="${__base_bash_libs_cli_attrs[version]-}"
     __base_bash_libs_cli_models["$model|meta|description"]="${__base_bash_libs_cli_attrs[description]-}"
@@ -839,7 +884,7 @@ base_cli_command() {
 # Usage: base_cli_option model command_path name type token... [key=value]
 base_cli_option() {
     local model="${1-}" path="${2-}" name="${3-}" type="${4-}" token argument key option_names
-    local existing_key existing_path route_prefix route_suffix
+    local existing_path route_prefix route_suffix index_value index_path
     local -a tokens=() attrs=()
     local -A token_seen=()
 
@@ -870,17 +915,11 @@ base_cli_option() {
         __base_bash_libs_cli_declaration_usage__ "base_cli_option: option '$name' is already declared on '$path'."
         return 2
     fi
-    route_prefix="$model|option|"
-    route_suffix="|meta|$name|type"
-    for existing_key in "${!__base_bash_libs_cli_models[@]}"; do
-        [[ "$existing_key" == "$route_prefix"*"$route_suffix" ]] || continue
-        existing_path="${existing_key#"$route_prefix"}"
-        existing_path="${existing_path%"$route_suffix"}"
-        if __base_bash_libs_cli_paths_overlap__ "$path" "$existing_path"; then
-            __base_bash_libs_cli_declaration_usage__ "base_cli_option: option name '$name' conflicts across '$path' and '$existing_path'."
-            return 2
-        fi
-    done
+    index_value="${__base_bash_libs_cli_option_name_index["$model|$name"]-}"
+    if [[ -n "$index_value" ]] && __base_bash_libs_cli_index_has_overlap__ "$index_value" "$path"; then
+        __base_bash_libs_cli_declaration_usage__ "base_cli_option: option name '$name' conflicts across '$path' and an overlapping command path."
+        return 2
+    fi
     shift 4
     for argument; do
         if [[ "$argument" == *=* ]]; then attrs+=("$argument"); else tokens+=("$argument"); fi
@@ -914,16 +953,11 @@ base_cli_option() {
             __base_bash_libs_cli_declaration_usage__ "base_cli_option: option token '$token' was repeated."
             return 2
         fi
-        route_suffix="|token|$token"
-        for existing_key in "${!__base_bash_libs_cli_models[@]}"; do
-            [[ "$existing_key" == "$route_prefix"*"$route_suffix" ]] || continue
-            existing_path="${existing_key#"$route_prefix"}"
-            existing_path="${existing_path%"$route_suffix"}"
-            if __base_bash_libs_cli_paths_overlap__ "$path" "$existing_path"; then
-                __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' conflicts across '$path' and '$existing_path'."
-                return 2
-            fi
-        done
+        index_value="${__base_bash_libs_cli_option_token_index["$model|$token"]-}"
+        if [[ -n "$index_value" ]] && __base_bash_libs_cli_index_has_overlap__ "$index_value" "$path"; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' conflicts across '$path' and an overlapping command path."
+            return 2
+        fi
         token_seen["$token"]=1
     done
     if [[ "$type" == flag && -n "${__base_bash_libs_cli_attrs[default]+set}" ]]; then
@@ -969,7 +1003,9 @@ base_cli_option() {
     done
     for token in "${tokens[@]}"; do
         __base_bash_libs_cli_models["$model|option|$path|token|$token"]="$name"
+        __base_bash_libs_cli_index_append__ token "$model|$token" "${path:-.}" || return 1
     done
+    __base_bash_libs_cli_index_append__ name "$model|$name" "${path:-.}" || return 1
     return 0
 }
 

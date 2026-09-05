@@ -569,6 +569,21 @@ EOF
     [ "${__base_bash_libs_cli_option_tokens[*]}" = caller-tokens ]
 }
 
+@test "large option declarations populate indexed collision metadata" {
+    local index option_name token
+    base_cli_model_init indexed name=indexed
+    base_cli_command indexed run Run
+
+    for ((index = 1; index <= 200; index++)); do
+        option_name="option_$index"
+        token="--option-$index"
+        base_cli_option indexed run "$option_name" value "$token" || return 1
+    done
+
+    [ "${__base_bash_libs_cli_option_name_index[indexed\|option_200]}" = run ]
+    [ "${__base_bash_libs_cli_option_token_index[indexed\|--option-200]}" = run ]
+}
+
 @test "the declarative runtime contains no eval dependency" {
     ! grep -Ev '^[[:space:]]*#' "$BASE_BASH_DIR/cli/lib_cli.sh" | grep -Eq '(^|[[:space:];])eval([[:space:];]|$)'
 }
