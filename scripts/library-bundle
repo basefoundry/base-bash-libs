@@ -222,14 +222,32 @@ verify_bundle() {
         }
         metadata_seen["$metadata_key"]=1
         case "$metadata_key" in
-        bundle_format) [[ "$metadata_value" == 1 ]] || { error 'unsupported bundle format'; return 1; } ;;
-        source_version) [[ "$metadata_value" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { error 'invalid source version metadata'; return 1; } ;;
-        source_commit) [[ "$metadata_value" =~ ^(unknown|[0-9a-f]{40})$ ]] || { error 'invalid source commit metadata'; return 1; } ;;
-        provenance) [[ "$metadata_value" == deterministic-directory-bundle || "$metadata_value" == release-artifact ]] || { error 'invalid provenance metadata'; return 1; } ;;
-        *) error "unknown BUNDLE.release field: $metadata_key"; return 1 ;;
+        bundle_format) [[ "$metadata_value" == 1 ]] || {
+            error 'unsupported bundle format'
+            return 1
+        } ;;
+        source_version) [[ "$metadata_value" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || {
+            error 'invalid source version metadata'
+            return 1
+        } ;;
+        source_commit) [[ "$metadata_value" =~ ^(unknown|[0-9a-f]{40})$ ]] || {
+            error 'invalid source commit metadata'
+            return 1
+        } ;;
+        provenance) [[ "$metadata_value" == deterministic-directory-bundle || "$metadata_value" == release-artifact ]] || {
+            error 'invalid provenance metadata'
+            return 1
+        } ;;
+        *)
+            error "unknown BUNDLE.release field: $metadata_key"
+            return 1
+            ;;
         esac
     done < "$root/BUNDLE.release"
-    ((metadata_line_count == 4)) || { error 'BUNDLE.release must contain exactly four metadata fields'; return 1; }
+    ((metadata_line_count == 4)) || {
+        error 'BUNDLE.release must contain exactly four metadata fields'
+        return 1
+    }
     printf 'Bundle provenance and hashes are valid: %s\n' "$root"
 }
 
