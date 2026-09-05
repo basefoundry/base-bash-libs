@@ -38,7 +38,7 @@ setup() {
 }
 
 @test "library bundle verification binds the complete inventory and metadata" {
-    local source="$TEST_TMPDIR/source" candidate first_line
+    local source="$TEST_TMPDIR/source" first_line
     "$BASE_REPO_ROOT/scripts/library-bundle" bundle "$source" >/dev/null
     first_line="$(sed -n '1p' "$source/MANIFEST.sha256")"
 

@@ -132,7 +132,7 @@ bundle_repo() {
 }
 
 verify_bundle() {
-    local root="${1:-}" expected actual path line line_number=0 allow_lock
+    local root="${1:-}" expected actual path line line_number=0
     local checksum_pattern
     local -A checksum_seen=() expected_seen=()
 

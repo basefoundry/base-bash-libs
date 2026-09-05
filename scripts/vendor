@@ -38,7 +38,8 @@ verify_bundle() {
 
 copy_verified_bundle() {
     local source="$1" destination="$2" expected path
-    while read -r expected path; do
+    while read -r checksum path; do
+        [[ -n "$checksum" ]] || continue
         [[ -n "$path" ]] || continue
         mkdir -p "$destination/$(dirname -- "$path")" || return 1
         cp -- "$source/$path" "$destination/$path" || return 1
