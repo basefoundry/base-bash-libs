@@ -14,6 +14,14 @@ validate_test_label() {
     [[ "$1" == valid ]]
 }
 
+validate_test_nested_load() {
+    if [[ "$1" == outer-value && -z "${APP_TEST_NESTED_ONCE-}" ]]; then
+        APP_TEST_NESTED_ONCE=1
+        base_app_config_load nested --cli value=nested-value
+    fi
+    return 0
+}
+
 declare_test_config() {
     base_app_init demo name=demo
     base_app_config_define demo mode enum enum=dev,prod default=dev env=APP_TEST_MODE
@@ -153,6 +161,28 @@ assert_demo_snapshot() {
     base_app_config_get demo label value
     [ "$value" = valid ]
     base_app_config_provenance demo label source
+    [ "$source" = cli ]
+}
+
+@test "nested validator loads keep outer staged configuration isolated" {
+    base_app_init nested name=nested
+    base_app_config_define nested value string default=nested-default
+    base_app_init outer name=outer
+    base_app_config_define outer first string default=outer-first
+    base_app_config_define outer value string default=outer-value validator=validate_test_nested_load
+
+    unset APP_TEST_NESTED_ONCE
+    base_app_config_load outer
+
+    base_app_config_get outer value value
+    [ "$value" = outer-value ]
+    base_app_config_provenance outer value source
+    [ "$source" = default ]
+    base_app_config_get outer first value
+    [ "$value" = outer-first ]
+    base_app_config_get nested value value
+    [ "$value" = nested-value ]
+    base_app_config_provenance nested value source
     [ "$source" = cli ]
 }
 
