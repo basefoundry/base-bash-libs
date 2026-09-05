@@ -197,6 +197,13 @@ __base_bash_libs_app_clear_staged_config__() {
     __base_bash_libs_app_staged_provenance=()
 }
 
+__base_bash_libs_app_clear_global_staged_config__() {
+    # Explicit -g keeps cleanup targeted at the compatibility globals even
+    # when a caller is already inside another dynamically scoped load frame.
+    declare -gA __base_bash_libs_app_staged_values=()
+    declare -gA __base_bash_libs_app_staged_provenance=()
+}
+
 __base_bash_libs_app_set_value__() {
     local model="$1" key="$2" value="$3" source="$4"
     __base_bash_libs_app_validate_value__ "$model" "$key" "$value" || return $?
@@ -462,9 +469,9 @@ base_app_config_load() {
     # map would let the nested transaction clear or overwrite the outer one.
     # Bash's dynamic scoping makes these locals visible to the existing helper
     # functions without changing their public/internal interfaces.
-    __base_bash_libs_app_clear_staged_config__
     local -A __base_bash_libs_app_staged_values=()
     local -A __base_bash_libs_app_staged_provenance=()
+    __base_bash_libs_app_clear_global_staged_config__
     local parse_options=1
 
     (($# >= 1)) || {

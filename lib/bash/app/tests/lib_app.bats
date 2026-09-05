@@ -168,6 +168,7 @@ assert_demo_snapshot() {
     base_app_init nested name=nested
     base_app_config_define nested value string default=nested-default
     base_app_init outer name=outer
+    base_app_config_define outer first string default=outer-first
     base_app_config_define outer value string default=outer-value validator=validate_test_nested_load
 
     unset APP_TEST_NESTED_ONCE
@@ -177,6 +178,8 @@ assert_demo_snapshot() {
     [ "$value" = outer-value ]
     base_app_config_provenance outer value source
     [ "$source" = default ]
+    base_app_config_get outer first value
+    [ "$value" = outer-first ]
     base_app_config_get nested value value
     [ "$value" = nested-value ]
     base_app_config_provenance nested value source
