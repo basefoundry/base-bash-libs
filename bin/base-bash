@@ -146,7 +146,9 @@ base_launcher_resolve_lib_dir() {
         return $?
     fi
 
-    for candidate in "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
+    for candidate in "$package_root/.base-bash-libs/lib/bash" \
+        "$package_root/vendor/base-bash-libs/lib/bash" \
+        "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
         if base_launcher_lib_dir_is_usable "$candidate"; then
             cd -L -- "$candidate" && pwd -L
             return $?
@@ -697,11 +699,12 @@ __base_bash_libs_launcher_print_version__() {
 
     metadata_root="$(__base_bash_libs_launcher_metadata_root__ "$lib_dir")" || return 1
     metadata_file="$lib_dir/base-bash-libs.release"
-    version=""
-    if [[ -r "$metadata_root/VERSION" ]]; then
+    # The release metadata belongs to the framework even when a standalone
+    # consumer keeps its own root VERSION. Prefer it over package-root VERSION.
+    version="$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" version 2> /dev/null || true)"
+    if [[ -z "$version" && -r "$metadata_root/VERSION" ]]; then
         IFS= read -r version < "$metadata_root/VERSION" || true
     fi
-    version="${version:-$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" version 2> /dev/null || true)}"
     [[ -n "$version" ]] || {
         printf 'ERROR: Unable to determine the base-bash-libs package version.\n' >&2
         return 1
@@ -757,7 +760,9 @@ __base_bash_libs_launcher_check_lib_dir__() {
         return 1
     fi
 
-    for candidate in "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
+    for candidate in "$package_root/.base-bash-libs/lib/bash" \
+        "$package_root/vendor/base-bash-libs/lib/bash" \
+        "$package_root/lib/bash" "$package_root/libexec/lib/bash"; do
         if base_launcher_lib_dir_is_usable "$candidate"; then
             printf '%s\n' "$(cd -L -- "$candidate" && pwd -L)"
             return 0
