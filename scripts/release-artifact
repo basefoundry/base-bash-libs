@@ -87,7 +87,7 @@ write_hash_manifest() {
         printf '%s  %s\n' "$(hash_file "$root/$path")" "$path" >> "$root/MANIFEST.sha256" || return 1
     done < <(
         {
-            printf '%s\n' VERSION base_api_manifest.yaml
+            printf '%s\n' BUNDLE.release VERSION base_api_manifest.yaml
             "$repo_root/scripts/api-manifest" artifact-paths
         } | LC_ALL=C sort -u
     )
