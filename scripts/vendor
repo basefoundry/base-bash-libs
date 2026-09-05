@@ -218,14 +218,17 @@ standalone_bundle() {
         rm -rf -- "$temporary"
         return 1
     fi
-    # Keep application metadata at the standalone root. The launcher searches
-    # this private framework directory before the application tree, so the
-    # framework's VERSION cannot overwrite the consumer's VERSION.
-    if ! mkdir -p "$temporary/.base-bash-libs" "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
-        ! copy_tree "$framework_bundle" "$temporary/.base-bash-libs" ||
+    # Put the verified framework at the standalone root for the established
+    # artifact layout, then restore the consumer-owned metadata that shares a
+    # framework filename. The launcher reads its version from the framework
+    # release file, so the application VERSION remains user-visible.
+    if ! mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
+        ! copy_tree "$framework_bundle" "$temporary" ||
         ! copy_tree "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
         ! write_lock "$temporary/vendor/base-bash-libs" "$framework_bundle" standalone ||
         ! cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" ||
+        ! cp -- "$application/VERSION" "$temporary/VERSION" ||
+        ! cp -- "$application/README.md" "$temporary/README.md" ||
         ! chmod +x "$temporary/bin/base-bash" "$temporary/bin/app"; then
         rm -rf -- "$temporary"
         return 1
