@@ -134,8 +134,9 @@ SCRIPT
         "$project_dir/.github/workflows/validate.yml"
     grep -Eq 'bats-core/bats-action@[0-9a-f]{40}[[:space:]]+# v4\.0\.0$' \
         "$project_dir/.github/workflows/validate.yml"
-    ! grep -Eq 'uses: .+@(v[0-9]|main|master)([[:space:]]|$)' \
+    run grep -Eq 'uses: .+@(v[0-9]|main|master)([[:space:]]|$)' \
         "$project_dir/.github/workflows/validate.yml"
+    [ "$status" -eq 1 ]
 
     bats_run env PATH="$BASE_REPO_ROOT/bin:$PATH" BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$project_dir/bin/app" run
     [ "$status" -eq 0 ]
