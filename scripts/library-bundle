@@ -34,6 +34,13 @@ file_list() {
     } | LC_ALL=C sort -u
 }
 
+bundle_inventory() {
+    {
+        printf '%s\n' BUNDLE.release
+        file_list
+    } | LC_ALL=C sort -u
+}
+
 check_one_file_boundary() {
     local source_path directory count
     while IFS= read -r source_path; do
@@ -69,7 +76,7 @@ write_hash_manifest() {
     while IFS= read -r path; do
         [[ -n "$path" ]] || continue
         printf '%s  %s\n' "$(hash_file "$root/$path")" "$path" >> "$root/MANIFEST.sha256" || return 1
-    done < <(file_list)
+    done < <(bundle_inventory)
 }
 
 bundle_repo() {
@@ -125,16 +132,40 @@ bundle_repo() {
 }
 
 verify_bundle() {
-    local root="${1:-}" expected actual path
+    local root="${1:-}" expected actual path line line_number=0 allow_lock
+    local checksum_pattern
+    local -A checksum_seen=() expected_seen=()
 
-    [[ -n "$root" && -f "$root/MANIFEST.sha256" ]] || {
+    [[ -n "$root" && -d "$root" && ! -L "$root" && -f "$root/MANIFEST.sha256" &&
+        ! -L "$root/MANIFEST.sha256" && -f "$root/BUNDLE.release" && ! -L "$root/BUNDLE.release" ]] || {
         error "bundle is missing MANIFEST.sha256: $root"
         return 1
     }
-    while read -r expected path; do
-        [[ -n "$path" ]] || continue
+    checksum_pattern='^([0-9a-f]{64})  ([A-Za-z0-9_./-]+)$'
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line_number=$((line_number + 1))
+        [[ "$line" =~ $checksum_pattern ]] || {
+            error "malformed checksum entry at line $line_number"
+            return 1
+        }
+        expected="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[2]}"
+        [[ "$path" != /* && "$path" != ./* && "$path" != */ && "$path" != *'//'* &&
+            "$path" != *'/../'* && "$path" != ../* && "$path" != *'/./'* && "$path" != ./ ]] || {
+            error "unsafe checksum path: $path"
+            return 1
+        }
+        [[ -z "${checksum_seen[$path]+set}" ]] || {
+            error "duplicate checksum entry: $path"
+            return 1
+        }
+        checksum_seen["$path"]=1
         [[ -f "$root/$path" ]] || {
             error "bundle file is missing: $path"
+            return 1
+        }
+        [[ ! -L "$root/$path" ]] || {
+            error "bundle file must not be a symlink: $path"
             return 1
         }
         actual="$(hash_file "$root/$path")"
@@ -143,6 +174,62 @@ verify_bundle() {
             return 1
         }
     done < "$root/MANIFEST.sha256"
+
+    while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        expected_seen["$path"]=1
+        [[ -n "${checksum_seen[$path]+set}" ]] || {
+            error "bundle checksum manifest omits expected file: $path"
+            return 1
+        }
+    done < <(bundle_inventory)
+    for path in "${!checksum_seen[@]}"; do
+        [[ -n "${expected_seen[$path]+set}" ]] || {
+            error "bundle checksum manifest contains unexpected file: $path"
+            return 1
+        }
+    done
+
+    # Reject symlink payloads and regular files not represented by the exact
+    # inventory. A vendor destination may additionally carry its lock file.
+    while IFS= read -r path; do
+        path="${path#./}"
+        [[ "$path" == MANIFEST.sha256 ]] && continue
+        [[ "$path" == base-bash-libs.lock && "${BUNDLE_VERIFY_ALLOW_LOCK:-0}" == 1 ]] && continue
+        [[ -n "${expected_seen[$path]+set}" ]] || {
+            error "bundle contains unexpected file: $path"
+            return 1
+        }
+    done < <(cd -- "$root" && find . -type f -print | LC_ALL=C sort)
+    if find "$root" -type l -print -quit | grep -q .; then
+        error 'bundle contains a symlink payload'
+        return 1
+    fi
+
+    local metadata_key metadata_value metadata_line metadata_line_count=0
+    local -A metadata_seen=()
+    while IFS= read -r metadata_line || [[ -n "$metadata_line" ]]; do
+        metadata_line_count=$((metadata_line_count + 1))
+        [[ "$metadata_line" =~ ^([a-z_][a-z_]*)=([^[:space:]]+)$ ]] || {
+            error "malformed BUNDLE.release field at line $metadata_line_count"
+            return 1
+        }
+        metadata_key="${BASH_REMATCH[1]}"
+        metadata_value="${BASH_REMATCH[2]}"
+        [[ -z "${metadata_seen[$metadata_key]+set}" ]] || {
+            error "duplicate BUNDLE.release field: $metadata_key"
+            return 1
+        }
+        metadata_seen["$metadata_key"]=1
+        case "$metadata_key" in
+        bundle_format) [[ "$metadata_value" == 1 ]] || { error 'unsupported bundle format'; return 1; } ;;
+        source_version) [[ "$metadata_value" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { error 'invalid source version metadata'; return 1; } ;;
+        source_commit) [[ "$metadata_value" =~ ^(unknown|[0-9a-f]{40})$ ]] || { error 'invalid source commit metadata'; return 1; } ;;
+        provenance) [[ "$metadata_value" == deterministic-directory-bundle || "$metadata_value" == release-artifact ]] || { error 'invalid provenance metadata'; return 1; } ;;
+        *) error "unknown BUNDLE.release field: $metadata_key"; return 1 ;;
+        esac
+    done < "$root/BUNDLE.release"
+    ((metadata_line_count == 4)) || { error 'BUNDLE.release must contain exactly four metadata fields'; return 1; }
     printf 'Bundle provenance and hashes are valid: %s\n' "$root"
 }
 
