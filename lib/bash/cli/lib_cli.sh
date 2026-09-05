@@ -884,7 +884,7 @@ base_cli_command() {
 # Usage: base_cli_option model command_path name type token... [key=value]
 base_cli_option() {
     local model="${1-}" path="${2-}" name="${3-}" type="${4-}" token argument key option_names
-    local existing_path route_prefix route_suffix index_value index_path
+    local index_value
     local -a tokens=() attrs=()
     local -A token_seen=()
 
