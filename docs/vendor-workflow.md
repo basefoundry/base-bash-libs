@@ -33,10 +33,11 @@ PATH="$PWD/dist/app/bin:$PATH" dist/app/bin/app --help
 ```
 
 The standalone payload contains two deterministic copies of the same verified
-framework bundle. The private `.base-bash-libs` copy is the authoritative
-runtime layout and is bound by `BASE_BASH_STANDALONE.release`; the launcher
-resolves its colocated `lib/bash` tree without ambient `BASE_BASH_LIBS_DIR`.
-The application's root `VERSION` remains its own user-visible version. The
+framework bundle. The root copy is the authoritative runtime layout and is
+bound by `BASE_BASH_STANDALONE.release`; the launcher resolves its colocated
+`lib/bash` tree without ambient `BASE_BASH_LIBS_DIR`. The application's root
+`VERSION` remains its own user-visible version; the launcher reads the framework
+version from `lib/bash/base-bash-libs.release`. The
 `vendor/base-bash-libs` copy is the authoritative audit/vendor layout and has
 its own `base-bash-libs.lock`, so consumers can verify it independently:
 

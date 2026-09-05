@@ -699,11 +699,12 @@ __base_bash_libs_launcher_print_version__() {
 
     metadata_root="$(__base_bash_libs_launcher_metadata_root__ "$lib_dir")" || return 1
     metadata_file="$lib_dir/base-bash-libs.release"
-    version=""
-    if [[ -r "$metadata_root/VERSION" ]]; then
+    # The release metadata belongs to the framework even when a standalone
+    # consumer keeps its own root VERSION. Prefer it over package-root VERSION.
+    version="$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" version 2> /dev/null || true)"
+    if [[ -z "$version" && -r "$metadata_root/VERSION" ]]; then
         IFS= read -r version < "$metadata_root/VERSION" || true
     fi
-    version="${version:-$(__base_bash_libs_launcher_metadata_value__ "$metadata_file" version 2> /dev/null || true)}"
     [[ -n "$version" ]] || {
         printf 'ERROR: Unable to determine the base-bash-libs package version.\n' >&2
         return 1

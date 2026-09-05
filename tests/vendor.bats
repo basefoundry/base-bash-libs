@@ -86,7 +86,7 @@ SCRIPT
     [ "$status" -eq 0 ]
     [ -x "$standalone/bin/base-bash" ]
     [ -x "$standalone/bin/app" ]
-    [ -d "$standalone/.base-bash-libs/lib/bash" ]
+    [ -d "$standalone/lib/bash" ]
     [ "$(<"$standalone/VERSION")" = "0.1.0" ]
     [ -f "$standalone/vendor/base-bash-libs/base-bash-libs.lock" ]
     bats_run "$BASE_REPO_ROOT/scripts/vendor" verify "$standalone/vendor/base-bash-libs"
