@@ -37,7 +37,7 @@ verify_bundle() {
 }
 
 copy_verified_bundle() {
-    local source="$1" destination="$2" expected path
+    local source="$1" destination="$2" checksum path
     while read -r checksum path; do
         [[ -n "$checksum" ]] || continue
         [[ -n "$path" ]] || continue
