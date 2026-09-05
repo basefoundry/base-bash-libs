@@ -177,6 +177,7 @@ archive_safe() {
 
 build_artifact() {
     local version="" output="" commit="" argument index
+    local seen_version=0 seen_output=0 seen_commit=0
     local repo_commit temporary stage_root root_name archive archive_name sbom provenance sums
     local archive_sha sbom_sha provenance_sha
     local -a arguments=("$@")
@@ -186,14 +187,29 @@ build_artifact() {
         argument="${arguments[$index]}"
         case "$argument" in
         --version)
+            ((seen_version == 0)) || {
+                error "Option '--version' may be provided only once."
+                return 2
+            }
+            seen_version=1
             index=$((index + 1))
             version="${arguments[$index]-}"
             ;;
         --output)
+            ((seen_output == 0)) || {
+                error "Option '--output' may be provided only once."
+                return 2
+            }
+            seen_output=1
             index=$((index + 1))
             output="${arguments[$index]-}"
             ;;
         --commit)
+            ((seen_commit == 0)) || {
+                error "Option '--commit' may be provided only once."
+                return 2
+            }
+            seen_commit=1
             index=$((index + 1))
             commit="${arguments[$index]-}"
             ;;
