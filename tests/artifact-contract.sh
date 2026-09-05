@@ -31,6 +31,14 @@ artifact_copy_contract() {
 artifact_run_contract() {
     local label="$1" root="$2" mode status index
     local -a modes=(none e u p eu ep up eup) pids=() logs=()
+    # Keep the verified source bundle immutable. The contract harness adds its
+    # own test file to a disposable copy so later standalone verification still
+    # exercises the exact-inventory boundary.
+    if [[ "$label" == generated-bundle ]]; then
+        local harness_root="$artifact_tmp/generated-bundle-contract"
+        cp -R "$root" "$harness_root" || artifact_fail "could not stage bundle contract harness"
+        root="$harness_root"
+    fi
     artifact_copy_contract "$root"
     # These modes are independent processes. Running them concurrently keeps
     # the artifact gate practical even on slower hosted runners while each
@@ -38,7 +46,7 @@ artifact_run_contract() {
     for mode in "${modes[@]}"; do
         logs+=("$artifact_tmp/${label}-${mode}.log")
         "$BASH" "$root/tests/bash-option-contract.sh" --mode "$mode" \
-            >"${logs[${#logs[@]} - 1]}" 2>&1 &
+            > "${logs[${#logs[@]} - 1]}" 2>&1 &
         pids+=("$!")
     done
     for index in "${!modes[@]}"; do
@@ -60,11 +68,11 @@ artifact_vendor="$artifact_tmp/vendor"
 artifact_standalone="$artifact_tmp/standalone"
 artifact_project="$artifact_tmp/project"
 
-"$artifact_repo_root/scripts/library-bundle" bundle "$artifact_bundle" >/dev/null ||
+"$artifact_repo_root/scripts/library-bundle" bundle "$artifact_bundle" > /dev/null ||
     artifact_fail 'deterministic bundle creation failed'
-"$artifact_repo_root/scripts/library-bundle" verify "$artifact_bundle" >/dev/null ||
+"$artifact_repo_root/scripts/library-bundle" verify "$artifact_bundle" > /dev/null ||
     artifact_fail 'deterministic bundle verification failed'
-"$artifact_repo_root/scripts/vendor" create "$artifact_bundle" "$artifact_vendor" >/dev/null ||
+"$artifact_repo_root/scripts/vendor" create "$artifact_bundle" "$artifact_vendor" > /dev/null ||
     artifact_fail 'verified vendor creation failed'
 
 artifact_run_contract source-checkout "$artifact_repo_root"
@@ -73,16 +81,16 @@ artifact_run_contract vendored-tree "$artifact_vendor"
 
 mkdir -p "$artifact_project" || artifact_fail 'could not create generated project directory'
 BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
-    "$artifact_repo_root/bin/base-bash" init --profile standard --dir "$artifact_project" >/dev/null ||
+    "$artifact_repo_root/bin/base-bash" init --profile standard --dir "$artifact_project" > /dev/null ||
     artifact_fail 'standard project generation failed'
 
 PATH="$artifact_repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
-    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" --help >/dev/null || artifact_fail 'generated app help failed'
+    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" --help > /dev/null || artifact_fail 'generated app help failed'
 PATH="$artifact_repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$artifact_repo_root/lib/bash" \
-    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" run --dry-run >/dev/null || artifact_fail 'generated app dry-run failed'
+    "$artifact_repo_root/bin/base-bash" "$artifact_project/bin/app" run --dry-run > /dev/null || artifact_fail 'generated app dry-run failed'
 
 "$artifact_repo_root/scripts/vendor" standalone "$artifact_project" "$artifact_bundle" \
-    "$artifact_standalone" >/dev/null || artifact_fail 'standalone bundle creation failed'
+    "$artifact_standalone" > /dev/null || artifact_fail 'standalone bundle creation failed'
 artifact_run_contract standalone-bundle "$artifact_standalone"
 
 printf 'Artifact contract passed for source, generated, vendored, standalone, and project-kit paths.\n'
