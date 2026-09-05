@@ -6,6 +6,11 @@ out of the containerized compatibility and lint checks. Actions and container
 images are pinned to full immutable commit or digest references; changing one
 requires a reviewable dependency update.
 
+The workflows emitted by `base-bash init` follow the same policy: every
+third-party action is pinned to a full commit SHA and carries a human-readable
+release comment. Generated consumer workflows can therefore be reviewed and
+upgraded without relying on mutable tags.
+
 The shfmt gate checks every Bash source changed by a pull request (and the
 latest commit on `main`). This prevents new formatting debt while allowing the
 existing v1-to-v2 codebase to be cleaned incrementally; touching a legacy file
