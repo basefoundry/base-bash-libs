@@ -457,6 +457,14 @@ base_app_config_set_cli() {
 base_app_config_load() {
     local model="${1-}" argument project_file="" user_file="" key value_key env_name value status
     local -a cli_pairs=()
+    # Keep each load transaction on the dynamic call frame. Validators may
+    # legitimately load another model (or re-enter this one); a global staging
+    # map would let the nested transaction clear or overwrite the outer one.
+    # Bash's dynamic scoping makes these locals visible to the existing helper
+    # functions without changing their public/internal interfaces.
+    __base_bash_libs_app_clear_staged_config__
+    local -A __base_bash_libs_app_staged_values=()
+    local -A __base_bash_libs_app_staged_provenance=()
     local parse_options=1
 
     (($# >= 1)) || {
@@ -464,7 +472,6 @@ base_app_config_load() {
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
-    __base_bash_libs_app_clear_staged_config__
     shift
     while (($#)); do
         argument="$1"
