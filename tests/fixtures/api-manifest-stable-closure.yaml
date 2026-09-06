@@ -1,0 +1,61 @@
+schema_version: 1
+manifest_kind: base-bash-libs-api
+manifest_version: 2.0.0
+minimum_bash: "4.2"
+generated_reference: tests/fixtures/api-manifest-stable-closure-reference.md
+migration_inventory: docs/v2-api-contract.md
+
+namespace:
+  public_function_prefix: base_
+  global_prefix: BASE_BASH_LIBS_
+  internal_function_prefix: __base_bash_libs_
+  lifecycle_functions: base_init,base_require_version
+
+environment:
+  - FIXTURE_INPUT|caller-input|fixture-only manifest input
+
+optional_commands: bash
+
+artifacts:
+  - lib/bash/process/lib_process.sh|source|process fixture source
+  - lib/bash/process/README.md|documentation|process fixture documentation
+  - lib/bash/process/tests/lib_process.bats|test-support|process fixture tests
+  - lib/bash/str/lib_str.sh|source|string fixture source
+  - lib/bash/str/README.md|documentation|string fixture documentation
+  - lib/bash/str/tests/lib_str.bats|test-support|string fixture tests
+
+modules:
+  - name: process
+    kind: sourceable-library
+    source: lib/bash/process/lib_process.sh
+    documentation: lib/bash/process/README.md
+    tests: lib/bash/process/tests/lib_process.bats
+    dependencies: none
+    optional_commands: ps,rm,sleep
+    artifacts: lib/bash/process/lib_process.sh,lib/bash/process/README.md,lib/bash/process/tests/lib_process.bats
+    public_symbols: base_process_owner_alive
+    signature_source: lib/bash/process/README.md
+    inputs: documented per symbol in the module README and API charter
+    outputs: documented per symbol; no caller-owned outputs
+    statuses: usage and contract errors return 2; a false owner relationship returns 1
+    side_effects: documented per symbol; sourcing is passive
+    stability: stable
+    since: 2.0.0
+    deprecated: false
+  - name: str
+    kind: sourceable-library
+    source: lib/bash/str/lib_str.sh
+    documentation: lib/bash/str/README.md
+    tests: lib/bash/str/tests/lib_str.bats
+    dependencies: process
+    optional_commands: none
+    artifacts: lib/bash/str/lib_str.sh,lib/bash/str/README.md,lib/bash/str/tests/lib_str.bats
+    public_symbols: base_str_contains,base_str_ends_with,base_str_join,base_str_lower,base_str_ltrim,base_str_rtrim,base_str_split,base_str_starts_with,base_str_trim,base_str_upper
+    signature_source: lib/bash/str/README.md
+    inputs: documented per symbol in the module README and API charter
+    outputs: documented per symbol; named outputs are caller-owned
+    statuses: recoverable failures return nonzero statuses
+    side_effects: documented per symbol; sourcing is passive
+    stability: stable
+    since: 2.0.0
+    deprecated: false

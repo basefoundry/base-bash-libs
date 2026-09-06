@@ -174,7 +174,7 @@ statuses, and side effects are normative in the linked module README and
 - Tests: [`lib/bash/gh/tests/lib_gh.bats`](../lib/bash/gh/tests/lib_gh.bats)
 - Dependencies: `std,process`
 - Optional commands: `gh,awk,grep,mktemp,rm,sleep,timeout,gtimeout`
-- Stability: `stable`; since `2.0.0`; deprecated: `false`
+- Stability: `preview`; since `unreleased`; deprecated: `false`
 - Inputs: documented per symbol in the module README and API charter
 - Outputs: documented per symbol; named outputs are caller-owned
 - Statuses: usage and contract errors return 2; recoverable failures return 1 unless a symbol preserves an underlying gh status

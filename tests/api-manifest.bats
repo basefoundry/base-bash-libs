@@ -83,6 +83,29 @@ setup() {
     [[ "$output" == *"may use since: unreleased only with preview stability"* ]]
 }
 
+@test "manifest rejects stable modules that depend on preview modules" {
+    invalid_dependency="$TEST_TMPDIR/stable-preview-dependency.yaml"
+    perl -0pe 's/(  - name: process\n.*?    stability: )stable/$1preview/s; s/(  - name: process\n.*?    since: )2[.]0[.]0/$1unreleased/s' \
+        "$BASE_REPO_ROOT/tests/fixtures/api-manifest-stable-closure.yaml" > "$invalid_dependency"
+
+    run "$BASE_REPO_ROOT/scripts/api-manifest" check "$invalid_dependency"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"stable module dependency path 'str -> process' reaches non-stable module 'process'"* ]]
+}
+
+@test "release-check validates the complete stable dependency closure" {
+    fixture="$BASE_REPO_ROOT/tests/fixtures/api-manifest-stable-closure.yaml"
+
+    run "$BASE_REPO_ROOT/scripts/api-manifest" release-check HEAD "$fixture"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Stable API release reference is valid: HEAD"* ]]
+
+    run "$BASE_REPO_ROOT/scripts/api-manifest" release-check v2.0.0 "$fixture"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"stable module dependency path 'process'"* ]]
+    [[ "$output" == *"lib/bash/process/lib_process.sh"* ]]
+}
+
 @test "release-check verifies stable APIs in the immutable GA tree" {
     run "$BASE_REPO_ROOT/scripts/api-manifest" release-check v2.0.0
     [ "$status" -eq 0 ]

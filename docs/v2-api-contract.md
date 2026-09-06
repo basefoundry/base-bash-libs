@@ -100,9 +100,13 @@ guidance. v1 inputs are never fallback-loaded into a v2 module graph.
 
 The optional `process` module depends on `std` and must be imported only after
 the stdlib. It is a preview addition on `main`, not part of the immutable
-`v2.0.0` contract, and must not be imported by a v2.0.0-pinned consumer. The
-stdlib does not import `process`; existing `base_std_run*` callers therefore
-retain their current source and API contract.
+`v2.0.0` contract, and must not be imported by a v2.0.0-pinned consumer. Stable
+modules may depend only on stable modules; dependency closure is part of the
+release contract. The current `gh` implementation is therefore preview-only
+on `main` because it uses `process`; the immutable `v2.0.0` `gh` implementation
+remains stable and self-contained. The stdlib does not import `process`;
+existing `base_std_run*` callers therefore retain their current source and API
+contract.
 
 ## 5. Interactive behavior
 
@@ -200,7 +204,7 @@ signature/effects reference; this table makes coverage auditable.
 | std miscellaneous | `base_std_safe_cd`, `base_std_safe_unalias`, `base_std_get_my_source_dir`, `base_std_ask_yes_no`, `base_std_wait_for_enter` | `safe_cd` changes `PWD`; source-dir writes one validated output; interactive functions return recoverable EOF/non-TTY statuses. |
 | file | `base_file_section_exists`, `base_file_section_needs_update`, `base_file_update_file_section` | Read-only predicates do not mutate; update is idempotent, symlink-preserving, atomic, metadata-preserving, and conflict-aware. |
 | git | `base_git_detect_default_branch`, `base_git_worktree_path_for_branch`, `base_git_list_worktree_branches`, `base_git_branch_upstream`, `base_git_branch_merged_to_ref`, `base_git_list_remote_branches`, `base_git_update_repo`, `base_git_get_current_branch`, `base_git_check_script_up_to_date` | Usage and contract errors return `2`; recoverable Git failures and false predicates return `1` unless a function documents a specific status. Read-only inspections use named outputs/stdout as documented; freshness outcomes are `3` dirty, `4` behind, and `5` diverged. |
-| gh | `base_gh_require_cli`, `base_gh_auth_status_diagnostics`, `base_gh_report_command_failure`, `base_gh_run`, `base_gh_repo_from_remote_url`, `base_gh_infer_repo_from_origin`, `base_gh_repo_default_branch`, `base_gh_api_with_retry` | Usage and contract errors return `2`; recoverable GitHub failures return `1` unless the helper preserves the underlying `gh` status. Diagnostics go stderr; repository/API values use named outputs; retries are bounded and mutation-aware. |
+| gh (preview, unreleased on `main`) | `base_gh_require_cli`, `base_gh_auth_status_diagnostics`, `base_gh_report_command_failure`, `base_gh_run`, `base_gh_repo_from_remote_url`, `base_gh_infer_repo_from_origin`, `base_gh_repo_default_branch`, `base_gh_api_with_retry` | Usage and contract errors return `2`; recoverable GitHub failures return `1` unless the helper preserves the underlying `gh` status. Diagnostics go stderr; repository/API values use named outputs; retries are bounded and mutation-aware. The immutable `v2.0.0` implementation remains stable and self-contained. |
 | str | `base_str_lower`, `base_str_upper`, `base_str_ltrim`, `base_str_rtrim`, `base_str_trim`, `base_str_contains`, `base_str_starts_with`, `base_str_ends_with`, `base_str_split`, `base_str_join` | String transforms/predicates preserve caller values until validation succeeds; split/join use validated named outputs. |
 | arg | `base_arg_parse` | Parses into caller-owned validated arrays/maps and leaves them unchanged on failure. |
 | list | `base_list_append`, `base_list_prepend`, `base_list_remove`, `base_list_contains`, `base_list_unique`, `base_list_length` | Indexed-array mutators/predicates use caller-owned arrays; usage and operational errors return rather than exit. |

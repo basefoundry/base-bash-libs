@@ -147,6 +147,21 @@ module_cycle_check() {
     return 0
 }
 
+module_stability_check() {
+    local current="$1"
+    local path="$2"
+    local dependency
+
+    while IFS= read -r dependency; do
+        [[ -z "$dependency" || "$dependency" == none ]] && continue
+        if [[ "${module_stability[$dependency]}" != stable ]]; then
+            error "stable module dependency path '$path -> $dependency' reaches non-stable module '$dependency' (${module_stability[$dependency]}, since: ${module_since[$dependency]})"
+            return 1
+        fi
+        module_stability_check "$dependency" "$path -> $dependency" || return 1
+    done < <(split_csv "${module_dependencies[$current]}")
+}
+
 generate_reference() {
     local manifest="$1"
     local record field
@@ -208,6 +223,8 @@ check_manifest() {
     local -A module_sources=()
     local -A module_tests=()
     local -A module_docs=()
+    local -A module_stability=()
+    local -A module_since=()
 
     [[ -f "$manifest" ]] || {
         error "manifest not found: $manifest"
@@ -298,6 +315,8 @@ check_manifest() {
         module_sources["${fields[0]}"]="${fields[2]}"
         module_tests["${fields[0]}"]="${fields[4]}"
         module_docs["${fields[0]}"]="${fields[3]}"
+        module_stability["${fields[0]}"]="${fields[14]}"
+        module_since["${fields[0]}"]="${fields[15]}"
         [[ "${fields[1]}" == sourceable-library || "${fields[1]}" == executable-launcher ]] || {
             error "module '${fields[0]}' has an unsupported kind"
             return 1
@@ -394,6 +413,10 @@ check_manifest() {
     for module in "${!module_names[@]}"; do
         module_cycle_check "$module" || return 1
     done
+    for module in "${!module_names[@]}"; do
+        [[ "${module_stability[$module]}" == stable ]] || continue
+        module_stability_check "$module" "$module" || return 1
+    done
     while IFS= read -r row; do
         [[ -n "$row" ]] || continue
         field="${row%%|*}"
@@ -410,33 +433,62 @@ check_manifest() {
     return 0
 }
 
+release_module_check() {
+    local module="$1"
+    local path="$2"
+    local dependency release_path symbol
+    local -a symbols=()
+
+    [[ -n "${release_checked[$module]-}" ]] && return 0
+    release_checked[$module]=1
+    for release_path in "${release_module_sources[$module]}" \
+        "${release_module_docs[$module]}" "${release_module_tests[$module]}"; do
+        git -C "$repo_root" cat-file -e "$release_ref:$release_path" 2> /dev/null || {
+            error "stable module dependency path '$path' module '$module' path '$release_path' is absent from release reference '$release_ref'"
+            return 1
+        }
+    done
+    IFS=',' read -r -a symbols <<< "${release_module_symbols[$module]}"
+    for symbol in "${symbols[@]}"; do
+        git -C "$repo_root" cat-file blob "$release_ref:${release_module_sources[$module]}" |
+            grep -E "^${symbol}[[:space:]]*\(\)" > /dev/null || {
+            error "stable module dependency path '$path' module '$module' symbol '$symbol' is absent from release reference '$release_ref'"
+            return 1
+        }
+    done
+    while IFS= read -r dependency; do
+        [[ -z "$dependency" || "$dependency" == none ]] && continue
+        release_module_check "$dependency" "$path -> $dependency" || return 1
+    done < <(split_csv "${release_module_dependencies[$module]}")
+}
+
 check_release_tree() {
     local manifest="$1"
     local release_ref="$2"
-    local symbol release_path
+    local symbol
     local -a fields=()
-    local -a symbols=()
+    local -A release_module_sources=()
+    local -A release_module_docs=()
+    local -A release_module_tests=()
+    local -A release_module_symbols=()
+    local -A release_module_dependencies=()
+    local -A release_checked=()
 
     git -C "$repo_root" rev-parse --verify "${release_ref}^{commit}" > /dev/null 2>&1 || {
         error "release reference is not a local commit: $release_ref"
         return 1
     }
     while IFS=$'\t' read -r -a fields; do
+        [[ -n "${fields[0]-}" ]] || continue
+        release_module_sources["${fields[0]}"]="${fields[2]}"
+        release_module_docs["${fields[0]}"]="${fields[3]}"
+        release_module_tests["${fields[0]}"]="${fields[4]}"
+        release_module_symbols["${fields[0]}"]="${fields[8]}"
+        release_module_dependencies["${fields[0]}"]="${fields[5]}"
+    done < <(manifest_rows "$manifest")
+    while IFS=$'\t' read -r -a fields; do
         [[ -n "${fields[0]-}" && "${fields[14]}" == stable ]] || continue
-        for release_path in "${fields[2]}" "${fields[3]}" "${fields[4]}"; do
-            git -C "$repo_root" cat-file -e "${release_ref}:${release_path}" 2> /dev/null || {
-                error "stable module '${fields[0]}' path '$release_path' is absent from release reference '$release_ref'"
-                return 1
-            }
-        done
-        IFS=',' read -r -a symbols <<< "${fields[8]}"
-        for symbol in "${symbols[@]}"; do
-            git -C "$repo_root" cat-file blob "${release_ref}:${fields[2]}" |
-                grep -E "^${symbol}[[:space:]]*\(\)" > /dev/null || {
-                error "stable symbol '$symbol' is absent from release reference '$release_ref'"
-                return 1
-            }
-        done
+        release_module_check "${fields[0]}" "${fields[0]}" || return 1
     done < <(manifest_rows "$manifest")
     printf 'Stable API release reference is valid: %s\n' "$release_ref"
 }

@@ -130,8 +130,8 @@ modules:
     outputs: documented per symbol; named outputs are caller-owned
     statuses: usage and contract errors return 2; recoverable failures return 1 unless a symbol preserves an underlying gh status
     side_effects: documented per symbol; sourcing is passive
-    stability: stable
-    since: 2.0.0
+    stability: preview
+    since: unreleased
     deprecated: false
   - name: str
     kind: sourceable-library
