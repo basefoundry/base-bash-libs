@@ -46,6 +46,15 @@ delegating safe operations to Base's generic release machinery.
    git diff --check
    ```
 
+   The release-invariant stage derives its API reference from the checked-out
+   release contract. Mainline and ordinary post-GA checkouts use the published
+   GA tag from `first-party-cutover.yaml`; a release-preparation checkout whose
+   `VERSION` differs from that GA version validates the candidate tree at
+   `HEAD`. The selected reference and provenance are printed in the
+   diagnostics. `BASE_BASH_LIBS_RELEASE_REF` remains available for explicit
+   audited overrides, but is not required for the documented local or CI
+   command.
+
 6. Open and merge the release-preparation pull request.
 7. Sync local `main`, then inspect the release from the repository root:
 

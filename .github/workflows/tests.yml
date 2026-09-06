@@ -189,6 +189,8 @@ jobs:
             bash examples/reference-apps/verify.sh
 
       - name: Verify deterministic release invariants
+        # release-invariants.sh derives the GA or candidate reference from the
+        # checked-out VERSION and first-party-cutover.yaml for local/CI parity.
         run: ./tests/release-invariants.sh
 
   downstream-demo:
