@@ -41,9 +41,10 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   Git helper functions built on the stdlib for default-branch, worktree,
   upstream, remote, repository update, and script freshness checks.
 - [`lib/bash/gh/lib_gh.sh`](lib/bash/gh/README.md)
-  GitHub CLI helper functions built on the stdlib for command readiness,
-  authentication diagnostics, remote parsing, API retries, and checked `gh`
-  execution.
+  Preview-only GitHub CLI helper functions on `main`, built on the stdlib and
+  process module for command readiness, authentication diagnostics, remote
+  parsing, API retries, and checked `gh` execution. The immutable `v2.0.0` tree
+  contains the prior stable, self-contained implementation.
 - [`lib/bash/str/lib_str.sh`](lib/bash/str/README.md)
   String helpers built on the stdlib for case conversion, trimming,
   predicates, splitting, and joining.

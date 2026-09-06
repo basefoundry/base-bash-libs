@@ -14,7 +14,9 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
 - `git/`
   Git-related helpers built on top of the stdlib.
 - `gh/`
-  GitHub CLI helpers built on top of the stdlib.
+  Preview-only GitHub CLI helpers on `main`, built on top of the stdlib and
+  process module; the immutable `v2.0.0` tree contains the prior stable,
+  self-contained implementation.
 - `file/`
   File-editing helpers built on top of the stdlib.
 - `str/`

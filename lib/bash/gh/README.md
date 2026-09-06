@@ -13,10 +13,12 @@ base_init app_args --source "${BASH_SOURCE[0]}" --
 base_std_import gh/lib_gh.sh
 ```
 
-Loading `gh/lib_gh.sh` on `main` also imports the preview-only `process` module
-because the retry-capture path uses its owner-guardian lifecycle. This
-post-GA implementation detail is not present in the immutable `v2.0.0` tree;
-GitHub-specific capture and workspace cleanup remain local to this module.
+The current `main` implementation is preview-only and unreleased because it
+imports the preview-only `process` module for the retry-capture owner-guardian
+lifecycle. This post-GA implementation detail is not present in the immutable
+`v2.0.0` tree, whose GitHub helper implementation remains stable and
+self-contained. A future release must promote both modules together (or remove
+the dependency); stable modules may not depend on preview modules.
 
 ## Public Functions
 
