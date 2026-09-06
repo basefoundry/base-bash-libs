@@ -49,6 +49,27 @@ release_test_build() {
     grep -F '"reproducible": true' "$first"/*.provenance.json
 }
 
+@test "release artifact build rejects duplicate options" {
+    local output="$TEST_TMPDIR/duplicate"
+    bats_run "$RELEASE_ARTIFACT" build \
+        --version 2.0.0-rc.1 --version 2.0.0-rc.1 \
+        --commit "$RELEASE_COMMIT" --output "$output"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Option '--version' may be provided only once."* ]]
+
+    bats_run "$RELEASE_ARTIFACT" build \
+        --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" \
+        --output "$output" --output "$output"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Option '--output' may be provided only once."* ]]
+
+    bats_run "$RELEASE_ARTIFACT" build \
+        --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" \
+        --commit "$RELEASE_COMMIT" --output "$output"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Option '--commit' may be provided only once."* ]]
+}
+
 @test "release artifact build and verify support post-GA patch and minor versions" {
     local version artifact
 
