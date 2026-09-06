@@ -62,6 +62,7 @@ required_files=(
     tests/quality-contract.sh
     tests/shfmt-contract.sh
     tests/release-invariants.sh
+    tests/release-invariants.bats
     examples/std-usage.sh
     examples/cookbook-cleanup-temp.sh
     examples/cookbook-args-lists-strings.sh
@@ -437,6 +438,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/quality-contract.sh \
     tests/shfmt-contract.sh \
     tests/release-invariants.sh \
+    tests/release-invariants.bats \
     tests/validate.sh \
     tests/lint-warnings.sh \
     examples/std-usage.sh \
@@ -476,6 +478,7 @@ bats_files=(
     tests/api-manifest.bats
     tests/consumer-kit/tests/consumer_kit.bats
     tests/library-bundle.bats
+    tests/release-invariants.bats
     tests/vendor.bats
     tests/integrations.bats
     tests/examples.bats
