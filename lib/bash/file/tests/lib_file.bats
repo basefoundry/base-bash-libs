@@ -233,7 +233,9 @@ EOF
     printf 'before\n# BEGIN\nold\n# END\nafter\n' > "$target"
     eval "$(declare -f __base_bash_libs_file_commit_temp__ | sed '1s/__base_bash_libs_file_commit_temp__/__orig_base_bash_libs_file_commit_temp__/')"
     __base_bash_libs_file_commit_temp__() {
-        printf 'writer-won\n' > "$target"
+        # Keep the replacement the same size so coarse timestamp/size
+        # fingerprints cannot distinguish this concurrent rewrite.
+        printf 'before\n# BEGIN\nnew\n# END\nafter\n' > "$target"
         __orig_base_bash_libs_file_commit_temp__ "$@"
     }
 
@@ -245,7 +247,7 @@ EOF
 
     unset -f __base_bash_libs_file_commit_temp__ __orig_base_bash_libs_file_commit_temp__
     [ "$status" -eq 6 ]
-    [ "$(cat "$target")" = "writer-won" ]
+    [ "$(cat "$target")" = $'before\n# BEGIN\nnew\n# END\nafter' ]
     [[ "$(cat "$stderr_file")" == *"Concurrent modification detected"* ]]
 }
 
