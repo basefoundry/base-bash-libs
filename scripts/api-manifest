@@ -452,9 +452,9 @@ release_module_check() {
     for symbol in "${symbols[@]}"; do
         git -C "$repo_root" cat-file blob "$release_ref:${release_module_sources[$module]}" |
             grep -E "^${symbol}[[:space:]]*\(\)" > /dev/null || {
-                error "stable module dependency path '$path' module '$module' symbol '$symbol' is absent from release reference '$release_ref'"
-                return 1
-            }
+            error "stable module dependency path '$path' module '$module' symbol '$symbol' is absent from release reference '$release_ref'"
+            return 1
+        }
     done
     while IFS= read -r dependency; do
         [[ -z "$dependency" || "$dependency" == none ]] && continue
