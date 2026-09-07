@@ -23,6 +23,9 @@ publication use the same verified-artifact and immutable-tag gates.
 
 The refs command is a read-only preflight that fails closed when the candidate
 tag already exists locally or on origin. Published tags are immutable.
+
+For governed releases, pass --bom <path> to check or publish so Base validates
+the cross-repository compatibility BOM before any tag or release is created.
 EOF
 }
 
@@ -80,6 +83,7 @@ main() {
     local seen_dry_run=0
     local seen_format=0
     local seen_manifest=0
+    local seen_bom=0
     local seen_version=0
     local seen_yes=0
 
@@ -137,6 +141,22 @@ main() {
                 "$manifest_value" != "$canonical_manifest" ]]; then
                 release_error "Release operations must use the canonical manifest at '$canonical_manifest'."
                 return 1
+            fi
+            ;;
+        --bom)
+            if [[ "$command" != "check" && "$command" != "publish" ]]; then
+                release_error "Option '--bom' is only supported by release check and release publish."
+                return 2
+            fi
+            if ((seen_bom)); then
+                release_error "Option '--bom' may be provided only once."
+                return 2
+            fi
+            seen_bom=1
+            index=$((index + 1))
+            if ((index >= ${#arguments[@]})) || [[ -z "${arguments[$index]}" ]]; then
+                release_error "Option '--bom' requires an argument."
+                return 2
             fi
             ;;
         --format)
