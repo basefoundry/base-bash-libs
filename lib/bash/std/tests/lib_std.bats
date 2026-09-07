@@ -4952,6 +4952,55 @@ EOF
     [[ "$normalized" == *"payload"* ]]
 }
 
+@test "base_std_ask_yes_no accepts a caller-owned input fd and leaves it open" {
+    local input_file="$TEST_TMPDIR/ask-fd-input"
+    local script="$TEST_TMPDIR/ask-fd.sh"
+
+    printf 'yn' > "$input_file"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+exec 9< "\$1"
+if base_std_ask_yes_no "First" no 9; then
+    first=yes
+else
+    first=no
+fi
+if base_std_ask_yes_no "Second" no 9; then
+    second=yes
+else
+    second=no
+fi
+if : <&9; then
+    fd=open
+else
+    fd=closed
+fi
+printf 'first=%s second=%s fd=%s\n' "\$first" "\$second" "\$fd"
+EOF
+
+    bats_run bash "$script" "$input_file"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"First [y/N]:"* ]]
+    [[ "$output" == *"Second [y/N]:"* ]]
+    [[ "$output" == *"first=yes second=no fd=open"* ]]
+}
+
+@test "base_std_ask_yes_no validates an injected input fd" {
+    local stderr_file="$TEST_TMPDIR/ask-input-fd.err"
+    local rc
+
+    if base_std_ask_yes_no "Proceed" no invalid 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    [ "$rc" -eq 2 ]
+    [[ "$(cat "$stderr_file")" == *"base_std_ask_yes_no: input_fd must be a non-negative integer."* ]]
+}
+
 @test "base_std_ask_yes_no validates argument count" {
     local stderr_file="$TEST_TMPDIR/ask-yes-no.err"
     local rc

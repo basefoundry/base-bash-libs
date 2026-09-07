@@ -110,10 +110,13 @@ contract.
 
 ## 5. Interactive behavior
 
-`base_std_ask_yes_no MESSAGE [yes|no]` defaults to `no` and displays `[y/N]`;
-passing `yes` displays `[Y/n]`. `y`/`n` are accepted case-insensitively, and
-Enter accepts the displayed default. Invalid input is reprompted. Missing
-`/dev/tty`, EOF, and non-interactive use return `1` without terminating.
+`base_std_ask_yes_no MESSAGE [yes|no] [input_fd]` defaults to `no` and displays
+`[y/N]`; passing `yes` displays `[Y/n]`. `y`/`n` are accepted
+case-insensitively, and Enter accepts the displayed default. Invalid input is
+reprompted. When `input_fd` is omitted, input is read from `/dev/tty`; when it
+is supplied, the caller-owned descriptor is used and remains open. Missing
+`/dev/tty`, an unavailable input descriptor, EOF, and non-interactive use
+return `1` without terminating.
 `base_std_wait_for_enter` has the same non-TTY/EOF rule. Neither API reads from
 or mutates the caller's ordinary stdin stream.
 
