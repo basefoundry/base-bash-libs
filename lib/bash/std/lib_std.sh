@@ -4054,6 +4054,7 @@ base_std_get_my_source_dir() {
 # Arguments:
 #   $1: The message string to display as the prompt.
 #   $2: Optional default, either `no` (the default) or `yes`.
+#   $3: Optional caller-owned input file descriptor.
 #
 # Usage:
 #
@@ -4064,14 +4065,14 @@ base_std_get_my_source_dir() {
 #   fi
 #
 base_std_ask_yes_no() {
-    if (("$#" < 1 || "$#" > 2)); then
+    if (("$#" < 1 || "$#" > 3)); then
         base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: invalid arguments"
-        base_std_log_info -l base_bash_libs.std "Usage: base_std_ask_yes_no <prompt_message> [yes|no]"
+        base_std_log_info -l base_bash_libs.std "Usage: base_std_ask_yes_no <prompt_message> [yes|no] [input_fd]"
         return 2
     fi
 
-    local message=$1 user_input tty_fd default="no" prompt_suffix
-    if (($# == 2)); then
+    local message=$1 user_input input_fd default="no" prompt_suffix input_fd_owned=0
+    if (($# >= 2)); then
         case "${2,,}" in
         yes) default="yes" ;;
         no) default="no" ;;
@@ -4087,19 +4088,38 @@ base_std_ask_yes_no() {
     else
         prompt_suffix='[y/N]'
     fi
-    if ! exec {tty_fd}< /dev/tty 2> /dev/null; then
-        base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: /dev/tty is not available"
-        return 1
+    if (("$#" == 3)); then
+        input_fd="${3-}"
+        if [[ ! "$input_fd" =~ ^[0-9]+$ ]]; then
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_ask_yes_no: input_fd must be a non-negative integer."
+            return 2
+        fi
+        if ! { : <&"$input_fd"; } 2> /dev/null; then
+            base_std_log_error -l base_bash_libs.std \
+                "base_std_ask_yes_no: input file descriptor '$input_fd' is not available"
+            return 1
+        fi
+    else
+        if ! exec {input_fd}< /dev/tty 2> /dev/null; then
+            base_std_log_error -l base_bash_libs.std "base_std_ask_yes_no: /dev/tty is not available"
+            return 1
+        fi
+        input_fd_owned=1
     fi
 
     while true; do
         # Prompt the user for input.
         # -n 1: Reads only one character.
         # -r: Prevents backslash from acting as an escape character.
-        # -p: Displays the prompt string.
         # The text "[y/N]" suggests that 'N' is the default choice.
-        if ! read -r -n 1 -p "$message $prompt_suffix: " user_input <&"$tty_fd"; then
-            exec {tty_fd}<&-
+        # Print explicitly so injected non-terminal descriptors receive the
+        # same prompt as the default /dev/tty path.
+        printf '%s' "$message $prompt_suffix: " >&2
+        if ! read -r -n 1 user_input <&"$input_fd"; then
+            if ((input_fd_owned)); then
+                exec {input_fd}<&-
+            fi
             echo
             return 1
         fi
@@ -4109,15 +4129,21 @@ base_std_ask_yes_no() {
 
         case "$user_input" in
         [yY])
-            exec {tty_fd}<&-
+            if ((input_fd_owned)); then
+                exec {input_fd}<&-
+            fi
             return 0
             ;;
         [nN])
-            exec {tty_fd}<&-
+            if ((input_fd_owned)); then
+                exec {input_fd}<&-
+            fi
             return 1
             ;;
         $'\n' | $'\r' | '')
-            exec {tty_fd}<&-
+            if ((input_fd_owned)); then
+                exec {input_fd}<&-
+            fi
             [[ "$default" == yes ]]
             return $?
             ;;

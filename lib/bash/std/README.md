@@ -176,8 +176,10 @@ APIs above.
 
 ### Interactive Helpers
 
-- `base_std_ask_yes_no <prompt> [yes|no]`: prompts on a TTY, accepts Enter as
-  the displayed `[y/N]` or `[Y/n]` default, and returns the user's decision.
+- `base_std_ask_yes_no <prompt> [yes|no] [input_fd]`: prompts on `/dev/tty`
+  by default, or reads from the optional caller-owned input file descriptor;
+  accepts Enter as the displayed `[y/N]` or `[Y/n]` default, and returns the
+  user's decision. A supplied descriptor remains open for the caller.
 - `base_std_wait_for_enter [prompt]`: waits for Enter on a TTY and returns nonzero when
   no usable terminal is available.
 
