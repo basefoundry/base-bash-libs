@@ -247,7 +247,9 @@ EOF
 
 @test "base-bash check validates a consumer project without mutation" {
     local project_dir="$TEST_TMPDIR/generated"
-    local before after
+    local before after expected_version
+
+    expected_version="$(<"$BASE_REPO_ROOT/VERSION")"
 
     mkdir -p "$project_dir"
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile minimal --dir "$project_dir"
@@ -256,7 +258,7 @@ EOF
 
     bats_run env BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" check --project "$project_dir"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"project/framework-pin: 2.0.0@"* ]]
+    [[ "$output" == *"project/framework-pin: $expected_version@"* ]]
     [[ "$output" == *"OK project/application-version: CLI is bound to VERSION 0.1.0"* ]]
     [[ "$output" == *"OK project/namespace:"* ]]
 

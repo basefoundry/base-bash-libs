@@ -6,12 +6,13 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `2.0.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.0.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0) |
+| `2.1.0` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.1.0](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.1.0) |
 
-The v2.0.0 release is published with a deterministic bundle archive, checksum
+The v2.1.0 release is published with a deterministic bundle archive, checksum
 manifest, SPDX SBOM, and provenance statement. First-party consumers and
-Homebrew are pinned to the exact GA commit; the coordinated cutover is recorded
-in the completed issue #240.
+Homebrew can promote to its exact immutable commit through the coordinated
+release handoff; the original v2.0.0 cutover is recorded in completed issue
+#240.
 
 Reusable Bash standard library for reliable shell scripts.
 

@@ -7,6 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [2.1.0] - 2026-09-08
+
 ### Added
 
 - Added the isolated Base Bash Demo as an immutable released-package consumer

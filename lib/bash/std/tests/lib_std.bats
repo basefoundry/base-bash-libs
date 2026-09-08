@@ -656,13 +656,17 @@ EOF
 
 @test "base_require_version orders prereleases before a newer stable release" {
     local script="$TEST_TMPDIR/version-prerelease.sh"
+    local major minor patch future_version
+
+    IFS=. read -r major minor patch < "$BASE_REPO_ROOT/VERSION"
+    future_version="$major.$minor.$((patch + 1))"
 
     create_script "$script" <<EOF
 #!/usr/bin/env bash
 source "$STDLIB_PATH"
 base_require_version "2.0.0-rc.1"
 base_require_version "2.0.0-alpha.1"
-if base_require_version "2.0.1"; then
+if base_require_version "$future_version"; then
     exit 3
 fi
 EOF
@@ -670,7 +674,7 @@ EOF
     bats_run bash "$script"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"base-bash-libs 2.0.1 or newer is required"* ]]
+    [[ "$output" == *"base-bash-libs $future_version or newer is required"* ]]
 }
 
 @test "base_require_version returns status 2 for malformed minimum versions" {
@@ -994,7 +998,9 @@ EOF
 
 @test "copy-only library artifacts report embedded release identity without VERSION" {
     local artifact_dir="$TEST_TMPDIR/copy artifact"
-    local output
+    local output expected_version
+
+    expected_version="$(sed -n 's/^version=//p' "$BASE_REPO_ROOT/lib/bash/base-bash-libs.release")"
 
     mkdir -p "$artifact_dir/lib"
     cp -R "$BASE_REPO_ROOT/lib/bash" "$artifact_dir/lib/"
@@ -1008,7 +1014,7 @@ EOF
             "$BASE_BASH_LIBS_COMMIT" "$BASE_BASH_LIBS_DIRTY_STATE"
     ' bash "$artifact_dir")"
 
-    [[ "$output" == *"version=2.0.0"* ]]
+    [[ "$output" == *"version=$expected_version"* ]]
     [[ "$output" == *"provenance=release-artifact"* ]]
     [[ "$output" == *"commit=unknown"* ]]
     [[ "$output" == *"dirty=unknown"* ]]
@@ -1016,7 +1022,9 @@ EOF
 
 @test "symlinked package roots and spaced paths keep one physical package identity" {
     local link_path="$TEST_TMPDIR/spaced package"
-    local output
+    local output expected_version
+
+    expected_version="$(sed -n 's/^version=//p' "$BASE_REPO_ROOT/lib/bash/base-bash-libs.release")"
 
     ln -s "$BASE_REPO_ROOT" "$link_path"
     output="$(cd "$TEST_TMPDIR" && bash -c '
@@ -1026,7 +1034,7 @@ EOF
     ' bash "$link_path")"
 
     [[ "$output" == *"root=$BASE_REPO_ROOT"* ]]
-    [[ "$output" == *"version=2.0.0"* ]]
+    [[ "$output" == *"version=$expected_version"* ]]
 }
 
 @test "mixed-major stdlib inputs fail with migration guidance" {
