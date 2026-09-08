@@ -99,9 +99,11 @@ SCRIPT
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/app" run
     [ "$status" -eq 0 ]
     [[ "$output" == *"hello=world"* ]]
+    local expected_version
+    expected_version="$(<"$BASE_REPO_ROOT/VERSION")"
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/base-bash" --version
     [ "$status" -eq 0 ]
-    [[ "$output" == *"base-bash $(<"$BASE_REPO_ROOT/VERSION")"* ]]
+    [[ "$output" == *"base-bash $expected_version"* ]]
 }
 
 @test "vendor verification detects tampering" {
