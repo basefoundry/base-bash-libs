@@ -10,8 +10,14 @@ setup() {
     run env -u BASE_HOME BASE_CACHE_DIR="$TEST_TMPDIR/cache" \
         "$BASE_REPO_ROOT/tests/release-invariants.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"candidate_version=2.0.0 release_ref=v2.0.0"* ]]
-    [[ "$output" == *"provenance=published GA tag from first-party-cutover.yaml"* ]]
+    candidate_version="$(<"$BASE_REPO_ROOT/VERSION")"
+    if [[ "$candidate_version" == 2.0.0 ]]; then
+        [[ "$output" == *"candidate_version=2.0.0 release_ref=v2.0.0"* ]]
+        [[ "$output" == *"provenance=published GA tag from first-party-cutover.yaml"* ]]
+    else
+        [[ "$output" == *"candidate_version=$candidate_version release_ref=HEAD"* ]]
+        [[ "$output" == *"provenance=candidate checkout (VERSION $candidate_version differs from v2.0.0)"* ]]
+    fi
 }
 
 @test "release invariants use the candidate checkout when VERSION advances" {

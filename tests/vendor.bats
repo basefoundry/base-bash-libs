@@ -101,7 +101,7 @@ SCRIPT
     [[ "$output" == *"hello=world"* ]]
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/base-bash" --version
     [ "$status" -eq 0 ]
-    [[ "$output" == *"base-bash 2.0.0"* ]]
+    [[ "$output" == *"base-bash $(<"$BASE_REPO_ROOT/VERSION")"* ]]
 }
 
 @test "vendor verification detects tampering" {
