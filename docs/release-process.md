@@ -39,6 +39,15 @@ delegating safe operations to Base's generic release machinery.
    agree on the archive digest, version, and full source commit. Treat any
    missing, duplicate, traversal-bearing, or inconsistent record as a failed
    release gate; do not choose one asset from an ambiguous directory.
+   Generate the repository component row for the ecosystem BOM from the same
+   immutable commit:
+
+   ```bash
+   scripts/release-bom-row --version X.Y.Z --commit <full-tag-sha> \
+     --platform macos-14 --platform ubuntu-24.04 \
+     --evidence run://base-bash-libs/validation \
+     --output /private/tmp/base-bash-libs-X.Y.Z-row.json
+   ```
 5. Run the full library validation and inspect the diff:
 
    ```bash
@@ -60,10 +69,12 @@ delegating safe operations to Base's generic release machinery.
 
    ```bash
    scripts/release refs --version X.Y.Z
-   scripts/release check --version X.Y.Z --manifest base_manifest.yaml
+   scripts/release check --version X.Y.Z --manifest base_manifest.yaml \
+     --bom /private/tmp/base-ecosystem-X.Y.Z.json
    scripts/release plan --version X.Y.Z --manifest base_manifest.yaml
    scripts/release notes --version X.Y.Z --manifest base_manifest.yaml
-   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml --dry-run
+   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml \
+     --bom /private/tmp/base-ecosystem-X.Y.Z.json --dry-run
    ```
 
    The `refs` preflight is mandatory before any real publication attempt. It
@@ -74,7 +85,8 @@ delegating safe operations to Base's generic release machinery.
    trusted non-interactive release shell:
 
    ```bash
-   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml --yes
+   scripts/release publish --version X.Y.Z --manifest base_manifest.yaml \
+     --bom /private/tmp/base-ecosystem-X.Y.Z.json --yes
    ```
 
 9. Verify the annotated `vX.Y.Z` tag and the GitHub Release for

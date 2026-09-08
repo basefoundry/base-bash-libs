@@ -44,6 +44,7 @@ required_files=(
     bin/base-bash
     scripts/release
     scripts/release-artifact
+    scripts/release-bom-row
     scripts/release-version-policy.sh
     scripts/api-manifest
     scripts/library-bundle

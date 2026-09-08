@@ -63,6 +63,22 @@ assert_driver_not_called() {
     grep -Fx "arg=<$BASE_REPO_ROOT/base_manifest.yaml>" "$RELEASE_CAPTURE"
 }
 
+@test "release guard forwards a BOM path for governed checks" {
+    bats_run "$RELEASE_SCRIPT" check --version 2.1.0 --bom "$TEST_TMPDIR/release-bom.json"
+
+    [ "$status" -eq 0 ]
+    grep -Fx 'arg=<--bom>' "$RELEASE_CAPTURE"
+    grep -Fx "arg=<$TEST_TMPDIR/release-bom.json>" "$RELEASE_CAPTURE"
+}
+
+@test "release guard rejects BOM options for non-check commands" {
+    bats_run "$RELEASE_SCRIPT" plan --version 2.1.0 --bom "$TEST_TMPDIR/release-bom.json"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"only supported by release check and release publish"* ]]
+    assert_driver_not_called
+}
+
 @test "release guard injects the canonical manifest when it is omitted" {
     bats_run "$RELEASE_SCRIPT" plan --version 2.0.0-alpha.1
 
