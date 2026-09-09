@@ -10,6 +10,9 @@ the [versioning policy](versioning-policy.md). Always enter the release workflow
 through [`scripts/release`](../scripts/release); do not invoke
 `basectl release` directly. The repository guard validates the candidate before
 delegating safe operations to Base's generic release machinery.
+The shared provider, platform, license, and release-artifact rules are
+summarized in the [Base ecosystem platform, license, and release
+policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 
 ## Standard Sequence
 

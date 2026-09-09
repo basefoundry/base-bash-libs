@@ -2,15 +2,16 @@
 
 ## Current Release Line
 
-`v2.0.0` is the current stable Base Bash release, backed by its verified
-canonical GA asset. `v1.4.0` and earlier releases are historical references;
+`v2.1.0` is the current stable Base Bash release, backed by its verified
+canonical release asset. `v1.4.0` and earlier releases are historical references;
 the 5/5 initiative has one stable target and will not create a stable `v1.5.0`
 or reset the version to 0.x.
 
 Those choices would either hide breaking changes inside the current 1.x
 compatibility range or move version precedence backward.
 
-Post-GA releases use one repository-owned v2 SemVer policy:
+Post-GA releases use one repository-owned v2 SemVer policy. Compatibility
+guarantees began at `v2.0.0`; `v2.1.0` is the current release on that line:
 
 ```text
 2.MINOR.PATCH

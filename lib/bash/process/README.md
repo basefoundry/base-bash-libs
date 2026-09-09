@@ -5,10 +5,9 @@ scripts. It is an optional companion module layered on `lib_std.sh`; the
 stdlib's stable `base_std_run` and `base_std_run_or_exit` APIs remain in
 `lib_std.sh`.
 
-This module is currently preview-only and unreleased on `main`. It is not part
-of the immutable `v2.0.0` release; consumers pinned to that release must not
-import it. It will receive a released `since` value when a release containing
-the module is published.
+This module is preview-only rather than part of the stable API. It is included
+in the immutable `v2.1.0` release but is not part of the immutable `v2.0.0`
+release; consumers pinned to v2.0.0 must not import it.
 
 ## Loading the library
 

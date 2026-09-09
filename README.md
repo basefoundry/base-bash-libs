@@ -24,6 +24,8 @@ independently through Homebrew, source checkouts, vendored copies, or git
 submodules.
 
 Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
+The shared Base ecosystem boundary is maintained in the [Base ecosystem
+platform, license, and release policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 
 ## Libraries
 
@@ -33,8 +35,8 @@ Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash
   `BASE_BASH_LIBS_VERSION` constant.
 - [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
   Preview-only process-supervision primitives for owner-guardian liveness and
-  asynchronous cleanup, layered on the stdlib. This post-GA module is on
-  `main` but is not included in the immutable `v2.0.0` release.
+  asynchronous cleanup, layered on the stdlib. This post-GA module is included
+  in the immutable `v2.1.0` release but is not part of the stable API.
 - [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
   File editing helpers built on the stdlib, including idempotent
   marker-delimited file section updates.
@@ -238,14 +240,13 @@ The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
 
-`v2.0.0` is the current stable release. It is intentionally a clean break from
-the v1 surface; SemVer compatibility guarantees apply from v2.0.0 onward. See
-the [versioning and release-line policy](docs/versioning-policy.md) for
-immutable consumption and the post-GA support contract.
+`v2.1.0` is the current stable release. It is a post-GA release on the v2 line;
+SemVer compatibility guarantees began at v2.0.0. See the [versioning and
+release-line policy](docs/versioning-policy.md) for immutable consumption and
+the post-GA support contract.
 
-The `process` module is a preview addition on `main` and remains unreleased;
-the `v2.0.0` pin above does not contain it. Do not import that module from a
-v2.0.0 checkout until a release that contains it is published.
+The `process` module remains preview-only. It is present in v2.1.0, while the
+v2.0.0 pin above does not contain it; do not import it from a v2.0.0 checkout.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
 documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
