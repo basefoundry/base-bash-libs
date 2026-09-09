@@ -16,6 +16,10 @@ No unreleased changes yet.
 - Added the isolated Base Bash Demo as an immutable released-package consumer
   and pinned downstream compatibility canary while keeping independent
   adoption evidence separate.
+- Added reusable process-supervision primitives and caller-owned input
+  descriptors for yes/no prompts.
+- Added deterministic ecosystem BOM component evidence for the immutable
+  repository release identity and API schema.
 
 ### Security
 
@@ -25,6 +29,13 @@ No unreleased changes yet.
 - Bound offline release verification to one complete asset set by requiring
   strict checksum coverage and consistent archive, provenance, SBOM, version,
   and source-commit identity.
+- Pinned generated GitHub Actions to immutable revisions.
+
+### Changed
+
+- Made release validation derive its invariant reference from the active API
+  release line, while release-preparation checkouts validate their candidate
+  tree.
 
 ### Fixed
 
@@ -57,6 +68,13 @@ No unreleased changes yet.
   last-status value as a compatibility view of the most recently active model.
 - Added a manifest-bound lock to standalone applications' embedded vendor copy
   so it passes the same offline vendor verification as ordinary installs.
+- Preserved application metadata when creating standalone bundles and enforced
+  a stable manifest dependency closure.
+- Rejected duplicate release-artifact build options.
+- Indexed CLI declaration collision checks instead of scanning the full model
+  registry.
+- Reported all forced-terminal metadata degradation paths in GitHub helper
+  operations.
 - Prevented list, CLI, and application call paths from creating or overwriting
   caller-visible variables through undeclared internal scratch assignments.
 - Eliminated an intermittent macOS Bash process-group race in supervised
