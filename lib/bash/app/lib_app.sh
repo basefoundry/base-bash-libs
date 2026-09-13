@@ -648,23 +648,26 @@ base_app_config_provenance() {
 
 # base_app_config_report - Emits deterministic, secret-redacted effective data.
 base_app_config_report() {
-    local model="${1-}" key value source secret
+    local __base_bash_libs_app_report_model="${1-}"
+    local __base_bash_libs_app_report_key __base_bash_libs_app_report_value
+    local __base_bash_libs_app_report_source __base_bash_libs_app_report_secret
+    local -a __base_bash_libs_app_report_keys=()
 
     (($# == 1)) || {
         __base_bash_libs_app_error__ 'base_app_config_report: usage: base_app_config_report MODEL'
         return 2
     }
-    __base_bash_libs_app_model_exists__ "$model" || return 1
-    IFS=, read -r -a __base_bash_libs_app_keys <<< "${__base_bash_libs_app_models["$model|config-keys"]-}"
-    for key in "${__base_bash_libs_app_keys[@]+${__base_bash_libs_app_keys[@]}}"; do
-        value="${__base_bash_libs_app_values["$model|$key"]-<unset>}"
-        source="${__base_bash_libs_app_provenance["$model|$key"]-unset}"
-        secret="${__base_bash_libs_app_config["$model|$key|secret"]-false}"
-        __base_bash_libs_app_bool_true__ "$secret" && value='<redacted>'
+    __base_bash_libs_app_model_exists__ "$__base_bash_libs_app_report_model" || return 1
+    IFS=, read -r -a __base_bash_libs_app_report_keys <<< "${__base_bash_libs_app_models["$__base_bash_libs_app_report_model|config-keys"]-}"
+    for __base_bash_libs_app_report_key in "${__base_bash_libs_app_report_keys[@]+${__base_bash_libs_app_report_keys[@]}}"; do
+        __base_bash_libs_app_report_value="${__base_bash_libs_app_values["$__base_bash_libs_app_report_model|$__base_bash_libs_app_report_key"]-<unset>}"
+        __base_bash_libs_app_report_source="${__base_bash_libs_app_provenance["$__base_bash_libs_app_report_model|$__base_bash_libs_app_report_key"]-unset}"
+        __base_bash_libs_app_report_secret="${__base_bash_libs_app_config["$__base_bash_libs_app_report_model|$__base_bash_libs_app_report_key|secret"]-false}"
+        __base_bash_libs_app_bool_true__ "$__base_bash_libs_app_report_secret" && __base_bash_libs_app_report_value='<redacted>'
         printf '%s\t%s\t%s\n' \
-            "$(__base_bash_libs_str_escape_tsv_field__ "$key")" \
-            "$(__base_bash_libs_str_escape_tsv_field__ "$source")" \
-            "$(__base_bash_libs_str_escape_tsv_field__ "$value")"
+            "$(__base_bash_libs_str_escape_tsv_field__ "$__base_bash_libs_app_report_key")" \
+            "$(__base_bash_libs_str_escape_tsv_field__ "$__base_bash_libs_app_report_source")" \
+            "$(__base_bash_libs_str_escape_tsv_field__ "$__base_bash_libs_app_report_value")"
     done
 }
 
