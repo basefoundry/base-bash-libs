@@ -1595,6 +1595,9 @@ base_cli_result_get() {
 base_cli_result_get_positional() {
     local __base_bash_libs_cli_result_get_positional_index="${1-}"
     local __base_bash_libs_cli_result_get_positional_result_name="${2-}"
+    local __base_bash_libs_cli_result_get_positional_normalized
+    local __base_bash_libs_cli_result_get_positional_max_index
+    local __base_bash_libs_cli_result_get_positional_max_text
 
     if (($# != 2)) || [[ ! "$__base_bash_libs_cli_result_get_positional_index" =~ ^[0-9]+$ ]]; then
         __base_bash_libs_cli_error__ 'base_cli_result_get_positional: usage: base_cli_result_get_positional <index> <result_variable>'
@@ -1604,9 +1607,26 @@ base_cli_result_get_positional() {
         "$__base_bash_libs_cli_result_get_positional_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_cli_result_get_positional \
         "$__base_bash_libs_cli_result_get_positional_result_name" || return 2
-    ((10#$__base_bash_libs_cli_result_get_positional_index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})) || return 1
+    ((${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]} > 0)) || return 1
+    __base_bash_libs_cli_result_get_positional_normalized="${__base_bash_libs_cli_result_get_positional_index#"${__base_bash_libs_cli_result_get_positional_index%%[!0]*}"}"
+    [[ -n "$__base_bash_libs_cli_result_get_positional_normalized" ]] ||
+        __base_bash_libs_cli_result_get_positional_normalized=0
+    __base_bash_libs_cli_result_get_positional_max_index=$((${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]} - 1))
+    __base_bash_libs_cli_result_get_positional_max_text="$__base_bash_libs_cli_result_get_positional_max_index"
+    if ((${#__base_bash_libs_cli_result_get_positional_normalized} > \
+        ${#__base_bash_libs_cli_result_get_positional_max_text})); then
+        return 1
+    fi
+    if ((${#__base_bash_libs_cli_result_get_positional_normalized} == \
+        ${#__base_bash_libs_cli_result_get_positional_max_text})); then
+        # shellcheck disable=SC2071 # `[[ > ]]` is an intentional decimal-string comparison.
+        if [[ "$__base_bash_libs_cli_result_get_positional_normalized" > "$__base_bash_libs_cli_result_get_positional_max_text" ]]; then
+            return 1
+        fi
+    fi
+    __base_bash_libs_cli_result_get_positional_index=$((10#$__base_bash_libs_cli_result_get_positional_normalized))
     printf -v "$__base_bash_libs_cli_result_get_positional_result_name" '%s' \
-        "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[10#$__base_bash_libs_cli_result_get_positional_index]}"
+        "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[__base_bash_libs_cli_result_get_positional_index]}"
 }
 
 # base_cli_result_count - Copies the occurrence count of a repeatable option.
