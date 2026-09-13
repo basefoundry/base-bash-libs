@@ -73,7 +73,7 @@ benchmark_timer_source=unknown
 benchmark_timer_resolution_ns=0
 benchmark_timer_precision=unknown
 benchmark_timer_high_resolution=0
-benchmark_timestamp_ns >/dev/null || exit 1
+benchmark_timestamp_ns > /dev/null || exit 1
 if ((benchmark_timer_high_resolution)); then
     benchmark_quality=sufficient
 else

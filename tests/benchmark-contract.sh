@@ -22,37 +22,37 @@ benchmark_fail() {
 }
 
 BASE_REFERENCE_BENCHMARK_ITERATIONS=2 \
-    "$benchmark_repo_root/benchmarks/reference-apps.sh" >"$benchmark_tmp/output" 2>&1 ||
+    "$benchmark_repo_root/benchmarks/reference-apps.sh" > "$benchmark_tmp/output" 2>&1 ||
     benchmark_fail 'reference benchmark runner returned a failure'
 
-grep -Fx 'benchmark_schema=1' "$benchmark_tmp/output" >/dev/null ||
+grep -Fx 'benchmark_schema=1' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'schema marker is missing'
-grep -Fx 'iterations=2' "$benchmark_tmp/output" >/dev/null ||
+grep -Fx 'iterations=2' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'iteration marker is missing or incorrect'
-grep -F 'bash=' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'Bash provenance is missing'
-grep -F 'os=' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'OS provenance is missing'
-grep -F 'cpu_arch=' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'CPU architecture provenance is missing'
-grep -E '^framework_commit=([[:xdigit:]]{40}|unknown)$' "$benchmark_tmp/output" >/dev/null ||
+grep -F 'bash=' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'Bash provenance is missing'
+grep -F 'os=' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'OS provenance is missing'
+grep -F 'cpu_arch=' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'CPU architecture provenance is missing'
+grep -E '^framework_commit=([[:xdigit:]]{40}|unknown)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'framework commit provenance is malformed'
-grep -E '^framework_dirty_state=(clean|dirty|unknown)$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^framework_dirty_state=(clean|dirty|unknown)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'framework dirty-state provenance is malformed'
-grep -E '^timer_source=(date \+%s%N|date \+%s)$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^timer_source=(date \+%s%N|date \+%s)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'timer source is missing'
-grep -E '^timer_resolution_ns=[1-9][0-9]*$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^timer_resolution_ns=[1-9][0-9]*$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'timer resolution is missing'
-grep -E '^timer_precision=(nanoseconds|seconds)$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^timer_precision=(nanoseconds|seconds)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'timer precision is missing'
-grep -E '^benchmark_quality=(sufficient|insufficient-precision)$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^benchmark_quality=(sufficient|insufficient-precision)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'benchmark quality is missing'
-grep -E '^budget_startup_help_avg_ns=[1-9][0-9]*$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^budget_startup_help_avg_ns=[1-9][0-9]*$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'performance budget is missing'
-grep -E '^budget_status=(pass|exceeded|not-assessed)$' "$benchmark_tmp/output" >/dev/null ||
+grep -E '^budget_status=(pass|exceeded|not-assessed)$' "$benchmark_tmp/output" > /dev/null ||
     benchmark_fail 'performance budget result is missing'
 grep -Fx 'Methodology: fresh-process plain Bash, std source, cli import, and process startup plus --help through the repository launcher;' \
-    "$benchmark_tmp/output" >/dev/null || benchmark_fail 'methodology line is missing'
-grep -F 'stage=plain-bash' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'plain Bash baseline is missing'
-grep -F 'stage=std-source' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'stdlib baseline is missing'
-grep -F 'stage=cli-import' "$benchmark_tmp/output" >/dev/null || benchmark_fail 'CLI import baseline is missing'
+    "$benchmark_tmp/output" > /dev/null || benchmark_fail 'methodology line is missing'
+grep -F 'stage=plain-bash' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'plain Bash baseline is missing'
+grep -F 'stage=std-source' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'stdlib baseline is missing'
+grep -F 'stage=cli-import' "$benchmark_tmp/output" > /dev/null || benchmark_fail 'CLI import baseline is missing'
 
 declare -A benchmark_seen=()
 benchmark_record_count=0
@@ -62,8 +62,8 @@ while IFS=$'\t' read -r benchmark_app_field benchmark_total_field benchmark_aver
     benchmark_total="${benchmark_total_field#startup_help_total_ns=}"
     benchmark_average="${benchmark_average_field#startup_help_avg_ns=}"
     case "$benchmark_app" in
-        installer|release-helper|ops-cli) ;;
-        *) benchmark_fail "unexpected application record '$benchmark_app'" ;;
+    installer | release-helper | ops-cli) ;;
+    *) benchmark_fail "unexpected application record '$benchmark_app'" ;;
     esac
     [[ -z "${benchmark_seen[$benchmark_app]+set}" ]] ||
         benchmark_fail "duplicate application record '$benchmark_app'"
@@ -84,7 +84,7 @@ done
 
 benchmark_lowres_shim="$benchmark_tmp/lowres-bin"
 mkdir -p "$benchmark_lowres_shim"
-cat > "$benchmark_lowres_shim/date" <<'EOF'
+cat > "$benchmark_lowres_shim/date" << 'EOF'
 #!/usr/bin/env bash
 case "${1-}" in
 +%s%N|+%s) printf '1\n' ;;
@@ -93,13 +93,13 @@ esac
 EOF
 chmod +x "$benchmark_lowres_shim/date"
 PATH="$benchmark_lowres_shim:$PATH" BASE_REFERENCE_BENCHMARK_ITERATIONS=1 \
-    "$benchmark_repo_root/benchmarks/reference-apps.sh" >"$benchmark_tmp/lowres-output" 2>&1 ||
+    "$benchmark_repo_root/benchmarks/reference-apps.sh" > "$benchmark_tmp/lowres-output" 2>&1 ||
     benchmark_fail 'low-resolution timer fixture returned a failure'
-grep -Fx 'timer_precision=seconds' "$benchmark_tmp/lowres-output" >/dev/null ||
+grep -Fx 'timer_precision=seconds' "$benchmark_tmp/lowres-output" > /dev/null ||
     benchmark_fail 'low-resolution fixture did not disclose seconds precision'
-grep -Fx 'benchmark_quality=insufficient-precision' "$benchmark_tmp/lowres-output" >/dev/null ||
+grep -Fx 'benchmark_quality=insufficient-precision' "$benchmark_tmp/lowres-output" > /dev/null ||
     benchmark_fail 'low-resolution fixture was treated as precise'
-grep -Fx 'budget_status=not-assessed' "$benchmark_tmp/lowres-output" >/dev/null ||
+grep -Fx 'budget_status=not-assessed' "$benchmark_tmp/lowres-output" > /dev/null ||
     benchmark_fail 'low-resolution fixture incorrectly evaluated the budget'
 
 printf 'Benchmark contract passed: apps=3 iterations=2.\n'
