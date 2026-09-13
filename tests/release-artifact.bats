@@ -33,6 +33,64 @@ release_test_build() {
     "$RELEASE_ARTIFACT" build --version "$version" --commit "$RELEASE_COMMIT" --output "$destination" > /dev/null
 }
 
+release_test_make_remote_gh_stub() {
+    local stub="$TEST_TMPDIR/gh"
+
+    cat > "$stub" <<'EOF'
+#!/usr/bin/env bash
+set -u
+
+if [[ "${1-}" == api ]]; then
+    endpoint="${2-}"
+    if [[ "$endpoint" == */releases/tags/* ]]; then
+        if [[ "$*" == *"[.tag_name"* ]]; then
+            printf 'v%s\tfalse\n' "$REMOTE_VERSION"
+        else
+            for asset in "$REMOTE_SOURCE"/*; do
+                name="${asset##*/}"
+                [[ "${REMOTE_ASSET_MODE:-full}" == missing && "$name" == *'.spdx.json' ]] && continue
+                printf '%s\n' "$name"
+            done
+        fi
+        exit 0
+    fi
+    if [[ "$endpoint" == */git/ref/tags/* ]]; then
+        printf 'tag\t%s\n' "$REMOTE_TAG_OBJECT"
+        exit 0
+    fi
+    if [[ "$endpoint" == */git/tags/* ]]; then
+        printf 'commit\t%s\n' "$REMOTE_COMMIT"
+        exit 0
+    fi
+fi
+
+if [[ "${1-}" == release && "${2-}" == download ]]; then
+    shift 2
+    directory=""
+    while (($#)); do
+        if [[ "$1" == --dir ]]; then
+            directory="$2"
+            shift 2
+        else
+            shift
+        fi
+    done
+    mkdir -p "$directory"
+    cp -- "$REMOTE_SOURCE"/* "$directory/"
+    if [[ "${REMOTE_ASSET_MODE:-full}" == partial ]]; then
+        rm -f -- "$directory"/*.provenance.json
+    fi
+    exit 0
+fi
+
+printf 'unexpected gh invocation: %s\n' "$*" >&2
+exit 2
+EOF
+    chmod +x "$stub"
+    PATH="$TEST_TMPDIR:$BASE_TEST_ORIG_PATH"
+    export PATH
+}
+
 @test "release artifact build creates a deterministic verified asset set" {
     local first="$TEST_TMPDIR/first" second="$TEST_TMPDIR/second"
 
@@ -213,4 +271,38 @@ release_test_build() {
     bats_run "$RELEASE_ARTIFACT" verify "$TEST_TMPDIR/ambiguous"
     [ "$status" -eq 1 ]
     [[ "$output" == *"exactly one archive"* ]]
+}
+
+@test "remote release verification rejects missing assets and cleans partial retries" {
+    local artifact="$TEST_TMPDIR/artifact" verified="$TEST_TMPDIR/verified" source_repo
+
+    # Build from a clean local clone because the test worktree contains the
+    # uncommitted remote-verifier changes themselves.
+    source_repo="$TEST_TMPDIR/source-repo"
+    git clone --local "$BASE_REPO_ROOT" "$source_repo" > /dev/null
+    export REMOTE_VERSION=2.0.0-rc.1 REMOTE_COMMIT="$RELEASE_COMMIT" REMOTE_SOURCE="$artifact"
+    "$source_repo/scripts/release-artifact" build --version "$REMOTE_VERSION" \
+        --commit "$REMOTE_COMMIT" --output "$artifact" > /dev/null
+    export REMOTE_TAG_OBJECT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa REMOTE_ASSET_MODE=missing
+    release_test_make_remote_gh_stub
+
+    bats_run "$RELEASE_ARTIFACT" verify-remote --version "$REMOTE_VERSION" \
+        --commit "$REMOTE_COMMIT" --output "$verified"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing required asset"* ]]
+    [ ! -e "$verified" ]
+
+    export REMOTE_ASSET_MODE=partial
+    bats_run "$RELEASE_ARTIFACT" verify-remote --version "$REMOTE_VERSION" \
+        --commit "$REMOTE_COMMIT" --output "$verified"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"exactly one archive"* ]]
+    [ ! -e "$verified" ]
+
+    export REMOTE_ASSET_MODE=full
+    bats_run "$RELEASE_ARTIFACT" verify-remote --version "$REMOTE_VERSION" \
+        --commit "$REMOTE_COMMIT" --output "$verified"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"GitHub Release assets verified"* ]]
+    [ -f "$verified/base-bash-libs-v$REMOTE_VERSION.tar.gz" ]
 }

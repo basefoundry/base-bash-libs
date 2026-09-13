@@ -6,7 +6,11 @@
 # deterministic archive, an SPDX SBOM, a provenance statement, and a checksum
 # manifest that can be attached to the guarded release operation.
 
-repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+if [[ -n "${BASE_BASH_RELEASE_SOURCE_ROOT:-}" ]]; then
+    repo_root="$(cd -- "$BASE_BASH_RELEASE_SOURCE_ROOT" && pwd -P)" || exit 1
+else
+    repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
+fi
 # shellcheck source=release-version-policy.sh
 source "$repo_root/scripts/release-version-policy.sh" || exit 1
 
@@ -14,13 +18,17 @@ usage() {
     cat >&2 << 'EOF'
 Usage:
   scripts/release-artifact build --version VERSION --output DIRECTORY [--commit SHA]
-  scripts/release-artifact verify DIRECTORY
+  scripts/release-artifact verify DIRECTORY [--commit SHA]
 
 Build creates these release assets without publishing them:
   base-bash-libs-vVERSION.tar.gz
   base-bash-libs-vVERSION.spdx.json
   base-bash-libs-vVERSION.provenance.json
   base-bash-libs-vVERSION.SHA256SUMS
+
+Remote verification downloads and verifies the four canonical assets from the
+published GitHub Release and binds them to the expected annotated tag commit:
+  scripts/release-artifact verify-remote --version VERSION --commit SHA --output DIRECTORY
 EOF
 }
 
@@ -339,7 +347,7 @@ build_artifact() {
 }
 
 verify_artifact() {
-    local output="${1-}" archive sums sbom provenance version
+    local output="${1-}" expected_commit="${2-}" archive sums sbom provenance version
     local archive_name sums_name sbom_name provenance_name selected
     local expected path actual line checksum_pattern line_number=0 temp root_name entry
     local provenance_subject provenance_parameters provenance_dependency provenance_reproducible
@@ -541,6 +549,11 @@ verify_artifact() {
         error 'Embedded source commit is not a full SHA.'
         return 1
     }
+    if [[ -n "$expected_commit" && "${bundle_commit,,}" != "${expected_commit,,}" ]]; then
+        rm -rf -- "$temp"
+        error "Embedded source commit does not match expected commit: $bundle_commit"
+        return 1
+    fi
     provenance_parameters="${provenance_parameters}${bundle_commit}\", \"dirtyState\": \"clean\"},"
     provenance_dependency="${provenance_dependency}${bundle_commit}\"}}]"
     file_contains_once "$provenance" "$provenance_parameters" || {
@@ -589,6 +602,134 @@ verify_artifact() {
     printf 'Canonical release artifact set verified: %s\n' "$output"
 }
 
+verify_remote_artifact() {
+    local version="" expected_commit="" output="" argument index tag repository
+    local release_metadata release_tag release_draft asset_names ref_metadata ref_type tag_object
+    local tag_metadata tag_target_type tag_target temporary archive_name sbom_name provenance_name sums_name
+    local -a arguments=("$@") expected_assets=()
+
+    index=0
+    while ((index < ${#arguments[@]})); do
+        argument="${arguments[$index]}"
+        case "$argument" in
+        --version)
+            ((index++))
+            version="${arguments[$index]-}"
+            ;;
+        --commit)
+            ((index++))
+            expected_commit="${arguments[$index]-}"
+            ;;
+        --output)
+            ((index++))
+            output="${arguments[$index]-}"
+            ;;
+        -h | --help)
+            usage
+            return 0
+            ;;
+        *)
+            error "Unknown remote verification option '$argument'."
+            usage
+            return 2
+            ;;
+        esac
+        index=$((index + 1))
+    done
+    base_bash_release_version_supported "$version" || {
+        error "Version '$version' is outside the supported Base Bash v2 release policy."
+        return 1
+    }
+    commit_is_full_sha "$expected_commit" || {
+        error 'Remote verification requires a full 40-character expected commit.'
+        return 1
+    }
+    [[ -n "$output" ]] || {
+        error 'Remote verification requires --output DIRECTORY.'
+        return 2
+    }
+    [[ ! -e "$output" && ! -L "$output" ]] || {
+        error "Refusing to overwrite '$output'."
+        return 2
+    }
+    command -v gh > /dev/null 2>&1 || {
+        error 'Remote verification requires the GitHub CLI (gh).'
+        return 1
+    }
+
+    repository="${BASE_BASH_RELEASE_REPOSITORY:-basefoundry/base-bash-libs}"
+    tag="v$version"
+    archive_name="base-bash-libs-v$version.tar.gz"
+    sbom_name="base-bash-libs-v$version.spdx.json"
+    provenance_name="base-bash-libs-v$version.provenance.json"
+    sums_name="base-bash-libs-v$version.SHA256SUMS"
+    expected_assets=("$archive_name" "$sbom_name" "$provenance_name" "$sums_name")
+
+    release_metadata="$(gh api "repos/$repository/releases/tags/$tag" --jq '[.tag_name, (.draft | tostring)] | @tsv' 2> /dev/null)" || {
+        error "Unable to inspect GitHub Release '$tag'."
+        return 1
+    }
+    IFS=$'\t' read -r release_tag release_draft <<< "$release_metadata"
+    [[ "$release_tag" == "$tag" && "$release_draft" == false ]] || {
+        error "GitHub Release '$tag' is missing, mismatched, or still a draft."
+        return 1
+    }
+    asset_names="$(gh api "repos/$repository/releases/tags/$tag" --jq '.assets[].name' 2> /dev/null | LC_ALL=C sort)" || {
+        error "Unable to inspect assets for GitHub Release '$tag'."
+        return 1
+    }
+    for argument in "${expected_assets[@]}"; do
+        grep -Fx -- "$argument" <<< "$asset_names" > /dev/null || {
+            error "GitHub Release '$tag' is missing required asset: $argument"
+            return 1
+        }
+    done
+
+    ref_metadata="$(gh api "repos/$repository/git/ref/tags/$tag" --jq '.object.type + "\t" + .object.sha' 2> /dev/null)" || {
+        error "Unable to inspect annotated tag '$tag'."
+        return 1
+    }
+    IFS=$'\t' read -r ref_type tag_object <<< "$ref_metadata"
+    commit_is_full_sha "$tag_object" && [[ "$ref_type" == tag ]] || {
+        error "GitHub tag '$tag' is not an annotated tag."
+        return 1
+    }
+    tag_metadata="$(gh api "repos/$repository/git/tags/$tag_object" --jq '.object.type + "\t" + .object.sha' 2> /dev/null)" || {
+        error "Unable to inspect annotated tag object '$tag_object'."
+        return 1
+    }
+    IFS=$'\t' read -r tag_target_type tag_target <<< "$tag_metadata"
+    [[ "$tag_target_type" == commit && "${tag_target,,}" == "${expected_commit,,}" ]] || {
+        error "GitHub tag '$tag' resolves to ${tag_target_type:-unknown} ${tag_target:-unknown}, expected commit $expected_commit."
+        return 1
+    }
+
+    temporary="$(mktemp -d "${output}.tmp.XXXXXX")" || {
+        error 'Unable to create a private remote-artifact staging directory.'
+        return 1
+    }
+    if ! gh release download "$tag" --repo "$repository" --dir "$temporary" --pattern "$archive_name" \
+        --pattern "$sbom_name" --pattern "$provenance_name" --pattern "$sums_name"; then
+        rm -rf -- "$temporary"
+        error "Unable to download canonical assets for GitHub Release '$tag'."
+        return 1
+    fi
+    if ! verify_artifact "$temporary" "$expected_commit" > /dev/null; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    mkdir "$output" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
+    if ! mv -- "$temporary"/* "$output/"; then
+        rm -rf -- "$temporary" "$output"
+        return 1
+    fi
+    rm -rf -- "$temporary"
+    printf 'GitHub Release assets verified: %s (%s)\n' "$tag" "$output"
+}
+
 main() {
     case "${1-}" in
     build)
@@ -597,11 +738,18 @@ main() {
         ;;
     verify)
         shift
-        (($# == 1)) || {
+        if (($# == 1)); then
+            verify_artifact "$1"
+        elif (($# == 3)) && [[ "$2" == --commit ]]; then
+            verify_artifact "$1" "$3"
+        else
             usage
             return 2
-        }
-        verify_artifact "$1"
+        fi
+        ;;
+    verify-remote)
+        shift
+        verify_remote_artifact "$@"
         ;;
     -h | --help | help | "")
         usage
