@@ -264,6 +264,24 @@ __base_bash_libs_cli_set_option__() {
     BASE_BASH_LIBS_CLI_RESULT_OPTIONS["$name"]="$value"
 }
 
+__base_bash_libs_cli_flag_enabled__() {
+    case "${1-}" in
+    1 | true | yes) return 0 ;;
+    0 | false | no | '') return 1 ;;
+    *) return 1 ;;
+    esac
+}
+
+__base_bash_libs_cli_option_active__() {
+    local model="$1" path="$2" name="$3" type value
+
+    [[ -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$name]+set}" ]] || return 1
+    type="$(__base_bash_libs_cli_option_meta__ "$model" "$path" "$name" type)"
+    [[ "$type" == flag ]] || return 0
+    value="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$name]-}"
+    __base_bash_libs_cli_flag_enabled__ "$value"
+}
+
 __base_bash_libs_cli_add_repeat__() {
     local name="$1" value="$2" count
 
@@ -1208,7 +1226,7 @@ __base_bash_libs_cli_usage_error__() {
 }
 
 __base_bash_libs_cli_apply_defaults_and_validate__() {
-    local model="$1" path="$2" index name option_path type value required default conflicts conflict
+    local model="$1" path="$2" index option_index name option_path type value required default conflicts conflict conflict_path
     local -a conflict_names=()
 
     __base_bash_libs_cli_collect_options__ "$model" "$path"
@@ -1232,11 +1250,19 @@ __base_bash_libs_cli_apply_defaults_and_validate__() {
             fi
         fi
         conflicts="$(__base_bash_libs_cli_option_meta__ "$model" "$option_path" "$name" conflicts)"
-        if [[ -n "$conflicts" && -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$name]+set}" ]]; then
+        if [[ -n "$conflicts" ]] &&
+            __base_bash_libs_cli_option_active__ "$model" "$option_path" "$name"; then
             IFS=, read -r -a conflict_names <<< "$conflicts"
             for conflict in "${conflict_names[@]}"; do
                 [[ -z "$conflict" ]] && continue
-                if [[ -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$conflict]+set}" ]]; then
+                conflict_path="$option_path"
+                for option_index in "${!__base_bash_libs_cli_option_names[@]}"; do
+                    if [[ "${__base_bash_libs_cli_option_names[option_index]}" == "$conflict" ]]; then
+                        conflict_path="${__base_bash_libs_cli_option_paths[option_index]}"
+                        break
+                    fi
+                done
+                if __base_bash_libs_cli_option_active__ "$model" "$conflict_path" "$conflict"; then
                     __base_bash_libs_cli_error__ "options '$name' and '$conflict' conflict."
                     return $?
                 fi
@@ -1352,7 +1378,7 @@ base_cli_parse() {
                 return 2
             fi
             if [[ "$type" == flag ]]; then
-                if [[ -n "$option_value" ]]; then
+                if [[ "$current" == --*=* ]]; then
                     __base_bash_libs_cli_usage_error__ "$model" "$path" "flag '$token' does not accept a value."
                     return 2
                 fi
