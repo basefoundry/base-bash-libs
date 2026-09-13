@@ -363,6 +363,46 @@ EOF
     [[ "$output" != *"unbound variable"* ]]
 }
 
+@test "base_init publishes through collision-prone caller array names" {
+    local script="$TEST_TMPDIR/init-collision.sh"
+
+    create_script "$script" <<EOF
+# base-bash-libs: passive-source
+source "$STDLIB_PATH"
+
+exercise_global() {
+    local candidate
+    for candidate in input_args filtered_args value result_name input_index parse_config color_requested configure_runtime; do
+        declare -a "\$candidate=([0]=sentinel)"
+        base_init "\$candidate" -- --keep payload
+        printf 'global:%s:' "\$candidate"
+        declare -p "\$candidate"
+    done
+}
+
+exercise_local() {
+    local candidate="\$1"
+    local -a "\$candidate=([0]=sentinel)"
+    base_init "\$candidate" -- --keep payload
+    printf 'local:%s:' "\$candidate"
+    declare -p "\$candidate"
+}
+
+exercise_global
+for candidate in input_args filtered_args value result_name input_index parse_config color_requested configure_runtime; do
+    exercise_local "\$candidate"
+done
+EOF
+
+    bats_run "$BASH" "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(grep -c 'global:.*--keep.*payload' <<<"$output")" -eq 8 ]
+    [ "$(grep -c 'local:.*--keep.*payload' <<<"$output")" -eq 8 ]
+    [[ "$output" != *sentinel* ]]
+    [[ "$output" != *"unbound variable"* ]]
+}
+
 @test "stdlib source guard rejects caller-owned incompatible metadata" {
     bats_run bash -c '
         BASE_BASH_LIBS_STD_SOURCE_GUARD=1
