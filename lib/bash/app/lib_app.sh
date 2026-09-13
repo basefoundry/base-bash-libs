@@ -609,30 +609,40 @@ base_app_config_load() {
 
 # base_app_config_get - Copies one effective configuration value by name.
 base_app_config_get() {
-    local model="${1-}" key="${2-}" result_name="${3-}"
+    local __base_bash_libs_app_config_get_model="${1-}"
+    local __base_bash_libs_app_config_get_key="${2-}"
+    local __base_bash_libs_app_config_get_result_name="${3-}"
 
     (($# == 3)) || {
         __base_bash_libs_app_error__ 'base_app_config_get: usage: base_app_config_get MODEL KEY RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_validate_variable_names__ base_app_config_get "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_app_config_get "$result_name" || return 2
-    [[ -n "${__base_bash_libs_app_values["$model|$key"]+set}" ]] || return 1
-    printf -v "$result_name" '%s' "${__base_bash_libs_app_values["$model|$key"]}"
+    __base_bash_libs_std_validate_variable_names__ base_app_config_get \
+        "$__base_bash_libs_app_config_get_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_config_get \
+        "$__base_bash_libs_app_config_get_result_name" || return 2
+    [[ -n "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]+set}" ]] || return 1
+    printf -v "$__base_bash_libs_app_config_get_result_name" '%s' \
+        "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"
 }
 
 # base_app_config_provenance - Copies the source of one effective value.
 base_app_config_provenance() {
-    local model="${1-}" key="${2-}" result_name="${3-}"
+    local __base_bash_libs_app_config_provenance_model="${1-}"
+    local __base_bash_libs_app_config_provenance_key="${2-}"
+    local __base_bash_libs_app_config_provenance_result_name="${3-}"
 
     (($# == 3)) || {
         __base_bash_libs_app_error__ 'base_app_config_provenance: usage: base_app_config_provenance MODEL KEY RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_validate_variable_names__ base_app_config_provenance "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_app_config_provenance "$result_name" || return 2
-    [[ -n "${__base_bash_libs_app_provenance["$model|$key"]+set}" ]] || return 1
-    printf -v "$result_name" '%s' "${__base_bash_libs_app_provenance["$model|$key"]}"
+    __base_bash_libs_std_validate_variable_names__ base_app_config_provenance \
+        "$__base_bash_libs_app_config_provenance_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_config_provenance \
+        "$__base_bash_libs_app_config_provenance_result_name" || return 2
+    [[ -n "${__base_bash_libs_app_provenance["$__base_bash_libs_app_config_provenance_model|$__base_bash_libs_app_config_provenance_key"]+set}" ]] || return 1
+    printf -v "$__base_bash_libs_app_config_provenance_result_name" '%s' \
+        "${__base_bash_libs_app_provenance["$__base_bash_libs_app_config_provenance_model|$__base_bash_libs_app_config_provenance_key"]}"
 }
 
 # base_app_config_report - Emits deterministic, secret-redacted effective data.
@@ -796,13 +806,17 @@ base_app_run() {
 
 # base_app_status - Copies the model's last run status; never-run models are 0.
 base_app_status() {
-    local model="${1-}" result_name="${2-}"
+    local __base_bash_libs_app_status_model="${1-}"
+    local __base_bash_libs_app_status_result_name="${2-}"
     (($# == 2)) || {
         __base_bash_libs_app_error__ 'base_app_status: usage: base_app_status MODEL RESULT_VARIABLE'
         return 2
     }
-    __base_bash_libs_std_validate_variable_names__ base_app_status "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_app_status "$result_name" || return 2
-    __base_bash_libs_app_model_exists__ "$model" || return 1
-    printf -v "$result_name" '%s' "${__base_bash_libs_app_models["$model|last-status"]-0}"
+    __base_bash_libs_std_validate_variable_names__ base_app_status \
+        "$__base_bash_libs_app_status_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_app_status \
+        "$__base_bash_libs_app_status_result_name" || return 2
+    __base_bash_libs_app_model_exists__ "$__base_bash_libs_app_status_model" || return 1
+    printf -v "$__base_bash_libs_app_status_result_name" '%s' \
+        "${__base_bash_libs_app_models["$__base_bash_libs_app_status_model|last-status"]-0}"
 }

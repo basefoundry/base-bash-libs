@@ -107,6 +107,50 @@ setup() {
     [[ "$output" == "" ]]
 }
 
+@test "named output helpers publish through caller variables with ordinary names" {
+    run bash -c '
+        source "$1/std/lib_std.sh"
+        base_std_import cli/lib_cli.sh app/lib_app.sh
+
+        base_app_init app
+        base_app_config_define app channel string default=stable
+        base_app_config_load app
+        model=unchanged
+        base_app_config_get app channel model
+        [[ "$model" == stable ]]
+        key=unchanged
+        base_app_config_provenance app channel key
+        [[ "$key" == default ]]
+        result_name=unchanged
+        base_app_status app result_name
+        [[ "$result_name" == 0 ]]
+
+        base_cli_model_init output
+        base_cli_command output status "Status"
+        base_cli_option output status key value --key
+        base_cli_option output status tag value --tag repeatable=true
+        base_cli_positional output status target
+        base_cli_parse output -- status target-value --key value --tag one --tag two
+        key=unchanged
+        base_cli_result_get key key
+        [[ "$key" == value ]]
+        index=unchanged
+        base_cli_result_get_positional 0 index
+        [[ "$index" == target-value ]]
+        count=unchanged
+        base_cli_result_count tag count
+        [[ "$count" == 2 ]]
+
+        readonly readonly_target=unchanged
+        if base_app_config_get app channel readonly_target 2>/dev/null; then
+            exit 1
+        fi
+        [[ "$readonly_target" == unchanged ]]
+    ' bash "$BASE_BASH_DIR"
+
+    [ "$status" -eq 0 ]
+}
+
 @test "source files contain no legacy generic function definitions or guards" {
     run bash -c '
         for file in "$1"/*/lib_*.sh; do

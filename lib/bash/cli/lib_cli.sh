@@ -1549,41 +1549,53 @@ base_cli_completion_script() {
 
 # base_cli_result_get - Copies a parsed scalar option into a caller variable.
 base_cli_result_get() {
-    local key="${1-}" result_name="${2-}"
+    local __base_bash_libs_cli_result_get_key="${1-}"
+    local __base_bash_libs_cli_result_get_result_name="${2-}"
 
     if (($# != 2)); then
         __base_bash_libs_cli_error__ 'base_cli_result_get: usage: base_cli_result_get <key> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_validate_variable_names__ base_cli_result_get "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_get "$result_name" || return 2
-    [[ -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$key]+set}" ]] || return 1
-    printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$key]}"
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_get \
+        "$__base_bash_libs_cli_result_get_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_get \
+        "$__base_bash_libs_cli_result_get_result_name" || return 2
+    [[ -n "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$__base_bash_libs_cli_result_get_key]+set}" ]] || return 1
+    printf -v "$__base_bash_libs_cli_result_get_result_name" '%s' \
+        "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[$__base_bash_libs_cli_result_get_key]}"
 }
 
 # base_cli_result_get_positional - Copies one parsed positional into a variable.
 base_cli_result_get_positional() {
-    local index="${1-}" result_name="${2-}"
+    local __base_bash_libs_cli_result_get_positional_index="${1-}"
+    local __base_bash_libs_cli_result_get_positional_result_name="${2-}"
 
-    if (($# != 2)) || [[ ! "$index" =~ ^[0-9]+$ ]]; then
+    if (($# != 2)) || [[ ! "$__base_bash_libs_cli_result_get_positional_index" =~ ^[0-9]+$ ]]; then
         __base_bash_libs_cli_error__ 'base_cli_result_get_positional: usage: base_cli_result_get_positional <index> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_validate_variable_names__ base_cli_result_get_positional "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_get_positional "$result_name" || return 2
-    ((index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})) || return 1
-    printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[index]}"
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_get_positional \
+        "$__base_bash_libs_cli_result_get_positional_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_get_positional \
+        "$__base_bash_libs_cli_result_get_positional_result_name" || return 2
+    ((10#$__base_bash_libs_cli_result_get_positional_index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})) || return 1
+    printf -v "$__base_bash_libs_cli_result_get_positional_result_name" '%s' \
+        "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[10#$__base_bash_libs_cli_result_get_positional_index]}"
 }
 
 # base_cli_result_count - Copies the occurrence count of a repeatable option.
 base_cli_result_count() {
-    local key="${1-}" result_name="${2-}"
+    local __base_bash_libs_cli_result_count_key="${1-}"
+    local __base_bash_libs_cli_result_count_result_name="${2-}"
 
     if (($# != 2)); then
         __base_bash_libs_cli_error__ 'base_cli_result_count: usage: base_cli_result_count <key> <result_variable>'
         return 2
     fi
-    __base_bash_libs_std_validate_variable_names__ base_cli_result_count "$result_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_cli_result_count "$result_name" || return 2
-    printf -v "$result_name" '%s' "${BASE_BASH_LIBS_CLI_RESULT_REPEATABLE_COUNTS[$key]-0}"
+    __base_bash_libs_std_validate_variable_names__ base_cli_result_count \
+        "$__base_bash_libs_cli_result_count_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_cli_result_count \
+        "$__base_bash_libs_cli_result_count_result_name" || return 2
+    printf -v "$__base_bash_libs_cli_result_count_result_name" '%s' \
+        "${BASE_BASH_LIBS_CLI_RESULT_REPEATABLE_COUNTS[$__base_bash_libs_cli_result_count_key]-0}"
 }
