@@ -548,6 +548,46 @@ EOF
     [[ "$output" == *"option:child:--mode"* ]]
 }
 
+@test "option validators may render help without corrupting required-option traversal" {
+    show_nested_help() {
+        base_cli_help nested run >/dev/null
+    }
+
+    base_cli_model_init nested name=nested
+    base_cli_command nested run "Nested run"
+    base_cli_option nested run mode value --mode
+
+    base_cli_model_init outer name=outer
+    base_cli_command outer run "Outer run"
+    base_cli_option outer run first value --first validator=show_nested_help
+    base_cli_option outer run credential value --credential required=true
+
+    bats_run base_cli_parse outer -- run --first value
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required option 'credential' was not provided"* ]]
+}
+
+@test "positional validators may render help without corrupting positional traversal" {
+    show_nested_help() {
+        base_cli_help nested run >/dev/null
+    }
+
+    base_cli_model_init nested name=nested
+    base_cli_command nested run "Nested run"
+    base_cli_positional nested run target help="Target"
+
+    base_cli_model_init outer name=outer
+    base_cli_command outer run "Outer run"
+    base_cli_positional outer run first required=true validator=show_nested_help
+    base_cli_positional outer run credential required=true
+
+    bats_run base_cli_parse outer -- run first-value
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required positional 'credential' was not provided"* ]]
+}
+
 @test "completion emits aliases and a self-contained completion adapter" {
     declare_demo_model
 

@@ -1101,6 +1101,7 @@ base_cli_positional() {
 
 __base_bash_libs_cli_usage_line__() {
     local model="$1" path="$2" child_list positionals suffix="" name program
+    local -a __base_bash_libs_cli_positional_names=()
     program="${__base_bash_libs_cli_models["$model|meta|name"]}"
     child_list="${__base_bash_libs_cli_models["$model|command|children|$path"]-}"
     __base_bash_libs_cli_collect_positionals__ "$model" "$path"
@@ -1122,6 +1123,8 @@ base_cli_help() {
     local model="${1-}" path="${2-}" child_list child description name alias handler
     local label help_label_width=0 index option_path tokens help metavar required default sensitive
     local -a help_labels=() help_descriptions=() help_sections=() __base_bash_libs_cli_children=()
+    local -a __base_bash_libs_cli_option_names=() __base_bash_libs_cli_option_paths=()
+    local -a __base_bash_libs_cli_positional_names=()
     local has_commands=0 has_arguments=0
 
     if (($# > 2)); then
@@ -1230,6 +1233,7 @@ __base_bash_libs_cli_usage_error__() {
 __base_bash_libs_cli_apply_defaults_and_validate__() {
     local model="$1" path="$2" index option_index name option_path type value required default conflicts conflict conflict_path
     local -a conflict_names=()
+    local -a __base_bash_libs_cli_option_names=() __base_bash_libs_cli_option_paths=()
 
     __base_bash_libs_cli_collect_options__ "$model" "$path"
     for index in "${!__base_bash_libs_cli_option_names[@]}"; do
@@ -1276,6 +1280,7 @@ __base_bash_libs_cli_apply_defaults_and_validate__() {
 
 __base_bash_libs_cli_apply_positionals__() {
     local model="$1" path="$2" value name index repeatable required default repeat_start
+    local -a __base_bash_libs_cli_positional_names=()
 
     __base_bash_libs_cli_collect_positionals__ "$model" "$path"
     if ((${#__base_bash_libs_cli_positional_names[@]} == 0)); then
@@ -1475,6 +1480,7 @@ base_cli_complete() {
     local found_name found_path found_type
     local parse_options=1 pending_value=0 inline_value=0
     local -a words=() completed=() children=() __base_bash_libs_cli_option_tokens=()
+    local -a __base_bash_libs_cli_option_names=() __base_bash_libs_cli_option_paths=()
 
     if (($# < 2)) || [[ "$2" != -- ]]; then
         __base_bash_libs_cli_error__ 'base_cli_complete: usage: base_cli_complete <model> -- [words...]'
