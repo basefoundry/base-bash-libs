@@ -3839,6 +3839,49 @@ EOF
     [ ! -e "$target" ]
 }
 
+@test "SIGHUP composes with caller traps and cleanup at status 129" {
+    local script="$TEST_TMPDIR/cleanup-hup-signal.sh"
+    local target="$TEST_TMPDIR/cleanup-hup-signal-target"
+    local log_file="$TEST_TMPDIR/cleanup-hup-signal.log"
+
+    printf 'temporary\n' > "$target"
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap 'printf "caller-hup\\n" >> "$log_file"' HUP
+cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
+base_std_register_cleanup_path "$target"
+base_std_register_cleanup_hook cleanup_once
+kill -HUP "\$\$"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 129 ]
+    [ "$(cat "$log_file")" = $'caller-hup\ncleanup' ]
+    [ ! -e "$target" ]
+}
+
+@test "ignored SIGHUP remains ignored while cleanup is registered" {
+    local script="$TEST_TMPDIR/cleanup-ignored-hup.sh"
+    local log_file="$TEST_TMPDIR/cleanup-ignored-hup.log"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+trap '' HUP
+cleanup_once() { printf 'cleanup\\n' >> "$log_file"; }
+base_std_register_cleanup_hook cleanup_once
+kill -HUP "\$\$"
+printf 'after-hup\\n' >> "$log_file"
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$log_file")" = $'after-hup\ncleanup' ]
+}
+
 @test "later caller TERM traps compose with cleanup" {
     local script="$TEST_TMPDIR/cleanup-later-term.sh"
     local target="$TEST_TMPDIR/cleanup-later-term-target"

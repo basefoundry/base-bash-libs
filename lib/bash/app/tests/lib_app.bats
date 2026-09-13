@@ -505,6 +505,8 @@ inner_hook() { printf 'inner:%s:%s\n' "$1" "$2" >>"$events_file"; }
 inner_handler() {
     if [[ "$mode" == exit ]]; then
         exit 7
+    elif [[ "$mode" == hup ]]; then
+        kill -HUP "$$"
     fi
     kill -TERM "$$"
 }
@@ -513,22 +515,27 @@ base_app_init outer
 base_app_init inner
 base_app_hook outer fatal fatal outer_hook
 base_app_hook outer term term outer_hook
+base_app_hook outer hup hup outer_hook
 base_app_hook outer cleanup cleanup outer_hook
 base_app_hook inner fatal fatal inner_hook
 base_app_hook inner term term inner_hook
+base_app_hook inner hup hup inner_hook
 base_app_hook inner cleanup cleanup inner_hook
 base_app_run outer outer_handler
 EOF
     chmod +x "$script"
 
-    for mode in exit term; do
+    for mode in exit term hup; do
         : >"$events_file"
         if [[ "$mode" == exit ]]; then
             expected_status=7
             expected_phase=fatal
-        else
+        elif [[ "$mode" == term ]]; then
             expected_status=143
             expected_phase=term
+        else
+            expected_status=129
+            expected_phase=hup
         fi
 
         bats_run bash "$script" \
