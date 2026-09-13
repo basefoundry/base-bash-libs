@@ -13,12 +13,12 @@ base_init app_args --source "${BASH_SOURCE[0]}" --
 base_std_import gh/lib_gh.sh
 ```
 
-The current `main` implementation is preview-only and unreleased because it
-imports the preview-only `process` module for the retry-capture owner-guardian
-lifecycle. This post-GA implementation detail is not present in the immutable
-`v2.0.0` tree, whose GitHub helper implementation remains stable and
-self-contained. A future release must promote both modules together (or remove
-the dependency); stable modules may not depend on preview modules.
+The public `base_gh_*` surface remains stable since v2.0.0. The current
+implementation imports the implementation-private `process` module for the
+retry-capture owner-guardian lifecycle. The process symbols remain preview and
+must be shipped in the same or an earlier release before a stable artifact uses
+this implementation; private implementation dependencies do not promote their
+public symbols.
 
 ## Public Functions
 

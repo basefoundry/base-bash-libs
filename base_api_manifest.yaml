@@ -121,7 +121,8 @@ modules:
     source: lib/bash/gh/lib_gh.sh
     documentation: lib/bash/gh/README.md
     tests: lib/bash/gh/tests/lib_gh.bats
-    dependencies: std,process
+    dependencies: std
+    implementation_dependencies: process
     optional_commands: gh,awk,grep,mktemp,rm,sleep,timeout,gtimeout
     artifacts: lib/bash/gh/lib_gh.sh,lib/bash/gh/README.md,lib/bash/gh/tests/lib_gh.bats
     public_symbols: base_gh_api_with_retry,base_gh_auth_status_diagnostics,base_gh_infer_repo_from_origin,base_gh_repo_default_branch,base_gh_repo_from_remote_url,base_gh_report_command_failure,base_gh_require_cli,base_gh_run
@@ -130,8 +131,8 @@ modules:
     outputs: documented per symbol; named outputs are caller-owned
     statuses: usage and contract errors return 2; recoverable failures return 1 unless a symbol preserves an underlying gh status
     side_effects: documented per symbol; sourcing is passive
-    stability: preview
-    since: unreleased
+    stability: stable
+    since: 2.0.0
     deprecated: false
   - name: str
     kind: sourceable-library

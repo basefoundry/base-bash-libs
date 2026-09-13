@@ -33,6 +33,10 @@ metadata:
   `executable-launcher` for `bin/base-bash`.
 - `dependencies` names other manifest modules. `scripts/api-manifest check`
   rejects missing modules and dependency cycles.
+- `implementation_dependencies` names private runtime modules used to implement
+  a stable public module. They are checked for existence but do not change the
+  public dependency closure or promote a preview module's symbols. A release
+  must ship the private dependency before the stable implementation is used.
 - `public_symbols` is the complete exported function set. The checker compares
   it with declarations in the source file and rejects both undocumented and
   duplicate symbols.
