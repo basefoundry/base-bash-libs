@@ -27,6 +27,8 @@ metadata in one source of truth. It is one sourceable file and requires
   [conflicts=A,B] [sensitive=true|false] [hidden=true|false]` declares a
   `flag`, single `value`, or `repeatable` option. Tokens are exact `-x` or
   `--long` spellings; long options also accept `--long=value` for value kinds.
+  A flag never accepts an attached value: both `--flag=` and
+  `--flag=value` are usage errors.
   Conflict names must refer to options already declared on the same or an
   ancestor command. Sensitive defaults are redacted in generated help.
 - `base_cli_positional MODEL PATH NAME [required=true|false]
@@ -60,6 +62,13 @@ After a successful run parse:
   including empty values and values beginning with `-` after `--`.
 - `BASE_BASH_LIBS_CLI_RESULT_MODEL`, `..._COMMAND`, and `..._ACTION` identify
   the model, canonical command path, and `run`, `help`, or `version` action.
+
+Flag defaults are validated against `true`, `false`, `yes`, `no`, `1`, and `0`
+and are kept in that spelling in the result map. Conflict validation uses the
+effective boolean value: `true`, `yes`, and `1` enable a flag; `false`, `no`,
+and `0` leave it inactive. An explicitly supplied flag is enabled and therefore
+conflicts with another active option. This applies equally to ancestor and
+subcommand options.
 
 Results are valid after a successful parse. A failed parse returns status `2`
 and may have partially inspected input, but does not claim a valid result.

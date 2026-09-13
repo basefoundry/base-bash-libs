@@ -248,6 +248,52 @@ EOF
     [[ "$output" == *"unknown option '--unknown'"* ]]
 }
 
+@test "flags reject empty and non-empty attached values before handlers run" {
+    local handler_calls=0
+    flag_handler() { handler_calls=$((handler_calls + 1)); }
+
+    base_cli_model_init flags name=flags handler=flag_handler
+    base_cli_option flags '' enabled flag --enabled
+
+    bats_run base_cli_run flags -- --enabled=
+    [ "$status" -eq 2 ]
+    [ "$handler_calls" -eq 0 ]
+    [[ "$output" == *"flag '--enabled' does not accept a value"* ]]
+
+    bats_run base_cli_run flags -- --enabled=true
+    [ "$status" -eq 2 ]
+    [ "$handler_calls" -eq 0 ]
+}
+
+@test "flag defaults use effective booleans for ancestor and child conflicts" {
+    base_cli_model_init flags name=flags
+    base_cli_command flags run Run
+    base_cli_option flags '' inherited flag --inherited default=false
+    base_cli_option flags run selected flag --selected conflicts=inherited
+
+    base_cli_parse flags -- run --selected
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[inherited]}" = false ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[selected]}" = 1 ]
+
+    base_cli_model_init booleans name=booleans
+    base_cli_option booleans '' enabled flag --enabled default=yes
+    base_cli_option booleans '' disabled flag --disabled default=no
+    base_cli_option booleans '' one flag --one default=1
+    base_cli_option booleans '' zero flag --zero default=0
+    base_cli_parse booleans --
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[enabled]}" = yes ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[disabled]}" = no ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[one]}" = 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[zero]}" = 0 ]
+
+    base_cli_model_init active name=active
+    base_cli_option active '' first flag --first default=true
+    base_cli_option active '' second flag --second conflicts=first
+    bats_run base_cli_parse active -- --second
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"options 'second' and 'first' conflict"* ]]
+}
+
 @test "double dash preserves empty and option-looking positionals" {
     base_cli_model_init dash name=dash
     base_cli_command dash run "Run"
