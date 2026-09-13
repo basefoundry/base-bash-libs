@@ -396,62 +396,64 @@ base_std_check_bash_version() {
 ###################################################### INIT ############################################################
 
 __base_bash_libs_std_init_validate_result_array__() {
-    local result_name="${1-}" declaration attributes nocasematch_enabled=0 attributes_ok=0
+    local __base_bash_libs_std_init_result_name="${1-}"
+    local __base_bash_libs_std_init_declaration __base_bash_libs_std_init_attributes
+    local __base_bash_libs_std_init_nocasematch_enabled=0 __base_bash_libs_std_init_attributes_ok=0
 
-    [[ "$result_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
+    [[ "$__base_bash_libs_std_init_result_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
         printf '%s\n' "base_init: result name must be a valid Bash variable name." >&2
         return 1
     }
-    [[ "$result_name" != __* ]] || {
-        printf '%s\n' "base_init: result name '$result_name' uses the reserved internal namespace." >&2
+    [[ "$__base_bash_libs_std_init_result_name" != __* ]] || {
+        printf '%s\n' "base_init: result name '$__base_bash_libs_std_init_result_name' uses the reserved internal namespace." >&2
         return 1
     }
-    declaration="$(declare -p "$result_name" 2> /dev/null || true)"
-    [[ -n "$declaration" ]] || {
-        printf '%s\n' "base_init: result '$result_name' must be a caller-declared indexed array." >&2
+    __base_bash_libs_std_init_declaration="$(declare -p "$__base_bash_libs_std_init_result_name" 2> /dev/null || true)"
+    [[ -n "$__base_bash_libs_std_init_declaration" ]] || {
+        printf '%s\n' "base_init: result '$__base_bash_libs_std_init_result_name' must be a caller-declared indexed array." >&2
         return 1
     }
-    attributes="${declaration#declare -}"
-    attributes="${attributes%% *}"
+    __base_bash_libs_std_init_attributes="${__base_bash_libs_std_init_declaration#declare -}"
+    __base_bash_libs_std_init_attributes="${__base_bash_libs_std_init_attributes%% *}"
     if shopt -q nocasematch; then
-        nocasematch_enabled=1
+        __base_bash_libs_std_init_nocasematch_enabled=1
         shopt -u nocasematch
     fi
-    if [[ "$attributes" == *a* &&
-        "$attributes" != *A* &&
-        "$attributes" != *r* ]]; then
-        attributes_ok=1
+    if [[ "$__base_bash_libs_std_init_attributes" == *a* &&
+        "$__base_bash_libs_std_init_attributes" != *A* &&
+        "$__base_bash_libs_std_init_attributes" != *r* ]]; then
+        __base_bash_libs_std_init_attributes_ok=1
     fi
-    if ((nocasematch_enabled)); then
+    if ((__base_bash_libs_std_init_nocasematch_enabled)); then
         shopt -s nocasematch
     fi
-    ((attributes_ok)) || {
-        printf '%s\n' "base_init: result '$result_name' must be a caller-declared indexed array." >&2
+    ((__base_bash_libs_std_init_attributes_ok)) || {
+        printf '%s\n' "base_init: result '$__base_bash_libs_std_init_result_name' must be a caller-declared indexed array." >&2
         return 1
     }
 }
 
 __base_bash_libs_std_init_publish_array__() {
-    local result_name="$1" value
+    local __base_bash_libs_std_init_result_name="$1" __base_bash_libs_std_init_value
     shift
-    eval "$result_name=()"
+    eval "$__base_bash_libs_std_init_result_name=()"
     # shellcheck disable=SC2034 # eval publishes each value into a caller array.
-    for value; do
-        eval "$result_name+=(\"\$value\")"
+    for __base_bash_libs_std_init_value; do
+        eval "$__base_bash_libs_std_init_result_name+=(\"\$__base_bash_libs_std_init_value\")"
     done
 }
 
 __base_bash_libs_std_init_args_match__() {
-    local index=0
+    local __base_bash_libs_std_init_index=0
     (($# == ${#BASE_BASH_LIBS_SCRIPT_ARGS[@]})) || return 1
-    for index in "${!BASE_BASH_LIBS_SCRIPT_ARGS[@]}"; do
-        [[ "${BASE_BASH_LIBS_SCRIPT_ARGS[$index]}" == "$1" ]] || return 1
+    for __base_bash_libs_std_init_index in "${!BASE_BASH_LIBS_SCRIPT_ARGS[@]}"; do
+        [[ "${BASE_BASH_LIBS_SCRIPT_ARGS[$__base_bash_libs_std_init_index]}" == "$1" ]] || return 1
         shift
     done
 }
 
 __base_bash_libs_std_initialize_runtime_state__() {
-    local script_dir="$1"
+    local __base_bash_libs_std_init_script_dir="$1"
     shift
 
     if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
@@ -495,10 +497,10 @@ __base_bash_libs_std_initialize_runtime_state__() {
     declare -g __base_bash_libs_std_original_debug_trap_spec=""
     declare -g __base_bash_libs_std_cleanup_debug_trap_spec="__not-installed__"
 
-    readonly BASE_BASH_LIBS_STD_INIT_SOURCE="$script_dir"
+    readonly BASE_BASH_LIBS_STD_INIT_SOURCE="$__base_bash_libs_std_init_script_dir"
     declare -ga BASE_BASH_LIBS_SCRIPT_ARGS=("$@")
     readonly -a BASE_BASH_LIBS_SCRIPT_ARGS
-    declare -g BASE_BASH_LIBS_SCRIPT_DIR="$script_dir"
+    declare -g BASE_BASH_LIBS_SCRIPT_DIR="$__base_bash_libs_std_init_script_dir"
     readonly BASE_BASH_LIBS_SCRIPT_DIR
     readonly BASE_BASH_LIBS_STD_INITIALIZED=1
 }
@@ -513,90 +515,93 @@ __base_bash_libs_std_initialize_runtime_state__() {
 #   base_init app_args --source "$script" -- "$@"
 #
 base_init() {
-    local result_name="${1-}" source_path="" script_dir="" arg input_index
-    local parse_config=1 color_requested=0 configure_runtime=0
-    local -a input_args=() filtered_args=()
+    local __base_bash_libs_std_init_result_name="${1-}" __base_bash_libs_std_init_source_path=""
+    local __base_bash_libs_std_init_script_dir="" __base_bash_libs_std_init_arg
+    local __base_bash_libs_std_init_input_index
+    local __base_bash_libs_std_init_parse_config=1 __base_bash_libs_std_init_color_requested=0
+    local __base_bash_libs_std_init_configure_runtime=0
+    local -a __base_bash_libs_std_init_input_args=() __base_bash_libs_std_init_filtered_args=()
 
     (($# >= 1)) || {
         printf '%s\n' "base_init: expected a result array name." >&2
         return 1
     }
-    __base_bash_libs_std_init_validate_result_array__ "$result_name" || return 1
+    __base_bash_libs_std_init_validate_result_array__ "$__base_bash_libs_std_init_result_name" || return 1
     shift
 
     while (($#)); do
-        if ((parse_config)) && [[ "$1" == "--source" ]]; then
+        if ((__base_bash_libs_std_init_parse_config)) && [[ "$1" == "--source" ]]; then
             (($# >= 2)) || {
                 printf '%s\n' "base_init: --source requires a script path." >&2
                 return 1
             }
-            source_path="$2"
+            __base_bash_libs_std_init_source_path="$2"
             shift 2
             continue
         fi
-        if ((parse_config)) && [[ "$1" == "--" ]]; then
-            parse_config=0
+        if ((__base_bash_libs_std_init_parse_config)) && [[ "$1" == "--" ]]; then
+            __base_bash_libs_std_init_parse_config=0
             shift
-            input_args+=("$@")
+            __base_bash_libs_std_init_input_args+=("$@")
             break
         fi
-        input_args+=("$1")
+        __base_bash_libs_std_init_input_args+=("$1")
         shift
     done
 
-    source_path="${source_path:-${BASE_BASH_LIBS_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}}"
-    if [[ -n "$source_path" ]]; then
-        script_dir="$(cd -- "$(dirname -- "$source_path")" &> /dev/null && pwd -P)" || {
-            printf '%s\n' "base_init: unable to resolve source directory from '$source_path'." >&2
+    __base_bash_libs_std_init_source_path="${__base_bash_libs_std_init_source_path:-${BASE_BASH_LIBS_BOOTSTRAP_SOURCE:-${BASH_SOURCE[1]-}}}"
+    if [[ -n "$__base_bash_libs_std_init_source_path" ]]; then
+        __base_bash_libs_std_init_script_dir="$(cd -- "$(dirname -- "$__base_bash_libs_std_init_source_path")" &> /dev/null && pwd -P)" || {
+            printf '%s\n' "base_init: unable to resolve source directory from '$__base_bash_libs_std_init_source_path'." >&2
             return 1
         }
     else
-        script_dir="$(pwd -P)" || {
+        __base_bash_libs_std_init_script_dir="$(pwd -P)" || {
             printf '%s\n' "base_init: unable to resolve the current caller directory." >&2
             return 1
         }
     fi
 
     if [[ -n "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]; then
-        [[ "${BASE_BASH_LIBS_STD_INIT_SOURCE:-}" == "$script_dir" ]] || {
-            printf '%s\n' "base_init: already initialized for '$BASE_BASH_LIBS_STD_INIT_SOURCE'; requested '$script_dir'." >&2
+        [[ "${BASE_BASH_LIBS_STD_INIT_SOURCE:-}" == "$__base_bash_libs_std_init_script_dir" ]] || {
+            printf '%s\n' "base_init: already initialized for '$BASE_BASH_LIBS_STD_INIT_SOURCE'; requested '$__base_bash_libs_std_init_script_dir'." >&2
             return 1
         }
-        __base_bash_libs_std_init_args_match__ "${input_args[@]+${input_args[@]}}" || {
+        __base_bash_libs_std_init_args_match__ "${__base_bash_libs_std_init_input_args[@]+${__base_bash_libs_std_init_input_args[@]}}" || {
             printf '%s\n' "base_init: repeated initialization received different argv; refusing to hide the mismatch." >&2
             return 1
         }
     else
-        configure_runtime=1
-        __base_bash_libs_std_initialize_runtime_state__ "$script_dir" "${input_args[@]+${input_args[@]}}" || return 1
+        __base_bash_libs_std_init_configure_runtime=1
+        __base_bash_libs_std_initialize_runtime_state__ "$__base_bash_libs_std_init_script_dir" "${__base_bash_libs_std_init_input_args[@]+${__base_bash_libs_std_init_input_args[@]}}" || return 1
     fi
 
-    parse_config=1
-    for input_index in "${!input_args[@]}"; do
-        arg="${input_args[input_index]}"
-        if ((parse_config)) && [[ "$arg" == "--" ]]; then
-            filtered_args+=("$arg")
-            parse_config=0
+    __base_bash_libs_std_init_parse_config=1
+    for __base_bash_libs_std_init_input_index in "${!__base_bash_libs_std_init_input_args[@]}"; do
+        __base_bash_libs_std_init_arg="${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index]}"
+        if ((__base_bash_libs_std_init_parse_config)) && [[ "$__base_bash_libs_std_init_arg" == "--" ]]; then
+            __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
+            __base_bash_libs_std_init_parse_config=0
             continue
         fi
-        if ((parse_config)); then
-            case "$arg" in
+        if ((__base_bash_libs_std_init_parse_config)); then
+            case "$__base_bash_libs_std_init_arg" in
             --debug-wrapper)
-                if ((configure_runtime)); then
+                if ((__base_bash_libs_std_init_configure_runtime)); then
                     base_std_set_log_level DEBUG
                     base_std_set_log_category_level -l base_bash_libs DEBUG
                     export BASE_BASH_LIBS_LOG_DEBUG=1
                 fi
                 ;;
             --verbose-wrapper)
-                if ((configure_runtime)); then
+                if ((__base_bash_libs_std_init_configure_runtime)); then
                     base_std_set_log_level VERBOSE
                     base_std_set_log_category_level -l base_bash_libs VERBOSE
                     export BASE_BASH_LIBS_LOG_DEBUG=1
                 fi
                 ;;
             --utc-wrapper)
-                if ((configure_runtime)); then
+                if ((__base_bash_libs_std_init_configure_runtime)); then
                     export BASE_BASH_LIBS_LOG_UTC=1
                 fi
                 ;;
@@ -606,38 +611,38 @@ base_init() {
                 # wrapper form when it is bare or followed by an ordinary
                 # application argument, but let the documented modes reach
                 # the application parser unchanged.
-                if [[ "${input_args[input_index + 1]-}" == auto ||
-                    "${input_args[input_index + 1]-}" == always ||
-                    "${input_args[input_index + 1]-}" == never ]]; then
-                    filtered_args+=("$arg")
+                if [[ "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == auto ||
+                    "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == always ||
+                    "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == never ]]; then
+                    __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
                 else
-                    color_requested=1
+                    __base_bash_libs_std_init_color_requested=1
                 fi
                 ;;
             *)
-                filtered_args+=("$arg")
+                __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
                 ;;
             esac
         else
-            filtered_args+=("$arg")
+            __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
         fi
     done
 
-    if ((configure_runtime)); then
-        BASE_BASH_LIBS_STD_COLOR_ENABLED="$color_requested"
+    if ((__base_bash_libs_std_init_configure_runtime)); then
+        BASE_BASH_LIBS_STD_COLOR_ENABLED="$__base_bash_libs_std_init_color_requested"
         __base_bash_libs_std_init_colors__
         base_std_set_log_category_level -l base_bash_libs INFO
         # Re-apply explicit debug levels after the default category gate.
-        for arg in "${input_args[@]+${input_args[@]}}"; do
-            if [[ "$arg" == "--debug-wrapper" ]]; then
+        for __base_bash_libs_std_init_arg in "${__base_bash_libs_std_init_input_args[@]+${__base_bash_libs_std_init_input_args[@]}}"; do
+            if [[ "$__base_bash_libs_std_init_arg" == "--debug-wrapper" ]]; then
                 base_std_set_log_category_level -l base_bash_libs DEBUG
-            elif [[ "$arg" == "--verbose-wrapper" ]]; then
+            elif [[ "$__base_bash_libs_std_init_arg" == "--verbose-wrapper" ]]; then
                 base_std_set_log_category_level -l base_bash_libs VERBOSE
             fi
         done
     fi
 
-    __base_bash_libs_std_init_publish_array__ "$result_name" "${filtered_args[@]+${filtered_args[@]}}"
+    __base_bash_libs_std_init_publish_array__ "$__base_bash_libs_std_init_result_name" "${__base_bash_libs_std_init_filtered_args[@]+${__base_bash_libs_std_init_filtered_args[@]}}"
     return 0
 }
 
