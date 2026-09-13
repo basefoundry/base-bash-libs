@@ -482,6 +482,9 @@ __base_bash_libs_std_initialize_runtime_state__() {
     declare -g __base_bash_libs_std_original_exit_trap=""
     declare -g __base_bash_libs_std_original_exit_trap_spec=""
     declare -g __base_bash_libs_std_cleanup_dispatcher_trap_spec=""
+    declare -g __base_bash_libs_std_original_hup_trap=""
+    declare -g __base_bash_libs_std_original_hup_trap_spec=""
+    declare -g __base_bash_libs_std_cleanup_hup_trap_spec="__not-installed__"
     declare -g __base_bash_libs_std_original_int_trap=""
     declare -g __base_bash_libs_std_original_int_trap_spec=""
     declare -g __base_bash_libs_std_cleanup_int_trap_spec="__not-installed__"
@@ -2731,7 +2734,7 @@ __base_bash_libs_std_get_trap_command__() {
     EXIT | DEBUG)
         trap_name="$signal"
         ;;
-    INT | TERM)
+    HUP | INT | TERM)
         trap_name="SIG$signal"
         ;;
     *)
@@ -2836,7 +2839,19 @@ __base_bash_libs_std_cleanup_delete_path__() {
 }
 
 __base_bash_libs_std_cleanup_refresh_signal_traps__() {
-    local current_int_trap current_term_trap
+    local current_hup_trap current_int_trap current_term_trap
+
+    current_hup_trap="$(trap -p HUP || true)"
+    if [[ "$current_hup_trap" != "$__base_bash_libs_std_cleanup_hup_trap_spec" ]]; then
+        __base_bash_libs_std_original_hup_trap_spec="$current_hup_trap"
+        __base_bash_libs_std_get_trap_command__ __base_bash_libs_std_original_hup_trap HUP || true
+        if [[ -n "$current_hup_trap" && -z "$__base_bash_libs_std_original_hup_trap" ]]; then
+            __base_bash_libs_std_cleanup_hup_trap_spec="$current_hup_trap"
+        else
+            trap '__base_bash_libs_std_cleanup_signal_exit__ HUP 129' HUP
+            __base_bash_libs_std_cleanup_hup_trap_spec="$(trap -p HUP || true)"
+        fi
+    fi
 
     current_int_trap="$(trap -p INT || true)"
     if [[ "$current_int_trap" != "$__base_bash_libs_std_cleanup_int_trap_spec" ]]; then
@@ -2897,6 +2912,9 @@ __base_bash_libs_std_cleanup_signal_exit__() {
     local signal="$1" exit_status="$2"
 
     case "$signal" in
+    HUP)
+        __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_hup_trap" "$exit_status"
+        ;;
     INT)
         __base_bash_libs_std_run_saved_trap_command__ "$__base_bash_libs_std_original_int_trap" "$exit_status"
         ;;
@@ -2962,12 +2980,15 @@ __base_bash_libs_std_install_cleanup_dispatcher__() {
     __base_bash_libs_std_cleanup_pending_signal_status=0
     __base_bash_libs_std_original_exit_trap_spec="$(trap -p EXIT || true)"
     __base_bash_libs_std_get_exit_trap_command__ __base_bash_libs_std_original_exit_trap
+    __base_bash_libs_std_original_hup_trap_spec="$(trap -p HUP || true)"
+    __base_bash_libs_std_get_trap_command__ __base_bash_libs_std_original_hup_trap HUP || true
     __base_bash_libs_std_original_int_trap_spec="$(trap -p INT || true)"
     __base_bash_libs_std_get_trap_command__ __base_bash_libs_std_original_int_trap INT || true
     __base_bash_libs_std_original_term_trap_spec="$(trap -p TERM || true)"
     __base_bash_libs_std_get_trap_command__ __base_bash_libs_std_original_term_trap TERM || true
     __base_bash_libs_std_original_debug_trap_spec="$(trap -p DEBUG || true)"
     __base_bash_libs_std_get_trap_command__ __base_bash_libs_std_original_debug_trap DEBUG || true
+    __base_bash_libs_std_cleanup_hup_trap_spec="__not-installed__"
     __base_bash_libs_std_cleanup_int_trap_spec="__not-installed__"
     __base_bash_libs_std_cleanup_term_trap_spec="__not-installed__"
     __base_bash_libs_std_cleanup_debug_trap_spec="__not-installed__"
@@ -2981,7 +3002,7 @@ __base_bash_libs_std_install_cleanup_dispatcher__() {
 }
 
 __base_bash_libs_std_maybe_uninstall_cleanup_dispatcher__() {
-    local current_exit_trap_spec current_int_trap_spec
+    local current_exit_trap_spec current_hup_trap_spec current_int_trap_spec
     local current_term_trap_spec current_debug_trap_spec
 
     ((__base_bash_libs_std_cleanup_dispatcher_installed)) || return 0
@@ -2994,6 +3015,10 @@ __base_bash_libs_std_maybe_uninstall_cleanup_dispatcher__() {
     if [[ "$current_exit_trap_spec" == "$__base_bash_libs_std_cleanup_dispatcher_trap_spec" ]]; then
         trap - EXIT
         __base_bash_libs_std_restore_trap_spec__ EXIT "$__base_bash_libs_std_original_exit_trap_spec"
+    fi
+    current_hup_trap_spec="$(trap -p HUP || true)"
+    if [[ "$current_hup_trap_spec" == "$__base_bash_libs_std_cleanup_hup_trap_spec" ]]; then
+        __base_bash_libs_std_restore_trap_spec__ HUP "$__base_bash_libs_std_original_hup_trap_spec"
     fi
     current_int_trap_spec="$(trap -p INT || true)"
     if [[ "$current_int_trap_spec" == "$__base_bash_libs_std_cleanup_int_trap_spec" ]]; then
@@ -3014,6 +3039,9 @@ __base_bash_libs_std_maybe_uninstall_cleanup_dispatcher__() {
     __base_bash_libs_std_original_exit_trap=""
     __base_bash_libs_std_original_exit_trap_spec=""
     __base_bash_libs_std_cleanup_dispatcher_trap_spec=""
+    __base_bash_libs_std_original_hup_trap=""
+    __base_bash_libs_std_original_hup_trap_spec=""
+    __base_bash_libs_std_cleanup_hup_trap_spec="__not-installed__"
     __base_bash_libs_std_original_int_trap=""
     __base_bash_libs_std_original_int_trap_spec=""
     __base_bash_libs_std_cleanup_int_trap_spec="__not-installed__"
