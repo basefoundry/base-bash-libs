@@ -72,6 +72,7 @@ required_files=(
     tests/namespace-contract.bats
     tests/api-manifest.bats
     tests/consumer-kit/tests/consumer_kit.bats
+    tests/validate-driver.bats
     tests/library-bundle.bats
     tests/vendor.bats
     tests/lint-warnings.sh
@@ -470,7 +471,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/community-contract.sh \
     scripts/first-party-cutover \
     tests/first-party-cutover.bats \
-    tests/downstream-demo-contract.sh
+    tests/downstream-demo-contract.sh || exit $?
 
 bats_files=(
     tests/release.bats
@@ -478,6 +479,7 @@ bats_files=(
     tests/namespace-contract.bats
     tests/api-manifest.bats
     tests/consumer-kit/tests/consumer_kit.bats
+    tests/validate-driver.bats
     tests/library-bundle.bats
     tests/release-invariants.bats
     tests/vendor.bats
