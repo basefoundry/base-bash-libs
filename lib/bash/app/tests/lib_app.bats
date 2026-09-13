@@ -299,6 +299,8 @@ assert_demo_snapshot() {
 }
 
 @test "standard options publish opt-in policy and noninteractive prompts are denied" {
+    declare -a init_args=()
+    base_init init_args --
     base_cli_model_init demo name=demo
     base_cli_command demo run "Run"
     base_app_init policy
@@ -308,7 +310,16 @@ assert_demo_snapshot() {
     [ "$BASE_BASH_LIBS_APP_DRY_RUN" -eq 1 ]
     [ "$BASE_BASH_LIBS_APP_NONINTERACTIVE" -eq 1 ]
     [ "$BASE_BASH_LIBS_APP_COLOR" = never ]
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 3 ]
     ! base_app_should_prompt policy
+
+    base_cli_parse demo -- run --quiet
+    base_app_apply_standard_options policy
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 2 ]
+
+    base_cli_parse demo -- run --verbose
+    base_app_apply_standard_options policy
+    [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
 }
 
 @test "base_app_prompt validates usage and applies the prompt policy contract" {
