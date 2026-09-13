@@ -155,6 +155,43 @@ SCRIPT
     [[ "$output" == *"refusing to overwrite existing file"* ]]
 }
 
+@test "v2 quickstart uses one explicit launcher from an unrelated cwd" {
+    local project_root="$TEST_TMPDIR/quickstart/demo"
+    local framework_root="$BASE_REPO_ROOT"
+    local framework_launcher="$framework_root/bin/base-bash"
+    local bundle="$TEST_TMPDIR/quickstart/bundle"
+
+    mkdir -p "$project_root"
+    env -i HOME="$TEST_TMPDIR/home" PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        "$framework_launcher" init --profile standard --dir "$project_root"
+
+    run env PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        "$framework_launcher" "$project_root/bin/app" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Usage:"* ]]
+
+    run env PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        "$framework_launcher" check --project "$project_root"
+    [ "$status" -eq 0 ]
+
+    run env PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        bash -c 'cd "$1" && ./tests/run.sh' _ "$project_root"
+    [ "$status" -eq 0 ]
+
+    run env PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        "$framework_root/scripts/library-bundle" bundle "$bundle"
+    [ "$status" -eq 0 ]
+    run env PATH="$framework_root/bin:$BASE_TEST_ORIG_PATH" \
+        BASE_BASH_LIBS_DIR="$framework_root/lib/bash" \
+        "$framework_root/scripts/library-bundle" verify "$bundle"
+    [ "$status" -eq 0 ]
+}
+
 @test "base-bash init reconciles minimal scaffold modes under restrictive umask" {
     local project_dir="$TEST_TMPDIR/generated"
     local previous_umask

@@ -11,12 +11,12 @@ intentionally required rather than defaulting to a moving branch:
 
 ```bash
 export BASE_BASH_LIBS_REF='v2.0.0'
-export BASE_BASH_LIBS_COMMIT='b4243765726c133499feeabdc50154f99c0fec12'
+export EXPECTED_BASE_BASH_LIBS_COMMIT='b4243765726c133499feeabdc50154f99c0fec12'
 mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs fetch --tags origin "$BASE_BASH_LIBS_REF"
 git -C vendor/base-bash-libs checkout --detach "$BASE_BASH_LIBS_REF"
-test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$BASE_BASH_LIBS_COMMIT"
+test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$EXPECTED_BASE_BASH_LIBS_COMMIT"
 ```
 
 Do not replace the ref with `main`, a short SHA, or an automatically generated
@@ -33,13 +33,23 @@ The launcher creates a deterministic scaffold. The application module is one
 physical file, as required by `STANDARDS.md`:
 
 ```bash
+framework_root="$PWD/vendor/base-bash-libs"
+framework_launcher="$framework_root/bin/base-bash"
+export PATH="$framework_root/bin:$PATH"
+export BASE_BASH_LIBS_DIR="$framework_root/lib/bash"
 mkdir -p demo
-vendor/base-bash-libs/bin/base-bash init --profile standard --dir demo
+"$framework_launcher" init --profile standard --dir demo
 cd demo
-BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" ./bin/app --help
-BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" ./bin/app status
-BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" ./bin/app run --dry-run
+"$framework_launcher" ./bin/app --help
+"$framework_launcher" ./bin/app status
+"$framework_launcher" ./bin/app run --dry-run
 ```
+
+The explicit launcher path is intentional. It keeps the generated app and its
+tests on the verified checkout even when an older or unrelated `base-bash` is
+already present earlier on the original `PATH`. The exported `PATH` also lets
+the generated `#!/usr/bin/env base-bash` test commands resolve that same
+launcher.
 
 The generated app demonstrates declarative commands, typed data-only config,
 redacted diagnostics, dry-run behavior, lifecycle hooks, and status-preserving
@@ -55,13 +65,15 @@ framework source.
 ## 3. Check, test, and bundle
 
 ```bash
-BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" \
-  ../vendor/base-bash-libs/bin/base-bash check --project .
+"$framework_launcher" check --project .
 ./tests/run.sh
-BASE_BASH_LIBS_DIR="../vendor/base-bash-libs/lib/bash" \
-  ../vendor/base-bash-libs/scripts/library-bundle bundle /tmp/base-bash-bundle
-../vendor/base-bash-libs/scripts/library-bundle verify /tmp/base-bash-bundle
+"$framework_root/scripts/library-bundle" bundle /tmp/base-bash-bundle
+"$framework_root/scripts/library-bundle" verify /tmp/base-bash-bundle
 ```
+
+Run the commands above from the `demo` directory. The helper paths are
+absolute-to-the-checkout tool paths while bundle inputs and destinations retain
+their caller-relative meaning.
 
 The complete process is also available offline in the
 [`tests/consumer-kit`](../../tests/consumer-kit/README.md) fixture.

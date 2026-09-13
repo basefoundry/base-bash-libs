@@ -32,7 +32,11 @@ grep -F 'b4243765726c133499feeabdc50154f99c0fec12' docs/v2/quickstart.md README.
     printf 'The v2 quickstart and source-checkout example must pin the verified GA commit.\n' >&2
     exit 1
 }
-grep -F 'base-bash init --profile standard --dir demo' docs/v2/quickstart.md > /dev/null || {
+grep -F 'framework_launcher' docs/v2/quickstart.md > /dev/null || {
+    printf "The v2 quickstart must use the verified launcher path.\n" >&2
+    exit 1
+}
+grep -F 'init --profile standard --dir demo' docs/v2/quickstart.md > /dev/null || {
     printf "The v2 quickstart must use the launcher's --dir option.\n" >&2
     exit 1
 }
