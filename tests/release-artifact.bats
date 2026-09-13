@@ -47,6 +47,25 @@ release_test_build() {
     diff -ru "$first" "$second"
     grep -F '"spdxVersion": "SPDX-2.3"' "$first"/*.spdx.json
     grep -F '"reproducible": true' "$first"/*.provenance.json
+    awk '/"SPDXID": "SPDXRef-File-/ { id=$0; sub(/^.*"SPDXID": "/, "", id); sub(/".*$/, "", id); if (id !~ /^SPDXRef-File-[A-Za-z0-9.-]+$/ || seen[id]++) exit 1; count++ } END { exit (count > 0 ? 0 : 1) }' \
+        "$first"/*.spdx.json
+}
+
+@test "release SBOM file identifiers are collision-resistant and reject the former underscore form" {
+    local artifact="$TEST_TMPDIR/artifact" sbom sums temporary
+
+    release_test_build "$artifact"
+    sbom="$artifact/base-bash-libs-v2.0.0-rc.1.spdx.json"
+    sums="$artifact/base-bash-libs-v2.0.0-rc.1.SHA256SUMS"
+    temporary="$TEST_TMPDIR/sbom-invalid.tmp"
+    awk '!replaced && /SPDXRef-File-x/ { sub(/SPDXRef-File-x[0-9a-f]+/, "SPDXRef-File-lib_bash_std_lib_std_sh"); replaced=1 } { print }' \
+        "$sbom" > "$temporary"
+    mv -- "$temporary" "$sbom"
+    release_test_refresh_checksum "$sbom" "$sums"
+
+    bats_run "$RELEASE_ARTIFACT" verify "$artifact"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"invalid or duplicate SPDX file identifiers"* ]]
 }
 
 @test "release artifact build rejects duplicate options" {
