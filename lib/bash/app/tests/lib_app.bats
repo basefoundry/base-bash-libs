@@ -88,6 +88,36 @@ assert_demo_snapshot() {
     [ "$source" = project ]
 }
 
+@test "environment bindings survive loader-local and caller-local names" {
+    local model_value key_value value_value env_name_value project_file_value actual
+
+    exercise_environment_bindings() {
+        local model=from-model key=from-key value=from-value
+        local env_name=from-env-name project_file=from-project-file
+        export model key value env_name project_file
+
+        base_app_init env_bindings
+        base_app_config_define env_bindings model_value string env=model
+        base_app_config_define env_bindings key_value string env=key
+        base_app_config_define env_bindings value_value string env=value
+        base_app_config_define env_bindings env_name_value string env=env_name
+        base_app_config_define env_bindings project_file_value string env=project_file
+        base_app_config_load env_bindings
+
+        for actual in model_value key_value value_value env_name_value project_file_value; do
+            base_app_config_get env_bindings "$actual" "$actual"
+        done
+    }
+
+    exercise_environment_bindings
+
+    [ "$model_value" = from-model ]
+    [ "$key_value" = from-key ]
+    [ "$value_value" = from-value ]
+    [ "$env_name_value" = from-env-name ]
+    [ "$project_file_value" = from-project-file ]
+}
+
 @test "enum validation preserves a caller variable with the internal scratch name" {
     local -a __base_bash_libs_app_enum_values=(caller-owned)
 
