@@ -48,6 +48,10 @@ metadata in one source of truth. It is one sourceable file and requires
   `base_cli_result_count KEY RESULT_VARIABLE` copy parsed values into
   caller-owned variables without command substitution.
 
+Positional result indexes use decimal digits, accept leading zeros, and are
+range-checked before Bash arithmetic or array subscripting. Out-of-range and
+very large indexes return `1` without changing the destination variable.
+
 ## Result contract
 
 After a successful run parse:

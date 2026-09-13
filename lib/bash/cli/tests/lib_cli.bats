@@ -261,6 +261,23 @@ EOF
     [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = "--looks-like-option" ]
 }
 
+@test "positional result indexes are decimal and range checked before arithmetic" {
+    BASE_BASH_LIBS_CLI_RESULT_POSITIONALS=(zero one two three four five six seven eight)
+    local value=unchanged
+
+    base_cli_result_get_positional 0 value
+    [ "$value" = zero ]
+    base_cli_result_get_positional 08 value
+    [ "$value" = eight ]
+
+    bats_run base_cli_result_get_positional 9 value
+    [ "$status" -eq 1 ]
+    [ "$value" = eight ]
+    bats_run base_cli_result_get_positional 18446744073709551616 value
+    [ "$status" -eq 1 ]
+    [ "$value" = eight ]
+}
+
 @test "double dash keeps command names and aliases as root positionals" {
     base_cli_model_init boundary name=boundary
     base_cli_command boundary run "Run" aliases=r
