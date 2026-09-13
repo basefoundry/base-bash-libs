@@ -464,6 +464,7 @@ base_app_config_set_cli() {
 base_app_config_load() {
     local model="${1-}" argument project_file="" user_file="" key value_key env_name value status
     local -a cli_pairs=()
+    local -a __base_bash_libs_app_keys=()
     # Keep each load transaction on the dynamic call frame. Validators may
     # legitimately load another model (or re-enter this one); a global staging
     # map would let the nested transaction clear or overwrite the outer one.

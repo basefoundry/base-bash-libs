@@ -186,6 +186,39 @@ assert_demo_snapshot() {
     [ "$source" = cli ]
 }
 
+@test "nested validator loads cannot bypass outer required keys or overrides" {
+    nested_validator_with_failure() {
+        base_app_config_load nested --cli inner=from-nested
+    }
+
+    base_app_init nested name=nested
+    base_app_config_define nested inner string default=nested-default
+    base_app_init outer name=outer
+    base_app_config_define outer first string default=outer-default env=APP_TEST_MODE \
+        validator=nested_validator_with_failure
+    base_app_config_define outer token string required=true
+    base_app_config_define outer second string required=true
+
+    export APP_TEST_MODE=from-environment
+    base_app_config_set_cli outer second from-cli
+    bats_run base_app_config_load outer
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required configuration 'token'"* ]]
+    [ -z "${__base_bash_libs_app_values[outer|token]+set}" ]
+    [ -z "${__base_bash_libs_app_values[outer|second]+set}" ]
+
+    base_app_config_set_cli outer token provided
+    base_app_config_load outer
+    base_app_config_get outer first value
+    [ "$value" = from-environment ]
+    base_app_config_get outer token value
+    [ "$value" = provided ]
+    base_app_config_get outer second value
+    [ "$value" = from-cli ]
+    base_app_config_get nested inner value
+    [ "$value" = from-nested ]
+}
+
 @test "application declaration APIs accept only their documented attributes" {
     base_app_init alpha name=alpha-app description="Alpha application"
     [ "${__base_bash_libs_app_models[alpha\|name]}" = alpha-app ]
