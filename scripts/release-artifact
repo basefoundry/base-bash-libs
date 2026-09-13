@@ -46,6 +46,31 @@ json_escape() {
     printf '%s' "$value"
 }
 
+spdx_file_identifier() {
+    local relative="$1" encoded
+
+    encoded="$(printf '%s' "$relative" | od -An -tx1 | tr -d '[:space:]')" || return 1
+    [[ -n "$encoded" ]] || return 1
+    printf 'SPDXRef-File-x%s' "$encoded"
+}
+
+validate_spdx_file_records() {
+    local sbom="$1"
+
+    awk '
+        /"SPDXID": "SPDXRef-File-/ {
+            id = $0
+            sub(/^.*"SPDXID": "/, "", id)
+            sub(/".*$/, "", id)
+            if (id !~ /^SPDXRef-File-[A-Za-z0-9.-]+$/ || seen[id]++) {
+                invalid = 1
+            }
+            files++
+        }
+        END { exit (files > 0 && !invalid) ? 0 : 1 }
+    ' "$sbom"
+}
+
 commit_is_full_sha() {
     [[ "${1-}" =~ ^[[:xdigit:]]{40}$ ]]
 }
@@ -125,8 +150,8 @@ write_sbom() {
                 printf ',\n'
             fi
             first=0
-            printf '    {"SPDXID": "SPDXRef-File-%s", "fileName": "%s", "checksums": [{"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
-                "${relative//[^[:alnum:]]/_}" "$(json_escape "$relative")" "$(hash_file "$path")"
+            printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
+                "$(spdx_file_identifier "$relative")" "$(json_escape "$relative")" "$(hash_file "$path")"
         done < <(find "$root" -type f -print | LC_ALL=C sort)
         printf '\n  ],\n'
         printf '  "relationships": [{"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package"}]\n'
@@ -437,6 +462,10 @@ verify_artifact() {
     }
     file_contains_once "$sbom" "$sbom_name_record" || {
         error 'SBOM name does not identify the selected release version.'
+        return 1
+    }
+    validate_spdx_file_records "$sbom" || {
+        error 'SBOM contains invalid or duplicate SPDX file identifiers.'
         return 1
     }
     temp="$(mktemp -d "${TMPDIR:-/tmp}/base-bash-release-verify.XXXXXX")" || return 1
