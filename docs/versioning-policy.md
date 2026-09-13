@@ -40,12 +40,12 @@ before delegating read-only operations and dry runs to Base's guarded release
 command. The artifact builder and repository validation source the same policy.
 
 The release-invariant CI stage follows the active release contract without a
-hidden environment setting. It uses the published GA tag named by
-`first-party-cutover.yaml` while `VERSION` matches that GA release. During
-release preparation, after `VERSION` is advanced for the candidate, it checks
-the candidate checkout at `HEAD` until the immutable candidate tag exists. The
-chosen reference and provenance are always printed; `BASE_BASH_LIBS_RELEASE_REF`
-is reserved for explicit, audited overrides.
+hidden environment setting. It always checks the current candidate tree at
+`HEAD` against the published compatibility baseline named by
+`first-party-cutover.yaml`, even after `VERSION` is advanced for a candidate.
+The two references and their provenance are always printed. An explicit,
+audited `BASE_BASH_LIBS_COMPATIBILITY_REF` override is available for isolated
+fixtures and controlled release rehearsals.
 
 Prerelease publication became available because #233 and the follow-up
 release-artifact contract landed. The reviewed `v2.0.0-rc.1` artifact and the

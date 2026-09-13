@@ -24,26 +24,21 @@ invariant_ga_tag="$(sed -n 's/^  tag: //p' first-party-cutover.yaml | sed -n '1p
 [[ "$invariant_ga_tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([-.][[:alnum:].-]+)?$ ]] ||
     invariant_fail "first-party-cutover.yaml does not declare a valid GA tag"
 
-invariant_release_ref="${BASE_BASH_LIBS_RELEASE_REF:-}"
-invariant_release_ref_source=""
-if [[ -n "$invariant_release_ref" ]]; then
-    invariant_release_ref_source="BASE_BASH_LIBS_RELEASE_REF override"
-elif [[ "$invariant_candidate_version" == "${invariant_ga_tag#v}" ]]; then
-    invariant_release_ref="$invariant_ga_tag"
-    invariant_release_ref_source="published GA tag from first-party-cutover.yaml"
+invariant_candidate_ref=HEAD
+invariant_compatibility_ref="${BASE_BASH_LIBS_COMPATIBILITY_REF:-$invariant_ga_tag}"
+invariant_compatibility_ref_source=""
+if [[ -n "${BASE_BASH_LIBS_COMPATIBILITY_REF:-}" ]]; then
+    invariant_compatibility_ref_source="BASE_BASH_LIBS_COMPATIBILITY_REF override"
 else
-    # A release-preparation checkout changes VERSION before its candidate tag
-    # exists. HEAD is the only local ref shared by the documented local and CI
-    # commands, and it contains the candidate manifest and source tree.
-    invariant_release_ref=HEAD
-    invariant_release_ref_source="candidate checkout (VERSION $invariant_candidate_version differs from $invariant_ga_tag)"
+    invariant_compatibility_ref_source="published GA tag from first-party-cutover.yaml"
 fi
-printf 'Release invariant API reference: candidate_version=%s release_ref=%s provenance=%s\n' \
-    "$invariant_candidate_version" "$invariant_release_ref" "$invariant_release_ref_source"
+printf 'Release invariant API references: candidate_version=%s candidate_ref=%s compatibility_ref=%s provenance=%s\n' \
+    "$invariant_candidate_version" "$invariant_candidate_ref" "$invariant_compatibility_ref" \
+    "$invariant_compatibility_ref_source"
 scripts/api-manifest check > /dev/null || invariant_fail "API manifest check failed"
-if ! invariant_release_check_output="$(scripts/api-manifest release-check "$invariant_release_ref" 2>&1)"; then
+if ! invariant_release_check_output="$(scripts/api-manifest release-check "$invariant_compatibility_ref" 2>&1)"; then
     printf '%s\n' "$invariant_release_check_output" >&2
-    invariant_fail "stable API is not present in release_ref=$invariant_release_ref (provenance=$invariant_release_ref_source)"
+    invariant_fail "stable API is not compatible with compatibility_ref=$invariant_compatibility_ref (provenance=$invariant_compatibility_ref_source)"
 fi
 printf '%s\n' "$invariant_release_check_output"
 scripts/library-bundle check > /dev/null || invariant_fail "library bundle check failed"

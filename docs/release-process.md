@@ -58,14 +58,13 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    git diff --check
    ```
 
-   The release-invariant stage derives its API reference from the checked-out
-   release contract. Mainline and ordinary post-GA checkouts use the published
-   GA tag from `first-party-cutover.yaml`; a release-preparation checkout whose
-   `VERSION` differs from that GA version validates the candidate tree at
-   `HEAD`. The selected reference and provenance are printed in the
-   diagnostics. `BASE_BASH_LIBS_RELEASE_REF` remains available for explicit
-   audited overrides, but is not required for the documented local or CI
-   command.
+   The release-invariant stage derives two API references from the checked-out
+   release contract. It validates the candidate tree at `HEAD` against the
+   published compatibility baseline from `first-party-cutover.yaml`, including
+   when `VERSION` has advanced for release preparation. Both references and
+   provenance are printed in diagnostics. `BASE_BASH_LIBS_COMPATIBILITY_REF`
+   remains available for explicit audited fixture overrides, but is not needed
+   for the documented local or CI command.
 
 6. Open and merge the release-preparation pull request.
 7. Sync local `main`, then inspect the release from the repository root:
