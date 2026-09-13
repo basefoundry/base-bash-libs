@@ -91,7 +91,7 @@ write_hash_manifest() {
 }
 
 bundle_repo() {
-    local destination="${1:-}" temporary path inventory
+    local destination="${1:-}" temporary path inventory inventory_status
 
     [[ -n "$destination" ]] || {
         usage
@@ -107,8 +107,9 @@ bundle_repo() {
         return 1
     }
     inventory="$(file_list)" || {
+        inventory_status=$?
         rm -rf -- "$temporary"
-        return $?
+        return "$inventory_status"
     }
     while IFS= read -r path; do
         [[ -n "$path" ]] || continue

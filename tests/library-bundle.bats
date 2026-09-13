@@ -52,6 +52,36 @@ setup() {
     [[ "$output" == *"refusing to overwrite"* ]]
 }
 
+@test "library bundle preserves inventory failure status and removes staging" {
+    local destination="$TEST_TMPDIR/inventory-failure" count_file="$TEST_TMPDIR/file-list-count"
+
+    # Source the repository-owned command so the test can inject a failure at
+    # the second inventory pass, after the repository preflight succeeds.
+    source "$BASE_REPO_ROOT/scripts/library-bundle" check >/dev/null
+    printf '0\n' > "$count_file"
+    file_list() {
+        local manifest calls
+        calls="$(<"$count_file")"
+        calls=$((calls + 1))
+        printf '%s\n' "$calls" > "$count_file"
+        if ((calls == 2)); then
+            return 42
+        fi
+        manifest="$("$repo_root/scripts/api-manifest" artifact-paths)" || return $?
+        {
+            printf '%s\n' VERSION base_api_manifest.yaml
+            printf '%s\n' "$manifest"
+        } | LC_ALL=C sort -u
+    }
+
+    bats_run bundle_repo "$destination"
+
+    [ "$status" -eq 42 ]
+    [ ! -e "$destination" ]
+    [ -z "$(find "$TEST_TMPDIR" -maxdepth 1 -type d -name 'inventory-failure.tmp.*' -print -quit)" ]
+    [[ "$output" != *"Created deterministic bundle"* ]]
+}
+
 @test "library bundle verification binds the complete inventory and metadata" {
     local source="$TEST_TMPDIR/source" first_line
     "$BASE_REPO_ROOT/scripts/library-bundle" bundle "$source" >/dev/null
