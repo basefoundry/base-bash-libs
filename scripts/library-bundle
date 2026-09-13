@@ -28,21 +28,28 @@ hash_file() {
 }
 
 file_list() {
+    local manifest
+
+    manifest="$("$repo_root/scripts/api-manifest" artifact-paths)" || return $?
     {
         printf '%s\n' VERSION base_api_manifest.yaml
-        scripts/api-manifest artifact-paths
+        printf '%s\n' "$manifest"
     } | LC_ALL=C sort -u
 }
 
 bundle_inventory() {
+    local inventory
+
+    inventory="$(file_list)" || return $?
     {
         printf '%s\n' BUNDLE.release
-        file_list
+        printf '%s\n' "$inventory"
     } | LC_ALL=C sort -u
 }
 
 check_one_file_boundary() {
-    local source_path directory count
+    local source_path directory count source_paths
+    source_paths="$("$repo_root/scripts/api-manifest" source-paths)" || return $?
     while IFS= read -r source_path; do
         [[ "$source_path" == lib/bash/*/lib_*.sh ]] || continue
         directory="${source_path%/*}"
@@ -55,32 +62,36 @@ check_one_file_boundary() {
             error "public library '$source_path' contains a source-time implementation import"
             return 1
         fi
-    done < <(scripts/api-manifest source-paths)
+    done <<< "$source_paths"
 }
 
 check_repo() {
-    scripts/api-manifest check > /dev/null || return $?
+    local inventory
+
+    "$repo_root/scripts/api-manifest" check > /dev/null || return $?
     check_one_file_boundary || return $?
+    inventory="$(file_list)" || return $?
     while IFS= read -r path; do
         [[ -n "$path" && -f "$repo_root/$path" ]] || {
             error "manifest artifact is missing: $path"
             return 1
         }
-    done < <(file_list)
+    done <<< "$inventory"
     printf 'Library bundle contract is valid: one canonical file per public library.\n'
 }
 
 write_hash_manifest() {
-    local root="$1" path
+    local root="$1" path inventory
+    inventory="$(bundle_inventory)" || return $?
     : > "$root/MANIFEST.sha256" || return 1
     while IFS= read -r path; do
         [[ -n "$path" ]] || continue
         printf '%s  %s\n' "$(hash_file "$root/$path")" "$path" >> "$root/MANIFEST.sha256" || return 1
-    done < <(bundle_inventory)
+    done <<< "$inventory"
 }
 
 bundle_repo() {
-    local destination="${1:-}" temporary path
+    local destination="${1:-}" temporary path inventory
 
     [[ -n "$destination" ]] || {
         usage
@@ -95,6 +106,10 @@ bundle_repo() {
         error "unable to create a private staging directory beside '$destination'"
         return 1
     }
+    inventory="$(file_list)" || {
+        rm -rf -- "$temporary"
+        return $?
+    }
     while IFS= read -r path; do
         [[ -n "$path" ]] || continue
         if ! mkdir -p "$temporary/$(dirname -- "$path")" ||
@@ -102,7 +117,7 @@ bundle_repo() {
             rm -rf -- "$temporary"
             return 1
         fi
-    done < <(file_list)
+    done <<< "$inventory"
     if ! mkdir -p "$temporary/lib/bash"; then
         rm -rf -- "$temporary"
         return 1
@@ -133,7 +148,7 @@ bundle_repo() {
 
 verify_bundle() {
     local root="${1:-}" expected actual path line line_number=0
-    local checksum_pattern
+    local checksum_pattern inventory
     local -A checksum_seen=() expected_seen=()
 
     [[ -n "$root" && -d "$root" && ! -L "$root" && -f "$root/MANIFEST.sha256" &&
@@ -141,6 +156,7 @@ verify_bundle() {
         error "bundle is missing MANIFEST.sha256: $root"
         return 1
     }
+    inventory="$(bundle_inventory)" || return $?
     checksum_pattern='^([0-9a-f]{64})  ([A-Za-z0-9_./-]+)$'
     while IFS= read -r line || [[ -n "$line" ]]; do
         line_number=$((line_number + 1))
@@ -182,7 +198,7 @@ verify_bundle() {
             error "bundle checksum manifest omits expected file: $path"
             return 1
         }
-    done < <(bundle_inventory)
+    done <<< "$inventory"
     for path in "${!checksum_seen[@]}"; do
         [[ -n "${expected_seen[$path]+set}" ]] || {
             error "bundle checksum manifest contains unexpected file: $path"
