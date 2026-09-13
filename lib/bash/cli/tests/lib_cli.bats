@@ -452,6 +452,22 @@ EOF
     base_cli_validate_model validate
 }
 
+@test "model validation accepts reachable root and nested options" {
+    base_cli_model_init reachable name=reachable
+    base_cli_command reachable admin "Administration" aliases=a
+    base_cli_option reachable '' output value --output -o
+    base_cli_option reachable '' token value --token
+    base_cli_option reachable admin local flag --local
+    base_cli_option reachable admin mode value --mode
+
+    base_cli_validate_model reachable
+    base_cli_parse reachable -- a --output expected --local
+
+    [ "${BASE_BASH_LIBS_CLI_RESULT_COMMAND}" = admin ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[output]}" = expected ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[local]}" = 1 ]
+}
+
 @test "command names and aliases remain unique in either declaration order" {
     base_cli_model_init alias_first name=alias-first
     base_cli_command alias_first user "User" aliases=u

@@ -224,20 +224,22 @@ __base_bash_libs_cli_ancestors_for__() {
 }
 
 __base_bash_libs_cli_option_lookup__() {
-    local model="$1" path="$2" token="$3"
-    local name_result="$4" path_result="$5" type_result="$6" ancestor found_name
+    local __base_bash_libs_cli_lookup_model="$1" __base_bash_libs_cli_lookup_path="$2"
+    local __base_bash_libs_cli_lookup_token="$3" __base_bash_libs_cli_lookup_name_result="$4"
+    local __base_bash_libs_cli_lookup_path_result="$5" __base_bash_libs_cli_lookup_type_result="$6"
+    local __base_bash_libs_cli_lookup_ancestor __base_bash_libs_cli_lookup_found_name
 
-    printf -v "$name_result" '%s' ''
-    printf -v "$path_result" '%s' ''
-    printf -v "$type_result" '%s' ''
-    __base_bash_libs_cli_ancestors_for__ "$path"
-    for ancestor in "${__base_bash_libs_cli_ancestors[@]}"; do
-        if [[ -n "${__base_bash_libs_cli_models["$model|option|$ancestor|token|$token"]+set}" ]]; then
-            found_name="${__base_bash_libs_cli_models["$model|option|$ancestor|token|$token"]}"
-            printf -v "$name_result" '%s' "$found_name"
-            printf -v "$path_result" '%s' "$ancestor"
-            printf -v "$type_result" '%s' \
-                "${__base_bash_libs_cli_models["$model|option|$ancestor|meta|$found_name|type"]}"
+    printf -v "$__base_bash_libs_cli_lookup_name_result" '%s' ''
+    printf -v "$__base_bash_libs_cli_lookup_path_result" '%s' ''
+    printf -v "$__base_bash_libs_cli_lookup_type_result" '%s' ''
+    __base_bash_libs_cli_ancestors_for__ "$__base_bash_libs_cli_lookup_path"
+    for __base_bash_libs_cli_lookup_ancestor in "${__base_bash_libs_cli_ancestors[@]}"; do
+        if [[ -n "${__base_bash_libs_cli_models["$__base_bash_libs_cli_lookup_model|option|$__base_bash_libs_cli_lookup_ancestor|token|$__base_bash_libs_cli_lookup_token"]+set}" ]]; then
+            __base_bash_libs_cli_lookup_found_name="${__base_bash_libs_cli_models["$__base_bash_libs_cli_lookup_model|option|$__base_bash_libs_cli_lookup_ancestor|token|$__base_bash_libs_cli_lookup_token"]}"
+            printf -v "$__base_bash_libs_cli_lookup_name_result" '%s' "$__base_bash_libs_cli_lookup_found_name"
+            printf -v "$__base_bash_libs_cli_lookup_path_result" '%s' "$__base_bash_libs_cli_lookup_ancestor"
+            printf -v "$__base_bash_libs_cli_lookup_type_result" '%s' \
+                "${__base_bash_libs_cli_models["$__base_bash_libs_cli_lookup_model|option|$__base_bash_libs_cli_lookup_ancestor|meta|$__base_bash_libs_cli_lookup_found_name|type"]}"
             return 0
         fi
     done
