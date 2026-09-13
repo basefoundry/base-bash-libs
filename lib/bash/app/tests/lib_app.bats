@@ -249,6 +249,33 @@ assert_demo_snapshot() {
     [ "$value" = from-nested ]
 }
 
+@test "configuration reports from validators preserve the active load" {
+    report_nested_model() {
+        base_app_config_report nested >/dev/null
+    }
+
+    base_app_init nested name=nested
+    base_app_config_define nested inner string default=inside
+    base_app_config_load nested
+
+    base_app_init outer name=outer
+    base_app_config_define outer first string default=outer validator=report_nested_model
+    base_app_config_define outer token string required=true
+
+    bats_run base_app_config_load outer
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"required configuration 'token'"* ]]
+
+    base_app_config_set_cli outer token provided
+    base_app_config_load outer
+    base_app_config_get outer first value
+    [ "$value" = outer ]
+    base_app_config_get outer token value
+    [ "$value" = provided ]
+    base_app_config_get nested inner value
+    [ "$value" = inside ]
+}
+
 @test "application declaration APIs accept only their documented attributes" {
     base_app_init alpha name=alpha-app description="Alpha application"
     [ "${__base_bash_libs_app_models[alpha\|name]}" = alpha-app ]
