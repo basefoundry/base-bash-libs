@@ -111,3 +111,13 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Stable API release reference is valid: v2.0.0"* ]]
 }
+
+@test "release-check rejects retroactive stable downgrades" {
+    invalid_metadata="$TEST_TMPDIR/gh-downgrade.yaml"
+    perl -0pe 's/(  - name: gh\n.*?    stability: )stable/$1preview/s; s/(  - name: gh\n.*?    since: )2[.]0[.]0/$1unreleased/s' \
+        "$BASE_REPO_ROOT/base_api_manifest.yaml" > "$invalid_metadata"
+
+    run "$BASE_REPO_ROOT/scripts/api-manifest" release-check v2.0.0 "$invalid_metadata"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"stable module 'gh' was downgraded"* ]]
+}

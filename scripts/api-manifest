@@ -57,10 +57,10 @@ manifest_rows() {
         }
         function emit() {
             if (name != "") {
-                printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", \
+                printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", \
                     name, kind, source, documentation, tests, dependencies, \
                     optional_commands, artifacts, public_symbols, signature_source, \
-                    inputs, outputs, statuses, side_effects, stability, since, deprecated
+                    inputs, outputs, statuses, side_effects, stability, since, deprecated, implementation_dependencies
             }
         }
         /^modules:[[:space:]]*$/ { in_modules=1; next }
@@ -70,6 +70,7 @@ manifest_rows() {
             dependencies=""; optional_commands=""; artifacts=""
             public_symbols=""; signature_source=""; inputs=""; outputs=""
             statuses=""; side_effects=""; stability=""; since=""; deprecated=""
+            implementation_dependencies=""
             next
         }
         in_modules && /^    kind:/ { kind=field($0); next }
@@ -77,6 +78,7 @@ manifest_rows() {
         in_modules && /^    documentation:/ { documentation=field($0); next }
         in_modules && /^    tests:/ { tests=field($0); next }
         in_modules && /^    dependencies:/ { dependencies=field($0); next }
+        in_modules && /^    implementation_dependencies:/ { implementation_dependencies=field($0); next }
         in_modules && /^    optional_commands:/ { optional_commands=field($0); next }
         in_modules && /^    artifacts:/ { artifacts=field($0); next }
         in_modules && /^    public_symbols:/ { public_symbols=field($0); next }
@@ -191,6 +193,9 @@ generate_reference() {
         printf -- '- Documentation: [`%s`](../%s)\n' "${fields[3]}" "${fields[3]}"
         printf -- '- Tests: [`%s`](../%s)\n' "${fields[4]}" "${fields[4]}"
         printf -- '- Dependencies: `%s`\n' "${fields[5]}"
+        if [[ -n "${fields[17]-}" ]]; then
+            printf -- '- Implementation dependencies: `%s`\n' "${fields[17]}"
+        fi
         printf -- '- Optional commands: `%s`\n' "${fields[6]}"
         printf -- '- Stability: `%s`; since `%s`; deprecated: `%s`\n' \
             "${fields[14]}" "${fields[15]}" "${fields[16]}"
@@ -219,6 +224,7 @@ check_manifest() {
     local -A manifest_symbols=()
     local -A module_names=()
     local -A module_dependencies=()
+    local -A module_implementation_dependencies=()
     local -A module_visit=()
     local -A module_sources=()
     local -A module_tests=()
@@ -312,6 +318,7 @@ check_manifest() {
         }
         module_names["${fields[0]}"]=1
         module_dependencies["${fields[0]}"]="${fields[5]}"
+        module_implementation_dependencies["${fields[0]}"]="${fields[17]-}"
         module_sources["${fields[0]}"]="${fields[2]}"
         module_tests["${fields[0]}"]="${fields[4]}"
         module_docs["${fields[0]}"]="${fields[3]}"
@@ -411,6 +418,16 @@ check_manifest() {
     }
 
     for module in "${!module_names[@]}"; do
+        while IFS= read -r dependency; do
+            [[ -z "$dependency" || "$dependency" == none ]] && continue
+            [[ -n "${module_names[$dependency]-}" ]] || {
+                error "module '$module' has missing implementation dependency '$dependency'"
+                return 1
+            }
+        done < <(split_csv "${module_implementation_dependencies[$module]-}")
+    done
+
+    for module in "${!module_names[@]}"; do
         module_cycle_check "$module" || return 1
     done
     for module in "${!module_names[@]}"; do
@@ -431,6 +448,80 @@ check_manifest() {
     done < <(manifest_section_rows "$manifest" artifacts)
 
     return 0
+}
+
+check_stable_compatibility() {
+    local manifest="$1" release_ref="$2" strict_presence="${3:-1}" historical_manifest row module symbol
+    local -a fields=() symbols=()
+    local -A current_stability=() current_since=() current_dependencies=() current_symbols=()
+    local -A historical_stability=() historical_since=() historical_dependencies=() historical_symbols=()
+
+    historical_manifest="$(mktemp "${TMPDIR:-/tmp}/base-api-historical.XXXXXX")" || return 1
+    if ! git -C "$repo_root" show "$release_ref:base_api_manifest.yaml" > "$historical_manifest" 2> /dev/null; then
+        rm -f "$historical_manifest"
+        error "release reference '$release_ref' does not contain base_api_manifest.yaml"
+        return 1
+    fi
+    while IFS=$'\t' read -r -a fields; do
+        [[ -n "${fields[0]-}" ]] || continue
+        current_stability["${fields[0]}"]="${fields[14]}"
+        current_since["${fields[0]}"]="${fields[15]}"
+        current_dependencies["${fields[0]}"]="${fields[5]}"
+        IFS=',' read -r -a symbols <<< "${fields[8]}"
+        for symbol in "${symbols[@]}"; do current_symbols["$symbol"]="${fields[0]}"; done
+    done < <(manifest_rows "$manifest")
+    while IFS=$'\t' read -r -a fields; do
+        [[ -n "${fields[0]-}" ]] || continue
+        historical_stability["${fields[0]}"]="${fields[14]}"
+        historical_since["${fields[0]}"]="${fields[15]}"
+        historical_dependencies["${fields[0]}"]="${fields[5]}"
+        IFS=',' read -r -a symbols <<< "${fields[8]}"
+        for symbol in "${symbols[@]}"; do historical_symbols["$symbol"]="${fields[0]}"; done
+    done < <(manifest_rows "$historical_manifest")
+
+    for module in "${!historical_stability[@]}"; do
+        [[ "${historical_stability[$module]}" == stable ]] || continue
+        if [[ -z "${current_stability[$module]-}" ]]; then
+            ((strict_presence)) || continue
+            rm -f "$historical_manifest"
+            error "stable module '$module' was removed after release reference '$release_ref'"
+            return 1
+        fi
+        [[ "${current_stability[$module]}" == stable ]] || {
+            rm -f "$historical_manifest"
+            error "stable module '$module' was downgraded after release reference '$release_ref'"
+            return 1
+        }
+        if ((strict_presence)); then
+            [[ "${current_since[$module]}" == "${historical_since[$module]}" ]] || {
+                rm -f "$historical_manifest"
+                error "stable module '$module' changed its since-version from '${historical_since[$module]}'"
+                return 1
+            }
+            while IFS= read -r dependency; do
+                [[ -z "$dependency" || "$dependency" == none ]] && continue
+                case ",${current_dependencies[$module]}," in
+                *",$dependency,"*) ;;
+                *)
+                    rm -f "$historical_manifest"
+                    error "stable module '$module' removed public dependency '$dependency'"
+                    return 1
+                    ;;
+                esac
+            done < <(split_csv "${historical_dependencies[$module]}")
+        fi
+    done
+    for symbol in "${!historical_symbols[@]}"; do
+        module="${historical_symbols[$symbol]}"
+        [[ "${historical_stability[$module]}" == stable ]] || continue
+        if [[ -z "${current_symbols[$symbol]-}" ]]; then
+            ((strict_presence)) || continue
+            rm -f "$historical_manifest"
+            error "stable symbol '$symbol' was removed after release reference '$release_ref'"
+            return 1
+        fi
+    done
+    rm -f "$historical_manifest"
 }
 
 release_module_check() {
@@ -549,6 +640,11 @@ main() {
         ;;
     release-check)
         check_manifest "$manifest" || return $?
+        if [[ "$manifest" == "$default_manifest" ]]; then
+            check_stable_compatibility "$manifest" "$release_ref" 1 || return $?
+        else
+            check_stable_compatibility "$manifest" "$release_ref" 0 || return $?
+        fi
         check_release_tree "$manifest" "$release_ref"
         ;;
     generate)
