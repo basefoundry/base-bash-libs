@@ -25,6 +25,21 @@ setup() {
     diff -ru "$first" "$second"
 }
 
+@test "library bundle resolves helpers from the tool root outside the caller cwd" {
+    local caller="$TEST_TMPDIR/caller with spaces" bundle_name=bundle-output
+
+    mkdir -p "$caller/scripts"
+    bats_run bash -c 'cd "$1" && "$2" bundle "$3"' bash "$caller" \
+        "$BASE_REPO_ROOT/scripts/library-bundle" "$bundle_name"
+    [ "$status" -eq 0 ]
+    [ -d "$caller/$bundle_name" ]
+
+    bats_run bash -c 'cd "$1" && "$2" verify "$3"' bash "$caller" \
+        "$BASE_REPO_ROOT/scripts/library-bundle" "$bundle_name"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Bundle provenance and hashes are valid"* ]]
+}
+
 @test "library bundle rejects tampering and divergent overwrite" {
     local bundle="$TEST_TMPDIR/bundle"
     "$BASE_REPO_ROOT/scripts/library-bundle" bundle "$bundle"
