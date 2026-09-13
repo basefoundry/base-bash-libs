@@ -703,6 +703,35 @@ base_app_apply_standard_options() {
     BASE_BASH_LIBS_APP_NONINTERACTIVE="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[noninteractive]-0}"
     value="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]-auto}"
     BASE_BASH_LIBS_APP_COLOR="$value"
+    if [[ -n "${BASE_BASH_LIBS_STD_LOG_LEVELS[INFO]+set}" ]]; then
+        case "${BASE_BASH_LIBS_APP_QUIET}:${BASE_BASH_LIBS_APP_VERBOSE}" in
+        1:0) base_std_set_log_level WARN || return $? ;;
+        0:1) base_std_set_log_level DEBUG || return $? ;;
+        0:0) base_std_set_log_level INFO || return $? ;;
+        *)
+            __base_bash_libs_app_error__ 'base_app_apply_standard_options: quiet and verbose cannot both be enabled.'
+            return 2
+            ;;
+        esac
+    elif [[ "${BASE_BASH_LIBS_APP_QUIET}:${BASE_BASH_LIBS_APP_VERBOSE}" == 1:1 ]]; then
+        __base_bash_libs_app_error__ 'base_app_apply_standard_options: quiet and verbose cannot both be enabled.'
+        return 2
+    fi
+    case "$value" in
+    auto | always)
+        # shellcheck disable=SC2034
+        BASE_BASH_LIBS_STD_COLOR_ENABLED=1
+        ;;
+    never)
+        # shellcheck disable=SC2034
+        BASE_BASH_LIBS_STD_COLOR_ENABLED=0
+        ;;
+    *)
+        __base_bash_libs_app_error__ "base_app_apply_standard_options: invalid color mode '$value'."
+        return 2
+        ;;
+    esac
+    __base_bash_libs_std_init_colors__
     BASE_BASH_LIBS_DRY_RUN="$BASE_BASH_LIBS_APP_DRY_RUN"
     export BASE_BASH_LIBS_APP_DRY_RUN BASE_BASH_LIBS_APP_NONINTERACTIVE BASE_BASH_LIBS_APP_COLOR
     export BASE_BASH_LIBS_DRY_RUN

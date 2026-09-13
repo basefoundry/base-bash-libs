@@ -12,6 +12,18 @@ setup() {
     [[ "$output" == *"passed launcher smoke checks"* ]]
 }
 
+@test "reference application accepts application color modes through launcher" {
+    run env PATH="$repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$repo_root/lib/bash" \
+        "$repo_root/examples/reference-apps/ops-cli/bin/app" --color never status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"workspace="* ]]
+
+    run env PATH="$repo_root/bin:$PATH" BASE_BASH_LIBS_DIR="$repo_root/lib/bash" \
+        "$repo_root/examples/reference-apps/ops-cli/bin/app" --color=never status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"workspace="* ]]
+}
+
 @test "reference application failure suites remain green" {
     for app in installer release-helper ops-cli; do
         run bats "$repo_root/examples/reference-apps/$app/tests/app.bats"

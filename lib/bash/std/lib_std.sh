@@ -510,7 +510,7 @@ __base_bash_libs_std_initialize_runtime_state__() {
 #   base_init app_args --source "$script" -- "$@"
 #
 base_init() {
-    local result_name="${1-}" source_path="" script_dir="" arg
+    local result_name="${1-}" source_path="" script_dir="" arg input_index
     local parse_config=1 color_requested=0 configure_runtime=0
     local -a input_args=() filtered_args=()
 
@@ -569,7 +569,8 @@ base_init() {
     fi
 
     parse_config=1
-    for arg in "${input_args[@]+${input_args[@]}}"; do
+    for input_index in "${!input_args[@]}"; do
+        arg="${input_args[input_index]}"
         if ((parse_config)) && [[ "$arg" == "--" ]]; then
             filtered_args+=("$arg")
             parse_config=0
@@ -597,7 +598,18 @@ base_init() {
                 fi
                 ;;
             --color)
-                color_requested=1
+                # `--color` was historically a bare launcher flag. A
+                # standard application may also own `--color MODE`; keep the
+                # wrapper form when it is bare or followed by an ordinary
+                # application argument, but let the documented modes reach
+                # the application parser unchanged.
+                if [[ "${input_args[input_index + 1]-}" == auto ||
+                    "${input_args[input_index + 1]-}" == always ||
+                    "${input_args[input_index + 1]-}" == never ]]; then
+                    filtered_args+=("$arg")
+                else
+                    color_requested=1
+                fi
                 ;;
             *)
                 filtered_args+=("$arg")
@@ -1099,7 +1111,6 @@ __base_bash_libs_std_init_colors__() {
         BASE_BASH_LIBS_STD_COLOR_BLUE="\033[0;36m"
         BASE_BASH_LIBS_STD_COLOR_OFF="\033[0m"
     fi
-    readonly BASE_BASH_LIBS_STD_COLOR_BOLD BASE_BASH_LIBS_STD_COLOR_RED BASE_BASH_LIBS_STD_COLOR_GREEN BASE_BASH_LIBS_STD_COLOR_YELLOW BASE_BASH_LIBS_STD_COLOR_BLUE BASE_BASH_LIBS_STD_COLOR_OFF
 }
 
 #
