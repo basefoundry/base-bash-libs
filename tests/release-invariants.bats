@@ -30,6 +30,8 @@ setup() {
 @test "release invariants reject a committed stable downgrade against the published baseline" {
     candidate_repo="$TEST_TMPDIR/downgraded-candidate"
     git clone --local "$BASE_REPO_ROOT" "$candidate_repo" > /dev/null
+    git -C "$candidate_repo" config user.name "Release invariant test"
+    git -C "$candidate_repo" config user.email "release-invariant-test@example.invalid"
     perl -0pi -e 's/(  - name: gh\n.*?    stability: )stable/$1preview/s; s/(  - name: gh\n.*?    since: )2[.]0[.]0/$1unreleased/s' \
         "$candidate_repo/base_api_manifest.yaml"
     (cd "$candidate_repo" && scripts/api-manifest generate base_api_manifest.yaml docs/api-reference.md)
@@ -47,6 +49,8 @@ setup() {
 @test "release invariants accept an additive candidate against the published baseline" {
     candidate_repo="$TEST_TMPDIR/additive-candidate"
     git clone --local "$BASE_REPO_ROOT" "$candidate_repo" > /dev/null
+    git -C "$candidate_repo" config user.name "Release invariant test"
+    git -C "$candidate_repo" config user.email "release-invariant-test@example.invalid"
     printf '2.2.0\n' > "$candidate_repo/VERSION"
     git -C "$candidate_repo" add VERSION
     git -C "$candidate_repo" commit -m "test: advance candidate version" > /dev/null
