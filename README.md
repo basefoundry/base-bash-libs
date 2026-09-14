@@ -293,6 +293,7 @@ Start with the [versioned v2 documentation](docs/README.md), especially the
 - [Support matrix](docs/support-matrix.md), [support policy](docs/support-policy.md),
   [threat model](docs/threat-model.md), and [security policy](SECURITY.md)
 - [Bash support and validation quickstart](docs/bash-validation-quickstart.md)
+- [Consumer-kit contribution path](docs/consumer-kit-contribution.md)
 - [Community participation and independent validation](docs/community.md),
   [who uses Base Bash](docs/who-uses-base-bash.md), and the
   [consumer-validation status](docs/consumer-validation-status.md)
