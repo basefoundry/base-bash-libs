@@ -12,6 +12,7 @@ when updating an existing script.
 - [API reference](api-reference.md) and [v2 API contract](v2-api-contract.md)
 - [Configuration, lifecycle, and status contracts](v2/architecture.md#application-contract)
 - [Testing, vendoring, bundling, and release](v2/architecture.md#delivery)
+- [Bash support and validation quickstart](bash-validation-quickstart.md)
 - [CI and default-branch policy](ci-policy.md)
 - [Support and threat model](support-policy.md) · [security reporting](../SECURITY.md)
 
