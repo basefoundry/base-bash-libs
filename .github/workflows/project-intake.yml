@@ -110,7 +110,7 @@ jobs:
                   "Area": os.environ["BASE_PROJECT_DEFAULT_AREA"],
                   "Initiative": os.environ["BASE_PROJECT_DEFAULT_INITIATIVE"],
               }
-              fields = api("GET", f"{project}/fields?per_page=100", paginate=True)
+              fields = api("GET", f"{project}/fields", paginate=True, params={"per_page": "100"})
               managed = {}
               for name in defaults:
                   matches = [field for field in fields if field["name"] == name]
@@ -120,10 +120,12 @@ jobs:
               field_ids = ",".join(str(field["id"]) for field in managed.values())
 
               def find_item():
-                  # Match immutable issue identity, including beyond the first page.
+                  # Scan every Project page, avoiding search grammar or index
+                  # visibility dependencies, then match immutable issue identity.
                   items = api("GET", f"{project}/items", paginate=True,
-                              params={"per_page": "100", "q": f"repo:{repo} is:issue"})
-                  matches = [item for item in items if item.get("content", {}).get("id") == issue["id"]]
+                              params={"per_page": "100"})
+                  matches = [item for item in items if item.get("content_type") == "Issue"
+                             and (item.get("content") or {}).get("id") == issue["id"]]
                   if len(matches) > 1:
                       raise RuntimeError("Multiple Project items match the exact issue.")
                   return matches[0] if matches else None
@@ -155,14 +157,16 @@ jobs:
                       try:
                           current = api("GET", item_endpoint, params={"fields": field_ids})
                       except RuntimeError as error:
-                          if "HTTP 404" not in str(error) or attempt == 2:
+                          if "HTTP 404" not in str(error):
                               raise
+                          if attempt == 2:
+                              raise RuntimeError("Project item is not visible after bounded retries.") from error
                       else:
-                          if current.get("content", {}).get("id") != issue["id"]:
+                          if (current.get("content_type") != "Issue"
+                                  or (current.get("content") or {}).get("id") != issue["id"]):
                               raise RuntimeError("Project item identity did not match the requested issue.")
                           return current
                       time.sleep(attempt + 1)
-                  raise RuntimeError("Project item is not visible after bounded retries.")
 
               def values(current):
                   return {field["id"]: (field.get("value") or {}).get("id")

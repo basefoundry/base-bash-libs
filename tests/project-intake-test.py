@@ -13,7 +13,32 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / '.github/workflows/project-intake.yml').read_text()
-SCRIPT = textwrap.dedent(WORKFLOW.split('        run: |\n', 1)[1])
+
+
+def extract_reconcile_script(workflow):
+    """Read the named step's literal block without adding a YAML dependency."""
+    lines = workflow.splitlines(keepends=True)
+    step_marker = '      - name: Reconcile Project item'
+    matches = [index for index, line in enumerate(lines) if line.rstrip() == step_marker]
+    if len(matches) != 1:
+        raise AssertionError('Expected exactly one workflow step named Reconcile Project item.')
+    start = matches[0] + 1
+    end = next((index for index in range(start, len(lines))
+                if lines[index].strip() and not lines[index].startswith('        ')), len(lines))
+    step = lines[start:end]
+    run_markers = [index for index, line in enumerate(step) if line.rstrip() == '        run: |']
+    if len(run_markers) != 1:
+        raise AssertionError('Reconcile Project item must contain exactly one literal run: | block.')
+    start = run_markers[0] + 1
+    end = next((index for index in range(start, len(step))
+                if step[index].strip() and not step[index].startswith('          ')), len(step))
+    script = textwrap.dedent(''.join(step[start:end])).strip()
+    if not script:
+        raise AssertionError('Reconcile Project item has an empty run block.')
+    return script + '\n'
+
+
+SCRIPT = extract_reconcile_script(WORKFLOW)
 DEFAULTS = {'Status': 'Backlog', 'Priority': 'P2', 'Size': 'S',
             'Area': 'Product', 'Initiative': 'Adoption Polish'}
 
@@ -44,9 +69,12 @@ class RestFixture:
         self.stale_readback = 0
         self.patch_failure = False
         self.concurrent_status = ''
+        self.filtered_search_empty = False
+        self.item_read_failure = ''
 
     def item(self):
-        return {'id': 101, 'content': {'id': 42 if not self.wrong_identity else 99},
+        return {'id': 101, 'content_type': 'Issue',
+                'content': {'id': 42 if not self.wrong_identity else 99},
                 'fields': [{'id': key, 'value': {'id': value}} for key, value in self.current.items()]}
 
     def run(self, command, **kwargs):
@@ -67,7 +95,7 @@ class RestFixture:
             result = {'title': 'base-bash-libs'}
         elif endpoint == 'repos/basefoundry/base-bash-libs/issues/495':
             result = {'id': 42, 'state': 'closed' if self.closed else 'open'}
-        elif '/fields?' in endpoint:
+        elif endpoint.endswith('/fields'):
             # Both fields and item discovery must work beyond the first page.
             result = [self.fields[:2], self.fields[2:]]
         elif endpoint.endswith('/items'):
@@ -77,11 +105,18 @@ class RestFixture:
                     return subprocess.CompletedProcess(command, 1, '',
                                                        'Content already exists in this project (HTTP 422)')
                 result = self.item() if self.direct_add else {'value': self.item()}
+            elif self.filtered_search_empty and any(arg.startswith('q=') for arg in command):
+                result = [[]]
             elif not self.exists or self.delayed_search:
                 self.delayed_search = max(0, self.delayed_search - 1)
                 result = [[]]
             else:
-                result = [[{'id': 100, 'content': {'id': 41}}], [self.item()]]
+                result = [[{'id': 100, 'content_type': 'Issue',
+                            'content': {'id': 41, 'number': 495,
+                                        'repository_url': 'https://api.github.com/repos/another/repo'}},
+                           {'id': 102, 'content_type': 'DraftIssue', 'content': {'id': 42}},
+                           {'id': 103, 'content_type': 'Issue', 'content': None}],
+                          [self.item()]]
         elif endpoint.endswith('/items/101'):
             if method == 'PATCH':
                 if self.patch_failure:
@@ -92,6 +127,8 @@ class RestFixture:
                 if self.concurrent_status:
                     self.current[1] = self.concurrent_status
                 result = self.item()
+            elif self.item_read_failure:
+                return subprocess.CompletedProcess(command, 1, '', self.item_read_failure)
             elif self.delayed:
                 self.delayed -= 1
                 return subprocess.CompletedProcess(command, 1, '', 'Not Found (HTTP 404)')
@@ -109,7 +146,7 @@ class RestFixture:
         assert kwargs['timeout'] == 60
         assert kwargs['capture_output'] is True
         assert not kwargs.get('shell')
-        if command[3] == 'GET' and ('/fields?' in command[4] or command[4].endswith('/items')):
+        if command[3] == 'GET' and command[4].endswith(('/fields', '/items')):
             assert '--paginate' in command and '--slurp' in command
 
 
@@ -134,6 +171,27 @@ class ProjectIntakeTests(unittest.TestCase):
             except SystemExit as error:
                 status = error.code
         return status, stdout.getvalue(), stderr.getvalue(), sleep
+
+    def test_extraction_ignores_neighboring_run_steps_and_metadata(self):
+        before = ('      - name: Setup\n        run: |\n          echo setup\n')
+        after = ('        env:\n          EXAMPLE: value\n'
+                 '      - name: Finish\n        run: |\n          echo finish\n')
+        workflow = WORKFLOW.replace('    steps:\n', '    steps:\n' + before) + '\n' + after
+        self.assertEqual(extract_reconcile_script(workflow), SCRIPT)
+
+    def test_extraction_reports_missing_or_duplicate_named_step(self):
+        for workflow in (WORKFLOW.replace('name: Reconcile Project item', 'name: Renamed'),
+                         WORKFLOW + '\n      - name: Reconcile Project item\n'):
+            with self.subTest(workflow=workflow[-80:]):
+                with self.assertRaisesRegex(AssertionError, 'exactly one workflow step'):
+                    extract_reconcile_script(workflow)
+
+    def test_extraction_reports_unsupported_or_empty_run_block(self):
+        for workflow in (WORKFLOW.replace('        run: |\n', '        run: >\n'),
+                         '      - name: Reconcile Project item\n        run: |\n'):
+            with self.subTest(workflow=workflow[-80:]):
+                with self.assertRaisesRegex(AssertionError, 'Reconcile Project item.*run'):
+                    extract_reconcile_script(workflow)
 
     def test_workflow_uses_trusted_inline_python_and_secret(self):
         self.assertIn('shell: python', WORKFLOW)
@@ -192,6 +250,16 @@ class ProjectIntakeTests(unittest.TestCase):
         status, _, stderr, _ = self.execute(fixture)
         self.assertEqual(status, 0, stderr)
         self.assertEqual(sum(c[0][3] == 'POST' for c in fixture.calls), 1)
+
+    def test_item_lookup_does_not_depend_on_search_filter_grammar(self):
+        fixture = RestFixture()
+        fixture.filtered_search_empty = True
+        fixture.duplicate = True
+        status, stdout, stderr, _ = self.execute(fixture)
+        self.assertEqual(status, 0, stderr)
+        self.assertIn('verified all five fields', stdout)
+        self.assertFalse(any(c[0][3] == 'POST' for c in fixture.calls))
+        self.assertFalse(any(arg.startswith('q=') for c in fixture.calls for arg in c[0]))
 
     def test_transient_rest_failures_retry(self):
         for error in ('rate limit (HTTP 429) Retry-After: 7', 'Bad Gateway (HTTP 502)',
@@ -267,11 +335,24 @@ class ProjectIntakeTests(unittest.TestCase):
         fixture = RestFixture()
         fixture.exists = False
         fixture.delayed = 3
-        status, stdout, _, sleep = self.execute(fixture)
+        status, stdout, stderr, sleep = self.execute(fixture)
         self.assertEqual(status, 1)
         self.assertNotIn('Synced issue', stdout)
         self.assertEqual(sleep.call_count, 2)
         self.assertEqual(sum(c[0][3] == 'POST' for c in fixture.calls), 1)
+        self.assertIn('Project item is not visible after bounded retries.', stderr)
+        self.assertEqual(sum(c[0][3:5] == ['GET', 'orgs/basefoundry/projectsV2/8/items/101']
+                             for c in fixture.calls), 3)
+
+    def test_non_404_item_read_failure_keeps_original_diagnostic(self):
+        fixture = RestFixture()
+        fixture.item_read_failure = 'Forbidden (HTTP 403)'
+        status, stdout, stderr, sleep = self.execute(fixture)
+        self.assertEqual(status, 1)
+        self.assertNotIn('Synced issue', stdout)
+        self.assertIn('Forbidden (HTTP 403)', stderr)
+        self.assertNotIn('not visible after bounded retries', stderr)
+        sleep.assert_not_called()
 
     def test_readback_mismatch_never_claims_success(self):
         fixture = RestFixture()
