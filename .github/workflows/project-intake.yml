@@ -14,10 +14,15 @@ permissions:
   contents: read
   issues: read
 
+concurrency:
+  group: project-intake-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   sync:
     name: Sync issue Project fields
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       BASE_PROJECT_OWNER: ${{ github.repository_owner }}
       BASE_PROJECT_TITLE: ${{ github.event.repository.name }}
@@ -28,131 +33,181 @@ jobs:
       BASE_PROJECT_DEFAULT_SIZE: S
       BASE_PROJECT_DEFAULT_AREA: Product
       BASE_PROJECT_DEFAULT_INITIATIVE: Adoption Polish
-      BASE_PROJECT_MIN_GRAPHQL_REMAINING: 500
+      BASE_PROJECT_NUMBER: 8
       GH_TOKEN: ${{ secrets.BASE_PROJECT_TOKEN }}
     steps:
       - name: Reconcile Project item
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          import time
 
-          issue_number="${BASE_PROJECT_ISSUE_NUMBER:-}"
-          if [[ -z "$issue_number" ]]; then
-            echo "::error::Issue number was not provided by the event or workflow_dispatch input."
-            exit 1
-          fi
 
-          if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "::error::BASE_PROJECT_TOKEN is required for Project intake because github.token cannot write org Project fields."
-            exit 1
-          fi
+          def api(method, endpoint, *, payload=None, params=None, paginate=False):
+              """Use only REST, keeping JSON stdout separate from gh diagnostics."""
+              command = ["gh", "api", "--method", method, endpoint,
+                         "-H", "Accept: application/vnd.github+json"]
+              if paginate:
+                  command += ["--paginate", "--slurp"]
+              for key, value in (params or {}).items():
+                  command += ["-f", f"{key}={value}"]
+              if payload is not None:
+                  command += ["--input", "-"]
+              for attempt in range(3):
+                  try:
+                      result = subprocess.run(
+                          command, input=json.dumps(payload) if payload is not None else None,
+                          capture_output=True, text=True, timeout=60, check=False,
+                      )
+                      if result.returncode == 0:
+                          data = json.loads(result.stdout)
+                          return [item for page in data for item in page] if paginate else data
+                      detail = result.stderr + "\n" + result.stdout
+                  except subprocess.TimeoutExpired:
+                      detail = "GitHub request timed out"
+                  retryable = re.search(
+                      r"HTTP (429|5\d\d)|rate limit|secondary rate|timed out|"
+                      r"Could not resolve host|connection (reset|refused)", detail, re.I,
+                  )
+                  delay = 2 ** attempt
+                  retry_after = re.search(r"Retry-After:?\s*(\d+)", detail, re.I)
+                  if retry_after:
+                      delay = max(delay, int(retry_after[1]))
+                  # Never spin until an hourly quota reset or ignore a long Retry-After.
+                  if not retryable or attempt == 2 or delay > 30:
+                      raise RuntimeError(f"{method} {endpoint} failed: {detail.strip()}")
+                  print(f"Retrying {method} {endpoint} in {delay}s.", file=sys.stderr)
+                  time.sleep(delay)
 
-          graphql_min_remaining="${BASE_PROJECT_MIN_GRAPHQL_REMAINING:-500}"
-          if ! [[ "$graphql_min_remaining" =~ ^[0-9]+$ ]] || (( graphql_min_remaining == 0 )); then
-            echo "::error::BASE_PROJECT_MIN_GRAPHQL_REMAINING must be a positive integer."
-            exit 1
-          fi
 
-          rate_limit_json="$(gh api graphql -f query='query { rateLimit { remaining resetAt } }')"
-          graphql_remaining="$(jq -r '.data.rateLimit.remaining // 0' <<<"$rate_limit_json")"
-          graphql_reset_at="$(jq -r '.data.rateLimit.resetAt // "unknown"' <<<"$rate_limit_json")"
-          if ! [[ "$graphql_remaining" =~ ^[0-9]+$ ]]; then
-            echo "::error::Unable to read GitHub GraphQL quota for Project intake."
-            exit 1
-          fi
+          def main():
+              if not os.environ.get("GH_TOKEN"):
+                  raise RuntimeError("BASE_PROJECT_TOKEN is required for organization Project writes.")
+              number = os.environ.get("BASE_PROJECT_ISSUE_NUMBER", "")
+              if not re.fullmatch(r"[1-9][0-9]*", number):
+                  raise RuntimeError("Issue number must be a positive integer.")
+              repo = os.environ["GITHUB_REPOSITORY"]
+              owner = os.environ["BASE_PROJECT_OWNER"]
+              project_number = os.environ["BASE_PROJECT_NUMBER"]
+              if not re.fullmatch(r"[1-9][0-9]*", project_number):
+                  raise RuntimeError("Project number must be a positive integer.")
+              project = f"orgs/{owner}/projectsV2/{project_number}"
+              metadata = api("GET", project)
+              if metadata.get("title") != os.environ["BASE_PROJECT_TITLE"]:
+                  raise RuntimeError("Configured Project does not match the repository Project title.")
+              issue = api("GET", f"repos/{repo}/issues/{number}")
+              if "pull_request" in issue or issue.get("state") not in ("open", "closed"):
+                  raise RuntimeError("Intake requires an open or closed issue.")
 
-          if (( graphql_remaining < graphql_min_remaining )); then
-            echo "::error::GitHub GraphQL quota is too low for Project intake (${graphql_remaining} remaining; need at least ${graphql_min_remaining}; retry after ${graphql_reset_at})."
-            exit 1
-          fi
+              defaults = {
+                  "Status": os.environ["BASE_PROJECT_DEFAULT_OPEN_STATUS"],
+                  "Priority": os.environ["BASE_PROJECT_DEFAULT_PRIORITY"],
+                  "Size": os.environ["BASE_PROJECT_DEFAULT_SIZE"],
+                  "Area": os.environ["BASE_PROJECT_DEFAULT_AREA"],
+                  "Initiative": os.environ["BASE_PROJECT_DEFAULT_INITIATIVE"],
+              }
+              fields = api("GET", f"{project}/fields?per_page=100", paginate=True)
+              managed = {}
+              for name in defaults:
+                  matches = [field for field in fields if field["name"] == name]
+                  if len(matches) != 1 or matches[0].get("data_type") != "single_select":
+                      raise RuntimeError(f"Expected exactly one single-select field: {name}")
+                  managed[name] = matches[0]
+              field_ids = ",".join(str(field["id"]) for field in managed.values())
 
-          issue_json="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state,url)"
-          issue_state="$(jq -r '.state' <<<"$issue_json")"
-          issue_url="$(jq -r '.url' <<<"$issue_json")"
+              def find_item():
+                  # Match immutable issue identity, including beyond the first page.
+                  items = api("GET", f"{project}/items", paginate=True,
+                              params={"per_page": "100", "q": f"repo:{repo} is:issue"})
+                  matches = [item for item in items if item.get("content", {}).get("id") == issue["id"]]
+                  if len(matches) > 1:
+                      raise RuntimeError("Multiple Project items match the exact issue.")
+                  return matches[0] if matches else None
 
-          project_number="$(
-            gh project list --owner "$BASE_PROJECT_OWNER" --format json --limit 100 |
-              jq -r --arg title "$BASE_PROJECT_TITLE" \
-                '.projects[] | select(.title == $title) | .number' |
-              head -n 1
-          )"
-          if [[ -z "$project_number" ]]; then
-            echo "::error::GitHub Project '$BASE_PROJECT_TITLE' was not found for owner '$BASE_PROJECT_OWNER'."
-            exit 1
-          fi
+              item = find_item()
+              if item is None:
+                  try:
+                      added = api("POST", f"{project}/items", payload={"type": "Issue", "id": issue["id"]})
+                      item = added.get("value", added)
+                      if not item.get("id"):
+                          raise RuntimeError("Project item add did not return an item id.")
+                  except RuntimeError as error:
+                      # Another intake/Project automation may win the add race.
+                      if "content already exists in this project" not in str(error).lower():
+                          raise
+                      for attempt in range(3):
+                          item = find_item()
+                          if item is not None:
+                              break
+                          if attempt < 2:
+                              time.sleep(attempt + 1)
+                      if item is None:
+                          raise RuntimeError("Existing Project item is not visible after bounded retries.") from error
 
-          project_id="$(gh project view "$project_number" --owner "$BASE_PROJECT_OWNER" --format json --jq '.id')"
-          item_id="$(gh project item-add "$project_number" --owner "$BASE_PROJECT_OWNER" --url "$issue_url" --format json --jq '.id')"
-          item_json="$(
-            gh project item-list "$project_number" --owner "$BASE_PROJECT_OWNER" --format json --limit 1000 |
-              jq --arg id "$item_id" '.items[] | select(.id == $id)'
-          )"
-          fields_json="$(gh project field-list "$project_number" --owner "$BASE_PROJECT_OWNER" --format json)"
+              item_endpoint = f"{project}/items/{item['id']}"
 
-          field_id_for() {
-            local field_name="$1"
+              def read_item():
+                  for attempt in range(3):
+                      try:
+                          current = api("GET", item_endpoint, params={"fields": field_ids})
+                      except RuntimeError as error:
+                          if "HTTP 404" not in str(error) or attempt == 2:
+                              raise
+                      else:
+                          if current.get("content", {}).get("id") != issue["id"]:
+                              raise RuntimeError("Project item identity did not match the requested issue.")
+                          return current
+                      time.sleep(attempt + 1)
+                  raise RuntimeError("Project item is not visible after bounded retries.")
 
-            jq -r --arg name "$field_name" \
-              '.fields[] | select(.name == $name) | .id' <<<"$fields_json" |
-              head -n 1
-          }
+              def values(current):
+                  return {field["id"]: (field.get("value") or {}).get("id")
+                          for field in current.get("fields", [])}
 
-          option_id_for() {
-            local field_name="$1"
-            local option_name="$2"
+              def option_id(field, label):
+                  matches = [option["id"] for option in field.get("options", [])
+                             if (option["name"].get("raw") if isinstance(option["name"], dict)
+                                 else option["name"]) == label]
+                  if len(matches) != 1:
+                      raise RuntimeError(f"Project field {field['name']!r} option {label!r} was not found uniquely.")
+                  return matches[0]
 
-            jq -r --arg name "$field_name" --arg option "$option_name" \
-              '.fields[] | select(.name == $name) | .options[]? | select(.name == $option) | .id' \
-              <<<"$fields_json" |
-              head -n 1
-          }
+              current_values = values(read_item())
+              expected = {}
+              updates = []
+              closed_status = os.environ["BASE_PROJECT_DEFAULT_CLOSED_STATUS"]
+              for name, field in managed.items():
+                  current = current_values.get(field["id"])
+                  desired = current
+                  if name == "Status" and issue["state"] == "closed":
+                      desired = option_id(field, closed_status)
+                  elif name == "Status" and current == option_id(field, closed_status):
+                      desired = option_id(field, defaults[name])
+                  elif not current:
+                      desired = option_id(field, defaults[name])
+                  expected[field["id"]] = desired
+                  if current != desired:
+                      updates.append({"id": field["id"], "value": desired})
+              if updates:
+                  api("PATCH", item_endpoint, payload={"fields": updates})
+              for attempt in range(3):
+                  verified = values(read_item())
+                  if all(verified.get(field_id) == value for field_id, value in expected.items()):
+                      print(f"Synced issue #{number} into Project {project_number} via REST; verified all five fields.")
+                      return
+                  if attempt < 2:
+                      time.sleep(attempt + 1)
+              raise RuntimeError("Project field readback did not match the intended values after bounded retries.")
 
-          set_single_select() {
-            local field_name="$1"
-            local option_name="$2"
-            local field_id
-            local option_id
 
-            [[ -n "$option_name" ]] || return 0
-
-            field_id="$(field_id_for "$field_name")"
-            option_id="$(option_id_for "$field_name" "$option_name")"
-            if [[ -z "$field_id" || -z "$option_id" ]]; then
-              echo "::error::Project field '$field_name' option '$option_name' was not found."
-              exit 1
-            fi
-
-            gh project item-edit \
-              --id "$item_id" \
-              --project-id "$project_id" \
-              --field-id "$field_id" \
-              --single-select-option-id "$option_id" \
-              >/dev/null
-          }
-
-          set_single_select_if_missing() {
-            local field_name="$1"
-            local item_key="$2"
-            local option_name="$3"
-            local current_value
-
-            current_value="$(jq -r --arg key "$item_key" '.[$key] // ""' <<<"$item_json")"
-            if [[ -n "$current_value" ]]; then
-              return 0
-            fi
-
-            set_single_select "$field_name" "$option_name"
-          }
-
-          status_value="$BASE_PROJECT_DEFAULT_OPEN_STATUS"
-          if [[ "$issue_state" == "CLOSED" ]]; then
-            status_value="$BASE_PROJECT_DEFAULT_CLOSED_STATUS"
-          fi
-
-          set_single_select Status "$status_value"
-          set_single_select_if_missing Priority priority "$BASE_PROJECT_DEFAULT_PRIORITY"
-          set_single_select_if_missing Size size "$BASE_PROJECT_DEFAULT_SIZE"
-          set_single_select_if_missing Area area "$BASE_PROJECT_DEFAULT_AREA"
-          set_single_select_if_missing Initiative initiative "$BASE_PROJECT_DEFAULT_INITIATIVE"
-
-          printf 'Synced issue #%s into Project %s.\n' "$issue_number" "$BASE_PROJECT_TITLE"
+          try:
+              main()
+          except (RuntimeError, ValueError, KeyError, TypeError, OSError) as error:
+              # Escape annotation control characters; never claim success on partial sync.
+              message = str(error).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error::{message}", file=sys.stderr)
+              sys.exit(1)
