@@ -13,6 +13,7 @@ when updating an existing script.
 - [Configuration, lifecycle, and status contracts](v2/architecture.md#application-contract)
 - [Testing, vendoring, bundling, and release](v2/architecture.md#delivery)
 - [Bash support and validation quickstart](bash-validation-quickstart.md)
+- [Consumer-kit contribution path](consumer-kit-contribution.md)
 - [CI and default-branch policy](ci-policy.md)
 - [Support and threat model](support-policy.md) · [security reporting](../SECURITY.md)
 
