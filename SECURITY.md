@@ -16,12 +16,20 @@ line and migration policy.
 
 ## Reporting a vulnerability
 
-Please do not open a public issue for an unpatched vulnerability. Use GitHub's
-private **Report a vulnerability** action on the
-[Security tab](https://github.com/basefoundry/base-bash-libs/security) of this
-repository. If private reporting is unavailable, contact the maintainers
-through the address listed in the repository's GitHub security settings and
-include `base-bash-libs security report` in the subject.
+Please do not open a public issue for an unpatched vulnerability. Use the
+repository's enabled GitHub private **Report a vulnerability** action from the
+[Security tab](https://github.com/basefoundry/base-bash-libs/security). This is
+the primary intake channel and creates a private security advisory for the
+reporter and maintainers.
+
+If the GitHub action is unavailable, email
+[codeforester@gmail.com](mailto:codeforester@gmail.com?subject=base-bash-libs%20security%20report)
+with `base-bash-libs security report` in the subject. Use that fallback only to
+request a private reporting channel: do not include vulnerability details,
+credentials, private data, or sensitive attachments until a secure channel has
+been confirmed. No public encryption key is required for the supported GitHub
+private-reporting flow; maintainers will provide the appropriate secure path
+for any fallback report.
 
 Include, when safe to share:
 
@@ -36,6 +44,13 @@ security contact page. Do not include real credentials, tokens, private data,
 or destructive payloads in a report.
 
 ## Response and disclosure
+
+The primary triage owner is `codeforester`, the repository maintainer. GitHub
+repository administrators and organization security managers are the
+escalation roles for an unassigned, unavailable, or time-sensitive report; no
+second maintainer is implied by this policy. If no acknowledgment arrives
+within 5 business days, reply to the fallback address above with the same
+subject and ask for escalation.
 
 Maintainers acknowledge private reports within 5 business days, provide an
 initial severity and affected-version assessment within 10 business days, and
