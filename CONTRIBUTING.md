@@ -79,15 +79,18 @@ The `Project Intake` workflow uses the `BASE_PROJECT_TOKEN` repository secret
 to write to organization Project #8 through the REST Projects API. The token
 must have access to the repository and write access to the Project. Intake
 does not depend on GraphQL quota. It initializes missing fields, preserves
-existing metadata and active open-issue status, moves closed issues to `Done`,
+existing metadata and active open-issue status (including status changes made
+by linked-PR automation during intake), moves closed issues to `Done`,
 and resets `Done` to `Backlog` for reopened issues. Every run reads back all
 five managed fields before reporting success.
 
-If issues are missing from the Project, dispatch them sequentially:
+If issues are missing from the Project, pace manual backfills to avoid REST
+secondary limits:
 
 ```bash
 for issue in <issue-numbers>; do
   gh workflow run project-intake.yml --repo basefoundry/base-bash-libs -f issue_number="$issue"
+  sleep 12
 done
 ```
 

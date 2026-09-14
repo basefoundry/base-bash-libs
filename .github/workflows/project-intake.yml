@@ -194,14 +194,29 @@ jobs:
                       updates.append({"id": field["id"], "value": desired})
               if updates:
                   api("PATCH", item_endpoint, payload={"fields": updates})
+              status_field = managed["Status"]
+              open_status_ids = {option["id"] for option in status_field["options"]}
+              open_status_ids.discard(option_id(status_field, closed_status))
               for attempt in range(3):
                   verified = values(read_item())
-                  if all(verified.get(field_id) == value for field_id, value in expected.items()):
+                  verification_expected = dict(expected)
+                  # Linked-PR automation or a maintainer can advance an open
+                  # issue while intake initializes its other fields. Preserve
+                  # that valid status just as we preserve it before the write.
+                  observed_status = verified.get(status_field["id"])
+                  if issue["state"] == "open" and observed_status in open_status_ids:
+                      verification_expected[status_field["id"]] = observed_status
+                  if all(verified.get(field_id) == value for field_id, value in verification_expected.items()):
+                      if verification_expected != expected:
+                          print("Preserved a concurrent open-issue Project status change.")
                       print(f"Synced issue #{number} into Project {project_number} via REST; verified all five fields.")
                       return
                   if attempt < 2:
                       time.sleep(attempt + 1)
-              raise RuntimeError("Project field readback did not match the intended values after bounded retries.")
+              mismatches = [name for name, field in managed.items()
+                            if verified.get(field["id"]) != verification_expected[field["id"]]]
+              raise RuntimeError("Project field readback did not match the intended values after bounded retries: "
+                                 + ", ".join(mismatches))
 
 
           try:

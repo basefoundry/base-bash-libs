@@ -43,6 +43,7 @@ class RestFixture:
         self.direct_add = False
         self.stale_readback = 0
         self.patch_failure = False
+        self.concurrent_status = ''
 
     def item(self):
         return {'id': 101, 'content': {'id': 42 if not self.wrong_identity else 99},
@@ -88,6 +89,8 @@ class RestFixture:
                 if not self.mismatch:
                     for field in json.loads(kwargs['input'])['fields']:
                         self.current[field['id']] = field['value']
+                if self.concurrent_status:
+                    self.current[1] = self.concurrent_status
                 result = self.item()
             elif self.delayed:
                 self.delayed -= 1
@@ -305,6 +308,37 @@ class ProjectIntakeTests(unittest.TestCase):
         status, _, stderr, sleep = self.execute(fixture)
         self.assertEqual(status, 0, stderr)
         self.assertEqual(sleep.call_count, 2)
+
+    def test_preserves_concurrent_open_status_change(self):
+        for status_value in ('In Progress', 'In Review'):
+            with self.subTest(status=status_value):
+                fixture = RestFixture()
+                fixture.concurrent_status = status_value
+                status, stdout, stderr, sleep = self.execute(fixture)
+                self.assertEqual(status, 0, stderr)
+                self.assertEqual(fixture.current[1], status_value)
+                self.assertIn('Preserved a concurrent open-issue Project status change', stdout)
+                self.assertEqual(sum(c[0][3] == 'PATCH' for c in fixture.calls), 1)
+                sleep.assert_not_called()
+
+    def test_open_status_readback_rejects_done_and_invalid_options(self):
+        for status_value in ('Done', 'invalid-option'):
+            with self.subTest(status=status_value):
+                fixture = RestFixture()
+                fixture.concurrent_status = status_value
+                status, stdout, stderr, _ = self.execute(fixture)
+                self.assertEqual(status, 1)
+                self.assertNotIn('Synced issue', stdout)
+                self.assertIn('bounded retries: Status', stderr)
+
+    def test_closed_status_readback_remains_strict(self):
+        fixture = RestFixture()
+        fixture.closed = True
+        fixture.concurrent_status = 'In Progress'
+        status, stdout, stderr, _ = self.execute(fixture)
+        self.assertEqual(status, 1)
+        self.assertNotIn('Synced issue', stdout)
+        self.assertIn('bounded retries: Status', stderr)
 
 
 if __name__ == '__main__':
