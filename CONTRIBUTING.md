@@ -76,15 +76,16 @@ basectl test base-bash-libs
 ## Project intake backfill
 
 The `Project Intake` workflow uses the `BASE_PROJECT_TOKEN` repository secret
-to write to the organization Project. If issues are missing from the Project,
-check GraphQL quota before starting a backfill:
+to write to organization Project #8 through the REST Projects API. The token
+must have access to the repository and write access to the Project. Intake
+does not depend on GraphQL quota. It initializes missing fields, preserves
+existing metadata and active open-issue status (including status changes made
+by linked-PR automation during intake), moves closed issues to `Done`,
+and resets `Done` to `Backlog` for reopened issues. Every run reads back all
+five managed fields before reporting success.
 
-```bash
-gh api graphql -f query='query { rateLimit { remaining resetAt } }'
-```
-
-Dispatch missed issues slowly so Project field mutations do not exhaust the
-GraphQL quota:
+If issues are missing from the Project, pace manual backfills to avoid REST
+secondary limits:
 
 ```bash
 for issue in <issue-numbers>; do
@@ -92,3 +93,13 @@ for issue in <issue-numbers>; do
   sleep 12
 done
 ```
+
+The workflow retries transient REST failures up to three attempts and bounds
+post-add visibility and field-readback retries. Authentication, permission,
+configuration, persistent API failures, and readback mismatches still fail
+the run. For a rate-limit failure, respect GitHub's reset time or `Retry-After`
+before dispatching again; rotating a valid token is unnecessary. See the
+[REST Projects API documentation](https://docs.github.com/en/rest/projects/items).
+
+Run the offline workflow regression tests with
+`python3 tests/project-intake-test.py`; they also run in `./tests/validate.sh`.

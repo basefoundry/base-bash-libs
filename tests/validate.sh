@@ -39,6 +39,7 @@ required_files=(
     integrations/compatibility.yaml
     docs/discovery/awesome-bash.md
     .github/workflows/project-intake.yml
+    tests/project-intake-test.py
     .github/ISSUE_TEMPLATE/config.yml
     .github/workflows/tests.yml
     bin/base-bash
@@ -379,16 +380,6 @@ if ! grep -F 'GH_TOKEN: ${{ secrets.BASE_PROJECT_TOKEN }}' .github/workflows/pro
     exit 1
 fi
 
-if ! grep -F 'BASE_PROJECT_MIN_GRAPHQL_REMAINING' .github/workflows/project-intake.yml > /dev/null; then
-    printf 'Project intake workflow must define a minimum GraphQL quota before Project mutations.\n' >&2
-    exit 1
-fi
-
-if ! grep -F 'rateLimit { remaining resetAt }' .github/workflows/project-intake.yml > /dev/null; then
-    printf 'Project intake workflow must check GitHub GraphQL quota before Project mutations.\n' >&2
-    exit 1
-fi
-
 if ! grep -F 'Project intake backfill' CONTRIBUTING.md > /dev/null; then
     printf 'CONTRIBUTING.md must document the throttled Project intake backfill workflow.\n' >&2
     exit 1
@@ -495,6 +486,8 @@ done <<< "$manifest_test_paths"
 
 run_stage "BATS test suites" bats \
     "${bats_files[@]}" || exit $?
+
+run_stage "Project intake REST contract" python3 tests/project-intake-test.py || exit $?
 
 run_stage "Bash logging smoke" tests/bash-42-logging-smoke.sh || exit $?
 run_stage "Bash release guard smoke" tests/bash-42-release-smoke.sh || exit $?
