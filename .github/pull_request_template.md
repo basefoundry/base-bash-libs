@@ -4,7 +4,7 @@
 
 ## Issue
 
-Closes #
+Closes # / Related to # / None (small-fix)
 
 ## Validation
 
@@ -36,13 +36,13 @@ Closes #
 
 ## Checklist
 
-- [ ] Branch name follows `<category>/<issue>-<YYYYMMDD>-<slug>`.
-- [ ] Branch category matches the issue's single primary category label.
-- [ ] Pull request is scoped to one issue, unless a documented multi-issue exception applies.
+- [ ] Branch name follows `<category>/<issue>-<YYYYMMDD>-<slug>` for tracked work, or `small-fix/<YYYYMMDD>-<slug>` for a narrow fix without an issue.
+- [ ] Tracked branch category matches the issue's single primary category label; small-fix PRs have exactly one maintainer-applied primary category label.
+- [ ] Pull request is scoped to one issue, unless it uses the documented small-fix exception.
 - [ ] Pull request body explains what changed and how it was validated.
 - [ ] Relevant project checks pass.
 - [ ] Documentation is updated when behavior or user-facing commands change.
 - [ ] Applicable impact sections required by `base_manifest.yaml` are complete, or explicitly say `None.`
 - [ ] Support/security claims link to the enforced matrix and caller responsibilities.
 - [ ] CHANGELOG is updated for notable user-visible or release-worthy changes.
-- [ ] Pull request includes `Fixes #<issue>` or `Closes #<issue>` when merge should close the issue.
+- [ ] Pull request includes `Fixes #<issue>` or `Closes #<issue>` when merge should close the issue, or explains the small-fix/related-issue exception.

@@ -15,39 +15,48 @@ operation must enter through the repository-owned `scripts/release` guard.
 
 ## Workflow
 
-1. Create or choose a GitHub issue before starting implementation work.
-   Contributions from a public fork are welcome, but the issue and
-   pull-request contract still applies.
-2. Give the issue exactly one primary category label:
+1. For tracked work, create or choose a GitHub issue before starting
+   implementation work. Contributions from a public fork are welcome. A
+   genuinely small, self-contained fix may use the documented small-fix
+   exception without a pre-existing issue; the maintainer applies its primary
+   category label after reviewing the scope.
+2. Give each tracked issue exactly one primary category label. For a small-fix
+   pull request, the maintainer applies exactly one primary category label:
    - `bug` for defects or regressions.
    - `enhancement` for new capabilities, refactors, and maintenance.
    - `documentation` for documentation-only work.
    - `ci` for workflows, tests, release automation, or CI reliability.
    - `security` for security hardening, dependency pinning, or vulnerabilities.
-3. If the issue is tracked in the repository Project, move it to `In Progress`
+3. If tracked work is in the repository Project, move its issue to `In Progress`
    before branch or worktree work begins. Move it to `In Review` when the pull
-   request opens, and verify it is `Done` after merge or closure.
-4. Create an issue-backed branch:
+   request opens, and verify it is `Done` after merge or closure. Small-fix
+   contributions have no issue card to move.
+4. Create a branch using one of these forms:
 
    ```text
-   <category>/<issue>-<YYYYMMDD>-<slug>
+   <category>/<issue>-<YYYYMMDD>-<slug>  # tracked work
+   small-fix/<YYYYMMDD>-<slug>            # narrow fix without an issue
    ```
 
-   The category must match the issue's one primary category label, and the date
-   must be a real calendar date. The branch-name ruleset and the trusted
-   `base/issue-branch-policy` workflow enforce this for every contribution.
-5. Use a dedicated Git worktree for each pull request so the main checkout can
-   stay on the default branch:
+   For tracked work, the category must match the issue's one primary category
+   label. For a small fix, the maintainer must apply exactly one primary
+   category label to the pull request. In both forms, the date must be a real
+   calendar date. The branch-name ruleset and trusted
+   `base/issue-branch-policy` workflow enforce these rules.
+5. Use a dedicated Git worktree for tracked pull requests so the main checkout
+   can stay on the default branch. A small-fix contributor may work from a
+   normal clone using standard Git:
 
    ```bash
    git fetch origin
    git worktree add -b <branch> ../base-bash-libs-worktrees/<slug> origin/<default-branch>
    ```
 
-6. Keep the pull request scoped to one issue and link it with `Fixes #<issue>`
-   or `Closes #<issue>` when merge should close the issue. Fill in the standard
-   `Summary`, `Issue`, and `Validation` sections plus any applicable impact
-   sections required by `base_manifest.yaml`.
+6. Keep tracked pull requests scoped to one issue and link them with `Fixes
+   #<issue>` or `Closes #<issue>` when merge should close the issue. A small-fix
+   pull request may use `Related to #<issue>` when an issue exists, but no issue
+   is required. Fill in the standard `Summary`, `Issue`, and `Validation`
+   sections plus any applicable impact sections required by `base_manifest.yaml`.
 7. Run the project checks before opening or updating a pull request. The full
    hosted tests and quality workflows remain release gates even though the
    default branch baseline does not require every job as a merge check.

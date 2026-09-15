@@ -15,5 +15,8 @@ of truth; this page is a short orientation for new contributors.
 
 Work is not considered complete because a document exists: each issue links
 automated evidence, an immutable artifact, or an explicitly accepted limitation.
-Small fixes may be submitted without first opening an issue; use the issue
-templates when a decision, vulnerability, or multi-step change needs tracking.
+Small fixes may be submitted without first opening an issue by using the
+documented `small-fix/<YYYYMMDD>-<slug>` branch form. Keep the change narrow;
+the maintainer must apply exactly one primary category label before the branch
+policy check can pass. Use the issue templates when a decision, vulnerability,
+or multi-step change needs tracking.

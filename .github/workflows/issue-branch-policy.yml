@@ -6,6 +6,8 @@ on:
       - opened
       - reopened
       - synchronize
+      - labeled
+      - unlabeled
       - closed
   issues:
     types:
@@ -116,12 +118,13 @@ jobs:
             ((day <= days_in_month))
           }
 
-          branch_pattern='^(bug|enhancement|documentation|ci|security)/([1-9][0-9]*)-([0-9]{8})-[a-z0-9]+(-[a-z0-9]+)*$'
+          issue_branch_pattern='^(bug|enhancement|documentation|ci|security)/([1-9][0-9]*)-([0-9]{8})-[a-z0-9]+(-[a-z0-9]+)*$'
+          small_fix_branch_pattern='^small-fix/([0-9]{8})-[a-z0-9]+(-[a-z0-9]+)*$'
 
           validate_pull_request() {
             local pull_request_number="$1"
             local expected_head_sha="$2"
-            local pull_request_json branch_name head_sha
+            local pull_request_json branch_name head_sha branch_kind
             local category issue branch_date issue_json category_lines
             local issue_categories=()
             local issue_category
@@ -152,19 +155,56 @@ jobs:
               return 2
             fi
 
-            if [[ ! "$branch_name" =~ $branch_pattern ]]; then
+            if [[ "$branch_name" =~ $issue_branch_pattern ]]; then
+              branch_kind=issue
+              category="${BASH_REMATCH[1]}"
+              issue="${BASH_REMATCH[2]}"
+              branch_date="${BASH_REMATCH[3]}"
+            elif [[ "$branch_name" =~ $small_fix_branch_pattern ]]; then
+              branch_kind=small-fix
+              branch_date="${BASH_REMATCH[1]}"
+            else
               printf 'Pull request #%s: branch name is not canonical.\n' \
                 "$pull_request_number" >&2
               return 1
             fi
-
-            category="${BASH_REMATCH[1]}"
-            issue="${BASH_REMATCH[2]}"
-            branch_date="${BASH_REMATCH[3]}"
             if ! calendar_date_is_valid "$branch_date"; then
               printf 'Pull request #%s: branch date is not a valid YYYYMMDD date.\n' \
                 "$pull_request_number" >&2
               return 1
+            fi
+
+            if [[ "$branch_kind" == small-fix ]]; then
+              category_lines="$(
+                jq -r '
+                  [.labels[].name
+                    | select(
+                        . == "bug" or
+                        . == "enhancement" or
+                        . == "documentation" or
+                        . == "ci" or
+                        . == "security"
+                      )]
+                  | unique
+                  | .[]
+                ' <<< "$pull_request_json"
+              )" || {
+                printf 'Pull request #%s: unable to read small-fix category labels.\n' \
+                  "$pull_request_number" >&2
+                return 1
+              }
+              issue_categories=()
+              while IFS= read -r issue_category; do
+                [[ -z "$issue_category" ]] || issue_categories+=("$issue_category")
+              done <<< "$category_lines"
+              if ((${#issue_categories[@]} != 1)); then
+                printf 'Pull request #%s: a small-fix branch needs exactly one primary category label.\n' \
+                  "$pull_request_number" >&2
+                return 1
+              fi
+              printf 'Validated %s as a small fix (%s).\n' \
+                "$branch_name" "${issue_categories[0]}"
+              return 0
             fi
 
             issue_json="$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue" 2>/dev/null)" || {
@@ -248,7 +288,7 @@ jobs:
                 overall_status=1
                 continue
               fi
-              if [[ "$candidate_branch" =~ $branch_pattern ]] &&
+              if [[ "$candidate_branch" =~ $issue_branch_pattern ]] &&
                 [[ "${BASH_REMATCH[2]}" == "$ISSUE_EVENT_NUMBER" ]]; then
                 matched=$((matched + 1))
                 if ! publish_status "$candidate_head_sha" pending \

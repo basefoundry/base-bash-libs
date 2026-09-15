@@ -13,8 +13,12 @@
 Normal contributions may come from a public fork and may be submitted with
 standard Git, GitHub, Bats, and ShellCheck tooling. A pre-existing issue,
 dedicated worktree, and Base helper command are the recommended workflow for
-tracked work; the issue, validation, and review-checklist requirements still
-apply to small fixes.
+tracked work. A genuinely small, self-contained fix may instead use
+`small-fix/<YYYYMMDD>-<slug>` without a pre-existing issue, dedicated worktree,
+or Base helper command. The maintainer must apply exactly one primary category
+label (`bug`, `enhancement`, `documentation`, `ci`, or `security`) before the
+branch-policy check can pass. If the scope expands beyond a small fix, open an
+issue and use the tracked-work workflow.
 
 ## Review and decisions
 
