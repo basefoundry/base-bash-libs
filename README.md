@@ -295,7 +295,10 @@ Start with the [versioned v2 documentation](docs/README.md), especially the
 - [Bash support and validation quickstart](docs/bash-validation-quickstart.md)
 - [Consumer-kit contribution path](docs/consumer-kit-contribution.md)
 - [Community participation and independent validation](docs/community.md),
-  [who uses Base Bash](docs/who-uses-base-bash.md), and the
+  [GitHub Discussions](https://github.com/basefoundry/base-bash-libs/discussions)
+  for design questions and usage support, and [GitHub Issues](https://github.com/basefoundry/base-bash-libs/issues)
+  for tracked work. See also [who uses Base Bash](docs/who-uses-base-bash.md)
+  and the
   [consumer-validation status](docs/consumer-validation-status.md)
 - [Versioning policy](docs/versioning-policy.md) and
   [release process](docs/release-process.md)

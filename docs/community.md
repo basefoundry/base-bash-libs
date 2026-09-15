@@ -4,8 +4,9 @@
 
 - Use GitHub Issues for reproducible bugs, documentation gaps, and roadmap
   work. The templates request the minimum environment and validation details.
-- Use GitHub Discussions (when enabled for the repository) for design questions,
-  usage patterns, and comparisons that do not need a code change.
+- Use [GitHub Discussions](https://github.com/basefoundry/base-bash-libs/discussions)
+  for design questions, usage patterns, and comparisons that do not need a code
+  change.
 - Use the private security workflow in [`SECURITY.md`](../SECURITY.md) for
   vulnerabilities or sensitive conduct concerns.
 

@@ -15,6 +15,12 @@ for file in CODE_OF_CONDUCT.md ROADMAP.md docs/community.md docs/who-uses-base-b
 done
 
 grep -F 'SECURITY.md' docs/community.md > /dev/null || exit 1
+grep -F 'https://github.com/basefoundry/base-bash-libs/discussions' docs/community.md > /dev/null || exit 1
+grep -F 'https://github.com/basefoundry/base-bash-libs/discussions' README.md > /dev/null || exit 1
+if grep -F 'when enabled for the repository' docs/community.md > /dev/null; then
+    printf 'Community contract still hedges the Discussions channel.\n' >&2
+    exit 1
+fi
 grep -F 'No public entries yet.' docs/who-uses-base-bash.md > /dev/null || exit 1
 grep -F 'public fork' CONTRIBUTING.md > /dev/null || exit 1
 
