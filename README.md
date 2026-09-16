@@ -300,6 +300,8 @@ Start with the [versioned v2 documentation](docs/README.md), especially the
   for tracked work. See also [who uses Base Bash](docs/who-uses-base-bash.md)
   and the
   [consumer-validation status](docs/consumer-validation-status.md)
+- New contributors can start with the repository's
+  [good first issues](https://github.com/basefoundry/base-bash-libs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 - [Versioning policy](docs/versioning-policy.md) and
   [release process](docs/release-process.md)
 
