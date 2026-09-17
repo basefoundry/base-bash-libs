@@ -1302,9 +1302,15 @@ __base_bash_libs_cli_apply_positionals__() {
                 __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?
                 ((index++))
             done
-            if ((index == repeat_start)) && [[ "$required" =~ ^(1|true|yes)$ ]]; then
-                __base_bash_libs_cli_error__ "required positional '$name' was not provided."
-                return $?
+            if ((index == repeat_start)); then
+                if [[ -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$name|default"]+set}" ]]; then
+                    BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$default")
+                    __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$default" || return $?
+                    ((index++))
+                elif [[ "$required" =~ ^(1|true|yes)$ ]]; then
+                    __base_bash_libs_cli_error__ "required positional '$name' was not provided."
+                    return $?
+                fi
             fi
             return 0
         fi
