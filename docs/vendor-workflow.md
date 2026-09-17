@@ -28,9 +28,27 @@ For an application that must run without a framework checkout, assemble a
 standalone directory:
 
 ```bash
-scripts/vendor standalone . /tmp/base-bash-libs-v2 dist/app
-PATH="$PWD/dist/app/bin:$PATH" dist/app/bin/app --help
+scripts/vendor standalone . /tmp/base-bash-libs-v2 /tmp/my-app-dist
+PATH="/tmp/my-app-dist/bin:$PATH" /tmp/my-app-dist/bin/app --help
 ```
+
+The application payload uses a fixed allowlist: `README.md`, `VERSION`,
+`BASE_BASH_LIBS_PIN`, `bin/app`, `lib/app.sh`, and
+`config/app.conf.example`. Development-only repository metadata, local
+configuration overrides, tests, build output, caches, and previous
+output/staging trees are not recursively copied. Put additional runtime assets
+under `assets/` or `config/` and name each one explicitly:
+
+```bash
+scripts/vendor standalone . /tmp/base-bash-libs-v2 /tmp/my-app-dist \
+  --include assets/templates/default.conf \
+  --include config/production.conf
+```
+
+Included paths must be regular files with no symlink in any path component.
+The destination parent must already exist, and the destination must be outside
+the application source tree; use a sibling or temporary output directory. This
+prevents an output/staging tree from becoming part of its own package input.
 
 The standalone payload contains two deterministic copies of the same verified
 framework bundle. The root copy is the authoritative runtime layout and is

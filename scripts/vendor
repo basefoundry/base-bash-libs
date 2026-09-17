@@ -12,7 +12,7 @@ Usage:
   scripts/vendor update BUNDLE DESTINATION
   scripts/vendor rollback DESTINATION
   scripts/vendor verify DESTINATION
-  scripts/vendor standalone APPLICATION BUNDLE DESTINATION
+  scripts/vendor standalone APPLICATION BUNDLE DESTINATION [--include assets/PATH|config/PATH ...]
 EOF
 }
 
@@ -48,14 +48,63 @@ copy_verified_bundle() {
     cp -- "$source/MANIFEST.sha256" "$destination/MANIFEST.sha256" || return 1
 }
 
-copy_tree() {
-    local source="$1" destination="$2" file relative
-    while IFS= read -r -d '' file; do
-        relative="${file#"$source/"}"
+validate_payload_file() {
+    local source="$1" relative="$2" candidate component
+    local -a components=()
+
+    [[ -n "$relative" && "$relative" != /* && "$relative" != */ ]] || {
+        error "application payload path is not a clean relative path: $relative"
+        return 1
+    }
+    [[ "$relative" != *//* ]] || {
+        error "application payload path contains an empty component: $relative"
+        return 1
+    }
+    case "$relative" in
+    . | .. | ./* | ../* | */./* | */../* | */. | */.. | *$'\n'* | *$'\r'*)
+        error "application payload path contains an unsafe component: $relative"
+        return 1
+        ;;
+    esac
+
+    IFS='/' read -r -a components <<< "$relative"
+    candidate="$source"
+    for component in "${components[@]}"; do
+        candidate="$candidate/$component"
+        [[ ! -L "$candidate" ]] || {
+            error "application payload path traverses a symlink: $relative"
+            return 1
+        }
+    done
+    [[ -f "$candidate" ]] || {
+        error "application payload entry is not a regular file: $relative"
+        return 1
+    }
+}
+
+copy_payload_files() {
+    local source="$1" destination="$2" relative
+    shift 2
+    while IFS= read -r relative; do
+        [[ -n "$relative" ]] || continue
         mkdir -p "$destination/$(dirname -- "$relative")" || return 1
-        cp -- "$file" "$destination/$relative" || return 1
-        if [[ -x "$file" ]]; then chmod +x "$destination/$relative" || return 1; fi
-    done < <(find "$source" -type f -print0 | LC_ALL=C sort -z)
+        cp -- "$source/$relative" "$destination/$relative" || return 1
+        if [[ -x "$source/$relative" ]]; then chmod +x "$destination/$relative" || return 1; fi
+    done < <(printf '%s\n' "$@" | LC_ALL=C sort -u)
+}
+
+standalone_destination_is_external() {
+    local source="$1" destination="$2" destination_parent destination_name canonical
+    destination_parent="$(cd -- "$(dirname -- "$destination")" 2> /dev/null && pwd -P)" || {
+        error "standalone destination parent does not exist: $(dirname -- "$destination")"
+        return 1
+    }
+    destination_name="$(basename -- "$destination")"
+    canonical="$destination_parent/$destination_name"
+    [[ "$canonical" != "$source" && "$canonical" != "$source/"* ]] || {
+        error "standalone destination must be outside the application source tree: $destination"
+        return 1
+    }
 }
 
 write_lock() {
@@ -195,11 +244,52 @@ verify_destination() {
 
 standalone_bundle() {
     local application="$1" framework_bundle="$2" destination="$3" temporary
+    local application_root relative
+    local -a payload_files=(README.md VERSION BASE_BASH_LIBS_PIN bin/app lib/app.sh config/app.conf.example)
+    local -A payload_seen=()
+    shift 3
+    while (($#)); do
+        case "$1" in
+        --include)
+            (($# >= 2)) || {
+                error "--include requires a relative path under assets/ or config/"
+                return 2
+            }
+            payload_files+=("$2")
+            shift 2
+            ;;
+        *)
+            error "unknown standalone option: $1"
+            return 2
+            ;;
+        esac
+    done
+
     verify_bundle "$framework_bundle" || return $?
-    [[ -d "$application" && -f "$application/bin/app" ]] || {
+    [[ -d "$application" && ! -L "$application" && -f "$application/bin/app" ]] || {
         error "application is not a generated project: $application"
         return 1
     }
+    application_root="$(cd -- "$application" && pwd -P)" || return 1
+    standalone_destination_is_external "$application_root" "$destination" || return 2
+
+    local selected_paths=()
+    for relative in "${payload_files[@]}"; do
+        if [[ -z "${payload_seen[$relative]+set}" ]]; then
+            validate_payload_file "$application_root" "$relative" || return 2
+            case "$relative" in
+            README.md | VERSION | BASE_BASH_LIBS_PIN | bin/app | lib/app.sh | config/app.conf.example) ;;
+            assets/* | config/*) ;;
+            *)
+                error "optional application payload must be explicitly selected under assets/ or config/: $relative"
+                return 2
+                ;;
+            esac
+            payload_seen["$relative"]=1
+            selected_paths+=("$relative")
+        fi
+    done
+
     [[ ! -e "$destination" && ! -L "$destination" ]] || {
         error "refusing to overwrite standalone destination '$destination'"
         return 2
@@ -208,7 +298,7 @@ standalone_bundle() {
         error "unable to create a private staging directory beside '$destination'"
         return 1
     }
-    if ! copy_tree "$application" "$temporary"; then
+    if ! copy_payload_files "$application_root" "$temporary" "${selected_paths[@]}"; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -270,11 +360,11 @@ main() {
         verify_destination "$2"
         ;;
     standalone)
-        (($# == 4)) || {
+        (($# >= 4)) || {
             usage
             return 2
         }
-        standalone_bundle "$2" "$3" "$4"
+        standalone_bundle "$2" "$3" "$4" "${@:5}"
         ;;
     *)
         usage

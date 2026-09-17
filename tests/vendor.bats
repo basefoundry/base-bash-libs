@@ -82,11 +82,26 @@ SCRIPT
 }
 
 @test "standalone bundle contains its own launcher and vendored framework" {
-    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" "$standalone"
+    mkdir -p "$application/assets" "$application/.git" "$application/dist/prior"
+    printf 'local-secret-marker\n' > "$application/.env"
+    printf 'repository-marker\n' > "$application/.git/config"
+    printf 'old-output-marker\n' > "$application/dist/prior/marker"
+    printf 'runtime asset\n' > "$application/assets/runtime.txt"
+
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" "$standalone" \
+        --include assets/runtime.txt
     [ "$status" -eq 0 ]
     [ -x "$standalone/bin/base-bash" ]
     [ -x "$standalone/bin/app" ]
     [ -d "$standalone/lib/bash" ]
+    [ -f "$standalone/config/app.conf.example" ]
+    [ "$(<"$standalone/assets/runtime.txt")" = 'runtime asset' ]
+    [ ! -e "$standalone/.env" ]
+    [ ! -e "$standalone/.git" ]
+    [ ! -e "$standalone/dist" ]
+    [ ! -e "$standalone/Makefile" ]
+    [ ! -e "$standalone/tests/app.bats" ]
+    [ ! -e "$standalone/.github" ]
     [ "$(<"$standalone/VERSION")" = "0.1.0" ]
     [ -f "$standalone/vendor/base-bash-libs/base-bash-libs.lock" ]
     bats_run "$BASE_REPO_ROOT/scripts/vendor" verify "$standalone/vendor/base-bash-libs"
@@ -104,6 +119,30 @@ SCRIPT
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/base-bash" --version
     [ "$status" -eq 0 ]
     [[ "$output" == *"base-bash $expected_version"* ]]
+}
+
+@test "standalone rejects destinations inside source and unsafe optional payload entries" {
+    mkdir -p "$application/dist" "$application/assets"
+    printf 'outside\n' > "$TEST_TMPDIR/outside-marker"
+    ln -s "$TEST_TMPDIR/outside-marker" "$application/assets/linked-marker"
+
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" \
+        "$application/dist/standalone"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"destination must be outside the application source tree"* ]]
+    [ ! -e "$application/dist/standalone" ]
+
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" \
+        "$TEST_TMPDIR/standalone-symlink" --include assets/linked-marker
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"traverses a symlink"* ]]
+    [ ! -e "$TEST_TMPDIR/standalone-symlink" ]
+
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" \
+        "$TEST_TMPDIR/standalone-unlisted" --include tests/app.bats
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"must be explicitly selected under assets/ or config/"* ]]
+    [ ! -e "$TEST_TMPDIR/standalone-unlisted" ]
 }
 
 @test "vendor verification detects tampering" {
