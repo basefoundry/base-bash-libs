@@ -91,6 +91,17 @@ create_script() {
     [ "${values[3]}" = "" ]
 }
 
+@test "base_list_prepend preserves order and empty values for an empty array" {
+    local -a values=()
+
+    base_list_prepend values "" "first value" "second"
+
+    [ "${#values[@]}" -eq 3 ]
+    [ "${values[0]}" = "" ]
+    [ "${values[1]}" = "first value" ]
+    [ "${values[2]}" = "second" ]
+}
+
 @test "base_list_remove deletes all matching values and preserves order" {
     local -a values=("alpha" "beta" "alpha" "" "gamma")
 
