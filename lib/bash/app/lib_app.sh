@@ -710,6 +710,7 @@ base_app_apply_standard_options() {
     BASE_BASH_LIBS_APP_NONINTERACTIVE="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[noninteractive]-0}"
     value="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]-auto}"
     BASE_BASH_LIBS_APP_COLOR="$value"
+    __base_bash_libs_std_color_mode="$value"
     if [[ -n "${BASE_BASH_LIBS_STD_LOG_LEVELS[INFO]+set}" ]]; then
         case "${BASE_BASH_LIBS_APP_QUIET}:${BASE_BASH_LIBS_APP_VERBOSE}" in
         1:0) base_std_set_log_level WARN || return $? ;;

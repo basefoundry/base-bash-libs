@@ -379,6 +379,35 @@ assert_demo_snapshot() {
     [ "${BASE_BASH_LIBS_STD_LOGGER_LEVELS[default]}" -eq 4 ]
 }
 
+@test "standard color modes distinguish auto always and never" {
+    local stderr_file="$TEST_TMPDIR/color.stderr"
+    local -a init_args=()
+
+    base_init init_args --
+    base_cli_model_init color name=color
+    base_cli_command color run "Run"
+    base_app_init color_policy name=color
+    base_app_add_standard_options color run
+
+    unset NO_COLOR
+    base_cli_parse color -- run --color auto
+    base_app_apply_standard_options color_policy
+    base_std_print_error auto 2>"$stderr_file"
+    [[ "$(<"$stderr_file")" != *$'\033['* ]]
+
+    export NO_COLOR=1
+    base_cli_parse color -- run --color always
+    base_app_apply_standard_options color_policy
+    base_std_print_error always 2>"$stderr_file"
+    [[ "$(<"$stderr_file")" == *$'\033['* ]]
+
+    base_cli_parse color -- run --color never
+    base_app_apply_standard_options color_policy
+    base_std_print_error never 2>"$stderr_file"
+    [[ "$(<"$stderr_file")" != *$'\033['* ]]
+    unset NO_COLOR
+}
+
 @test "base_app_prompt validates usage and applies the prompt policy contract" {
     local prompt_calls=()
     base_app_init prompt

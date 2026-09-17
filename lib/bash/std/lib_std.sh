@@ -471,6 +471,7 @@ __base_bash_libs_std_initialize_runtime_state__() {
 
     __base_bash_libs_std_log_init__
     declare -g BASE_BASH_LIBS_STD_COLOR_ENABLED=0
+    declare -g __base_bash_libs_std_color_mode=auto
     declare -ga __base_bash_libs_std_cleanup_hooks=()
     declare -ga __base_bash_libs_std_cleanup_paths=()
     declare -ga __base_bash_libs_std_cleanup_entries=()
@@ -1102,8 +1103,20 @@ __base_bash_libs_std_print_log_record__() {
 # This is called from base_init.
 #
 __base_bash_libs_std_init_colors__() {
-    # If --color was not passed, NO_COLOR is set, or the log stream is not a terminal, disable colors.
-    if [[ "$BASE_BASH_LIBS_STD_COLOR_ENABLED" != 1 || -n "${NO_COLOR+x}" || ! -t 2 ]]; then
+    local __base_bash_libs_std_colors_enabled=0
+
+    case "${__base_bash_libs_std_color_mode:-auto}" in
+    always)
+        __base_bash_libs_std_colors_enabled=1
+        ;;
+    auto)
+        if [[ "$BASE_BASH_LIBS_STD_COLOR_ENABLED" == 1 && -z "${NO_COLOR+x}" && -t 2 ]]; then
+            __base_bash_libs_std_colors_enabled=1
+        fi
+        ;;
+    never) ;;
+    esac
+    if ((__base_bash_libs_std_colors_enabled == 0)); then
         BASE_BASH_LIBS_STD_COLOR_BOLD=""
         BASE_BASH_LIBS_STD_COLOR_RED=""
         BASE_BASH_LIBS_STD_COLOR_GREEN=""

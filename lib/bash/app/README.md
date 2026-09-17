@@ -55,8 +55,10 @@ zero. No configuration value is evaluated as shell code.
 `--config`, and `--user-config` options to a declarative CLI model.
 `--color` accepts `auto`, `always`, or `never`; the bare legacy launcher
 `--color` flag remains supported when it is not followed by one of those
-modes. `--quiet` sets the default logger threshold to `WARN`, while
-`--verbose` sets it to `DEBUG`; the options are mutually exclusive.
+modes. `auto` colors only when stderr is a terminal and `NO_COLOR` is unset;
+`always` forces ANSI colors even for captured stderr or a set `NO_COLOR`, and
+`never` disables them. `--quiet` sets the default logger threshold to `WARN`,
+while `--verbose` sets it to `DEBUG`; the options are mutually exclusive.
 `base_app_apply_standard_options` publishes the parsed policy in
 `BASE_BASH_LIBS_APP_*` globals and applies the logging/color policy.
 Applications should call

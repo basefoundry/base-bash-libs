@@ -174,7 +174,7 @@ argv. This mapping is the v2 migration reference:
 | `--debug-wrapper` | Enables DEBUG logging and is removed from application argv. |
 | `--verbose-wrapper` | Preserves the deprecated VERBOSE compatibility level and is removed from application argv. |
 | `--utc-wrapper` | Exports UTC logging for the initialized runtime and is removed from application argv. |
-| `--color` | Requests terminal colors and is removed from application argv. |
+| `--color` | Requests automatic terminal colors (stderr TTY and `NO_COLOR` unset) and is removed from application argv. |
 | `base_init --` | Stops wrapper parsing; the separator and all following values remain literal application argv. (The launcher's own script-selection `--` is not forwarded.) |
 
 No other launcher option is implicitly forwarded. Applications that need an
