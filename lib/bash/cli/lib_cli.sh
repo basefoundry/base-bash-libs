@@ -1573,8 +1573,14 @@ base_cli_completion_script() {
     fi
     program="${__base_bash_libs_cli_models["$model|meta|name"]}"
     printf '%s\n' "$function_name() {"
-    printf '%s\n' '    local current="${COMP_WORDS[COMP_CWORD]-}"'
-    printf '%s\n' '    local -a cli_words=( "${COMP_WORDS[@]:1}" )'
+    printf '%s\n' '    local cursor="${COMP_CWORD:-0}" word_count candidate'
+    printf '%s\n' '    local -a completion_words=( "${COMP_WORDS[@]+${COMP_WORDS[@]}}" ) cli_words=()'
+    printf '%s\n' '    if [[ "$cursor" =~ ^[0-9]+$ ]]; then cursor=$((10#$cursor)); else cursor=0; fi'
+    printf '%s\n' '    word_count="${#completion_words[@]}"'
+    printf '%s\n' '    if ((cursor > 0 && word_count > 1)); then'
+    printf '%s\n' '        ((cursor < word_count)) || cursor=$((word_count - 1))'
+    printf '%s\n' '        cli_words=( "${completion_words[@]:1:cursor}" )'
+    printf '%s\n' '    fi'
     printf '%s\n' '    COMPREPLY=()'
     printf '    while IFS= read -r candidate; do COMPREPLY+=("$candidate"); done < <(base_cli_complete %q -- "${cli_words[@]}")\n' "$model"
     printf '%s\n' '}'

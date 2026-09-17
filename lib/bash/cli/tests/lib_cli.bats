@@ -602,6 +602,46 @@ EOF
     [[ "$output" == *"complete -F _demo_complete demo"* ]]
 }
 
+@test "generated completion honors the cursor and keeps scratch variables local" {
+    local completion_script="$TEST_TMPDIR/completion.bash"
+    local candidate=caller-owned
+
+    base_cli_model_init cursor name=cursor
+    base_cli_command cursor admin "Administration"
+    base_cli_command cursor admin/user "User"
+    base_cli_option cursor '' channel value --channel enum=alpha,beta
+    base_cli_option cursor '' output value --output
+    base_cli_option cursor admin/user color value --color
+    base_cli_completion_script cursor _cursor_complete > "$completion_script"
+    source "$completion_script"
+
+    COMP_WORDS=(cursor --ch stable --output result)
+    COMP_CWORD=1
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --channel ]
+    [ "$candidate" = caller-owned ]
+
+    COMP_WORDS=(cursor --channel a --output result)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+
+    COMP_WORDS=(cursor admin --out --channel alpha)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --output ]
+
+    COMP_WORDS=(cursor admin user --co)
+    COMP_CWORD=3
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --color ]
+
+    COMP_WORDS=(cursor -- --channel)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+}
+
 @test "completion consumes option values and honors the double-dash boundary" {
     base_cli_model_init complete name=complete
     base_cli_command complete admin "Administration" aliases=a
