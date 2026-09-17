@@ -43,6 +43,25 @@ jobs:
       - name: Validate repository
         run: ./tests/validate.sh
 
+      - name: Install pinned SPDX validator (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/spdx-tools"
+          "$RUNNER_TEMP/spdx-tools/bin/python" -m pip install --disable-pip-version-check 'spdx-tools==0.8.5'
+
+      - name: Validate SPDX release artifact independently (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          output="$RUNNER_TEMP/spdx-validation-artifact"
+          scripts/release-artifact build \
+            --version 2.2.0 \
+            --commit "$(git rev-parse --verify 'HEAD^{commit}')" \
+            --output "$output"
+          "$RUNNER_TEMP/spdx-tools/bin/python" tests/validate-spdx.py \
+            "$output/base-bash-libs-v2.2.0.spdx.json"
+          "$RUNNER_TEMP/spdx-tools/bin/python" tests/validate-spdx.py \
+            --expect-missing-sha1 tests/fixtures/spdx/missing-sha1.spdx.json
+
       - name: Smoke supported runner Bash
         run: |
           bash -c '

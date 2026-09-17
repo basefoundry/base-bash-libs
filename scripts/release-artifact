@@ -45,6 +45,14 @@ hash_file() {
     fi
 }
 
+hash_file_sha1() {
+    if command -v sha1sum > /dev/null 2>&1; then
+        sha1sum -- "$1" | awk '{print $1}'
+    else
+        shasum -a 1 -- "$1" | awk '{print $1}'
+    fi
+}
+
 json_escape() {
     local value="${1-}"
     value=${value//\\/\\\\}
@@ -158,8 +166,9 @@ write_sbom() {
                 printf ',\n'
             fi
             first=0
-            printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
-                "$(spdx_file_identifier "$relative")" "$(json_escape "$relative")" "$(hash_file "$path")"
+            printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA1", "checksumValue": "%s"}, {"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
+                "$(spdx_file_identifier "$relative")" "$(json_escape "$relative")" \
+                "$(hash_file_sha1 "$path")" "$(hash_file "$path")"
         done < <(find "$root" -type f -print | LC_ALL=C sort)
         printf '\n  ],\n'
         printf '  "relationships": [{"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package"}]\n'

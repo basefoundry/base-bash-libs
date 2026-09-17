@@ -104,6 +104,8 @@ EOF
     [ "$status" -eq 0 ]
     diff -ru "$first" "$second"
     grep -F '"spdxVersion": "SPDX-2.3"' "$first"/*.spdx.json
+    grep -F '"algorithm": "SHA1"' "$first"/*.spdx.json
+    grep -F '"algorithm": "SHA256"' "$first"/*.spdx.json
     grep -F '"reproducible": true' "$first"/*.provenance.json
     awk '/"SPDXID": "SPDXRef-File-/ { id=$0; sub(/^.*"SPDXID": "/, "", id); sub(/".*$/, "", id); if (id !~ /^SPDXRef-File-[A-Za-z0-9.-]+$/ || seen[id]++) exit 1; count++ } END { exit (count > 0 ? 0 : 1) }' \
         "$first"/*.spdx.json
