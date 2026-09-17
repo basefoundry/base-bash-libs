@@ -61,7 +61,14 @@ __base_bash_libs_cli_valid_model__() {
 }
 
 __base_bash_libs_cli_valid_segment__() {
-    [[ "${1-}" =~ ^[A-Za-z0-9_-]+$ ]]
+    [[ "${1-}" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]
+}
+
+__base_bash_libs_cli_is_builtin_option_token__() {
+    case "${1-}" in
+    -h | --help | -V | --version) return 0 ;;
+    *) return 1 ;;
+    esac
 }
 
 __base_bash_libs_cli_valid_path__() {
@@ -786,7 +793,8 @@ base_cli_validate_model() {
         path="${route%%|token|*}"
         token="${route#*|token|}"
         name="${__base_bash_libs_cli_models[$key]}"
-        if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token" ||
+            ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
             [[ "$found_name" != "$name" || "$found_path" != "$path" ]]; then
             unreachable_routes+=("option:$path:$token")
         fi
@@ -959,6 +967,10 @@ base_cli_option() {
     for token in "${tokens[@]}"; do
         if [[ ! "$token" =~ ^--?[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_option: invalid option token '$token'."
+            return 2
+        fi
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token"; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' is reserved for built-in CLI behavior."
             return 2
         fi
         if [[ "$token" == *=* ]]; then
