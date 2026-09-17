@@ -18,6 +18,10 @@ helpers are available.
 The options, positionals, and specs arrays must have distinct names. Every
 repeatable option's output array must also be distinct from those three arrays.
 Aliasing is rejected before any caller-owned output is changed.
+The options output must be a caller-declared associative array; positionals
+and repeatable option outputs must be caller-declared indexed arrays. Arrays
+with integer or case-converting attributes, readonly outputs, and nameref
+outputs are rejected before parsing or publication.
 
 ## Usage
 

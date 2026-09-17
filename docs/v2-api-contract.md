@@ -47,12 +47,20 @@ platform-specific utility's exact status.
 - Diagnostics, warnings, logs, usage text, traces, and failure explanations
   go to standard error. They never contaminate command-substitution data.
 - APIs that return a value use one pass-by-name result as their first argument,
-  followed by inputs. Result arrays are caller-declared indexed arrays and
-  scalar results are caller-owned variables.
+  followed by inputs. Each API documents whether its result is a scalar,
+  integer, indexed array, or associative array. Arrays must be declared with
+  the required kind before the call; ordinary scalar results accept an
+  untyped/exported scalar, and numeric results also accept an integer (`-i`)
+  scalar.
 - Before any side effect, an output name is checked for valid Bash identifier
   syntax, the reserved `__` prefix, readonly status, correct array kind, and
-  aliases with an input or another output. On failure, outputs remain
-  unchanged unless an API explicitly documents partial mutation.
+  aliases with an input or another output. Integer (`-i`) and case-converting
+  (`-l`/`-u`) attributes are rejected for string and array results because
+  Bash would silently coerce published values. Readonly variables and
+  namerefs are rejected; namerefs are never followed, so readonly targets,
+  cycles, and reserved targets fail safely on Bash versions that support them.
+  On failure, outputs remain unchanged unless an API explicitly documents
+  partial mutation.
 - Named-output APIs are preferred over command substitution for values that
   may contain newlines, whitespace, or leading dashes.
 

@@ -87,6 +87,51 @@ create_script() {
     [ "${positionals[2]}" = "gamma" ]
 }
 
+@test "base_arg_parse rejects coercing attributes on its output arrays before publication" {
+    local stderr_file="$TEST_TMPDIR/arg-typed-output.err"
+    local rc
+    local -Au options=([existing]=sentinel)
+    local -ai positionals=(23)
+    local -a specs=("verbose|flag|--verbose|-v")
+
+    if base_arg_parse options positionals specs -- --verbose new 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "${options[existing]}" = SENTINEL ]
+    [ "${positionals[0]}" -eq 23 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the associative-array output contract"* ]]
+
+    local -A plain_options=([existing]=keep)
+    if base_arg_parse plain_options positionals specs -- --verbose new 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "${plain_options[existing]}" = keep ]
+    [ "${positionals[0]}" -eq 23 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+
+    local -A repeatable_options=([existing]=keep)
+    local -a repeatable_positionals=(old)
+    local -ai tag_values=(23)
+    local -a repeatable_specs=("tag_values|repeatable|--tag")
+    if base_arg_parse repeatable_options repeatable_positionals repeatable_specs -- \
+        --tag new 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "${repeatable_options[existing]}" = keep ]
+    [ "${repeatable_positionals[0]}" = old ]
+    [ "${tag_values[0]}" -eq 23 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+}
+
 @test "base_arg_parse rejects readonly output arrays before parsing" {
     local script="$TEST_TMPDIR/arg-readonly-output.sh"
 

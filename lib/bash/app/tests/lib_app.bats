@@ -73,6 +73,58 @@ assert_demo_snapshot() {
     [ "$value" = cli-secret ]
 }
 
+@test "string configuration outputs reject integer and case-converting variables" {
+    local stderr_file="$TEST_TMPDIR/config-typed-output.err"
+    local rc output_name
+    local -i integer_output=42
+    local -u uppercase_output=MiXeD
+    local -a app_args=()
+
+    base_init app_args --source "${BASH_SOURCE[0]}" --
+    base_app_init typed_output name=typed-output
+    base_app_config_define typed_output greeting string default=hello
+
+    if base_app_config_get typed_output greeting integer_output 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$integer_output" -eq 42 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+
+    if base_app_config_get typed_output greeting uppercase_output 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$uppercase_output" = MIXED ]
+
+    if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3))); then
+        local readonly_target=unchanged
+        local __private_target=private
+        readonly readonly_target
+        local -n readonly_alias=readonly_target
+        local -n reserved_alias=__private_target
+        local cycle_left cycle_right
+        local -n cycle_left=cycle_right
+        local -n cycle_right=cycle_left
+
+        for output_name in readonly_alias reserved_alias cycle_left; do
+            if base_app_config_get typed_output greeting "$output_name" 2>"$stderr_file"; then
+                rc=0
+            else
+                rc=$?
+            fi
+            [ "$rc" -eq 2 ]
+            [[ "$(<"$stderr_file")" == *"is a nameref; named outputs require a direct variable"* ]]
+        done
+        [ "$readonly_target" = unchanged ]
+        [ "$__private_target" = private ]
+    fi
+}
+
 @test "empty environment bindings do not override file configuration" {
     local project_file="$TEST_TMPDIR/project.conf" value source
 

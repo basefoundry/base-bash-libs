@@ -403,6 +403,27 @@ EOF
     [[ "$output" != *"unbound variable"* ]]
 }
 
+@test "base_init rejects indexed arrays with coercing attributes before runtime state changes" {
+    bats_run "$BASH" -c '
+        source "$1"
+        declare -ai app_args=(42)
+        if base_init app_args -- replacement; then
+            exit 10
+        else
+            rc=$?
+        fi
+        [[ "$rc" -eq 1 ]]
+        [[ "${app_args[0]}" -eq 42 ]]
+        [[ -z "${BASE_BASH_LIBS_STD_INITIALIZED+x}" ]]
+        printf "preflight=passed\nvalue=%s\n" "${app_args[0]}"
+    ' bash "$STDLIB_PATH"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"preflight=passed"* ]]
+    [[ "$output" == *"value=42"* ]]
+    [[ "$output" == *"must be a caller-declared indexed array"* ]]
+}
+
 @test "stdlib source guard rejects caller-owned incompatible metadata" {
     bats_run bash -c '
         BASE_BASH_LIBS_STD_SOURCE_GUARD=1
@@ -4222,6 +4243,33 @@ EOF
     [ "$rc" -eq 2 ]
     [ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]
     [[ "$(cat "$stderr_file")" == *"result variable 'output' is readonly"* ]]
+}
+
+@test "scalar named outputs reject integer and case-converting attributes before side effects" {
+    local temp_root="$TEST_TMPDIR/typed-output"
+    local stderr_file="$TEST_TMPDIR/typed-output.err"
+    local rc
+    local -i integer_output=42
+    local -u uppercase_output=sentinel
+
+    mkdir -p "$temp_root"
+    if base_std_command_path integer_output bash 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$integer_output" -eq 42 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+
+    if TMPDIR="$temp_root" base_std_make_temp_file uppercase_output typed 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$uppercase_output" = SENTINEL ]
+    [[ -z "$(find "$temp_root" -mindepth 1 -maxdepth 1 -print -quit)" ]]
 }
 
 @test "readonly caller locals do not collide with logging diagnostics" {

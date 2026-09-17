@@ -625,7 +625,7 @@ base_app_config_get() {
     __base_bash_libs_std_validate_variable_names__ base_app_config_get \
         "$__base_bash_libs_app_config_get_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_app_config_get \
-        "$__base_bash_libs_app_config_get_result_name" || return 2
+        "$__base_bash_libs_app_config_get_result_name" scalar || return 2
     [[ -n "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]+set}" ]] || return 1
     printf -v "$__base_bash_libs_app_config_get_result_name" '%s' \
         "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"
@@ -644,7 +644,7 @@ base_app_config_provenance() {
     __base_bash_libs_std_validate_variable_names__ base_app_config_provenance \
         "$__base_bash_libs_app_config_provenance_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_app_config_provenance \
-        "$__base_bash_libs_app_config_provenance_result_name" || return 2
+        "$__base_bash_libs_app_config_provenance_result_name" scalar || return 2
     [[ -n "${__base_bash_libs_app_provenance["$__base_bash_libs_app_config_provenance_model|$__base_bash_libs_app_config_provenance_key"]+set}" ]] || return 1
     printf -v "$__base_bash_libs_app_config_provenance_result_name" '%s' \
         "${__base_bash_libs_app_provenance["$__base_bash_libs_app_config_provenance_model|$__base_bash_libs_app_config_provenance_key"]}"
@@ -852,7 +852,7 @@ base_app_status() {
     __base_bash_libs_std_validate_variable_names__ base_app_status \
         "$__base_bash_libs_app_status_result_name" || return 2
     __base_bash_libs_std_assert_writable_output__ base_app_status \
-        "$__base_bash_libs_app_status_result_name" || return 2
+        "$__base_bash_libs_app_status_result_name" integer || return 2
     __base_bash_libs_app_model_exists__ "$__base_bash_libs_app_status_model" || return 1
     printf -v "$__base_bash_libs_app_status_result_name" '%s' \
         "${__base_bash_libs_app_models["$__base_bash_libs_app_status_model|last-status"]-0}"

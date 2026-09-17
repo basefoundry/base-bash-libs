@@ -81,6 +81,10 @@ base_str_join joined "|" parts
 - Named string, result, and array arguments must be valid Bash variable names.
 - Array arguments and array result variables must already be declared as indexed
   arrays, for example with `declare -a parts=()`.
+- Scalar string results must be untyped or exported-only variables; integer
+  (`-i`) and case-converting (`-l`/`-u`) attributes are rejected to prevent
+  Bash from silently changing values. Readonly variables and nameref outputs
+  are rejected before publication.
 
 ## Tests
 

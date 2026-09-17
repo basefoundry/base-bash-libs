@@ -421,7 +421,11 @@ __base_bash_libs_std_init_validate_result_array__() {
     fi
     if [[ "$__base_bash_libs_std_init_attributes" == *a* &&
         "$__base_bash_libs_std_init_attributes" != *A* &&
-        "$__base_bash_libs_std_init_attributes" != *r* ]]; then
+        "$__base_bash_libs_std_init_attributes" != *r* &&
+        "$__base_bash_libs_std_init_attributes" != *i* &&
+        "$__base_bash_libs_std_init_attributes" != *l* &&
+        "$__base_bash_libs_std_init_attributes" != *n* &&
+        "$__base_bash_libs_std_init_attributes" != *u* ]]; then
         __base_bash_libs_std_init_attributes_ok=1
     fi
     if ((__base_bash_libs_std_init_nocasematch_enabled)); then
@@ -3357,7 +3361,7 @@ __base_bash_libs_std_make_temp_path__() {
         base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: result variable name must be a valid Bash variable name."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ "$__base_bash_libs_std_temp_helper_name" "$__base_bash_libs_std_temp_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ "$__base_bash_libs_std_temp_helper_name" "$__base_bash_libs_std_temp_result_name" scalar || return 2
     if [[ -z "$__base_bash_libs_std_temp_prefix" || "$__base_bash_libs_std_temp_prefix" == */* ]]; then
         base_std_log_error -l base_bash_libs.std "$__base_bash_libs_std_temp_helper_name: prefix must be a non-empty filename prefix without '/'."
         return 2
@@ -3454,7 +3458,15 @@ __base_bash_libs_std_is_valid_variable_name__() {
 
 __base_bash_libs_std_assert_writable_output__() {
     local __base_bash_libs_std_output_function_name="${1-}" __base_bash_libs_std_output_name="${2-}"
-    local __base_bash_libs_std_output_declaration __base_bash_libs_std_output_attributes
+    local __base_bash_libs_std_output_kind="${3:-scalar}"
+    local __base_bash_libs_std_output_declaration __base_bash_libs_std_output_attribute_token
+    local __base_bash_libs_std_output_attributes __base_bash_libs_std_output_character
+    local -i __base_bash_libs_std_output_character_index=0 __base_bash_libs_std_output_character_code=0
+    local -i __base_bash_libs_std_output_has_readonly=0 __base_bash_libs_std_output_has_nameref=0
+    local -i __base_bash_libs_std_output_has_integer=0 __base_bash_libs_std_output_has_lowercase=0
+    local -i __base_bash_libs_std_output_has_uppercase=0 __base_bash_libs_std_output_has_indexed=0
+    local -i __base_bash_libs_std_output_has_associative=0 __base_bash_libs_std_output_has_unsupported=0
+    local -i __base_bash_libs_std_output_compatible=0
 
     if [[ "$__base_bash_libs_std_output_name" == __* ]]; then
         case "$__base_bash_libs_std_output_function_name" in
@@ -3469,11 +3481,96 @@ __base_bash_libs_std_assert_writable_output__() {
 
     __base_bash_libs_std_output_declaration="$(declare -p "$__base_bash_libs_std_output_name" 2> /dev/null || true)"
     [[ -n "$__base_bash_libs_std_output_declaration" ]] || return 0
-    __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_declaration#declare -}"
-    __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_attributes%% *}"
-    if [[ "$__base_bash_libs_std_output_attributes" == *r* ]]; then
+
+    __base_bash_libs_std_output_attribute_token="${__base_bash_libs_std_output_declaration#declare }"
+    __base_bash_libs_std_output_attribute_token="${__base_bash_libs_std_output_attribute_token%% *}"
+    if [[ "$__base_bash_libs_std_output_attribute_token" == -- ]]; then
+        __base_bash_libs_std_output_attributes=""
+    else
+        __base_bash_libs_std_output_attributes="${__base_bash_libs_std_output_attribute_token#-}"
+    fi
+
+    # Inspect attribute bytes numerically so `shopt -s nocasematch` cannot
+    # confuse indexed-array `a` with associative-array `A`.
+    for ((__base_bash_libs_std_output_character_index = 0;  \
+    __base_bash_libs_std_output_character_index < ${#__base_bash_libs_std_output_attributes};  \
+    __base_bash_libs_std_output_character_index++)); do
+        __base_bash_libs_std_output_character="${__base_bash_libs_std_output_attributes:__base_bash_libs_std_output_character_index:1}"
+        printf -v __base_bash_libs_std_output_character_code '%d' "'$__base_bash_libs_std_output_character"
+        case "$__base_bash_libs_std_output_character_code" in
+        65) __base_bash_libs_std_output_has_associative=1 ;; # A
+        97) __base_bash_libs_std_output_has_indexed=1 ;;     # a
+        105) __base_bash_libs_std_output_has_integer=1 ;;    # i
+        108) __base_bash_libs_std_output_has_lowercase=1 ;;  # l
+        110) __base_bash_libs_std_output_has_nameref=1 ;;    # n
+        114) __base_bash_libs_std_output_has_readonly=1 ;;   # r
+        117) __base_bash_libs_std_output_has_uppercase=1 ;;  # u
+        120) ;;                                              # x (export)
+        *) __base_bash_libs_std_output_has_unsupported=1 ;;
+        esac
+    done
+
+    if ((__base_bash_libs_std_output_has_readonly)); then
         base_std_log_error -l base_bash_libs.std \
             "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' is readonly."
+        return 1
+    fi
+    if ((__base_bash_libs_std_output_has_nameref)); then
+        base_std_log_error -l base_bash_libs.std \
+            "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' is a nameref; named outputs require a direct variable."
+        return 1
+    fi
+
+    case "$__base_bash_libs_std_output_kind" in
+    scalar)
+        if ((!__base_bash_libs_std_output_has_integer && !\
+            __base_bash_libs_std_output_has_lowercase && !\
+            __base_bash_libs_std_output_has_uppercase && !\
+            __base_bash_libs_std_output_has_indexed && !\
+            __base_bash_libs_std_output_has_associative && !\
+            __base_bash_libs_std_output_has_unsupported)); then
+            __base_bash_libs_std_output_compatible=1
+        fi
+        ;;
+    integer)
+        if ((!__base_bash_libs_std_output_has_lowercase && !\
+            __base_bash_libs_std_output_has_uppercase && !\
+            __base_bash_libs_std_output_has_indexed && !\
+            __base_bash_libs_std_output_has_associative && !\
+            __base_bash_libs_std_output_has_unsupported)); then
+            __base_bash_libs_std_output_compatible=1
+        fi
+        ;;
+    indexed-array)
+        if ((__base_bash_libs_std_output_has_indexed && !\
+            __base_bash_libs_std_output_has_integer && !\
+            __base_bash_libs_std_output_has_lowercase && !\
+            __base_bash_libs_std_output_has_uppercase && !\
+            __base_bash_libs_std_output_has_associative && !\
+            __base_bash_libs_std_output_has_unsupported)); then
+            __base_bash_libs_std_output_compatible=1
+        fi
+        ;;
+    associative-array)
+        if ((__base_bash_libs_std_output_has_associative && !\
+            __base_bash_libs_std_output_has_integer && !\
+            __base_bash_libs_std_output_has_lowercase && !\
+            __base_bash_libs_std_output_has_uppercase && !\
+            __base_bash_libs_std_output_has_indexed && !\
+            __base_bash_libs_std_output_has_unsupported)); then
+            __base_bash_libs_std_output_compatible=1
+        fi
+        ;;
+    *)
+        base_std_log_error -l base_bash_libs.std \
+            "$__base_bash_libs_std_output_function_name: internal output contract '$__base_bash_libs_std_output_kind' is unknown."
+        return 1
+        ;;
+    esac
+
+    if ((!__base_bash_libs_std_output_compatible)); then
+        base_std_log_error -l base_bash_libs.std \
+            "$__base_bash_libs_std_output_function_name: result variable '$__base_bash_libs_std_output_name' has attributes incompatible with the $__base_bash_libs_std_output_kind output contract."
         return 1
     fi
     return 0
@@ -3670,7 +3767,7 @@ base_std_command_path() {
         base_std_log_error -l base_bash_libs.std "base_std_command_path: result variable name must be a valid Bash variable name."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_std_command_path "$__base_bash_libs_std_command_result_name" scalar || return 2
 
     if [[ -n "$__base_bash_libs_std_command_name" ]]; then
         __base_bash_libs_std_command_resolved_path="$(type -P "$__base_bash_libs_std_command_name" 2> /dev/null || true)"
@@ -4069,7 +4166,7 @@ base_std_get_my_source_dir() {
             "base_std_get_my_source_dir: result variable name must be a valid Bash variable name."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_std_get_my_source_dir "$__base_bash_libs_std_source_result_name" scalar || return 2
     local __base_bash_libs_std_source_dir __base_bash_libs_std_source_path="${BASH_SOURCE[1]-}"
     # Reference: https://stackoverflow.com/a/246128/6862601
     if [[ -n "$__base_bash_libs_std_source_path" ]]; then
