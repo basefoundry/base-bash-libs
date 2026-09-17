@@ -17,6 +17,11 @@ done
 grep -F 'SECURITY.md' docs/community.md > /dev/null || exit 1
 grep -F 'https://github.com/basefoundry/base-bash-libs/discussions' docs/community.md > /dev/null || exit 1
 grep -F 'https://github.com/basefoundry/base-bash-libs/discussions' README.md > /dev/null || exit 1
+grep -F 'https://github.com/basefoundry/base-bash-libs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22' \
+    README.md > /dev/null || {
+    printf 'README must link directly to the live good-first-issue search.\n' >&2
+    exit 1
+}
 if grep -F 'when enabled for the repository' docs/community.md > /dev/null; then
     printf 'Community contract still hedges the Discussions channel.\n' >&2
     exit 1
