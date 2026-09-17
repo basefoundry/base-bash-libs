@@ -131,10 +131,10 @@ normalize_tree_times() {
     while IFS= read -r path; do
         # USTAR cannot represent pre-epoch timestamps; 1980 is stable and
         # within the format's portable range.
-        touch -t 198001010000 "$path" || return 1
+        TZ=UTC touch -t 198001010000 "$path" || return 1
     done < <(find "$root" -type f -print)
     while IFS= read -r path; do
-        touch -t 198001010000 "$path" || return 1
+        TZ=UTC touch -t 198001010000 "$path" || return 1
     done < <(find "$root" -type d -print)
 }
 
