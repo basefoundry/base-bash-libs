@@ -111,6 +111,18 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 9. Verify the annotated `vX.Y.Z` tag and the GitHub Release for
    `basefoundry/base-bash-libs`.
 
+## SBOM Interoperability
+
+The SPDX 2.3 SBOM format is versioned with the release: releases before v2.2.0
+retain their published SHA256-only file records, while v2.2.0 and later include
+both SHA256 and the SHA1 checksum required by SPDX 2.3 file records. The Linux
+and macOS validation jobs independently parse and semantically validate each
+candidate SBOM with `spdx-tools==0.8.5`; macOS also exercises the `shasum -a 1`
+checksum path. Both jobs check a parseable negative fixture that must produce
+exactly one semantic error, specifically the missing SHA1 checksum. This
+validation does not rewrite or replace any already-published release asset;
+corrected SBOMs are produced only for a future authorized release.
+
 ## Homebrew Handoff
 
 The release contract requires the tap-owned formula

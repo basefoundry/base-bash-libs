@@ -94,29 +94,50 @@ EOF
 @test "release artifact build creates a deterministic verified asset set" {
     local first="$TEST_TMPDIR/first" second="$TEST_TMPDIR/second"
 
-    bats_run "$RELEASE_ARTIFACT" build --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$first"
+    bats_run "$RELEASE_ARTIFACT" build --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$first"
     [ "$status" -eq 0 ]
     bats_run "$RELEASE_ARTIFACT" verify "$first"
     [ "$status" -eq 0 ]
     [[ "$output" == *"verified"* ]]
 
-    bats_run "$RELEASE_ARTIFACT" build --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$second"
+    bats_run "$RELEASE_ARTIFACT" build --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$second"
     [ "$status" -eq 0 ]
     diff -ru "$first" "$second"
     grep -F '"spdxVersion": "SPDX-2.3"' "$first"/*.spdx.json
+    grep -F '"algorithm": "SHA1"' "$first"/*.spdx.json
+    grep -F '"algorithm": "SHA256"' "$first"/*.spdx.json
+    awk '/"SPDXID": "SPDXRef-File-/ { count++; if ($0 !~ /"algorithm": "SHA1"/ || $0 !~ /"algorithm": "SHA256"/) missing++ } END { exit (count > 0 && missing == 0 ? 0 : 1) }' \
+        "$first"/*.spdx.json
     grep -F '"reproducible": true' "$first"/*.provenance.json
     awk '/"SPDXID": "SPDXRef-File-/ { id=$0; sub(/^.*"SPDXID": "/, "", id); sub(/".*$/, "", id); if (id !~ /^SPDXRef-File-[A-Za-z0-9.-]+$/ || seen[id]++) exit 1; count++ } END { exit (count > 0 ? 0 : 1) }' \
         "$first"/*.spdx.json
+}
+
+@test "legacy 2.1 SBOM verification retains its SHA256-only file records" {
+    local artifact="$TEST_TMPDIR/legacy" sbom verified="$TEST_TMPDIR/verified"
+
+    release_test_build "$artifact" 2.1.0
+    sbom="$artifact/base-bash-libs-v2.1.0.spdx.json"
+    awk '/"SPDXID": "SPDXRef-File-/ { count++; if ($0 ~ /"algorithm": "SHA1"/ || $0 !~ /"algorithm": "SHA256"/) invalid++ } END { exit (count > 0 && invalid == 0 ? 0 : 1) }' \
+        "$sbom"
+
+    export REMOTE_VERSION=2.1.0 REMOTE_COMMIT="$RELEASE_COMMIT" REMOTE_SOURCE="$artifact"
+    export REMOTE_TAG_OBJECT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb REMOTE_ASSET_MODE=full
+    release_test_make_remote_gh_stub
+    bats_run "$RELEASE_ARTIFACT" verify-remote --version "$REMOTE_VERSION" \
+        --commit "$REMOTE_COMMIT" --output "$verified"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"GitHub Release assets verified"* ]]
 }
 
 @test "release artifact bytes are independent of the host timezone" {
     local utc="$TEST_TMPDIR/utc" local_tz="$TEST_TMPDIR/local-tz"
 
     bats_run env TZ=UTC0 TZDIR="$TEST_TMPDIR/missing-zoneinfo" "$RELEASE_ARTIFACT" build \
-        --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$utc"
+        --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$utc"
     [ "$status" -eq 0 ]
     bats_run env TZ=Asia/Kolkata "$RELEASE_ARTIFACT" build \
-        --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$local_tz"
+        --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$local_tz"
     [ "$status" -eq 0 ]
 
     diff -ru "$utc" "$local_tz"

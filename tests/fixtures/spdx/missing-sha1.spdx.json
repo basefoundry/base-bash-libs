@@ -1,0 +1,41 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "base-bash-libs-semantic-negative-fixture",
+  "documentNamespace": "https://example.invalid/base-bash-libs/semantic-negative-fixture",
+  "creationInfo": {
+    "created": "2026-01-01T00:00:00Z",
+    "creators": ["Tool: base-bash-libs-test"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package",
+      "name": "fixture",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": true,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION"
+    }
+  ],
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-fixture",
+      "fileName": "fixture.sh",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package"
+    }
+  ]
+}
