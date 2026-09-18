@@ -130,6 +130,19 @@ EOF
     [[ "$output" == *"GitHub Release assets verified"* ]]
 }
 
+@test "release artifact bytes are independent of the host timezone" {
+    local utc="$TEST_TMPDIR/utc" local_tz="$TEST_TMPDIR/local-tz"
+
+    bats_run env TZ=UTC0 TZDIR="$TEST_TMPDIR/missing-zoneinfo" "$RELEASE_ARTIFACT" build \
+        --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$utc"
+    [ "$status" -eq 0 ]
+    bats_run env TZ=Asia/Kolkata "$RELEASE_ARTIFACT" build \
+        --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" --output "$local_tz"
+    [ "$status" -eq 0 ]
+
+    diff -ru "$utc" "$local_tz"
+}
+
 @test "release SBOM file identifiers are collision-resistant and reject the former underscore form" {
     local artifact="$TEST_TMPDIR/artifact" sbom sums temporary
 

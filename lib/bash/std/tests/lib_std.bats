@@ -372,7 +372,7 @@ source "$STDLIB_PATH"
 
 exercise_global() {
     local candidate
-    for candidate in input_args filtered_args value result_name input_index parse_config color_requested configure_runtime; do
+    for candidate in input_args filtered_args value result_name input_index parse_config color_mode_requested configure_runtime; do
         declare -a "\$candidate=([0]=sentinel)"
         base_init "\$candidate" -- --keep payload
         printf 'global:%s:' "\$candidate"
@@ -389,7 +389,7 @@ exercise_local() {
 }
 
 exercise_global
-for candidate in input_args filtered_args value result_name input_index parse_config color_requested configure_runtime; do
+for candidate in input_args filtered_args value result_name input_index parse_config color_mode_requested configure_runtime; do
     exercise_local "\$candidate"
 done
 EOF
@@ -921,6 +921,52 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$normalized" == *"colors=disabled"* ]]
+}
+
+@test "base_init applies explicit wrapper color modes" {
+    local script="$TEST_TMPDIR/color-modes.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+export NO_COLOR=1
+source "$STDLIB_PATH"
+if [[ -n "\${BASE_BASH_LIBS_STD_COLOR_RED:-}" ]]; then
+    colors=enabled
+else
+    colors=disabled
+fi
+printf 'argv=%s colors=%s mode=%s wrapper=%s\\n' "\$*" "\$colors" "\$__base_bash_libs_std_color_mode" "\$__base_bash_libs_std_wrapper_color_mode"
+EOF
+
+    bats_run bash "$script" --color-mode always alpha
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"argv=alpha colors=enabled mode=always wrapper=always"* ]]
+
+    bats_run bash "$script" --color-mode=never alpha
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"argv=alpha colors=disabled mode=never wrapper=never"* ]]
+
+    bats_run bash -c '
+        source "$1"
+        declare -a args=()
+        base_init args --color-mode=invalid --
+        exit $?
+    ' bash "$STDLIB_PATH"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"invalid color mode"* ]]
+}
+
+@test "stdlib color initialization rejects invalid modes instead of silently disabling color" {
+    local status
+
+    __base_bash_libs_std_color_mode=unsupported
+    if __base_bash_libs_std_init_colors__ >/dev/null 2>"$TEST_TMPDIR/color-error"; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    grep -F "invalid color mode 'unsupported'" "$TEST_TMPDIR/color-error"
 }
 
 @test "base_std_import loads package-relative libraries independent of cwd and is idempotent" {

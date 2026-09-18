@@ -56,6 +56,9 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    agree on the archive digest, version, and full source commit. Treat any
    missing, duplicate, traversal-bearing, or inconsistent record as a failed
    release gate; do not choose one asset from an ambiguous directory.
+   Archive file and directory timestamps are normalized in UTC, path ordering
+   uses the `C` locale, and archive creation supports GNU tar and bsdtar only;
+   other tar implementations fail closed rather than claiming reproducibility.
    Generate the repository component row for the ecosystem BOM from the same
    immutable commit:
 

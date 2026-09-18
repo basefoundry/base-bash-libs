@@ -136,6 +136,7 @@ write_hash_manifest() {
 
 normalize_tree_times() {
     local root="$1" path
+    local -x TZ=UTC0
     while IFS= read -r path; do
         # USTAR cannot represent pre-epoch timestamps; 1980 is stable and
         # within the format's portable range.

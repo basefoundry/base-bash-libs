@@ -408,6 +408,68 @@ EOF
     [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = working ]
 }
 
+@test "repeatable positional defaults are applied and validated only when omitted" {
+    valid_archive() { [[ "$1" == archive ]]; }
+
+    base_cli_model_init direct_repeat_default name=direct-repeat-default
+    base_cli_command direct_repeat_default run "Run"
+    base_cli_positional direct_repeat_default run target required=true
+    base_cli_positional direct_repeat_default run files repeatable=true required=true \
+        default=fallback enum=fallback,archive validator=valid_target
+
+    base_cli_parse direct_repeat_default -- run target-value
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 2 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = target-value ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = fallback ]
+
+    base_cli_parse direct_repeat_default -- run target-value archive
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = archive ]
+
+    base_cli_model_init explicit_empty name=explicit-empty
+    base_cli_command explicit_empty run "Run"
+    base_cli_positional explicit_empty run values repeatable=true default=fallback
+    base_cli_parse explicit_empty -- run ""
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = "" ]
+
+    base_cli_model_init invalid_enum name=invalid-enum
+    base_cli_command invalid_enum run "Run"
+    bats_run base_cli_positional invalid_enum run values repeatable=true default=invalid enum=valid
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"default must be one of the declared enum values"* ]]
+
+    base_cli_model_init invalid_validator name=invalid-validator
+    base_cli_command invalid_validator run "Run"
+    base_cli_positional invalid_validator run values repeatable=true default=fallback \
+        enum=fallback,archive validator=valid_archive
+    if base_cli_parse invalid_validator -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
+
+    base_cli_model_init invalid_scalar_default name=invalid-scalar-default
+    base_cli_command invalid_scalar_default run "Run"
+    base_cli_positional invalid_scalar_default run value default=fallback validator=valid_archive
+    if base_cli_parse invalid_scalar_default -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
+
+    base_cli_declare table_repeat_default \
+        'model|name=table-repeat-default' \
+        'command|path=run|description=Run' \
+        'positional|path=run|name=values|repeatable=true|required=true|default=fallback|enum=fallback,archive'
+    base_cli_parse table_repeat_default -- run
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = fallback ]
+}
+
 @test "quick declarations enforce required repeatable positional tails" {
     base_cli_declare table_repeat \
         'model|name=table-repeat' \
@@ -489,6 +551,21 @@ EOF
     [[ "$output" == *"route 'u' was provided more than once"* ]]
 }
 
+@test "a lone dash is accepted as a model name command name and alias" {
+    base_cli_model_init dash_model name=-
+    base_cli_validate_model dash_model
+
+    base_cli_model_init dash_command name=dash-command
+    base_cli_command dash_command - "Read standard input"
+    base_cli_parse dash_command -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = - ]
+
+    base_cli_model_init dash_alias name=dash-alias
+    base_cli_command dash_alias stdin "Read standard input" aliases=-
+    base_cli_parse dash_alias -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = stdin ]
+}
+
 @test "ancestor and child option names and tokens cannot shadow each other" {
     base_cli_model_init ancestor_first name=ancestor-first
     base_cli_command ancestor_first child "Child"
@@ -530,6 +607,36 @@ EOF
     [ "$status" -eq 2 ]
 }
 
+@test "built-in option tokens and option-shaped command routes are unreachable" {
+    local before token path
+
+    base_cli_model_init reserved name=reserved version=2.0.0
+    base_cli_command reserved run "Run"
+    before="$(model_registry_dump reserved)"
+    for path in '' run; do
+        for token in -h --help -V --version; do
+            bats_run base_cli_option reserved "$path" custom value "$token"
+            [ "$status" -eq 2 ]
+            [[ "$output" == *"reserved for built-in CLI behavior"* ]]
+            [ "$(model_registry_dump reserved)" = "$before" ]
+        done
+    done
+
+    bats_run base_cli_command reserved --diagnose "Unreachable route"
+    [ "$status" -eq 2 ]
+    bats_run base_cli_command reserved run/-diagnose "Unreachable nested route"
+    [ "$status" -eq 2 ]
+    bats_run base_cli_command reserved manage "Manage" aliases=-m
+    [ "$status" -eq 2 ]
+
+    bats_run base_cli_declare reserved_table \
+        'model|name=reserved-table|version=2.0.0' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=help|type=flag|tokens=--help'
+    [ "$status" -eq 2 ]
+    [ "$(model_registry_dump reserved_table)" = "" ]
+}
+
 @test "model validation detects unreachable command and option routes" {
     base_cli_model_init routes name=routes
     base_cli_command routes user "User" aliases=u
@@ -541,11 +648,18 @@ EOF
     __base_bash_libs_cli_models['routes|option|child|meta|child_mode|tokens']='--mode'
     __base_bash_libs_cli_models['routes|option|child|token|--mode']=child_mode
 
+    __base_bash_libs_cli_models['routes|option|child|meta|built_in|type']=flag
+    __base_bash_libs_cli_models['routes|option|child|meta|built_in|tokens']='--help'
+    __base_bash_libs_cli_models['routes|option|child|token|--help']=built_in
+    __base_bash_libs_cli_option_name_index['routes|built_in']=child
+    __base_bash_libs_cli_option_token_index['routes|--help']=child
+
     bats_run base_cli_validate_model routes
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"alias:user:u"* ]]
     [[ "$output" == *"option:child:--mode"* ]]
+    [[ "$output" == *"option:child:--help"* ]]
 }
 
 @test "option validators may render help without corrupting required-option traversal" {
@@ -600,6 +714,56 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"_demo_complete()"* ]]
     [[ "$output" == *"complete -F _demo_complete demo"* ]]
+}
+
+@test "generated completion honors the cursor and keeps scratch variables local" {
+    local completion_script="$TEST_TMPDIR/completion.bash"
+    local candidate=caller-owned
+
+    base_cli_model_init cursor name=cursor
+    base_cli_command cursor admin "Administration"
+    base_cli_command cursor admin/user "User"
+    base_cli_option cursor '' channel value --channel enum=alpha,beta
+    base_cli_option cursor '' output value --output
+    base_cli_option cursor admin/user color value --color
+    base_cli_completion_script cursor _cursor_complete > "$completion_script"
+    source "$completion_script"
+
+    COMP_WORDS=(cursor --ch stable --output result)
+    COMP_CWORD=1
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --channel ]
+    [ "$candidate" = caller-owned ]
+
+    COMP_WORDS=(cursor --channel a --output result)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+
+    COMP_WORDS=(cursor admin --out --channel alpha)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --output ]
+
+    COMP_WORDS=(cursor admin user --co)
+    COMP_CWORD=3
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = --color ]
+
+    COMP_WORDS=(cursor -- --channel)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+
+    COMP_WORDS=(cursor admin)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = user ]
+
+    COMP_WORDS=(cursor)
+    COMP_CWORD=1
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = admin ]
 }
 
 @test "completion consumes option values and honors the double-dash boundary" {
