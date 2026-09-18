@@ -442,9 +442,24 @@ EOF
     base_cli_command invalid_validator run "Run"
     base_cli_positional invalid_validator run values repeatable=true default=fallback \
         enum=fallback,archive validator=valid_archive
-    bats_run base_cli_parse invalid_validator -- run
+    if base_cli_parse invalid_validator -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
     [ "$status" -eq 2 ]
-    [[ "$output" == *"value for 'values' failed validator 'valid_archive'"* ]]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
+
+    base_cli_model_init invalid_scalar_default name=invalid-scalar-default
+    base_cli_command invalid_scalar_default run "Run"
+    base_cli_positional invalid_scalar_default run value default=fallback validator=valid_archive
+    if base_cli_parse invalid_scalar_default -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
 
     base_cli_declare table_repeat_default \
         'model|name=table-repeat-default' \
