@@ -112,7 +112,7 @@ EOF
 @test "release artifact bytes are independent of the host timezone" {
     local utc="$TEST_TMPDIR/utc" local_tz="$TEST_TMPDIR/local-tz"
 
-    bats_run env TZ=UTC "$RELEASE_ARTIFACT" build \
+    bats_run env TZ=UTC0 TZDIR="$TEST_TMPDIR/missing-zoneinfo" "$RELEASE_ARTIFACT" build \
         --version 2.0.0-rc.1 --commit "$RELEASE_COMMIT" --output "$utc"
     [ "$status" -eq 0 ]
     bats_run env TZ=Asia/Kolkata "$RELEASE_ARTIFACT" build \
