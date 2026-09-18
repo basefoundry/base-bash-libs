@@ -248,6 +248,17 @@ EOF
     [ "${parts[2]}" = "" ]
 }
 
+@test "base_str_split preserves a leading empty field before the first separator" {
+    local -a parts=()
+
+    base_str_split parts ",alpha,beta" ","
+
+    [ "${#parts[@]}" -eq 3 ]
+    [ "${parts[0]}" = "" ]
+    [ "${parts[1]}" = "alpha" ]
+    [ "${parts[2]}" = "beta" ]
+}
+
 @test "base_str_split can store results in an array named fields" {
     local -a fields=()
 
