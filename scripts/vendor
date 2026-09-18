@@ -83,28 +83,52 @@ validate_payload_file() {
 }
 
 copy_payload_files() {
-    local source="$1" destination="$2" relative
+    local source="$1" destination="$2" relative source_hash copied_hash source_executable
     shift 2
     while IFS= read -r relative; do
         [[ -n "$relative" ]] || continue
+        validate_payload_file "$source" "$relative" || return 1
+        source_hash="$(hash_file "$source/$relative")" || return 1
+        validate_payload_file "$source" "$relative" || return 1
+        source_executable=0
+        [[ -x "$source/$relative" ]] && source_executable=1
         mkdir -p "$destination/$(dirname -- "$relative")" || return 1
-        cp -- "$source/$relative" "$destination/$relative" || return 1
-        if [[ -x "$source/$relative" ]]; then chmod +x "$destination/$relative" || return 1; fi
+        cp -P -- "$source/$relative" "$destination/$relative" || return 1
+        [[ -f "$destination/$relative" && ! -L "$destination/$relative" ]] || {
+            error "application payload changed to a symlink while it was copied: $relative"
+            return 1
+        }
+        validate_payload_file "$source" "$relative" || return 1
+        copied_hash="$(hash_file "$destination/$relative")" || return 1
+        [[ "$copied_hash" == "$source_hash" ]] || {
+            error "application payload changed while it was copied: $relative"
+            return 1
+        }
+        if ((source_executable)); then chmod +x "$destination/$relative" || return 1; fi
     done < <(printf '%s\n' "$@" | LC_ALL=C sort -u)
 }
 
 standalone_destination_is_external() {
-    local source="$1" destination="$2" destination_parent destination_name canonical
+    local source="$1" destination="$2" destination_parent destination_name canonical ancestor
     destination_parent="$(cd -- "$(dirname -- "$destination")" 2> /dev/null && pwd -P)" || {
         error "standalone destination parent does not exist: $(dirname -- "$destination")"
         return 1
     }
     destination_name="$(basename -- "$destination")"
     canonical="$destination_parent/$destination_name"
-    [[ "$canonical" != "$source" && "$canonical" != "$source/"* ]] || {
+    ancestor="$destination_parent"
+    while :; do
+        if [[ "$ancestor" -ef "$source" ]]; then
+            error "standalone destination must be outside the application source tree: $destination"
+            return 1
+        fi
+        [[ "$ancestor" == / ]] && break
+        ancestor="$(dirname -- "$ancestor")" || return 1
+    done
+    if [[ (-e "$canonical" || -L "$canonical") && "$canonical" -ef "$source" ]]; then
         error "standalone destination must be outside the application source tree: $destination"
         return 1
-    }
+    fi
 }
 
 write_lock() {
@@ -243,10 +267,10 @@ verify_destination() {
 }
 
 standalone_bundle() {
-    local application="$1" framework_bundle="$2" destination="$3" temporary
-    local application_root relative
-    local -a payload_files=(README.md VERSION BASE_BASH_LIBS_PIN bin/app lib/app.sh config/app.conf.example)
-    local -A payload_seen=()
+    local application="$1" framework_bundle="$2" destination="$3" temporary application_payload relative
+    local application_root required_payload
+    local -a payload_files=() selected_paths=()
+    local -A payload_seen=() required_payloads=()
     shift 3
     while (($#)); do
         case "$1" in
@@ -266,6 +290,17 @@ standalone_bundle() {
     done
 
     verify_bundle "$framework_bundle" || return $?
+    [[ -r "$repo_root/scripts/standalone-app-payloads.txt" ]] || {
+        error 'standalone application payload manifest is missing.'
+        return 1
+    }
+    while IFS= read -r required_payload || [[ -n "$required_payload" ]]; do
+        [[ -n "$required_payload" && "$required_payload" != \#* ]] || continue
+        if [[ -z "${required_payloads[$required_payload]+set}" ]]; then
+            required_payloads["$required_payload"]=1
+            payload_files+=("$required_payload")
+        fi
+    done < "$repo_root/scripts/standalone-app-payloads.txt"
     [[ -d "$application" && ! -L "$application" && -f "$application/bin/app" ]] || {
         error "application is not a generated project: $application"
         return 1
@@ -273,18 +308,13 @@ standalone_bundle() {
     application_root="$(cd -- "$application" && pwd -P)" || return 1
     standalone_destination_is_external "$application_root" "$destination" || return 2
 
-    local selected_paths=()
     for relative in "${payload_files[@]}"; do
         if [[ -z "${payload_seen[$relative]+set}" ]]; then
             validate_payload_file "$application_root" "$relative" || return 2
-            case "$relative" in
-            README.md | VERSION | BASE_BASH_LIBS_PIN | bin/app | lib/app.sh | config/app.conf.example) ;;
-            assets/* | config/*) ;;
-            *)
+            if [[ -z "${required_payloads[$relative]+set}" && "$relative" != assets/* && "$relative" != config/* ]]; then
                 error "optional application payload must be explicitly selected under assets/ or config/: $relative"
                 return 2
-                ;;
-            esac
+            fi
             payload_seen["$relative"]=1
             selected_paths+=("$relative")
         fi
@@ -298,7 +328,8 @@ standalone_bundle() {
         error "unable to create a private staging directory beside '$destination'"
         return 1
     }
-    if ! copy_payload_files "$application_root" "$temporary" "${selected_paths[@]}"; then
+    application_payload="$temporary/.application-payload"
+    if ! copy_payload_files "$application_root" "$application_payload" "${selected_paths[@]}"; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -310,13 +341,25 @@ standalone_bundle() {
         ! copy_verified_bundle "$framework_bundle" "$temporary" ||
         ! copy_verified_bundle "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
         ! write_lock "$temporary/vendor/base-bash-libs" "$framework_bundle" standalone ||
-        ! cp -- "$framework_bundle/bin/base-bash" "$temporary/bin/base-bash" ||
-        ! cp -- "$application/VERSION" "$temporary/VERSION" ||
-        ! cp -- "$application/README.md" "$temporary/README.md" ||
-        ! chmod +x "$temporary/bin/base-bash" "$temporary/bin/app"; then
+        ! chmod +x "$temporary/bin/base-bash"; then
         rm -rf -- "$temporary"
         return 1
     fi
+    while IFS= read -r relative; do
+        [[ -n "$relative" ]] || continue
+        mkdir -p "$temporary/$(dirname -- "$relative")" || {
+            rm -rf -- "$temporary"
+            return 1
+        }
+        mv -- "$application_payload/$relative" "$temporary/$relative" || {
+            rm -rf -- "$temporary"
+            return 1
+        }
+    done < <(printf '%s\n' "${selected_paths[@]}" | LC_ALL=C sort -u)
+    rm -rf -- "$application_payload" || {
+        rm -rf -- "$temporary"
+        return 1
+    }
     printf 'standalone_format=1\nframework_lock=%s\nprovenance=verified-offline-bundle\n' \
         "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || {
         rm -rf -- "$temporary"

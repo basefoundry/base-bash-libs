@@ -619,11 +619,19 @@ base_launcher_init() {
         return 1
     }
 
-    files=(README.md VERSION BASE_BASH_LIBS_PIN .gitignore .editorconfig .shellcheckrc bin/app lib/app.sh config/app.conf.example tests/app.bats)
+    package_root="$(base_launcher_package_root)" || return 1
+    [[ -r "$package_root/scripts/standalone-app-payloads.txt" ]] || {
+        printf 'ERROR: standalone application payload manifest is missing from %s\n' "$package_root" >&2
+        return 1
+    }
+    while IFS= read -r argument || [[ -n "$argument" ]]; do
+        [[ -n "$argument" && "$argument" != \#* ]] || continue
+        files+=("$argument")
+    done < "$package_root/scripts/standalone-app-payloads.txt"
+    files+=(.gitignore .editorconfig .shellcheckrc tests/app.bats)
     if [[ "$profile" == standard ]]; then
         files+=(tests/run.sh Makefile .github/workflows/validate.yml tools/shfmt-check.sh)
     fi
-    package_root="$(base_launcher_package_root)" || return 1
     __base_bash_libs_launcher_init_resolve_pin__ "$package_root" || return $?
     for argument in "${files[@]}"; do
         mkdir -p "$target_dir/$(dirname -- "$argument")" || return 1

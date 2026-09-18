@@ -41,6 +41,7 @@ artifacts:
   - docs/single-file-distribution.md|documentation|single-file and deterministic bundle workflow
   - docs/vendor-workflow.md|documentation|offline vendor and standalone workflow
   - docs/v2-symbol-map.md|documentation|v2 migration and symbol map
+  - scripts/standalone-app-payloads.txt|runtime-manifest|shared generated-app and standalone payload allowlist
   - lib/bash/README.md|documentation|package layout and namespace contract
   - lib/bash/tests/test_helper.sh|test-support|shared BATS helpers
 

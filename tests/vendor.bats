@@ -13,6 +13,42 @@ setup() {
     BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$application" >/dev/null
 }
 
+vendor_test_make_copy_race_stub() {
+    local stub_dir="$TEST_TMPDIR/racing-cp-bin"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/cp" <<'EOF'
+#!/usr/bin/env bash
+set -u
+source_path="${@: -2:1}"
+if [[ "$source_path" == "${VENDOR_TEST_RACE_SOURCE-}" ]]; then
+    if [[ "${VENDOR_TEST_RACE_MODE-}" == parent ]]; then
+        mv -- "$VENDOR_TEST_RACE_PARENT" "$VENDOR_TEST_RACE_BACKUP" || exit 1
+        ln -s -- "$VENDOR_TEST_RACE_TARGET" "$VENDOR_TEST_RACE_PARENT" || {
+            mv -- "$VENDOR_TEST_RACE_BACKUP" "$VENDOR_TEST_RACE_PARENT"
+            exit 1
+        }
+        "$VENDOR_TEST_REAL_CP" "$@"
+        copy_status=$?
+        rm -f -- "$VENDOR_TEST_RACE_PARENT"
+        mv -- "$VENDOR_TEST_RACE_BACKUP" "$VENDOR_TEST_RACE_PARENT" || exit 1
+        exit "$copy_status"
+    fi
+    mv -- "$VENDOR_TEST_RACE_SOURCE" "$VENDOR_TEST_RACE_BACKUP" || exit 1
+    ln -s -- "$VENDOR_TEST_RACE_TARGET" "$VENDOR_TEST_RACE_SOURCE" || {
+        mv -- "$VENDOR_TEST_RACE_BACKUP" "$VENDOR_TEST_RACE_SOURCE"
+        exit 1
+    }
+    "$VENDOR_TEST_REAL_CP" "$@"
+    copy_status=$?
+    rm -f -- "$VENDOR_TEST_RACE_SOURCE"
+    mv -- "$VENDOR_TEST_RACE_BACKUP" "$VENDOR_TEST_RACE_SOURCE" || exit 1
+    exit "$copy_status"
+fi
+exec "$VENDOR_TEST_REAL_CP" "$@"
+EOF
+    chmod +x "$stub_dir/cp"
+}
+
 @test "vendor create and verify are offline and immutable" {
     bats_run "$BASE_REPO_ROOT/scripts/vendor" create "$framework_bundle" "$vendor_tree"
     [ "$status" -eq 0 ]
@@ -143,6 +179,64 @@ SCRIPT
     [ "$status" -eq 2 ]
     [[ "$output" == *"must be explicitly selected under assets/ or config/"* ]]
     [ ! -e "$TEST_TMPDIR/standalone-unlisted" ]
+}
+
+@test "standalone destination containment uses filesystem identity on case-insensitive volumes" {
+    local alternate_application="${application^^}"
+    mkdir -p "$application/dist"
+    [[ "$application" -ef "$alternate_application" ]] || skip "The test volume is case-sensitive."
+
+    bats_run "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" \
+        "$alternate_application/dist/case-aliased-output"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"destination must be outside the application source tree"* ]]
+    [ ! -e "$application/dist/case-aliased-output" ]
+}
+
+@test "standalone refuses leaf and parent symlink swaps during payload copy" {
+    local real_cp canonical_application outside_marker destination="$TEST_TMPDIR/race-leaf"
+    real_cp="$(command -v cp)"
+    canonical_application="$(cd -- "$application" && pwd -P)"
+    printf 'external sensitive marker\n' > "$TEST_TMPDIR/outside-marker"
+    vendor_test_make_copy_race_stub
+
+    bats_run env PATH="$TEST_TMPDIR/racing-cp-bin:$BASE_TEST_ORIG_PATH" \
+        VENDOR_TEST_REAL_CP="$real_cp" \
+        VENDOR_TEST_RACE_MODE=leaf \
+        VENDOR_TEST_RACE_SOURCE="$canonical_application/VERSION" \
+        VENDOR_TEST_RACE_BACKUP="$canonical_application/VERSION.original" \
+        VENDOR_TEST_RACE_TARGET="$TEST_TMPDIR/outside-marker" \
+        "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" "$destination"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed to a symlink while it was copied"* ]] || {
+        printf 'Unexpected standalone staging output: %s\n' "$output" >&2
+        false
+    }
+    [ ! -e "$destination" ]
+    [ -f "$application/VERSION" ]
+    [ ! -e "$application/VERSION.original" ]
+
+    mkdir -p "$application/assets" "$TEST_TMPDIR/outside-assets"
+    printf 'trusted runtime asset\n' > "$application/assets/runtime.txt"
+    printf 'external sensitive marker\n' > "$TEST_TMPDIR/outside-assets/runtime.txt"
+    destination="$TEST_TMPDIR/race-parent"
+    bats_run env PATH="$TEST_TMPDIR/racing-cp-bin:$BASE_TEST_ORIG_PATH" \
+        VENDOR_TEST_REAL_CP="$real_cp" \
+        VENDOR_TEST_RACE_MODE=parent \
+        VENDOR_TEST_RACE_SOURCE="$canonical_application/assets/runtime.txt" \
+        VENDOR_TEST_RACE_PARENT="$canonical_application/assets" \
+        VENDOR_TEST_RACE_BACKUP="$canonical_application/assets.original" \
+        VENDOR_TEST_RACE_TARGET="$TEST_TMPDIR/outside-assets" \
+        "$BASE_REPO_ROOT/scripts/vendor" standalone "$application" "$framework_bundle" "$destination" \
+        --include assets/runtime.txt
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed while it was copied"* ]] || {
+        printf 'Unexpected standalone staging output: %s\n' "$output" >&2
+        false
+    }
+    [ ! -e "$destination" ]
+    [ -f "$application/assets/runtime.txt" ]
+    [ ! -e "$application/assets.original" ]
 }
 
 @test "vendor verification detects tampering" {
