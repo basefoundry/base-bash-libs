@@ -3684,11 +3684,24 @@ base_std_assert_variable_name() {
 __base_bash_libs_std_declares_array_kind__() {
     local __base_bash_libs_std_array_variable_name="${1-}" __base_bash_libs_std_array_kind="${2-}"
     local __base_bash_libs_std_array_declaration __base_bash_libs_std_array_attributes
+    local __base_bash_libs_std_array_attribute
+    local -i __base_bash_libs_std_array_kind_code=0 __base_bash_libs_std_array_attribute_code=0
+    local -i __base_bash_libs_std_array_attribute_index=0
 
     __base_bash_libs_std_array_declaration="$(declare -p "$__base_bash_libs_std_array_variable_name" 2> /dev/null)" || return 1
     __base_bash_libs_std_array_attributes="${__base_bash_libs_std_array_declaration#declare -}"
     __base_bash_libs_std_array_attributes="${__base_bash_libs_std_array_attributes%% *}"
-    [[ "$__base_bash_libs_std_array_attributes" == *"$__base_bash_libs_std_array_kind"* ]]
+    # Compare attribute bytes numerically so caller `nocasematch` cannot make
+    # Bash confuse indexed `a` and associative `A` declarations.
+    printf -v __base_bash_libs_std_array_kind_code '%d' "'$__base_bash_libs_std_array_kind"
+    for ((__base_bash_libs_std_array_attribute_index = 0;  \
+    __base_bash_libs_std_array_attribute_index < ${#__base_bash_libs_std_array_attributes};  \
+    __base_bash_libs_std_array_attribute_index++)); do
+        __base_bash_libs_std_array_attribute="${__base_bash_libs_std_array_attributes:__base_bash_libs_std_array_attribute_index:1}"
+        printf -v __base_bash_libs_std_array_attribute_code '%d' "'$__base_bash_libs_std_array_attribute"
+        ((__base_bash_libs_std_array_attribute_code == __base_bash_libs_std_array_kind_code)) && return 0
+    done
+    return 1
 }
 
 #

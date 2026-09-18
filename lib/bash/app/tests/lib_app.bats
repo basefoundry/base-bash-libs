@@ -125,6 +125,21 @@ assert_demo_snapshot() {
     fi
 }
 
+@test "integer configuration supports integer caller-owned output variables" {
+    local scalar_output=unchanged
+    local -i integer_output=42
+
+    base_app_init typed_integer_output name=typed-integer-output
+    base_app_config_define typed_integer_output timeout integer default=30
+    base_app_config_load typed_integer_output
+
+    base_app_config_get typed_integer_output timeout integer_output
+    [ "$integer_output" -eq 30 ]
+
+    base_app_config_get typed_integer_output timeout scalar_output
+    [ "$scalar_output" = 30 ]
+}
+
 @test "empty environment bindings do not override file configuration" {
     local project_file="$TEST_TMPDIR/project.conf" value source
 

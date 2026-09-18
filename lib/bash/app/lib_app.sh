@@ -617,6 +617,7 @@ base_app_config_get() {
     local __base_bash_libs_app_config_get_model="${1-}"
     local __base_bash_libs_app_config_get_key="${2-}"
     local __base_bash_libs_app_config_get_result_name="${3-}"
+    local __base_bash_libs_app_config_get_output_kind=scalar
 
     (($# == 3)) || {
         __base_bash_libs_app_error__ 'base_app_config_get: usage: base_app_config_get MODEL KEY RESULT_VARIABLE'
@@ -624,8 +625,12 @@ base_app_config_get() {
     }
     __base_bash_libs_std_validate_variable_names__ base_app_config_get \
         "$__base_bash_libs_app_config_get_result_name" || return 2
+    if [[ "${__base_bash_libs_app_config["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key|type"]-}" == integer ]]; then
+        __base_bash_libs_app_config_get_output_kind=integer
+    fi
     __base_bash_libs_std_assert_writable_output__ base_app_config_get \
-        "$__base_bash_libs_app_config_get_result_name" scalar || return 2
+        "$__base_bash_libs_app_config_get_result_name" \
+        "$__base_bash_libs_app_config_get_output_kind" || return 2
     [[ -n "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]+set}" ]] || return 1
     printf -v "$__base_bash_libs_app_config_get_result_name" '%s' \
         "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"

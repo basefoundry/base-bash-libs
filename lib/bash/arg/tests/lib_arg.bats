@@ -132,6 +132,25 @@ create_script() {
     [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
 }
 
+@test "base_arg_parse rejects an associative specs input when nocasematch is enabled" {
+    local -A options=()
+    local -a positionals=()
+    local -A specs=([verbose]="verbose|flag|--verbose")
+    local status
+
+    shopt -s nocasematch
+    if base_arg_parse options positionals specs -- --verbose 2>/dev/null; then
+        status=0
+    else
+        status=$?
+    fi
+
+    [ "$status" -eq 2 ]
+    [ "${#options[@]}" -eq 0 ]
+    [ "${#positionals[@]}" -eq 0 ]
+    shopt -q nocasematch
+}
+
 @test "base_arg_parse rejects readonly output arrays before parsing" {
     local script="$TEST_TMPDIR/arg-readonly-output.sh"
 

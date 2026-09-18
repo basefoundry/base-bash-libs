@@ -4549,6 +4549,32 @@ EOF
     [[ "$output" == *"Variable 'values' must be an indexed array declared by the caller."* ]]
 }
 
+@test "array assertions distinguish indexed and associative declarations with nocasematch enabled" {
+    local -a indexed_values=(alpha)
+    local -A associative_values=([alpha]=one)
+    local status
+
+    shopt -s nocasematch
+    base_std_assert_indexed_array indexed_values
+    base_std_assert_associative_array associative_values
+    shopt -q nocasematch
+
+    if (base_std_assert_indexed_array associative_values 2>/dev/null); then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 1 ]
+
+    if (base_std_assert_associative_array indexed_values 2>/dev/null); then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 1 ]
+    shopt -q nocasematch
+}
+
 @test "base_std_assert_associative_array accepts declared associative arrays" {
     local -A values=([alpha]="one")
 
