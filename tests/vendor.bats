@@ -118,6 +118,8 @@ SCRIPT
 }
 
 @test "standalone bundle contains its own launcher and vendored framework" {
+    local stdout_file="$TEST_TMPDIR/standalone.stdout" stderr_file="$TEST_TMPDIR/standalone.stderr"
+
     mkdir -p "$application/assets" "$application/.git" "$application/dist/prior"
     printf 'local-secret-marker\n' > "$application/.env"
     printf 'repository-marker\n' > "$application/.git/config"
@@ -150,6 +152,15 @@ SCRIPT
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/app" run
     [ "$status" -eq 0 ]
     [[ "$output" == *"hello=world"* ]]
+    if env NO_COLOR=1 PATH="$standalone/bin:$PATH" "$standalone/bin/app" \
+        run --color always --verbose >"$stdout_file" 2>"$stderr_file"; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 0 ]
+    [[ "$(<"$stdout_file")" == *"hello=world"* ]]
+    [[ "$(<"$stderr_file")" == *$'\033['* ]]
     local expected_version
     expected_version="$(<"$BASE_REPO_ROOT/VERSION")"
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/base-bash" --version

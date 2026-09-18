@@ -677,15 +677,16 @@ base_app_config_report() {
 
 # base_app_add_standard_options - Opts a CLI model into common policy options.
 base_app_add_standard_options() {
-    local cli_model="${1-}" path="${2-}"
+    local cli_model="${1-}" path="${2-}" color_modes
 
     (($# == 2)) || {
         __base_bash_libs_app_error__ 'base_app_add_standard_options: usage: base_app_add_standard_options CLI_MODEL COMMAND_PATH'
         return 2
     }
+    color_modes="$(__base_bash_libs_std_color_modes__)" || return $?
     base_cli_option "$cli_model" "$path" verbose flag --verbose -v help='Enable verbose diagnostics' || return $?
     base_cli_option "$cli_model" "$path" quiet flag --quiet -q conflicts=verbose help='Suppress informational output' || return $?
-    base_cli_option "$cli_model" "$path" color value --color default=auto enum=auto,always,never metavar=MODE help='Color policy' || return $?
+    base_cli_option "$cli_model" "$path" color value --color default=auto enum="$color_modes" metavar=MODE help='Color policy' || return $?
     base_cli_option "$cli_model" "$path" dry_run flag --dry-run help='Plan without mutating' || return $?
     base_cli_option "$cli_model" "$path" noninteractive flag --non-interactive help='Never prompt' || return $?
     base_cli_option "$cli_model" "$path" config value --config metavar=FILE help='Use a project configuration file' || return $?
@@ -694,13 +695,19 @@ base_app_add_standard_options() {
 
 # base_app_apply_standard_options - Publishes parsed common options as policy state.
 base_app_apply_standard_options() {
-    local model="${1-}" value
+    local model="${1-}" value cli_color
 
     (($# == 1)) || {
         __base_bash_libs_app_error__ 'base_app_apply_standard_options: usage: base_app_apply_standard_options MODEL'
         return 2
     }
     __base_bash_libs_app_model_exists__ "$model" || return 1
+    cli_color="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]-auto}"
+    if ! __base_bash_libs_std_color_mode_is_valid__ "$cli_color"; then
+        __base_bash_libs_app_error__ "base_app_apply_standard_options: invalid color mode '$cli_color'."
+        return 2
+    fi
+    value="${__base_bash_libs_std_wrapper_color_mode:-$cli_color}"
     # These are caller-visible policy globals consumed by application code.
     # shellcheck disable=SC2034
     BASE_BASH_LIBS_APP_VERBOSE="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[verbose]-0}"
@@ -708,8 +715,6 @@ base_app_apply_standard_options() {
     BASE_BASH_LIBS_APP_QUIET="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[quiet]-0}"
     BASE_BASH_LIBS_APP_DRY_RUN="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[dry_run]-0}"
     BASE_BASH_LIBS_APP_NONINTERACTIVE="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[noninteractive]-0}"
-    value="${BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]-auto}"
-    BASE_BASH_LIBS_APP_COLOR="$value"
     if [[ -n "${BASE_BASH_LIBS_STD_LOG_LEVELS[INFO]+set}" ]]; then
         case "${BASE_BASH_LIBS_APP_QUIET}:${BASE_BASH_LIBS_APP_VERBOSE}" in
         1:0) base_std_set_log_level WARN || return $? ;;
@@ -724,21 +729,8 @@ base_app_apply_standard_options() {
         __base_bash_libs_app_error__ 'base_app_apply_standard_options: quiet and verbose cannot both be enabled.'
         return 2
     fi
-    case "$value" in
-    auto | always)
-        # shellcheck disable=SC2034
-        BASE_BASH_LIBS_STD_COLOR_ENABLED=1
-        ;;
-    never)
-        # shellcheck disable=SC2034
-        BASE_BASH_LIBS_STD_COLOR_ENABLED=0
-        ;;
-    *)
-        __base_bash_libs_app_error__ "base_app_apply_standard_options: invalid color mode '$value'."
-        return 2
-        ;;
-    esac
-    __base_bash_libs_std_init_colors__
+    __base_bash_libs_std_apply_color_mode__ "$value" || return $?
+    BASE_BASH_LIBS_APP_COLOR="$value"
     BASE_BASH_LIBS_DRY_RUN="$BASE_BASH_LIBS_APP_DRY_RUN"
     export BASE_BASH_LIBS_APP_DRY_RUN BASE_BASH_LIBS_APP_NONINTERACTIVE BASE_BASH_LIBS_APP_COLOR
     export BASE_BASH_LIBS_DRY_RUN

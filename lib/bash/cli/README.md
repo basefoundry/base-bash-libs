@@ -34,7 +34,10 @@ metadata in one source of truth. It is one sourceable file and requires
 - `base_cli_positional MODEL PATH NAME [required=true|false]
   [repeatable=true|false] [default=VALUE] [enum=A,B] [validator=FUNCTION]
   [help=TEXT] [metavar=NAME]` declares a positional argument. A repeatable
-  positional must be the final positional in its command.
+  positional must be the final positional in its command. If it has a default,
+  that value is used and validated when no values are supplied. An explicitly
+  supplied empty value counts as input and does not select the default; a
+  default satisfies `required=true` when the caller omits the positional.
 - `base_cli_help MODEL [PATH]` renders deterministic help to stdout.
 - `base_cli_parse MODEL -- [ARGV...]` parses and validates an invocation. It
   returns `0` on success, `2` for usage/validation errors, and publishes the

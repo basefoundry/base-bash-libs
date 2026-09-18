@@ -61,7 +61,19 @@ __base_bash_libs_cli_valid_model__() {
 }
 
 __base_bash_libs_cli_valid_segment__() {
-    [[ "${1-}" =~ ^[A-Za-z0-9_-]+$ ]]
+    [[ "${1-}" == - || "${1-}" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]
+}
+
+__base_bash_libs_cli_builtin_option_action__() {
+    case "${1-}" in
+    -h | --help) printf 'help' ;;
+    -V | --version) printf 'version' ;;
+    *) return 1 ;;
+    esac
+}
+
+__base_bash_libs_cli_is_builtin_option_token__() {
+    __base_bash_libs_cli_builtin_option_action__ "${1-}" > /dev/null
 }
 
 __base_bash_libs_cli_valid_path__() {
@@ -786,7 +798,8 @@ base_cli_validate_model() {
         path="${route%%|token|*}"
         token="${route#*|token|}"
         name="${__base_bash_libs_cli_models[$key]}"
-        if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token" ||
+            ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
             [[ "$found_name" != "$name" || "$found_path" != "$path" ]]; then
             unreachable_routes+=("option:$path:$token")
         fi
@@ -959,6 +972,10 @@ base_cli_option() {
     for token in "${tokens[@]}"; do
         if [[ ! "$token" =~ ^--?[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_option: invalid option token '$token'."
+            return 2
+        fi
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token"; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' is reserved for built-in CLI behavior."
             return 2
         fi
         if [[ "$token" == *=* ]]; then
@@ -1278,8 +1295,23 @@ __base_bash_libs_cli_apply_defaults_and_validate__() {
     return 0
 }
 
+__base_bash_libs_cli_apply_positional_default__() {
+    local model="$1" path="$2" name="$3" default="$4" has_default="$5" required="$6"
+
+    if [[ "$has_default" == 1 ]]; then
+        __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$default" || return $?
+        BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$default")
+        return 0
+    fi
+    if [[ "$required" =~ ^(1|true|yes)$ ]]; then
+        __base_bash_libs_cli_error__ "required positional '$name' was not provided."
+        return $?
+    fi
+    return 1
+}
+
 __base_bash_libs_cli_apply_positionals__() {
-    local model="$1" path="$2" value name index repeatable required default repeat_start
+    local model="$1" path="$2" value name index repeatable required default default_set repeat_start status
     local -a __base_bash_libs_cli_positional_names=()
 
     __base_bash_libs_cli_collect_positionals__ "$model" "$path"
@@ -1295,6 +1327,8 @@ __base_bash_libs_cli_apply_positionals__() {
         repeatable="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" repeatable)"
         required="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" required)"
         default="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" default)"
+        default_set=0
+        [[ -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$name|default"]+set}" ]] && default_set=1
         if [[ "$repeatable" =~ ^(1|true|yes)$ ]]; then
             repeat_start="$index"
             while ((index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})); do
@@ -1302,22 +1336,27 @@ __base_bash_libs_cli_apply_positionals__() {
                 __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?
                 ((index++))
             done
-            if ((index == repeat_start)) && [[ "$required" =~ ^(1|true|yes)$ ]]; then
-                __base_bash_libs_cli_error__ "required positional '$name' was not provided."
-                return $?
+            if ((index == repeat_start)); then
+                if __base_bash_libs_cli_apply_positional_default__ \
+                    "$model" "$path" "$name" "$default" "$default_set" "$required"; then
+                    [[ "$default_set" == 1 ]] && index=$((index + 1))
+                else
+                    status=$?
+                    ((status == 1)) || return "$status"
+                fi
             fi
             return 0
         fi
         if ((index >= ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})); then
-            if [[ -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$name|default"]+set}" ]]; then
-                BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$default")
-                __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$default" || return $?
-                ((index++))
+            if __base_bash_libs_cli_apply_positional_default__ \
+                "$model" "$path" "$name" "$default" "$default_set" "$required"; then
+                index=$((index + 1))
                 continue
+            else
+                status=$?
+                ((status == 1)) && continue
+                return "$status"
             fi
-            [[ "$required" =~ ^(1|true|yes)$ ]] || continue
-            __base_bash_libs_cli_error__ "required positional '$name' was not provided."
-            return $?
         fi
         value="${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[index]}"
         __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?
@@ -1334,6 +1373,7 @@ __base_bash_libs_cli_apply_positionals__() {
 # Usage: base_cli_parse model -- [argv...]
 base_cli_parse() {
     local model="${1-}" current path="" token option_value name type child_path option_path
+    local builtin_action
     # shellcheck disable=SC2034 # Pass-by-name outputs used only to probe whether an option token is registered.
     local probe_name probe_path probe_type
     local parse_options=1 parse_commands=1
@@ -1357,13 +1397,17 @@ base_cli_parse() {
             parse_commands=0
             continue
         fi
-        if ((parse_options)) && [[ "$current" == -h || "$current" == --help ]]; then
+        builtin_action=""
+        if ((parse_options)); then
+            builtin_action="$(__base_bash_libs_cli_builtin_option_action__ "$current" || true)"
+        fi
+        if [[ "$builtin_action" == help ]]; then
             BASE_BASH_LIBS_CLI_RESULT_COMMAND="$path"
             BASE_BASH_LIBS_CLI_RESULT_ACTION="help"
             base_cli_help "$model" "$path"
             return $?
         fi
-        if ((parse_options)) && [[ "$current" == -V || "$current" == --version ]]; then
+        if [[ "$builtin_action" == version ]]; then
             if [[ -n "$path" || -z "${__base_bash_libs_cli_models["$model|meta|version"]-}" ]]; then
                 __base_bash_libs_cli_usage_error__ "$model" "$path" "version is not available for this command."
                 return 2
@@ -1573,8 +1617,18 @@ base_cli_completion_script() {
     fi
     program="${__base_bash_libs_cli_models["$model|meta|name"]}"
     printf '%s\n' "$function_name() {"
-    printf '%s\n' '    local current="${COMP_WORDS[COMP_CWORD]-}"'
-    printf '%s\n' '    local -a cli_words=( "${COMP_WORDS[@]:1}" )'
+    printf '%s\n' '    local cursor="${COMP_CWORD:-0}" word_count candidate'
+    printf '%s\n' '    local -a completion_words=( "${COMP_WORDS[@]+${COMP_WORDS[@]}}" ) cli_words=()'
+    printf '%s\n' '    if [[ "$cursor" =~ ^[0-9]+$ ]]; then cursor=$((10#$cursor)); else cursor=0; fi'
+    printf '%s\n' '    word_count="${#completion_words[@]}"'
+    printf '%s\n' '    if ((cursor > 0)); then'
+    printf '%s\n' '        if ((cursor < word_count)); then'
+    printf '%s\n' '            cli_words=( "${completion_words[@]:1:cursor}" )'
+    printf '%s\n' '        else'
+    printf '%s\n' '            cli_words=( "${completion_words[@]:1}" )'
+    printf '%s\n' '            cli_words+=("")'
+    printf '%s\n' '        fi'
+    printf '%s\n' '    fi'
     printf '%s\n' '    COMPREPLY=()'
     printf '    while IFS= read -r candidate; do COMPREPLY+=("$candidate"); done < <(base_cli_complete %q -- "${cli_words[@]}")\n' "$model"
     printf '%s\n' '}'

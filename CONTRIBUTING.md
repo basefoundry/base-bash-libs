@@ -20,6 +20,13 @@ operation must enter through the repository-owned `scripts/release` guard.
    genuinely small, self-contained fix may use the documented small-fix
    exception without a pre-existing issue; the maintainer applies its primary
    category label after reviewing the scope.
+   Issues labeled `good first issue` are intentionally offered to community
+   contributors. Maintainer issue sweeps and implementation trains must
+   exclude them by default, even when their Project status is `Ready`; report
+   them separately as contributor-reserved work. Only take one into maintainer
+   work when it is specifically selected. Before starting that work, remove
+   the `good first issue` label so contributors are not invited to duplicate
+   it, then follow the normal Project and issue/PR workflow below.
 2. Give each tracked issue exactly one primary category label. For a small-fix
    pull request, the maintainer applies exactly one primary category label:
    - `bug` for defects or regressions.
