@@ -640,6 +640,16 @@ EOF
     COMP_CWORD=2
     _cursor_complete
     [ "${#COMPREPLY[@]}" -eq 0 ]
+
+    COMP_WORDS=(cursor admin)
+    COMP_CWORD=2
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = user ]
+
+    COMP_WORDS=(cursor)
+    COMP_CWORD=1
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = admin ]
 }
 
 @test "completion consumes option values and honors the double-dash boundary" {
