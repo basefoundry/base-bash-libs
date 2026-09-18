@@ -1295,8 +1295,23 @@ __base_bash_libs_cli_apply_defaults_and_validate__() {
     return 0
 }
 
+__base_bash_libs_cli_apply_positional_default__() {
+    local model="$1" path="$2" name="$3" default="$4" has_default="$5" required="$6"
+
+    if [[ "$has_default" == 1 ]]; then
+        __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$default" || return $?
+        BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$default")
+        return 0
+    fi
+    if [[ "$required" =~ ^(1|true|yes)$ ]]; then
+        __base_bash_libs_cli_error__ "required positional '$name' was not provided."
+        return $?
+    fi
+    return 1
+}
+
 __base_bash_libs_cli_apply_positionals__() {
-    local model="$1" path="$2" value name index repeatable required default repeat_start
+    local model="$1" path="$2" value name index repeatable required default default_set repeat_start status
     local -a __base_bash_libs_cli_positional_names=()
 
     __base_bash_libs_cli_collect_positionals__ "$model" "$path"
@@ -1312,6 +1327,8 @@ __base_bash_libs_cli_apply_positionals__() {
         repeatable="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" repeatable)"
         required="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" required)"
         default="$(__base_bash_libs_cli_positional_meta__ "$model" "$path" "$name" default)"
+        default_set=0
+        [[ -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$name|default"]+set}" ]] && default_set=1
         if [[ "$repeatable" =~ ^(1|true|yes)$ ]]; then
             repeat_start="$index"
             while ((index < ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})); do
@@ -1319,22 +1336,27 @@ __base_bash_libs_cli_apply_positionals__() {
                 __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?
                 ((index++))
             done
-            if ((index == repeat_start)) && [[ "$required" =~ ^(1|true|yes)$ ]]; then
-                __base_bash_libs_cli_error__ "required positional '$name' was not provided."
-                return $?
+            if ((index == repeat_start)); then
+                if __base_bash_libs_cli_apply_positional_default__ \
+                    "$model" "$path" "$name" "$default" "$default_set" "$required"; then
+                    [[ "$default_set" == 1 ]] && index=$((index + 1))
+                else
+                    status=$?
+                    ((status == 1)) || return "$status"
+                fi
             fi
             return 0
         fi
         if ((index >= ${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]})); then
-            if [[ -n "${__base_bash_libs_cli_models["$model|positional|$path|meta|$name|default"]+set}" ]]; then
-                BASE_BASH_LIBS_CLI_RESULT_POSITIONALS+=("$default")
-                __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$default" || return $?
-                ((index++))
+            if __base_bash_libs_cli_apply_positional_default__ \
+                "$model" "$path" "$name" "$default" "$default_set" "$required"; then
+                index=$((index + 1))
                 continue
+            else
+                status=$?
+                ((status == 1)) && continue
+                return "$status"
             fi
-            [[ "$required" =~ ^(1|true|yes)$ ]] || continue
-            __base_bash_libs_cli_error__ "required positional '$name' was not provided."
-            return $?
         fi
         value="${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[index]}"
         __base_bash_libs_cli_validate_value__ "$model" "$path" positional "$name" "$value" || return $?

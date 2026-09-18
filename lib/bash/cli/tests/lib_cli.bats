@@ -408,6 +408,68 @@ EOF
     [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = working ]
 }
 
+@test "repeatable positional defaults are applied and validated only when omitted" {
+    valid_archive() { [[ "$1" == archive ]]; }
+
+    base_cli_model_init direct_repeat_default name=direct-repeat-default
+    base_cli_command direct_repeat_default run "Run"
+    base_cli_positional direct_repeat_default run target required=true
+    base_cli_positional direct_repeat_default run files repeatable=true required=true \
+        default=fallback enum=fallback,archive validator=valid_target
+
+    base_cli_parse direct_repeat_default -- run target-value
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 2 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = target-value ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = fallback ]
+
+    base_cli_parse direct_repeat_default -- run target-value archive
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[1]}" = archive ]
+
+    base_cli_model_init explicit_empty name=explicit-empty
+    base_cli_command explicit_empty run "Run"
+    base_cli_positional explicit_empty run values repeatable=true default=fallback
+    base_cli_parse explicit_empty -- run ""
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = "" ]
+
+    base_cli_model_init invalid_enum name=invalid-enum
+    base_cli_command invalid_enum run "Run"
+    bats_run base_cli_positional invalid_enum run values repeatable=true default=invalid enum=valid
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"default must be one of the declared enum values"* ]]
+
+    base_cli_model_init invalid_validator name=invalid-validator
+    base_cli_command invalid_validator run "Run"
+    base_cli_positional invalid_validator run values repeatable=true default=fallback \
+        enum=fallback,archive validator=valid_archive
+    if base_cli_parse invalid_validator -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
+
+    base_cli_model_init invalid_scalar_default name=invalid-scalar-default
+    base_cli_command invalid_scalar_default run "Run"
+    base_cli_positional invalid_scalar_default run value default=fallback validator=valid_archive
+    if base_cli_parse invalid_scalar_default -- run >/dev/null 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 0 ]
+
+    base_cli_declare table_repeat_default \
+        'model|name=table-repeat-default' \
+        'command|path=run|description=Run' \
+        'positional|path=run|name=values|repeatable=true|required=true|default=fallback|enum=fallback,archive'
+    base_cli_parse table_repeat_default -- run
+    [ "${#BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[@]}" -eq 1 ]
+    [ "${BASE_BASH_LIBS_CLI_RESULT_POSITIONALS[0]}" = fallback ]
+}
+
 @test "quick declarations enforce required repeatable positional tails" {
     base_cli_declare table_repeat \
         'model|name=table-repeat' \
