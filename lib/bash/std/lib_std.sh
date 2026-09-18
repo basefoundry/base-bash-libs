@@ -77,7 +77,7 @@
 # Notes:
 #   - Call base_init <result_array> [--source <script>] [--] [argv...]
 #     before using stateful helpers. It strips --debug-wrapper,
-#     --verbose-wrapper, --utc-wrapper, and --color into the result array.
+#     --verbose-wrapper, --utc-wrapper, --color, and --color-mode into the result array.
 #   - --verbose-wrapper is deprecated compatibility surface; prefer --debug-wrapper.
 #   - BASE_BASH_LIBS_BOOTSTRAP_SOURCE is accepted as a source-path fallback by the
 #     explicit initializer, not consumed while this file is sourced.
@@ -472,6 +472,7 @@ __base_bash_libs_std_initialize_runtime_state__() {
     __base_bash_libs_std_log_init__
     declare -g BASE_BASH_LIBS_STD_COLOR_ENABLED=0
     declare -g __base_bash_libs_std_color_mode=auto
+    declare -g __base_bash_libs_std_wrapper_color_mode=""
     declare -ga __base_bash_libs_std_cleanup_hooks=()
     declare -ga __base_bash_libs_std_cleanup_paths=()
     declare -ga __base_bash_libs_std_cleanup_entries=()
@@ -519,7 +520,8 @@ base_init() {
     local __base_bash_libs_std_init_result_name="${1-}" __base_bash_libs_std_init_source_path=""
     local __base_bash_libs_std_init_script_dir="" __base_bash_libs_std_init_arg
     local __base_bash_libs_std_init_input_index
-    local __base_bash_libs_std_init_parse_config=1 __base_bash_libs_std_init_color_requested=0
+    local __base_bash_libs_std_init_parse_config=1 __base_bash_libs_std_init_color_mode_requested=""
+    local __base_bash_libs_std_init_wrapper_color_mode_requested=""
     local __base_bash_libs_std_init_configure_runtime=0
     local -a __base_bash_libs_std_init_input_args=() __base_bash_libs_std_init_filtered_args=()
 
@@ -578,7 +580,9 @@ base_init() {
     fi
 
     __base_bash_libs_std_init_parse_config=1
-    for __base_bash_libs_std_init_input_index in "${!__base_bash_libs_std_init_input_args[@]}"; do
+    for ((__base_bash_libs_std_init_input_index = 0;  \
+    __base_bash_libs_std_init_input_index < ${#__base_bash_libs_std_init_input_args[@]};  \
+    __base_bash_libs_std_init_input_index++)); do
         __base_bash_libs_std_init_arg="${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index]}"
         if ((__base_bash_libs_std_init_parse_config)) && [[ "$__base_bash_libs_std_init_arg" == "--" ]]; then
             __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
@@ -608,17 +612,35 @@ base_init() {
                 ;;
             --color)
                 # `--color` was historically a bare launcher flag. A
-                # standard application may also own `--color MODE`; keep the
-                # wrapper form when it is bare or followed by an ordinary
-                # application argument, but let the documented modes reach
-                # the application parser unchanged.
-                if [[ "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == auto ||
-                    "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == always ||
-                    "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}" == never ]]; then
+                # standard application may also own `--color MODE`; keep that
+                # pair for its parser and offer `--color-mode` to wrappers
+                # that need an unambiguous explicit policy.
+                if __base_bash_libs_std_color_mode_is_valid__ \
+                    "${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}"; then
                     __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
                 else
-                    __base_bash_libs_std_init_color_requested=1
+                    __base_bash_libs_std_init_color_mode_requested=auto
+                    __base_bash_libs_std_init_wrapper_color_mode_requested=""
                 fi
+                ;;
+            --color-mode)
+                __base_bash_libs_std_init_color_mode_requested="${__base_bash_libs_std_init_input_args[__base_bash_libs_std_init_input_index + 1]-}"
+                if ! __base_bash_libs_std_color_mode_is_valid__ "$__base_bash_libs_std_init_color_mode_requested"; then
+                    printf 'base_init: --color-mode expects one of: %s.\n' \
+                        "$(__base_bash_libs_std_color_modes__)" >&2
+                    return 2
+                fi
+                __base_bash_libs_std_init_wrapper_color_mode_requested="$__base_bash_libs_std_init_color_mode_requested"
+                __base_bash_libs_std_init_input_index=$((__base_bash_libs_std_init_input_index + 1))
+                ;;
+            --color-mode=*)
+                __base_bash_libs_std_init_color_mode_requested="${__base_bash_libs_std_init_arg#*=}"
+                if ! __base_bash_libs_std_color_mode_is_valid__ "$__base_bash_libs_std_init_color_mode_requested"; then
+                    printf 'base_init: invalid color mode %s; expected one of: %s.\n' \
+                        "'$__base_bash_libs_std_init_color_mode_requested'" "$(__base_bash_libs_std_color_modes__)" >&2
+                    return 2
+                fi
+                __base_bash_libs_std_init_wrapper_color_mode_requested="$__base_bash_libs_std_init_color_mode_requested"
                 ;;
             *)
                 __base_bash_libs_std_init_filtered_args+=("$__base_bash_libs_std_init_arg")
@@ -630,8 +652,12 @@ base_init() {
     done
 
     if ((__base_bash_libs_std_init_configure_runtime)); then
-        BASE_BASH_LIBS_STD_COLOR_ENABLED="$__base_bash_libs_std_init_color_requested"
-        __base_bash_libs_std_init_colors__
+        if [[ -n "$__base_bash_libs_std_init_color_mode_requested" ]]; then
+            __base_bash_libs_std_apply_color_mode__ "$__base_bash_libs_std_init_color_mode_requested" || return $?
+            __base_bash_libs_std_wrapper_color_mode="$__base_bash_libs_std_init_wrapper_color_mode_requested"
+        else
+            __base_bash_libs_std_init_colors__ || return $?
+        fi
         base_std_set_log_category_level -l base_bash_libs INFO
         # Re-apply explicit debug levels after the default category gate.
         for __base_bash_libs_std_init_arg in "${__base_bash_libs_std_init_input_args[@]+${__base_bash_libs_std_init_input_args[@]}}"; do
@@ -1099,12 +1125,42 @@ __base_bash_libs_std_print_log_record__() {
 }
 
 #
+# __base_bash_libs_std_color_modes__ - Prints the supported standard color modes.
+__base_bash_libs_std_color_modes__() {
+    printf 'auto,always,never'
+}
+
+__base_bash_libs_std_color_mode_is_valid__() {
+    case "${1-}" in
+    auto | always | never) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
+__base_bash_libs_std_apply_color_mode__() {
+    local mode="${1-}"
+
+    if ! __base_bash_libs_std_color_mode_is_valid__ "$mode"; then
+        printf 'ERROR: invalid color mode %s.\n' "'$mode'" >&2
+        return 2
+    fi
+    __base_bash_libs_std_color_mode="$mode"
+    if [[ "$mode" == auto ]]; then
+        BASE_BASH_LIBS_STD_COLOR_ENABLED=1
+    fi
+    __base_bash_libs_std_init_colors__
+}
+
 # __base_bash_libs_std_init_colors__ - Initialize colors used for logging
 # This is called from base_init.
 #
 __base_bash_libs_std_init_colors__() {
     local __base_bash_libs_std_colors_enabled=0
 
+    if ! __base_bash_libs_std_color_mode_is_valid__ "${__base_bash_libs_std_color_mode:-auto}"; then
+        printf 'ERROR: invalid color mode %s.\n' "'${__base_bash_libs_std_color_mode-}'" >&2
+        return 2
+    fi
     case "${__base_bash_libs_std_color_mode:-auto}" in
     always)
         __base_bash_libs_std_colors_enabled=1

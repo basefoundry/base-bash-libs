@@ -54,8 +54,10 @@ zero. No configuration value is evaluated as shell code.
 `--verbose`, `--quiet`, `--color`, `--dry-run`, `--non-interactive`,
 `--config`, and `--user-config` options to a declarative CLI model.
 `--color` accepts `auto`, `always`, or `never`; the bare legacy launcher
-`--color` flag remains supported when it is not followed by one of those
-modes. `auto` colors only when stderr is a terminal and `NO_COLOR` is unset;
+`--color` flag remains supported, and wrappers can use `--color-mode MODE`
+when they need an explicit policy independent of the app's own CLI model.
+An explicit wrapper mode takes precedence over the app's `--color` selection.
+`auto` colors only when stderr is a terminal and `NO_COLOR` is unset;
 `always` forces ANSI colors even for captured stderr or a set `NO_COLOR`, and
 `never` disables them. `--quiet` sets the default logger threshold to `WARN`,
 while `--verbose` sets it to `DEBUG`; the options are mutually exclusive.

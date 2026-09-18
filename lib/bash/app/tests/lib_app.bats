@@ -408,6 +408,44 @@ assert_demo_snapshot() {
     unset NO_COLOR
 }
 
+@test "invalid standard color policy fails before publishing color state" {
+    local status
+
+    base_cli_model_init invalid_color name=invalid-color
+    base_cli_command invalid_color run "Run"
+    base_app_init invalid_color_policy
+    base_cli_parse invalid_color -- run
+    __base_bash_libs_std_color_mode=never
+    BASE_BASH_LIBS_APP_COLOR=never
+    BASE_BASH_LIBS_CLI_RESULT_OPTIONS[color]=unsupported
+
+    if base_app_apply_standard_options invalid_color_policy >/dev/null 2>"$TEST_TMPDIR/color-error"; then
+        status=0
+    else
+        status=$?
+    fi
+
+    [ "$status" -eq 2 ]
+    [ "$__base_bash_libs_std_color_mode" = never ]
+    [ "$BASE_BASH_LIBS_APP_COLOR" = never ]
+    grep -F "invalid color mode 'unsupported'" "$TEST_TMPDIR/color-error"
+}
+
+@test "explicit wrapper color mode overrides the app's standard color option" {
+    base_cli_model_init wrapper_color name=wrapper-color
+    base_cli_command wrapper_color run "Run"
+    base_app_init wrapper_color_policy
+    base_app_add_standard_options wrapper_color run
+    base_cli_parse wrapper_color -- run --color always
+    __base_bash_libs_std_wrapper_color_mode=never
+
+    base_app_apply_standard_options wrapper_color_policy
+
+    [ "$BASE_BASH_LIBS_APP_COLOR" = never ]
+    [ "$__base_bash_libs_std_color_mode" = never ]
+    [ -z "$BASE_BASH_LIBS_STD_COLOR_RED" ]
+}
+
 @test "base_app_prompt validates usage and applies the prompt policy contract" {
     local prompt_calls=()
     base_app_init prompt

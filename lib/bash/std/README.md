@@ -420,7 +420,12 @@ base_std_print_message "plain stdout message"
 stderr. `base_std_print_bold` and `base_std_print_message` write to stdout.
 
 The legacy `base_init --color` control requests automatic color and only enables
-it when stderr is a terminal and `NO_COLOR` is unset. Applications using
+it when stderr is a terminal and `NO_COLOR` is unset. Wrappers can use
+`base_init --color-mode auto|always|never` to select an explicit standard
+color policy; this explicit wrapper setting takes precedence over an app-level
+`--color MODE`. `always` overrides `NO_COLOR`, and `never` disables color.
+The application's own `--color MODE` pair remains untouched for its parser.
+Arguments after the application's separator remain application-owned. Applications using
 `base_app_add_standard_options` can select `auto`, `always`, or `never`:
 `always` explicitly forces ANSI output even when stderr is captured or
 `NO_COLOR` is set; `never` disables it.
