@@ -27,10 +27,11 @@ launcher_file_mode() {
 copy_launcher_package() {
     local package_root="$1"
 
-    mkdir -p "$package_root/bin" "$package_root/lib/bash"
+    mkdir -p "$package_root/bin" "$package_root/lib/bash" "$package_root/scripts"
     cp "$BASE_REPO_ROOT/bin/base-bash" "$package_root/bin/base-bash"
     cp "$BASE_REPO_ROOT/VERSION" "$package_root/VERSION"
     cp "$BASE_REPO_ROOT/lib/bash/base-bash-libs.release" "$package_root/lib/bash/base-bash-libs.release"
+    cp "$BASE_REPO_ROOT/scripts/standalone-app-payloads.txt" "$package_root/scripts/standalone-app-payloads.txt"
     chmod +x "$package_root/bin/base-bash"
 }
 
