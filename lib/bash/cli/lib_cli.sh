@@ -73,7 +73,7 @@ __base_bash_libs_cli_builtin_option_action__() {
 }
 
 __base_bash_libs_cli_is_builtin_option_token__() {
-    __base_bash_libs_cli_builtin_option_action__ "${1-}" >/dev/null
+    __base_bash_libs_cli_builtin_option_action__ "${1-}" > /dev/null
 }
 
 __base_bash_libs_cli_valid_path__() {
