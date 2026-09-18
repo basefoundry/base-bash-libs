@@ -194,7 +194,7 @@ SCRIPT
 }
 
 @test "standalone refuses leaf and parent symlink swaps during payload copy" {
-    local real_cp canonical_application outside_marker destination="$TEST_TMPDIR/race-leaf"
+    local real_cp canonical_application destination="$TEST_TMPDIR/race-leaf"
     real_cp="$(command -v cp)"
     canonical_application="$(cd -- "$application" && pwd -P)"
     printf 'external sensitive marker\n' > "$TEST_TMPDIR/outside-marker"
