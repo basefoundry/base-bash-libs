@@ -489,6 +489,21 @@ EOF
     [[ "$output" == *"route 'u' was provided more than once"* ]]
 }
 
+@test "a lone dash is accepted as a model name command name and alias" {
+    base_cli_model_init dash_model name=-
+    base_cli_validate_model dash_model
+
+    base_cli_model_init dash_command name=dash-command
+    base_cli_command dash_command - "Read standard input"
+    base_cli_parse dash_command -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = - ]
+
+    base_cli_model_init dash_alias name=dash-alias
+    base_cli_command dash_alias stdin "Read standard input" aliases=-
+    base_cli_parse dash_alias -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = stdin ]
+}
+
 @test "ancestor and child option names and tokens cannot shadow each other" {
     base_cli_model_init ancestor_first name=ancestor-first
     base_cli_command ancestor_first child "Child"
@@ -530,6 +545,36 @@ EOF
     [ "$status" -eq 2 ]
 }
 
+@test "built-in option tokens and option-shaped command routes are unreachable" {
+    local before token path
+
+    base_cli_model_init reserved name=reserved version=2.0.0
+    base_cli_command reserved run "Run"
+    before="$(model_registry_dump reserved)"
+    for path in '' run; do
+        for token in -h --help -V --version; do
+            bats_run base_cli_option reserved "$path" custom value "$token"
+            [ "$status" -eq 2 ]
+            [[ "$output" == *"reserved for built-in CLI behavior"* ]]
+            [ "$(model_registry_dump reserved)" = "$before" ]
+        done
+    done
+
+    bats_run base_cli_command reserved --diagnose "Unreachable route"
+    [ "$status" -eq 2 ]
+    bats_run base_cli_command reserved run/-diagnose "Unreachable nested route"
+    [ "$status" -eq 2 ]
+    bats_run base_cli_command reserved manage "Manage" aliases=-m
+    [ "$status" -eq 2 ]
+
+    bats_run base_cli_declare reserved_table \
+        'model|name=reserved-table|version=2.0.0' \
+        'command|path=run|description=Run' \
+        'option|path=run|name=help|type=flag|tokens=--help'
+    [ "$status" -eq 2 ]
+    [ "$(model_registry_dump reserved_table)" = "" ]
+}
+
 @test "model validation detects unreachable command and option routes" {
     base_cli_model_init routes name=routes
     base_cli_command routes user "User" aliases=u
@@ -541,11 +586,18 @@ EOF
     __base_bash_libs_cli_models['routes|option|child|meta|child_mode|tokens']='--mode'
     __base_bash_libs_cli_models['routes|option|child|token|--mode']=child_mode
 
+    __base_bash_libs_cli_models['routes|option|child|meta|built_in|type']=flag
+    __base_bash_libs_cli_models['routes|option|child|meta|built_in|tokens']='--help'
+    __base_bash_libs_cli_models['routes|option|child|token|--help']=built_in
+    __base_bash_libs_cli_option_name_index['routes|built_in']=child
+    __base_bash_libs_cli_option_token_index['routes|--help']=child
+
     bats_run base_cli_validate_model routes
 
     [ "$status" -eq 2 ]
     [[ "$output" == *"alias:user:u"* ]]
     [[ "$output" == *"option:child:--mode"* ]]
+    [[ "$output" == *"option:child:--help"* ]]
 }
 
 @test "option validators may render help without corrupting required-option traversal" {

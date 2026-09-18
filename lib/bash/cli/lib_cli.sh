@@ -61,7 +61,19 @@ __base_bash_libs_cli_valid_model__() {
 }
 
 __base_bash_libs_cli_valid_segment__() {
-    [[ "${1-}" =~ ^[A-Za-z0-9_-]+$ ]]
+    [[ "${1-}" == - || "${1-}" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]
+}
+
+__base_bash_libs_cli_builtin_option_action__() {
+    case "${1-}" in
+    -h | --help) printf 'help' ;;
+    -V | --version) printf 'version' ;;
+    *) return 1 ;;
+    esac
+}
+
+__base_bash_libs_cli_is_builtin_option_token__() {
+    __base_bash_libs_cli_builtin_option_action__ "${1-}" > /dev/null
 }
 
 __base_bash_libs_cli_valid_path__() {
@@ -786,7 +798,8 @@ base_cli_validate_model() {
         path="${route%%|token|*}"
         token="${route#*|token|}"
         name="${__base_bash_libs_cli_models[$key]}"
-        if ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token" ||
+            ! __base_bash_libs_cli_option_lookup__ "$model" "$path" "$token" found_name found_path found_type ||
             [[ "$found_name" != "$name" || "$found_path" != "$path" ]]; then
             unreachable_routes+=("option:$path:$token")
         fi
@@ -959,6 +972,10 @@ base_cli_option() {
     for token in "${tokens[@]}"; do
         if [[ ! "$token" =~ ^--?[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]; then
             __base_bash_libs_cli_declaration_usage__ "base_cli_option: invalid option token '$token'."
+            return 2
+        fi
+        if __base_bash_libs_cli_is_builtin_option_token__ "$token"; then
+            __base_bash_libs_cli_declaration_usage__ "base_cli_option: token '$token' is reserved for built-in CLI behavior."
             return 2
         fi
         if [[ "$token" == *=* ]]; then
@@ -1334,6 +1351,7 @@ __base_bash_libs_cli_apply_positionals__() {
 # Usage: base_cli_parse model -- [argv...]
 base_cli_parse() {
     local model="${1-}" current path="" token option_value name type child_path option_path
+    local builtin_action
     # shellcheck disable=SC2034 # Pass-by-name outputs used only to probe whether an option token is registered.
     local probe_name probe_path probe_type
     local parse_options=1 parse_commands=1
@@ -1357,13 +1375,17 @@ base_cli_parse() {
             parse_commands=0
             continue
         fi
-        if ((parse_options)) && [[ "$current" == -h || "$current" == --help ]]; then
+        builtin_action=""
+        if ((parse_options)); then
+            builtin_action="$(__base_bash_libs_cli_builtin_option_action__ "$current" || true)"
+        fi
+        if [[ "$builtin_action" == help ]]; then
             BASE_BASH_LIBS_CLI_RESULT_COMMAND="$path"
             BASE_BASH_LIBS_CLI_RESULT_ACTION="help"
             base_cli_help "$model" "$path"
             return $?
         fi
-        if ((parse_options)) && [[ "$current" == -V || "$current" == --version ]]; then
+        if [[ "$builtin_action" == version ]]; then
             if [[ -n "$path" || -z "${__base_bash_libs_cli_models["$model|meta|version"]-}" ]]; then
                 __base_bash_libs_cli_usage_error__ "$model" "$path" "version is not available for this command."
                 return 2
