@@ -489,6 +489,21 @@ EOF
     [[ "$output" == *"route 'u' was provided more than once"* ]]
 }
 
+@test "a lone dash is accepted as a model name command name and alias" {
+    base_cli_model_init dash_model name=-
+    base_cli_validate_model dash_model
+
+    base_cli_model_init dash_command name=dash-command
+    base_cli_command dash_command - "Read standard input"
+    base_cli_parse dash_command -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = - ]
+
+    base_cli_model_init dash_alias name=dash-alias
+    base_cli_command dash_alias stdin "Read standard input" aliases=-
+    base_cli_parse dash_alias -- -
+    [ "$BASE_BASH_LIBS_CLI_RESULT_COMMAND" = stdin ]
+}
+
 @test "ancestor and child option names and tokens cannot shadow each other" {
     base_cli_model_init ancestor_first name=ancestor-first
     base_cli_command ancestor_first child "Child"
