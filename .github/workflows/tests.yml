@@ -43,14 +43,12 @@ jobs:
       - name: Validate repository
         run: ./tests/validate.sh
 
-      - name: Install pinned SPDX validator (Linux)
-        if: runner.os == 'Linux'
+      - name: Install pinned SPDX validator
         run: |
           python3 -m venv "$RUNNER_TEMP/spdx-tools"
           "$RUNNER_TEMP/spdx-tools/bin/python" -m pip install --disable-pip-version-check 'spdx-tools==0.8.5'
 
-      - name: Validate SPDX release artifact independently (Linux)
-        if: runner.os == 'Linux'
+      - name: Validate SPDX release artifact independently
         run: |
           output="$RUNNER_TEMP/spdx-validation-artifact"
           scripts/release-artifact build \

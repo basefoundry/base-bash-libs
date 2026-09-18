@@ -29,10 +29,18 @@ def main() -> int:
 
     messages = validate_full_spdx_document(document, spdx_version="SPDX-2.3")
     if arguments.expect_missing_sha1:
-        if any("must contain a SHA1 algorithm checksum" in message.validation_message for message in messages):
+        sha1_errors = [
+            message
+            for message in messages
+            if "must contain a SHA1 algorithm checksum" in message.validation_message
+        ]
+        if len(messages) == 1 and len(sha1_errors) == 1:
             print("SPDX semantic-negative fixture rejected for its missing required SHA1 checksum.")
             return 0
-        print("SPDX semantic-negative fixture was not rejected for its missing SHA1 checksum.", file=sys.stderr)
+        print(
+            "SPDX semantic-negative fixture must produce exactly one validation error, for its missing SHA1 checksum.",
+            file=sys.stderr,
+        )
         for message in messages:
             print(message, file=sys.stderr)
         return 1

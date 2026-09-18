@@ -110,12 +110,15 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 
 ## SBOM Interoperability
 
-The generated SPDX 2.3 SBOM retains SHA256 and includes the SHA1 checksum
-required by SPDX 2.3 file records. The Linux validation job independently parses
-and semantically validates each candidate SBOM with `spdx-tools==0.8.5`, and
-checks a parseable negative fixture that is rejected specifically for missing
-SHA1. This validation does not rewrite or replace any already-published release
-asset; corrected SBOMs are produced only for a future authorized release.
+The SPDX 2.3 SBOM format is versioned with the release: releases before v2.2.0
+retain their published SHA256-only file records, while v2.2.0 and later include
+both SHA256 and the SHA1 checksum required by SPDX 2.3 file records. The Linux
+and macOS validation jobs independently parse and semantically validate each
+candidate SBOM with `spdx-tools==0.8.5`; macOS also exercises the `shasum -a 1`
+checksum path. Both jobs check a parseable negative fixture that must produce
+exactly one semantic error, specifically the missing SHA1 checksum. This
+validation does not rewrite or replace any already-published release asset;
+corrected SBOMs are produced only for a future authorized release.
 
 ## Homebrew Handoff
 

@@ -146,8 +146,25 @@ normalize_tree_times() {
     done < <(find "$root" -type d -print)
 }
 
+spdx_sbom_requires_sha1() {
+    local version="${1-}" major minor version_tail
+
+    major="${version%%.*}"
+    version_tail="${version#*.}"
+    minor="${version_tail%%.*}"
+    [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 2
+    ((10#$major > 2 || (10#$major == 2 && 10#$minor >= 2)))
+}
+
 write_sbom() {
     local output="$1" version="$2" commit="$3" root="$4" path relative first=1
+    local include_sha1=0 status file_id file_name sha1_hash sha256_hash
+    if spdx_sbom_requires_sha1 "$version"; then
+        include_sha1=1
+    else
+        status=$?
+        ((status == 1)) || return "$status"
+    fi
     {
         printf '{\n'
         printf '  "spdxVersion": "SPDX-2.3",\n'
@@ -166,9 +183,17 @@ write_sbom() {
                 printf ',\n'
             fi
             first=0
-            printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA1", "checksumValue": "%s"}, {"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
-                "$(spdx_file_identifier "$relative")" "$(json_escape "$relative")" \
-                "$(hash_file_sha1 "$path")" "$(hash_file "$path")"
+            file_id="$(spdx_file_identifier "$relative")" || return 1
+            file_name="$(json_escape "$relative")"
+            sha256_hash="$(hash_file "$path")" || return 1
+            if ((include_sha1)); then
+                sha1_hash="$(hash_file_sha1 "$path")" || return 1
+                printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA1", "checksumValue": "%s"}, {"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
+                    "$file_id" "$file_name" "$sha1_hash" "$sha256_hash"
+            else
+                printf '    {"SPDXID": "%s", "fileName": "%s", "checksums": [{"algorithm": "SHA256", "checksumValue": "%s"}], "licenseConcluded": "Apache-2.0"}' \
+                    "$file_id" "$file_name" "$sha256_hash"
+            fi
         done < <(find "$root" -type f -print | LC_ALL=C sort)
         printf '\n  ],\n'
         printf '  "relationships": [{"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package"}]\n'
