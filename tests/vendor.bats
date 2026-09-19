@@ -21,6 +21,12 @@ vendor_test_make_copy_race_stub() {
 set -u
 source_path="${@: -2:1}"
 if [[ "$source_path" == "${VENDOR_TEST_RACE_SOURCE-}" ]]; then
+    if [[ "${VENDOR_TEST_RACE_MODE-}" == content-after ]]; then
+        "$VENDOR_TEST_REAL_CP" "$@"
+        copy_status=$?
+        printf 'tampered-after-copy\n' > "$source_path"
+        exit "$copy_status"
+    fi
     if [[ "${VENDOR_TEST_RACE_MODE-}" == parent ]]; then
         mv -- "$VENDOR_TEST_RACE_PARENT" "$VENDOR_TEST_RACE_BACKUP" || exit 1
         ln -s -- "$VENDOR_TEST_RACE_TARGET" "$VENDOR_TEST_RACE_PARENT" || {
@@ -47,6 +53,25 @@ fi
 exec "$VENDOR_TEST_REAL_CP" "$@"
 EOF
     chmod +x "$stub_dir/cp"
+}
+
+@test "vendor create rejects framework payload mutation during copy" {
+    local real_cp
+    real_cp="$(command -v cp)"
+    vendor_test_make_copy_race_stub
+
+    bats_run env PATH="$TEST_TMPDIR/racing-cp-bin:$BASE_TEST_ORIG_PATH" \
+        VENDOR_TEST_REAL_CP="$real_cp" \
+        VENDOR_TEST_RACE_MODE=content-after \
+        VENDOR_TEST_RACE_SOURCE="$framework_bundle/VERSION" \
+        "$BASE_REPO_ROOT/scripts/vendor" create "$framework_bundle" "$vendor_tree"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed while it was being copied"* ]] || {
+        printf 'Unexpected vendor staging output: %s\n' "$output" >&2
+        false
+    }
+    [ ! -e "$vendor_tree" ]
+    [ -z "$(find "${vendor_tree}.tmp."* -maxdepth 0 -print -quit 2>/dev/null)" ]
 }
 
 @test "vendor create and verify are offline and immutable" {
