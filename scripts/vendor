@@ -37,15 +37,67 @@ verify_bundle() {
 }
 
 copy_verified_bundle() {
-    local source="$1" destination="$2" checksum path
+    local source="$1" destination="$2" checksum path source_hash destination_hash
+    local source_manifest_hash source_manifest_hash_after destination_manifest_hash
+    [[ -f "$source/MANIFEST.sha256" && ! -L "$source/MANIFEST.sha256" ]] || return 1
+    source_manifest_hash="$(hash_file "$source/MANIFEST.sha256")" || return 1
     while read -r checksum path; do
         [[ -n "$checksum" ]] || continue
         [[ -n "$path" ]] || continue
+        [[ -f "$source/$path" && ! -L "$source/$path" ]] || {
+            error "bundle payload changed to a symlink or non-file while being copied: $path"
+            return 1
+        }
+        source_hash="$(hash_file "$source/$path")" || return 1
+        [[ "$source_hash" == "$checksum" ]] || {
+            error "bundle payload changed before it was copied: $path"
+            return 1
+        }
         mkdir -p "$destination/$(dirname -- "$path")" || return 1
         cp -- "$source/$path" "$destination/$path" || return 1
+        [[ -f "$destination/$path" && ! -L "$destination/$path" ]] || {
+            error "copied bundle payload is not a regular file: $path"
+            return 1
+        }
+        destination_hash="$(hash_file "$destination/$path")" || return 1
+        [[ "$destination_hash" == "$checksum" ]] || {
+            error "copied bundle payload hash mismatch: $path"
+            return 1
+        }
+        [[ -f "$source/$path" && ! -L "$source/$path" ]] || {
+            error "bundle payload changed to a symlink or non-file while being copied: $path"
+            return 1
+        }
+        source_hash="$(hash_file "$source/$path")" || return 1
+        [[ "$source_hash" == "$checksum" ]] || {
+            error "bundle payload changed while it was being copied: $path"
+            return 1
+        }
         if [[ -x "$source/$path" ]]; then chmod +x "$destination/$path" || return 1; fi
     done < "$source/MANIFEST.sha256"
     cp -- "$source/MANIFEST.sha256" "$destination/MANIFEST.sha256" || return 1
+    destination_manifest_hash="$(hash_file "$destination/MANIFEST.sha256")" || return 1
+    [[ "$destination_manifest_hash" == "$source_manifest_hash" ]] || {
+        error 'copied bundle checksum manifest changed while it was being copied'
+        return 1
+    }
+    source_manifest_hash_after="$(hash_file "$source/MANIFEST.sha256")" || return 1
+    [[ "$source_manifest_hash_after" == "$source_manifest_hash" ]] || {
+        error 'bundle checksum manifest changed while it was being copied'
+        return 1
+    }
+}
+
+verify_manifest_copy() {
+    local root="$1" checksum path actual
+
+    [[ -f "$root/MANIFEST.sha256" && ! -L "$root/MANIFEST.sha256" ]] || return 1
+    while read -r checksum path; do
+        [[ -n "$checksum" && -n "$path" ]] || continue
+        [[ -f "$root/$path" && ! -L "$root/$path" ]] || return 1
+        actual="$(hash_file "$root/$path")" || return 1
+        [[ "$actual" == "$checksum" ]] || return 1
+    done < "$root/MANIFEST.sha256"
 }
 
 validate_payload_file() {
@@ -160,7 +212,8 @@ install_bundle() {
         rm -rf -- "$temporary"
         return 1
     fi
-    if ! write_lock "$temporary" "$bundle" "$mode"; then
+    if ! write_lock "$temporary" "$temporary" "$mode" ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary" > /dev/null; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -191,7 +244,8 @@ update_bundle() {
         rm -rf -- "$temporary"
         return 1
     fi
-    if ! write_lock "$temporary" "$bundle" update; then
+    if ! write_lock "$temporary" "$temporary" update ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary" > /dev/null; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -340,7 +394,9 @@ standalone_bundle() {
     if ! mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
         ! copy_verified_bundle "$framework_bundle" "$temporary" ||
         ! copy_verified_bundle "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
-        ! write_lock "$temporary/vendor/base-bash-libs" "$framework_bundle" standalone ||
+        ! write_lock "$temporary/vendor/base-bash-libs" "$temporary/vendor/base-bash-libs" standalone ||
+        ! verify_manifest_copy "$temporary" ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary/vendor/base-bash-libs" > /dev/null ||
         ! chmod +x "$temporary/bin/base-bash"; then
         rm -rf -- "$temporary"
         return 1
@@ -361,7 +417,7 @@ standalone_bundle() {
         return 1
     }
     printf 'standalone_format=1\nframework_lock=%s\nprovenance=verified-offline-bundle\n' \
-        "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || {
+        "$(hash_file "$temporary/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || {
         rm -rf -- "$temporary"
         return 1
     }
