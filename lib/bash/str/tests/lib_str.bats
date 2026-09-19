@@ -140,6 +140,64 @@ create_script() {
     [[ "$(cat "$stderr_file")" == *"result variable 'value' is readonly"* ]]
 }
 
+@test "string mutators reject typed outputs before coercing caller data" {
+    local stderr_file="$TEST_TMPDIR/string-typed-output.err"
+    local rc
+    local -i integer_value=42
+    local -u uppercase_value=MiXeD
+
+    if base_str_lower integer_value 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$integer_value" -eq 42 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+
+    if base_str_lower uppercase_value 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$uppercase_value" = MIXED ]
+}
+
+@test "string split rejects indexed-array outputs with coercing attributes" {
+    local stderr_file="$TEST_TMPDIR/string-array-output.err"
+    local rc
+    local -au fields=(sentinel)
+
+    if base_str_split fields "one:two" : 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "${fields[0]}" = SENTINEL ]
+    [ "${#fields[@]}" -eq 1 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+}
+
+@test "array output contracts distinguish indexed from associative arrays with nocasematch" {
+    local stderr_file="$TEST_TMPDIR/string-associative-output.err"
+    local rc
+    local -A fields=([keep]=sentinel)
+    shopt -s nocasematch
+
+    if base_str_split fields "one:two" : 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    shopt -u nocasematch
+
+    [ "$rc" -eq 2 ]
+    [ "${fields[keep]}" = sentinel ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+}
+
 @test "readonly string outputs cannot collide with argument-count decimal locals" {
     local candidate
 
