@@ -4575,6 +4575,23 @@ EOF
     shopt -q nocasematch
 }
 
+@test "array-kind validation keeps indexed diagnostics case-sensitive with nocasematch" {
+    local -A associative_values=([alpha]=one)
+    local stderr_file="$TEST_TMPDIR/array-kind-validation.err"
+    local status
+
+    shopt -s nocasematch
+    if __base_bash_libs_std_validate_array_kind__ base_std_test a associative_values 2>"$stderr_file"; then
+        status=0
+    else
+        status=$?
+    fi
+    shopt -u nocasematch
+
+    [ "$status" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"must be a caller-declared indexed array."* ]]
+}
+
 @test "base_std_assert_associative_array accepts declared associative arrays" {
     local -A values=([alpha]="one")
 

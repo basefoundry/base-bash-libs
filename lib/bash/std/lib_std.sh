@@ -3618,9 +3618,14 @@ __base_bash_libs_std_validate_array_kind__() {
     (($# >= 3)) || return 1
     local __base_bash_libs_std_validate_array_operation="$1" __base_bash_libs_std_validate_array_kind="$2"
     local __base_bash_libs_std_validate_array_name __base_bash_libs_std_validate_array_label=indexed
+    local -i __base_bash_libs_std_validate_array_kind_code=0
     shift 2
 
-    [[ "$__base_bash_libs_std_validate_array_kind" == "A" ]] &&
+    # Compare the marker byte numerically so caller `nocasematch` cannot make
+    # Bash classify the indexed marker `a` as the associative marker `A`.
+    printf -v __base_bash_libs_std_validate_array_kind_code '%d' \
+        "'$__base_bash_libs_std_validate_array_kind"
+    ((__base_bash_libs_std_validate_array_kind_code == 65)) &&
         __base_bash_libs_std_validate_array_label=associative
     __base_bash_libs_std_validate_variable_names__ \
         "$__base_bash_libs_std_validate_array_operation" "$@" || return 1
