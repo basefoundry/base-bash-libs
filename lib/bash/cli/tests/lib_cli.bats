@@ -760,9 +760,21 @@ EOF
     _cursor_complete
     [ "${COMPREPLY[*]}" = user ]
 
+    COMP_CWORD=99
+    _cursor_complete
+    [ "${COMPREPLY[*]}" = user ]
+
     COMP_WORDS=(cursor)
     COMP_CWORD=1
     _cursor_complete
+    [ "${COMPREPLY[*]}" = admin ]
+
+    unset COMP_WORDS COMP_CWORD
+    set -u
+    _cursor_complete
+    status=$?
+    set +u
+    [ "$status" -eq 0 ]
     [ "${COMPREPLY[*]}" = admin ]
 }
 
