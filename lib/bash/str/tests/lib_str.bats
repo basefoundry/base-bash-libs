@@ -195,7 +195,7 @@ create_script() {
 
     [ "$rc" -eq 2 ]
     [ "${fields[keep]}" = sentinel ]
-    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+    [[ "$(<"$stderr_file")" == *"must be a caller-declared indexed array"* ]]
 }
 
 @test "readonly string outputs cannot collide with argument-count decimal locals" {
