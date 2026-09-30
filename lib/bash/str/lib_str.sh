@@ -33,7 +33,7 @@ base_str_lower() {
     __base_bash_libs_std_validate_variable_names__ base_str_lower "${1-}" || return 2
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    __base_bash_libs_std_assert_writable_output__ base_str_lower "$__base_bash_libs_str_var_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_lower "$__base_bash_libs_str_var_name" scalar || return 2
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "${__base_bash_libs_str_value,,}"
 }
@@ -46,7 +46,7 @@ base_str_upper() {
     __base_bash_libs_std_validate_variable_names__ base_str_upper "${1-}" || return 2
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    __base_bash_libs_std_assert_writable_output__ base_str_upper "$__base_bash_libs_str_var_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_upper "$__base_bash_libs_str_var_name" scalar || return 2
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "${__base_bash_libs_str_value^^}"
 }
@@ -59,7 +59,7 @@ base_str_ltrim() {
     __base_bash_libs_std_validate_variable_names__ base_str_ltrim "${1-}" || return 2
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    __base_bash_libs_std_assert_writable_output__ base_str_ltrim "$__base_bash_libs_str_var_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_ltrim "$__base_bash_libs_str_var_name" scalar || return 2
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     __base_bash_libs_str_value="${__base_bash_libs_str_value#"${__base_bash_libs_str_value%%[![:space:]]*}"}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "$__base_bash_libs_str_value"
@@ -73,7 +73,7 @@ base_str_rtrim() {
     __base_bash_libs_std_validate_variable_names__ base_str_rtrim "${1-}" || return 2
     local __base_bash_libs_str_var_name="$1" __base_bash_libs_str_value
 
-    __base_bash_libs_std_assert_writable_output__ base_str_rtrim "$__base_bash_libs_str_var_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_rtrim "$__base_bash_libs_str_var_name" scalar || return 2
     __base_bash_libs_str_value="${!__base_bash_libs_str_var_name-}"
     __base_bash_libs_str_value="${__base_bash_libs_str_value%"${__base_bash_libs_str_value##*[![:space:]]}"}"
     printf -v "$__base_bash_libs_str_var_name" '%s' "$__base_bash_libs_str_value"
@@ -129,8 +129,8 @@ base_str_split() {
     __base_bash_libs_std_validate_variable_names__ base_str_split "${1-}" || return 2
     local __base_bash_libs_str_split_result_name="$1" __base_bash_libs_str_split_value="$2" __base_bash_libs_str_split_separator="$3"
 
-    __base_bash_libs_std_assert_writable_output__ base_str_split "$__base_bash_libs_str_split_result_name" || return 2
     __base_bash_libs_std_validate_array_kind__ base_str_split a "$__base_bash_libs_str_split_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_split "$__base_bash_libs_str_split_result_name" indexed-array || return 2
 
     local -a __base_bash_libs_str_split_fields=()
     local __base_bash_libs_str_split_remainder="$__base_bash_libs_str_split_value"
@@ -161,7 +161,7 @@ base_str_join() {
             "base_str_join: result and source variables must be distinct; '$__base_bash_libs_str_join_result_name' was provided for both."
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_str_join "$__base_bash_libs_str_join_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_str_join "$__base_bash_libs_str_join_result_name" scalar || return 2
     __base_bash_libs_std_validate_array_kind__ base_str_join a "$__base_bash_libs_str_join_array_name" || return 2
 
     local __base_bash_libs_str_join_joined="" __base_bash_libs_str_join_value __base_bash_libs_str_join_has_value=0

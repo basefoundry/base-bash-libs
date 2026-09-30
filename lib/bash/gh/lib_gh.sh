@@ -283,7 +283,7 @@ base_gh_repo_from_remote_url() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_from_remote_url <remote_url> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_gh_repo_from_remote_url "$__base_bash_libs_gh_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_repo_from_remote_url "$__base_bash_libs_gh_result_name" scalar || return 2
 
     __base_bash_libs_gh_parse_repo_from_remote_url__ "$__base_bash_libs_gh_remote_url" __base_bash_libs_gh_parsed_repo || return 2
     printf -v "$__base_bash_libs_gh_result_name" '%s' "$__base_bash_libs_gh_parsed_repo"
@@ -305,7 +305,7 @@ base_gh_infer_repo_from_origin() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_infer_repo_from_origin <repo_dir> <result_variable_name> [--optional]"
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_gh_infer_repo_from_origin "$__base_bash_libs_gh_infer_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_infer_repo_from_origin "$__base_bash_libs_gh_infer_result_name" scalar || return 2
 
     if [[ "${3:-}" == "--optional" ]]; then
         __base_bash_libs_gh_infer_optional=1
@@ -340,7 +340,7 @@ base_gh_repo_default_branch() {
         base_std_log_error -l base_bash_libs.gh "Usage: base_gh_repo_default_branch <owner/repo> <result_variable_name>"
         return 2
     fi
-    __base_bash_libs_std_assert_writable_output__ base_gh_repo_default_branch "$__base_bash_libs_gh_repo_result_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_gh_repo_default_branch "$__base_bash_libs_gh_repo_result_name" scalar || return 2
 
     base_gh_require_cli || return 1
     __base_bash_libs_gh_repo_default_branch="$(gh repo view "$__base_bash_libs_gh_repo" --json defaultBranchRef --jq .defaultBranchRef.name 2> /dev/null)" || __base_bash_libs_gh_repo_status=$?

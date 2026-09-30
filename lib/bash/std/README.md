@@ -64,6 +64,14 @@ documented arguments. Public helpers that write through caller-supplied
 variable or array names reserve the `__` prefix for library-internal state;
 such output names are rejected before caller state is changed.
 
+Named scalar outputs accept untyped or exported scalar variables. Numeric
+outputs also accept integer (`-i`) scalars. Array outputs must use the exact
+indexed or associative kind documented by the API; integer and case-converting
+(`-l`/`-u`) attributes are rejected where they could coerce data. Readonly
+variables and nameref outputs are rejected before writes. Namerefs are not
+resolved, which avoids following readonly, cyclic, or reserved targets on Bash
+versions that support namerefs.
+
 ### Runtime and Imports
 
 - `base_init <result_array> [--source <script>] -- [argv...]`:

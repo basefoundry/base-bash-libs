@@ -416,6 +416,22 @@ setup() {
     [[ "$(cat "$stderr_file")" == *"result variable 'branch' is readonly"* ]]
 }
 
+@test "base_git_get_current_branch rejects coercing scalar outputs before repository access" {
+    local repo="$TEST_TMPDIR/repo"
+    local stderr_file="$TEST_TMPDIR/git-typed-output.err"
+    local rc
+    local -i branch=42
+
+    if base_git_get_current_branch "$repo" branch 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$branch" -eq 42 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+}
+
 @test "Git result helpers reject exact internal holder names before locals or mutation" {
     local -r __base_bash_libs_git_detect_result_name=detected
     local -r __base_bash_libs_git_branch_result_name=current

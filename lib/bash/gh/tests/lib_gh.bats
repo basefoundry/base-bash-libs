@@ -370,6 +370,21 @@ EOF
     [[ "$(cat "$stderr_file")" == *"result variable 'repo' is readonly"* ]]
 }
 
+@test "GitHub result parser rejects coercing scalar output before publishing" {
+    local stderr_file="$TEST_TMPDIR/gh-typed-output.err"
+    local rc
+    local -i repo=42
+
+    if base_gh_repo_from_remote_url "https://github.com/basefoundry/base-bash-libs.git" repo 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$repo" -eq 42 ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+}
+
 @test "GitHub result helpers reject exact internal holder names before locals or mutation" {
     local -r __base_bash_libs_gh_result_name=parsed
     local -r __base_bash_libs_gh_infer_result_name=inferred

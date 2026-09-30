@@ -194,6 +194,28 @@ EOF
     [ "$count" -eq 2 ]
 }
 
+@test "CLI named outputs enforce scalar and integer attributes" {
+    local stderr_file="$TEST_TMPDIR/cli-typed-output.err"
+    local rc
+    local -u color_value=sentinel
+    local -i repeatable_count=99
+
+    declare_demo_model
+    base_cli_parse demo -- manage u target-name --color green --tag one
+
+    if base_cli_result_get color color_value 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$color_value" = SENTINEL ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the scalar output contract"* ]]
+
+    base_cli_result_count tag repeatable_count
+    [ "$repeatable_count" -eq 1 ]
+}
+
 @test "help is deterministic and includes aliases, defaults, and nested usage" {
     declare_demo_model
 

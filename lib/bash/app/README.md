@@ -46,7 +46,9 @@ model's complete effective snapshot.
 
 Supported types are `string`, `path`, `bool`, `integer`, and `enum`. Optional
 `validator=FUNCTION` callbacks receive the candidate value and must return
-zero. No configuration value is evaluated as shell code.
+zero. `base_app_config_get` writes integer-typed values to either an ordinary
+scalar or a caller-declared integer (`-i`) scalar; other configuration types
+require an ordinary scalar. No configuration value is evaluated as shell code.
 
 ## Standard options and prompts
 

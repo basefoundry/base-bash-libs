@@ -277,6 +277,35 @@ EOF
     [[ "$(cat "$stderr_file")" == *"result variable 'values' is readonly"* ]]
 }
 
+@test "list arrays reject coercing attributes and length accepts integer outputs" {
+    local stderr_file="$TEST_TMPDIR/list-typed-output.err"
+    local rc
+    local -au values=(alpha)
+    local -i count=99
+    local -u uppercase_count=sentinel
+
+    if base_list_append values beta 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "${values[*]}" = ALPHA ]
+    [[ "$(<"$stderr_file")" == *"attributes incompatible with the indexed-array output contract"* ]]
+
+    local -a plain_values=(one two)
+    base_list_length count plain_values
+    [ "$count" -eq 2 ]
+
+    if base_list_length uppercase_count plain_values 2>"$stderr_file"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    [ "$uppercase_count" = SENTINEL ]
+}
+
 @test "list helpers reject invalid variable names without echoing values" {
     local script="$TEST_TMPDIR/list-invalid-vars.sh"
 

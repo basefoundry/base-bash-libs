@@ -102,7 +102,7 @@ __base_bash_libs_arg_parse_specs__() {
                 base_std_log_error -l base_bash_libs.arg "base_arg_parse: repeatable option '$__base_bash_libs_arg_name' requires a caller-declared indexed array."
                 return 2
             fi
-            __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_name" || return 2
+            __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_name" indexed-array || return 2
             eval "$__base_bash_libs_arg_repeatable_names_name+=(\"\$__base_bash_libs_arg_name\")"
         fi
 
@@ -167,8 +167,8 @@ base_arg_parse() {
     __base_bash_libs_arg_assert_distinct_names__ "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name" || return 2
     __base_bash_libs_std_validate_array_kind__ base_arg_parse A "$__base_bash_libs_arg_options_name" || return 2
     __base_bash_libs_std_validate_array_kind__ base_arg_parse a "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_options_name" || return 2
-    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_positionals_name" || return 2
+    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_options_name" associative-array || return 2
+    __base_bash_libs_std_assert_writable_output__ base_arg_parse "$__base_bash_libs_arg_positionals_name" indexed-array || return 2
 
     __base_bash_libs_arg_parse_specs__ "$__base_bash_libs_arg_specs_name" __base_bash_libs_arg_token_kind __base_bash_libs_arg_token_name __base_bash_libs_arg_repeatable_names \
         "$__base_bash_libs_arg_options_name" "$__base_bash_libs_arg_positionals_name" "$__base_bash_libs_arg_specs_name" || return $?
