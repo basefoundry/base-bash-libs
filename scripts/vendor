@@ -5,6 +5,9 @@
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 
+# shellcheck source=bundle-manifest.sh
+source "$repo_root/scripts/bundle-manifest.sh" || exit 1
+
 usage() {
     cat >&2 << 'EOF'
 Usage:
@@ -37,15 +40,178 @@ verify_bundle() {
 }
 
 copy_verified_bundle() {
-    local source="$1" destination="$2" checksum path
-    while read -r checksum path; do
-        [[ -n "$checksum" ]] || continue
-        [[ -n "$path" ]] || continue
-        mkdir -p "$destination/$(dirname -- "$path")" || return 1
-        cp -- "$source/$path" "$destination/$path" || return 1
-        if [[ -x "$source/$path" ]]; then chmod +x "$destination/$path" || return 1; fi
+    local source="$1" destination="$2" checksum path line source_hash destination_hash
+    local source_manifest_hash source_manifest_hash_after destination_manifest_hash
+    local source_executable line_number=0
+    local -a manifest_lines=()
+
+    [[ -d "$source" && ! -L "$source" ]] || {
+        error "bundle source is not a real directory: $source"
+        return 1
+    }
+    [[ -f "$source/MANIFEST.sha256" && ! -L "$source/MANIFEST.sha256" ]] || {
+        error "bundle checksum manifest is missing or is a symlink: $source"
+        return 1
+    }
+    source_manifest_hash="$(hash_file "$source/MANIFEST.sha256")" || {
+        error "unable to hash bundle checksum manifest: $source"
+        return 1
+    }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        manifest_lines+=("$line")
     done < "$source/MANIFEST.sha256"
-    cp -- "$source/MANIFEST.sha256" "$destination/MANIFEST.sha256" || return 1
+
+    for line in "${manifest_lines[@]}"; do
+        line_number=$((line_number + 1))
+        [[ "$line" =~ ^([0-9a-f]{64})[[:space:]][[:space:]]([A-Za-z0-9_./-]+)$ ]] || {
+            error "malformed bundle checksum entry at line $line_number"
+            return 1
+        }
+        checksum="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[2]}"
+        bundle_manifest_path_is_safe "$path" || {
+            error "unsafe bundle checksum path: $path"
+            return 1
+        }
+        [[ -f "$source/$path" ]] || {
+            error "bundle payload is missing while being copied: $path"
+            return 1
+        }
+        [[ ! -L "$source/$path" ]] || {
+            error "bundle payload is a symlink while being copied: $path"
+            return 1
+        }
+        bundle_manifest_path_has_no_symlink_component "$source" "$path" || {
+            error "bundle payload path traverses a symlink while being copied: $path"
+            return 1
+        }
+        source_hash="$(hash_file "$source/$path")" || {
+            error "unable to hash bundle payload while copying: $path"
+            return 1
+        }
+        [[ "$source_hash" == "$checksum" ]] || {
+            error "bundle payload changed before it was copied: $path"
+            return 1
+        }
+        source_executable=0
+        [[ -x "$source/$path" ]] && source_executable=1
+        mkdir -p "$destination/$(dirname -- "$path")" || {
+            error "unable to create bundle destination path: $path"
+            return 1
+        }
+        cp -- "$source/$path" "$destination/$path" || {
+            error "unable to copy bundle payload: $path"
+            return 1
+        }
+        [[ -f "$destination/$path" && ! -L "$destination/$path" ]] || {
+            error "copied bundle payload is not a regular file: $path"
+            return 1
+        }
+        destination_hash="$(hash_file "$destination/$path")" || {
+            error "unable to hash copied bundle payload: $path"
+            return 1
+        }
+        [[ "$destination_hash" == "$checksum" ]] || {
+            error "copied bundle payload hash mismatch: $path"
+            return 1
+        }
+        [[ -f "$source/$path" ]] || {
+            error "bundle payload disappeared while it was being copied: $path"
+            return 1
+        }
+        [[ ! -L "$source/$path" ]] || {
+            error "bundle payload changed to a symlink while it was being copied: $path"
+            return 1
+        }
+        bundle_manifest_path_has_no_symlink_component "$source" "$path" || {
+            error "bundle payload path changed to a symlink while it was being copied: $path"
+            return 1
+        }
+        source_hash="$(hash_file "$source/$path")" || {
+            error "unable to re-hash bundle payload after copying: $path"
+            return 1
+        }
+        [[ "$source_hash" == "$checksum" ]] || {
+            error "bundle payload changed while it was being copied: $path"
+            return 1
+        }
+        if ((source_executable)) && ! chmod +x "$destination/$path"; then
+            error "unable to preserve executable mode for bundle payload: $path"
+            return 1
+        fi
+    done
+    cp -- "$source/MANIFEST.sha256" "$destination/MANIFEST.sha256" || {
+        error 'unable to copy bundle checksum manifest'
+        return 1
+    }
+    destination_manifest_hash="$(hash_file "$destination/MANIFEST.sha256")" || {
+        error 'unable to hash copied bundle checksum manifest'
+        return 1
+    }
+    [[ "$destination_manifest_hash" == "$source_manifest_hash" ]] || {
+        error 'copied bundle checksum manifest changed while it was being copied'
+        return 1
+    }
+    source_manifest_hash_after="$(hash_file "$source/MANIFEST.sha256")" || {
+        error 'unable to re-hash bundle checksum manifest after copying'
+        return 1
+    }
+    [[ "$source_manifest_hash_after" == "$source_manifest_hash" ]] || {
+        error 'bundle checksum manifest changed while it was being copied'
+        return 1
+    }
+}
+
+verify_manifest_copy() {
+    local root="$1" checksum path actual line line_number=0
+    local -A checksum_seen=()
+
+    [[ -d "$root" && ! -L "$root" ]] || {
+        error "manifest verification root is not a real directory: $root"
+        return 1
+    }
+    [[ -f "$root/MANIFEST.sha256" && ! -L "$root/MANIFEST.sha256" ]] || {
+        error "manifest verification root lacks a checksum manifest: $root"
+        return 1
+    }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line_number=$((line_number + 1))
+        [[ "$line" =~ ^([0-9a-f]{64})[[:space:]][[:space:]]([A-Za-z0-9_./-]+)$ ]] || {
+            error "malformed manifest entry at line $line_number"
+            return 1
+        }
+        checksum="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[2]}"
+        bundle_manifest_path_is_safe "$path" || {
+            error "unsafe manifest path: $path"
+            return 1
+        }
+        [[ -z "${checksum_seen[$path]+set}" ]] || {
+            error "duplicate manifest entry: $path"
+            return 1
+        }
+        checksum_seen["$path"]=1
+        [[ -f "$root/$path" ]] || {
+            error "manifest payload is missing: $path"
+            return 1
+        }
+        [[ ! -L "$root/$path" ]] || {
+            error "manifest payload must not be a symlink: $path"
+            return 1
+        }
+        bundle_manifest_path_has_no_symlink_component "$root" "$path" || {
+            error "manifest path traverses a symlink: $path"
+            return 1
+        }
+        actual="$(hash_file "$root/$path")" || {
+            error "unable to hash manifest payload: $path"
+            return 1
+        }
+        [[ "$actual" == "$checksum" ]] || {
+            error "manifest payload hash mismatch: $path"
+            return 1
+        }
+    done < "$root/MANIFEST.sha256"
 }
 
 validate_payload_file() {
@@ -131,6 +297,45 @@ standalone_destination_is_external() {
     fi
 }
 
+refresh_standalone_manifest() {
+    local root="$1" version_hash line temporary version_seen=0
+
+    version_hash="$(hash_file "$root/VERSION")" || {
+        error 'unable to hash standalone application VERSION'
+        return 1
+    }
+    temporary="$(mktemp "$root/MANIFEST.sha256.tmp.XXXXXX")" || {
+        error 'unable to stage the standalone root checksum manifest'
+        return 1
+    }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" == *'  VERSION' ]]; then
+            version_seen=$((version_seen + 1))
+            printf '%s  VERSION\n' "$version_hash" >> "$temporary" || {
+                rm -f -- "$temporary"
+                error 'unable to write the standalone root VERSION checksum'
+                return 1
+            }
+        else
+            printf '%s\n' "$line" >> "$temporary" || {
+                rm -f -- "$temporary"
+                error 'unable to rewrite the standalone root checksum manifest'
+                return 1
+            }
+        fi
+    done < "$root/MANIFEST.sha256"
+    if ((version_seen != 1)); then
+        rm -f -- "$temporary"
+        error 'standalone root checksum manifest does not contain exactly one VERSION entry'
+        return 1
+    fi
+    mv -- "$temporary" "$root/MANIFEST.sha256" || {
+        rm -f -- "$temporary"
+        error 'unable to install the standalone root checksum manifest'
+        return 1
+    }
+}
+
 write_lock() {
     local root="$1" bundle="$2" mode="$3"
     local source_version source_commit manifest_hash
@@ -160,7 +365,8 @@ install_bundle() {
         rm -rf -- "$temporary"
         return 1
     fi
-    if ! write_lock "$temporary" "$bundle" "$mode"; then
+    if ! write_lock "$temporary" "$temporary" "$mode" ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary" > /dev/null; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -191,7 +397,8 @@ update_bundle() {
         rm -rf -- "$temporary"
         return 1
     fi
-    if ! write_lock "$temporary" "$bundle" update; then
+    if ! write_lock "$temporary" "$temporary" update ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary" > /dev/null; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -268,7 +475,7 @@ verify_destination() {
 
 standalone_bundle() {
     local application="$1" framework_bundle="$2" destination="$3" temporary application_payload relative
-    local application_root required_payload
+    local application_root required_payload framework_manifest_hash root_manifest_hash
     local -a payload_files=() selected_paths=()
     local -A payload_seen=() required_payloads=()
     shift 3
@@ -328,20 +535,40 @@ standalone_bundle() {
         error "unable to create a private staging directory beside '$destination'"
         return 1
     }
-    application_payload="$temporary/.application-payload"
-    if ! copy_payload_files "$application_root" "$application_payload" "${selected_paths[@]}"; then
-        rm -rf -- "$temporary"
-        return 1
-    fi
     # Put the verified framework at the standalone root for the established
     # artifact layout, then restore the consumer-owned metadata that shares a
     # framework filename. The launcher reads its version from the framework
     # release file, so the application VERSION remains user-visible.
     if ! mkdir -p "$temporary/vendor/base-bash-libs" "$temporary/bin" ||
         ! copy_verified_bundle "$framework_bundle" "$temporary" ||
-        ! copy_verified_bundle "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
-        ! write_lock "$temporary/vendor/base-bash-libs" "$framework_bundle" standalone ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary" > /dev/null ||
         ! chmod +x "$temporary/bin/base-bash"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    if ! copy_verified_bundle "$framework_bundle" "$temporary/vendor/base-bash-libs" ||
+        ! write_lock "$temporary/vendor/base-bash-libs" "$temporary/vendor/base-bash-libs" standalone ||
+        ! BUNDLE_VERIFY_ALLOW_LOCK=1 "$repo_root/scripts/library-bundle" verify "$temporary/vendor/base-bash-libs" > /dev/null; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
+    framework_manifest_hash="$(hash_file "$temporary/vendor/base-bash-libs/MANIFEST.sha256")" || {
+        rm -rf -- "$temporary"
+        error 'unable to hash the staged framework manifest'
+        return 1
+    }
+    root_manifest_hash="$(hash_file "$temporary/MANIFEST.sha256")" || {
+        rm -rf -- "$temporary"
+        error 'unable to hash the staged standalone root manifest'
+        return 1
+    }
+    [[ "$root_manifest_hash" == "$framework_manifest_hash" ]] || {
+        rm -rf -- "$temporary"
+        error 'standalone framework copies observed different manifest content'
+        return 1
+    }
+    application_payload="$temporary/.application-payload"
+    if ! copy_payload_files "$application_root" "$application_payload" "${selected_paths[@]}"; then
         rm -rf -- "$temporary"
         return 1
     fi
@@ -360,8 +587,12 @@ standalone_bundle() {
         rm -rf -- "$temporary"
         return 1
     }
+    if ! refresh_standalone_manifest "$temporary" || ! verify_manifest_copy "$temporary"; then
+        rm -rf -- "$temporary"
+        return 1
+    fi
     printf 'standalone_format=1\nframework_lock=%s\nprovenance=verified-offline-bundle\n' \
-        "$(hash_file "$framework_bundle/MANIFEST.sha256")" > "$temporary/BASE_BASH_STANDALONE.release" || {
+        "$framework_manifest_hash" > "$temporary/BASE_BASH_STANDALONE.release" || {
         rm -rf -- "$temporary"
         return 1
     }

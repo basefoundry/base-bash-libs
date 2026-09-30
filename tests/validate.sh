@@ -48,6 +48,7 @@ required_files=(
     scripts/release-bom-row
     scripts/release-version-policy.sh
     scripts/api-manifest
+    scripts/bundle-manifest.sh
     scripts/library-bundle
     scripts/vendor
     scripts/migrate-v2-symbols
@@ -412,6 +413,7 @@ done <<< "$manifest_source_paths"
 run_stage "ShellCheck error profile" shellcheck --severity=error \
     bin/base-bash \
     scripts/api-manifest \
+    scripts/bundle-manifest.sh \
     scripts/library-bundle \
     scripts/vendor \
     scripts/release \

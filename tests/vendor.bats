@@ -13,6 +13,14 @@ setup() {
     BASE_BASH_LIBS_DIR="$BASE_BASH_DIR" "$BASE_REPO_ROOT/bin/base-bash" init --profile standard --dir "$application" >/dev/null
 }
 
+vendor_test_hash_file() {
+    if command -v sha256sum > /dev/null 2>&1; then
+        sha256sum -- "$1" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$1" | awk '{print $1}'
+    fi
+}
+
 vendor_test_make_copy_race_stub() {
     local stub_dir="$TEST_TMPDIR/racing-cp-bin"
     mkdir -p "$stub_dir"
@@ -21,6 +29,12 @@ vendor_test_make_copy_race_stub() {
 set -u
 source_path="${@: -2:1}"
 if [[ "$source_path" == "${VENDOR_TEST_RACE_SOURCE-}" ]]; then
+    if [[ "${VENDOR_TEST_RACE_MODE-}" == content-after ]]; then
+        "$VENDOR_TEST_REAL_CP" "$@"
+        copy_status=$?
+        printf 'tampered-after-copy\n' > "$source_path"
+        exit "$copy_status"
+    fi
     if [[ "${VENDOR_TEST_RACE_MODE-}" == parent ]]; then
         mv -- "$VENDOR_TEST_RACE_PARENT" "$VENDOR_TEST_RACE_BACKUP" || exit 1
         ln -s -- "$VENDOR_TEST_RACE_TARGET" "$VENDOR_TEST_RACE_PARENT" || {
@@ -47,6 +61,25 @@ fi
 exec "$VENDOR_TEST_REAL_CP" "$@"
 EOF
     chmod +x "$stub_dir/cp"
+}
+
+@test "vendor create rejects framework payload mutation during copy" {
+    local real_cp
+    real_cp="$(command -v cp)"
+    vendor_test_make_copy_race_stub
+
+    bats_run env PATH="$TEST_TMPDIR/racing-cp-bin:$BASE_TEST_ORIG_PATH" \
+        VENDOR_TEST_REAL_CP="$real_cp" \
+        VENDOR_TEST_RACE_MODE=content-after \
+        VENDOR_TEST_RACE_SOURCE="$framework_bundle/VERSION" \
+        "$BASE_REPO_ROOT/scripts/vendor" create "$framework_bundle" "$vendor_tree"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed while it was being copied"* ]] || {
+        printf 'Unexpected vendor staging output: %s\n' "$output" >&2
+        false
+    }
+    [ ! -e "$vendor_tree" ]
+    [ -z "$(find "${vendor_tree}.tmp."* -maxdepth 0 -print -quit 2>/dev/null)" ]
 }
 
 @test "vendor create and verify are offline and immutable" {
@@ -149,6 +182,12 @@ SCRIPT
         "$(sed -n 's/^source_version=//p' "$standalone/vendor/base-bash-libs/BUNDLE.release")" ]
     [ "$(sed -n 's/^source_commit=//p' "$standalone/vendor/base-bash-libs/base-bash-libs.lock")" = \
         "$(sed -n 's/^source_commit=//p' "$standalone/vendor/base-bash-libs/BUNDLE.release")" ]
+    root_version_hash="$(sed -n 's/^\([0-9a-f]*\)  VERSION$/\1/p' "$standalone/MANIFEST.sha256")"
+    nested_version_hash="$(sed -n 's/^\([0-9a-f]*\)  VERSION$/\1/p' "$standalone/vendor/base-bash-libs/MANIFEST.sha256")"
+    [ "$root_version_hash" = "$(vendor_test_hash_file "$standalone/VERSION")" ]
+    [ "$nested_version_hash" = "$(vendor_test_hash_file "$standalone/vendor/base-bash-libs/VERSION")" ]
+    [ "$(sed -n 's/^framework_lock=//p' "$standalone/BASE_BASH_STANDALONE.release")" = \
+        "$(vendor_test_hash_file "$standalone/vendor/base-bash-libs/MANIFEST.sha256")" ]
     bats_run env PATH="$standalone/bin:$PATH" "$standalone/bin/app" run
     [ "$status" -eq 0 ]
     [[ "$output" == *"hello=world"* ]]

@@ -69,7 +69,10 @@ its own `base-bash-libs.lock`, so consumers can verify it independently:
 scripts/vendor verify dist/app/vendor/base-bash-libs
 ```
 
-Both framework copies carry the same `MANIFEST.sha256`, version, and source commit from
-the input bundle. Standalone creation stages the complete payload and its lock
-before one atomic move. No command downloads, executes, or evaluates remote
-content.
+Both framework copies carry the same framework version, source commit, and
+canonical manifest before the application payload is restored. The root copy's
+manifest then records the application's user-visible `VERSION`, while
+`BASE_BASH_STANDALONE.release` binds `framework_lock` to the canonical manifest
+in `vendor/base-bash-libs`. Standalone creation stages the complete payload and
+its lock before one atomic move. No command downloads, executes, or evaluates
+remote content.

@@ -118,6 +118,13 @@ setup() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"symlink"* ]]
 
+    cp -R "$source" "$TEST_TMPDIR/parent-symlink"
+    mv "$TEST_TMPDIR/parent-symlink/lib" "$TEST_TMPDIR/parent-symlink/lib.real"
+    ln -s lib.real "$TEST_TMPDIR/parent-symlink/lib"
+    bats_run "$BASE_REPO_ROOT/scripts/library-bundle" verify "$TEST_TMPDIR/parent-symlink"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"path traverses a symlink"* ]]
+
     cp -R "$source" "$TEST_TMPDIR/metadata"
     awk '{ if ($0 ~ /^source_version=/) print "source_version=9.9.9"; else print }' \
         "$TEST_TMPDIR/metadata/BUNDLE.release" > "$TEST_TMPDIR/metadata/BUNDLE.tmp"
