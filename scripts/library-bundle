@@ -5,6 +5,9 @@
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 1
 
+# shellcheck source=bundle-manifest.sh
+source "$repo_root/scripts/bundle-manifest.sh" || exit 1
+
 usage() {
     cat >&2 << 'EOF'
 Usage:
@@ -167,8 +170,7 @@ verify_bundle() {
         }
         expected="${BASH_REMATCH[1]}"
         path="${BASH_REMATCH[2]}"
-        [[ "$path" != /* && "$path" != ./* && "$path" != */ && "$path" != *'//'* &&
-            "$path" != *'/../'* && "$path" != ../* && "$path" != *'/./'* && "$path" != ./ ]] || {
+        bundle_manifest_path_is_safe "$path" || {
             error "unsafe checksum path: $path"
             return 1
         }
@@ -183,6 +185,10 @@ verify_bundle() {
         }
         [[ ! -L "$root/$path" ]] || {
             error "bundle file must not be a symlink: $path"
+            return 1
+        }
+        bundle_manifest_path_has_no_symlink_component "$root" "$path" || {
+            error "bundle path traverses a symlink: $path"
             return 1
         }
         actual="$(hash_file "$root/$path")"
