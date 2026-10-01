@@ -486,7 +486,11 @@ while IFS= read -r file; do
     [[ -n "$file" ]] && bats_files+=("$file")
 done <<< "$manifest_test_paths"
 
-run_stage "BATS test suites" bats \
+run_bats_noninteractive() {
+    bats "$@" < /dev/null
+}
+
+run_stage "BATS test suites" run_bats_noninteractive \
     "${bats_files[@]}" || exit $?
 
 run_stage "Project intake REST contract" python3 tests/project-intake-test.py || exit $?
