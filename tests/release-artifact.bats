@@ -5,7 +5,10 @@ load ../lib/bash/tests/test_helper.sh
 setup() {
     setup_test_tmpdir
     RELEASE_ARTIFACT="$BASE_REPO_ROOT/scripts/release-artifact"
-    RELEASE_COMMIT="$(git -C "$BASE_REPO_ROOT" rev-parse HEAD)"
+    RELEASE_SOURCE_ROOT="$TEST_TMPDIR/source-repo"
+    git clone --local "$BASE_REPO_ROOT" "$RELEASE_SOURCE_ROOT" > /dev/null
+    RELEASE_COMMIT="$(git -C "$RELEASE_SOURCE_ROOT" rev-parse HEAD)"
+    export BASE_BASH_RELEASE_SOURCE_ROOT="$RELEASE_SOURCE_ROOT"
 }
 
 release_test_hash_file() {
@@ -181,6 +184,19 @@ EOF
     [[ "$output" == *"Option '--commit' may be provided only once."* ]]
 }
 
+@test "release artifact build rejects a dirty source root" {
+    local dirty_source="$TEST_TMPDIR/dirty-source" output="$TEST_TMPDIR/dirty-artifact"
+
+    git clone --local "$BASE_REPO_ROOT" "$dirty_source" > /dev/null
+    printf 'dirty\n' >> "$dirty_source/VERSION"
+
+    bats_run env BASE_BASH_RELEASE_SOURCE_ROOT="$dirty_source" \
+        "$RELEASE_ARTIFACT" build --version 2.2.0-rc.1 --commit "$RELEASE_COMMIT" \
+        --output "$output"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"The source checkout must be clean."* ]]
+}
+
 @test "release artifact build and verify support post-GA patch and minor versions" {
     local version artifact
 
@@ -310,10 +326,9 @@ EOF
 @test "remote release verification rejects missing assets and cleans partial retries" {
     local artifact="$TEST_TMPDIR/artifact" verified="$TEST_TMPDIR/verified" source_repo
 
-    # Build from a clean local clone because the test worktree contains the
-    # uncommitted remote-verifier changes themselves.
-    source_repo="$TEST_TMPDIR/source-repo"
-    git clone --local "$BASE_REPO_ROOT" "$source_repo" > /dev/null
+    # Build from the per-test clean local clone because the test worktree may
+    # contain uncommitted release-artifact changes itself.
+    source_repo="$RELEASE_SOURCE_ROOT"
     export REMOTE_VERSION=2.0.0-rc.1 REMOTE_COMMIT="$RELEASE_COMMIT" REMOTE_SOURCE="$artifact"
     "$source_repo/scripts/release-artifact" build --version "$REMOTE_VERSION" \
         --commit "$REMOTE_COMMIT" --output "$artifact" > /dev/null
