@@ -326,6 +326,17 @@ if [[ "$(grep -c '^## \[Unreleased\]' CHANGELOG.md)" != 1 ]]; then
     printf 'CHANGELOG.md must contain exactly one [Unreleased] section.\n' >&2
     exit 1
 fi
+if grep -F 'No unreleased changes yet.' CHANGELOG.md > /dev/null; then
+    latest_release_ref="$(git describe --tags --match 'v[0-9]*' --abbrev=0 2> /dev/null || true)"
+    if [[ -n "$latest_release_ref" ]]; then
+        unreleased_commit_count="$(git rev-list --count "$latest_release_ref..HEAD" 2> /dev/null || printf '0')"
+        if [[ "$unreleased_commit_count" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'CHANGELOG.md cannot retain the empty Unreleased placeholder while %s has %s commits after %s.\n' \
+                "$latest_release_ref" "$unreleased_commit_count" "$latest_release_ref" >&2
+            exit 1
+        fi
+    fi
+fi
 if [[ "$(grep -c -F "## [$version]" CHANGELOG.md)" -gt 1 ]]; then
     printf 'CHANGELOG.md contains duplicate release sections for %s.\n' "$version" >&2
     exit 1
