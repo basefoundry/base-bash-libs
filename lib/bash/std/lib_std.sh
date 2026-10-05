@@ -1650,11 +1650,11 @@ __base_bash_libs_std_decimal_integer_value__() {
     else
         __base_bash_libs_std_decimal_limit=9223372036854775807
     fi
-    if (( ${#__base_bash_libs_std_decimal_digits} > ${#__base_bash_libs_std_decimal_limit} )); then
+    if ((${#__base_bash_libs_std_decimal_digits} > ${#__base_bash_libs_std_decimal_limit})); then
         return 1
     fi
     # shellcheck disable=SC2071 # Equal-length decimal strings need lexical ordering.
-    if (( ${#__base_bash_libs_std_decimal_digits} == ${#__base_bash_libs_std_decimal_limit} )) &&
+    if ((${#__base_bash_libs_std_decimal_digits} == ${#__base_bash_libs_std_decimal_limit})) &&
         [[ "$__base_bash_libs_std_decimal_digits" > "$__base_bash_libs_std_decimal_limit" ]]; then
         return 1
     fi

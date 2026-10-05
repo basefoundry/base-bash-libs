@@ -635,7 +635,7 @@ base_app_config_get() {
     [[ -n "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]+set}" ]] || return 1
     local __base_bash_libs_app_config_get_value="${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"
     local __base_bash_libs_app_config_get_declaration=""
-    if __base_bash_libs_app_config_get_declaration=$(declare -p "$__base_bash_libs_app_config_get_result_name" 2>/dev/null) &&
+    if __base_bash_libs_app_config_get_declaration=$(declare -p "$__base_bash_libs_app_config_get_result_name" 2> /dev/null) &&
         [[ "$__base_bash_libs_app_config_get_declaration" == declare\ -i* ]]; then
         __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_app_config_get_value "$__base_bash_libs_app_config_get_value" || {
             __base_bash_libs_app_error__ "configuration '$__base_bash_libs_app_config_get_key' is outside the supported integer range."
