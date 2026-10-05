@@ -10,6 +10,24 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly BASE_BASH_LIBS_STR_LOADED=1
 
+__base_bash_libs_str_contains_exact__() {
+    local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_needle="${2-}"
+
+    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_needle"* ]])
+}
+
+__base_bash_libs_str_starts_with_exact__() {
+    local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_prefix="${2-}"
+
+    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == "$__base_bash_libs_str_prefix"* ]])
+}
+
+__base_bash_libs_str_ends_with_exact__() {
+    local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_suffix="${2-}"
+
+    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_suffix" ]])
+}
+
 # __base_bash_libs_str_escape_tsv_field__ - Escape one value for a TSV record.
 #
 # This internal primitive is shared by modules that publish line-oriented
@@ -96,7 +114,7 @@ base_str_contains() {
         base_std_log_error -l base_bash_libs.str "base_str_contains: usage: base_str_contains <value> <needle>"
         return 2
     }
-    [[ "$value" == *"$needle"* ]]
+    __base_bash_libs_str_contains_exact__ "$value" "$needle"
 }
 
 base_str_starts_with() {
@@ -106,7 +124,7 @@ base_str_starts_with() {
         base_std_log_error -l base_bash_libs.str "base_str_starts_with: usage: base_str_starts_with <value> <prefix>"
         return 2
     }
-    [[ "$value" == "$prefix"* ]]
+    __base_bash_libs_str_starts_with_exact__ "$value" "$prefix"
 }
 
 base_str_ends_with() {
@@ -116,7 +134,7 @@ base_str_ends_with() {
         base_std_log_error -l base_bash_libs.str "base_str_ends_with: usage: base_str_ends_with <value> <suffix>"
         return 2
     }
-    [[ "$value" == *"$suffix" ]]
+    __base_bash_libs_str_ends_with_exact__ "$value" "$suffix"
 }
 
 # Splits a value into a caller-owned indexed array. Empty fields are preserved,
@@ -138,7 +156,9 @@ base_str_split() {
     if [[ -z "$__base_bash_libs_str_split_separator" ]]; then
         __base_bash_libs_str_split_fields=("$__base_bash_libs_str_split_value")
     else
-        while [[ "$__base_bash_libs_str_split_remainder" == *"$__base_bash_libs_str_split_separator"* ]]; do
+        while __base_bash_libs_str_contains_exact__ \
+            "$__base_bash_libs_str_split_remainder" \
+            "$__base_bash_libs_str_split_separator"; do
             __base_bash_libs_str_split_fields+=("${__base_bash_libs_str_split_remainder%%"$__base_bash_libs_str_split_separator"*}")
             __base_bash_libs_str_split_remainder="${__base_bash_libs_str_split_remainder#*"$__base_bash_libs_str_split_separator"}"
         done

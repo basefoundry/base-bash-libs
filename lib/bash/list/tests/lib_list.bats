@@ -119,6 +119,22 @@ create_script() {
     [ "${values[1]}" = "gamma" ]
 }
 
+@test "list matching remains exact under nocasematch" {
+    local -a values=(A a)
+
+    shopt -s nocasematch
+    base_list_remove values a
+    if base_list_contains a values; then
+        shopt -u nocasematch
+        return 1
+    fi
+    base_list_contains A values
+    shopt -u nocasematch
+
+    [ "${#values[@]}" -eq 1 ]
+    [ "${values[0]}" = "A" ]
+}
+
 @test "base_list_remove preserves a caller scratch variable with the loop-item name" {
     local __base_bash_libs_list_item=caller-owned
     local -a values=(alpha beta)
