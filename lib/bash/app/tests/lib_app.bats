@@ -140,6 +140,40 @@ assert_demo_snapshot() {
     [ "$scalar_output" = 30 ]
 }
 
+@test "integer configuration normalizes decimal values before integer outputs" {
+    local scalar_output=unchanged
+    local -i integer_output=99
+
+    base_app_init decimal_integer name=decimal-integer
+    base_app_config_define decimal_integer count integer default=010
+    base_app_config_load decimal_integer --cli count=08
+
+    base_app_config_get decimal_integer count scalar_output
+    [ "$scalar_output" = 08 ]
+    base_app_config_get decimal_integer count integer_output
+    [ "$integer_output" -eq 8 ]
+}
+
+@test "integer configuration rejects overflow without replacing the last snapshot" {
+    local value=unchanged
+    local rc
+
+    base_app_init bounded_integer name=bounded-integer
+    base_app_config_define bounded_integer count integer default=7
+    base_app_config_load bounded_integer
+    base_app_config_get bounded_integer count value
+    [ "$value" = 7 ]
+
+    if base_app_config_load bounded_integer --cli count=18446744073709551616; then
+        rc=0
+    else
+        rc=$?
+    fi
+    [ "$rc" -eq 2 ]
+    base_app_config_get bounded_integer count value
+    [ "$value" = 7 ]
+}
+
 @test "empty environment bindings do not override file configuration" {
     local project_file="$TEST_TMPDIR/project.conf" value source
 

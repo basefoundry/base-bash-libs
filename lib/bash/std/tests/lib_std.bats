@@ -4842,6 +4842,31 @@ EOF
     [[ "$output" != *"value too great for base"* ]]
 }
 
+@test "integer range validation rejects machine overflow before arithmetic conversion" {
+    local script="$TEST_TMPDIR/assert-overflowing-integer.sh"
+
+    create_script "$script" <<EOF
+#!/usr/bin/env bash
+source "$STDLIB_PATH"
+value=18446744073709551617
+base_std_assert_integer_range value 1 10
+EOF
+
+    bats_run bash "$script"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"outside the supported integer range"* ]]
+    [[ "$output" != *"value too great for base"* ]]
+}
+
+@test "integer range validation accepts signed 64-bit boundaries" {
+    local minimum=-9223372036854775808
+    local maximum=9223372036854775807
+
+    base_std_assert_integer_range minimum -9223372036854775808 0
+    base_std_assert_integer_range maximum 0 9223372036854775807
+}
+
 @test "integer ranges reject inverted bounds" {
     local script="$TEST_TMPDIR/assert-inverted-range.sh"
 

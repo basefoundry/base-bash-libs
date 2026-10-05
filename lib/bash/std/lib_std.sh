@@ -1624,7 +1624,8 @@ base_std_is_dry_run() {
 
 __base_bash_libs_std_decimal_integer_value__() {
     local __base_bash_libs_std_decimal_result_name="${1-}" __base_bash_libs_std_decimal_value="${2-}" __base_bash_libs_std_decimal_sign=""
-    local __base_bash_libs_std_decimal_digits
+    local __base_bash_libs_std_decimal_digits __base_bash_libs_std_decimal_limit
+    local LC_ALL=C
 
     [[ "$__base_bash_libs_std_decimal_value" =~ ^[-+]?[0-9]+$ ]] || return 1
     case "$__base_bash_libs_std_decimal_value" in
@@ -1644,8 +1645,26 @@ __base_bash_libs_std_decimal_integer_value__() {
         __base_bash_libs_std_decimal_digits="${__base_bash_libs_std_decimal_digits:1}"
     done
 
+    if [[ "$__base_bash_libs_std_decimal_sign" == "-" ]]; then
+        __base_bash_libs_std_decimal_limit=9223372036854775808
+    else
+        __base_bash_libs_std_decimal_limit=9223372036854775807
+    fi
+    if (( ${#__base_bash_libs_std_decimal_digits} > ${#__base_bash_libs_std_decimal_limit} )); then
+        return 1
+    fi
+    # shellcheck disable=SC2071 # Equal-length decimal strings need lexical ordering.
+    if (( ${#__base_bash_libs_std_decimal_digits} == ${#__base_bash_libs_std_decimal_limit} )) &&
+        [[ "$__base_bash_libs_std_decimal_digits" > "$__base_bash_libs_std_decimal_limit" ]]; then
+        return 1
+    fi
+
     if [[ "$__base_bash_libs_std_decimal_sign" == "-" && "$__base_bash_libs_std_decimal_digits" != "0" ]]; then
-        printf -v "$__base_bash_libs_std_decimal_result_name" '%s' "-$((10#$__base_bash_libs_std_decimal_digits))"
+        if [[ "$__base_bash_libs_std_decimal_digits" == 9223372036854775808 ]]; then
+            printf -v "$__base_bash_libs_std_decimal_result_name" '%s' -9223372036854775808
+        else
+            printf -v "$__base_bash_libs_std_decimal_result_name" '%s' "-$((10#$__base_bash_libs_std_decimal_digits))"
+        fi
     else
         printf -v "$__base_bash_libs_std_decimal_result_name" '%s' "$((10#$__base_bash_libs_std_decimal_digits))"
     fi
@@ -3995,9 +4014,12 @@ base_std_assert_integer_range() {
     fi
     __base_bash_libs_std_range_value="${!__base_bash_libs_std_range_name-}"
     __base_bash_libs_std_assert_integer_names__ "$__base_bash_libs_std_range_name"
-    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_value_number "$__base_bash_libs_std_range_value"
-    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_min_number "$__base_bash_libs_std_range_min"
-    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_max_number "$__base_bash_libs_std_range_max"
+    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_value_number "$__base_bash_libs_std_range_value" ||
+        base_std_fatal_error "Variable '$__base_bash_libs_std_range_name' with value '$__base_bash_libs_std_range_value' is outside the supported integer range."
+    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_min_number "$__base_bash_libs_std_range_min" ||
+        base_std_fatal_error "base_std_assert_integer_range minimum bound '$__base_bash_libs_std_range_min' is outside the supported integer range."
+    __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_std_range_max_number "$__base_bash_libs_std_range_max" ||
+        base_std_fatal_error "base_std_assert_integer_range maximum bound '$__base_bash_libs_std_range_max' is outside the supported integer range."
     ((__base_bash_libs_std_range_min_number > __base_bash_libs_std_range_max_number)) &&
         base_std_fatal_error "base_std_assert_integer_range minimum '$__base_bash_libs_std_range_min' cannot exceed maximum '$__base_bash_libs_std_range_max'."
     ((__base_bash_libs_std_range_value_number < __base_bash_libs_std_range_min_number || __base_bash_libs_std_range_value_number > __base_bash_libs_std_range_max_number)) &&
