@@ -1229,6 +1229,21 @@ EOF
     [ "$PATH" = "/one:/two:/three" ]
 }
 
+@test "base_std_dedupe_path preserves literal glob entries" {
+    mkdir -p "$TEST_TMPDIR/literal-one" "$TEST_TMPDIR/literal-two"
+
+    bats_run bash -c '
+        source "$1"
+        shopt -s nullglob failglob
+        PATH="$2/literal*:/usr/bin:$2/literal*"
+        base_std_dedupe_path
+        printf "%s\n" "$PATH"
+    ' bash "$STDLIB_PATH" "$TEST_TMPDIR"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "$TEST_TMPDIR/literal*:/usr/bin" ]
+}
+
 @test "base_std_print_path emits one path entry per line" {
     PATH="/one:/two:/three"
 

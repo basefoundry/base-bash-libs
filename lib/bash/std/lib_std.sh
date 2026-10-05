@@ -901,7 +901,13 @@ base_std_add_to_path() {
 base_std_dedupe_path() {
     local -A seen
     local IFS=':' new_path dir
-    for dir in $PATH; do
+    local -a path_entries=()
+
+    # Read PATH as data before iterating.  An unquoted `$PATH` expansion would
+    # apply pathname expansion, so a literal entry such as `/opt/tools/*`
+    # could be replaced by matching filesystem names (or fail under failglob).
+    IFS=: read -r -a path_entries <<< "$PATH"
+    for dir in "${path_entries[@]+${path_entries[@]}}"; do
         if [[ -n "$dir" && -z "${seen[$dir]-}" ]]; then
             new_path="${new_path:+$new_path:}$dir"
             seen["$dir"]=1
