@@ -420,7 +420,7 @@ base_git_update_repo() {
         base_std_log_error -l base_bash_libs.git "Unable to resolve Git repository path '$git_repo'."
         return 1
     fi
-    if ! discovered_root=$(git -C "$git_repo" rev-parse --show-toplevel 2>/dev/null); then
+    if ! discovered_root=$(git -C "$git_repo" rev-parse --show-toplevel 2> /dev/null); then
         base_std_log_error -l base_bash_libs.git "'$git_repo' is not a Git repository."
         return 1
     fi
