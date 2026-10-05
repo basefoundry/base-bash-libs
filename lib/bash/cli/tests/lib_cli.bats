@@ -845,6 +845,50 @@ EOF
     [ -z "$output" ]
 }
 
+@test "completion stops command traversal after a positional while retaining root options" {
+    local completion_script="$TEST_TMPDIR/boundary-completion.bash"
+
+    base_cli_model_init boundary name=boundary
+    base_cli_command boundary deploy "Deploy" aliases=d
+    base_cli_command boundary deploy/plan "Plan" aliases=p
+    base_cli_option boundary '' root_flag flag --root-flag
+    base_cli_option boundary deploy force flag --force
+    base_cli_option boundary deploy/plan deep flag --deep
+    base_cli_positional boundary '' item repeatable=true
+
+    bats_run base_cli_complete boundary -- file deploy --f
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete boundary -- file deploy --r
+    [ "$status" -eq 0 ]
+    [ "$output" = --root-flag ]
+    bats_run base_cli_complete boundary -- file d p --d
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    bats_run base_cli_complete boundary -- file -- deploy ""
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+
+    base_cli_completion_script boundary _boundary_complete > "$completion_script"
+    source "$completion_script"
+    COMP_WORDS=(boundary file deploy --f)
+    COMP_CWORD=3
+    _boundary_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+    COMP_WORDS=(boundary file deploy --r)
+    COMP_CWORD=3
+    _boundary_complete
+    [ "${COMPREPLY[*]}" = --root-flag ]
+    COMP_WORDS=(boundary file d p --d)
+    COMP_CWORD=4
+    _boundary_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+    COMP_WORDS=(boundary file -- deploy "")
+    COMP_CWORD=4
+    _boundary_complete
+    [ "${#COMPREPLY[@]}" -eq 0 ]
+}
+
 @test "completion keeps partial candidates unique and one per line" {
     base_cli_model_init unique_complete name=unique-complete
     base_cli_command unique_complete admin "Administration" aliases=adm

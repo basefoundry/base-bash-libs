@@ -1522,7 +1522,7 @@ base_cli_complete() {
     local model="${1-}" current prefix path="" word token option_path name type child_path index
     # shellcheck disable=SC2034 # Option lookup path is intentionally unused while resolving completion state.
     local found_name found_path found_type
-    local parse_options=1 pending_value=0 inline_value=0
+    local parse_options=1 parse_commands=1 pending_value=0 inline_value=0
     local -a words=() completed=() children=() __base_bash_libs_cli_option_tokens=()
     local -a __base_bash_libs_cli_option_names=() __base_bash_libs_cli_option_paths=()
 
@@ -1542,6 +1542,7 @@ base_cli_complete() {
         fi
         if ((parse_options)) && [[ "$word" == -- ]]; then
             parse_options=0
+            parse_commands=0
             continue
         fi
         ((parse_options)) || continue
@@ -1558,8 +1559,16 @@ base_cli_complete() {
             fi
             continue
         fi
-        child_path="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$word")"
-        [[ -n "$child_path" ]] && path="$child_path"
+        if ((parse_commands)); then
+            child_path="$(__base_bash_libs_cli_command_child__ "$model" "$path" "$word")"
+            if [[ -n "$child_path" ]]; then
+                path="$child_path"
+                continue
+            fi
+        fi
+        # Match base_cli_parse: the first non-command word is positional and
+        # permanently ends command traversal, while options remain available.
+        parse_commands=0
     done
     ((parse_options && !pending_value)) || return 0
     if [[ "$prefix" == --*=* ]]; then
