@@ -7,8 +7,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-The v2.2.0 release-preparation issue will move these entries into the dated
-release section after the final merged commit is selected.
+<!-- The v2.2.0 release-preparation issue will move these entries into the
+dated release section after the final merged commit is selected. -->
 
 ### Added
 

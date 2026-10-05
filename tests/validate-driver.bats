@@ -66,3 +66,47 @@ PYTHON
     [ "$status" -eq 42 ]
     [ "$(cat "$sentinel")" = "non-tty" ]
 }
+
+@test "empty Unreleased is allowed for an untagged release-preparation section" {
+    local candidate_repo="$TEST_TMPDIR/candidate-repo"
+
+    mkdir -p "$candidate_repo"
+    git -C "$candidate_repo" init -q
+    git -C "$candidate_repo" config user.name "Validation test"
+    git -C "$candidate_repo" config user.email "validation@example.invalid"
+    printf '## [Unreleased]\n\nNo unreleased changes yet.\n' > "$candidate_repo/CHANGELOG.md"
+    git -C "$candidate_repo" add CHANGELOG.md
+    git -C "$candidate_repo" commit -qm "baseline"
+    git -C "$candidate_repo" tag v2.1.0
+    printf '2.2.0\n' > "$candidate_repo/VERSION"
+    printf '## [Unreleased]\n\nNo unreleased changes yet.\n\n## [2.2.0] - 2026-10-05\n\n### Added\n\n- Candidate notes.\n' > "$candidate_repo/CHANGELOG.md"
+    git -C "$candidate_repo" add VERSION CHANGELOG.md
+    git -C "$candidate_repo" commit -qm "prepare 2.2.0"
+
+    run bash -c 'source "$1"; check_changelog_unreleased_placeholder "$2" "$3"' \
+        bash "$BASE_REPO_ROOT/tests/changelog-guard.sh" "$candidate_repo" 2.2.0
+
+    [ "$status" -eq 0 ]
+}
+
+@test "empty Unreleased is rejected after a published release" {
+    local candidate_repo="$TEST_TMPDIR/candidate-repo"
+
+    mkdir -p "$candidate_repo"
+    git -C "$candidate_repo" init -q
+    git -C "$candidate_repo" config user.name "Validation test"
+    git -C "$candidate_repo" config user.email "validation@example.invalid"
+    printf '## [Unreleased]\n\nNo unreleased changes yet.\n' > "$candidate_repo/CHANGELOG.md"
+    git -C "$candidate_repo" add CHANGELOG.md
+    git -C "$candidate_repo" commit -qm "baseline"
+    git -C "$candidate_repo" tag v2.1.0
+    printf 'post-release change\n' > "$candidate_repo/marker"
+    git -C "$candidate_repo" add marker
+    git -C "$candidate_repo" commit -qm "post-release change"
+
+    run bash -c 'source "$1"; check_changelog_unreleased_placeholder "$2" "$3"' \
+        bash "$BASE_REPO_ROOT/tests/changelog-guard.sh" "$candidate_repo" 2.1.0
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"cannot retain the empty Unreleased placeholder"* ]]
+}
