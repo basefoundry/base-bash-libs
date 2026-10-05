@@ -13,7 +13,10 @@ readonly BASE_BASH_LIBS_LIST_LOADED=1
 __base_bash_libs_list_equals_exact__() {
     local __base_bash_libs_list_left="${1-}" __base_bash_libs_list_right="${2-}"
 
-    (shopt -u nocasematch; [[ "$__base_bash_libs_list_left" == "$__base_bash_libs_list_right" ]])
+    (
+        shopt -u nocasematch
+        [[ "$__base_bash_libs_list_left" == "$__base_bash_libs_list_right" ]]
+    )
 }
 
 __base_bash_libs_list_assert_distinct_names__() {

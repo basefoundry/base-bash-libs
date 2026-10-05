@@ -13,19 +13,28 @@ readonly BASE_BASH_LIBS_STR_LOADED=1
 __base_bash_libs_str_contains_exact__() {
     local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_needle="${2-}"
 
-    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_needle"* ]])
+    (
+        shopt -u nocasematch
+        [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_needle"* ]]
+    )
 }
 
 __base_bash_libs_str_starts_with_exact__() {
     local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_prefix="${2-}"
 
-    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == "$__base_bash_libs_str_prefix"* ]])
+    (
+        shopt -u nocasematch
+        [[ "$__base_bash_libs_str_value" == "$__base_bash_libs_str_prefix"* ]]
+    )
 }
 
 __base_bash_libs_str_ends_with_exact__() {
     local __base_bash_libs_str_value="${1-}" __base_bash_libs_str_suffix="${2-}"
 
-    (shopt -u nocasematch; [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_suffix" ]])
+    (
+        shopt -u nocasematch
+        [[ "$__base_bash_libs_str_value" == *"$__base_bash_libs_str_suffix" ]]
+    )
 }
 
 # __base_bash_libs_str_escape_tsv_field__ - Escape one value for a TSV record.
