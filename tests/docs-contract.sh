@@ -68,4 +68,46 @@ for link in SECURITY.md docs/support-policy.md docs/threat-model.md; do
     }
 done
 
+release_process=docs/release-process.md
+for release_contract_text in \
+    'lib/bash/base-bash-libs.release' \
+    'commit=unknown' \
+    'candidate rehearsal' \
+    'real merged commit' \
+    'scripts/release refs --version X.Y.Z' \
+    'scripts/release-artifact verify-remote --version X.Y.Z --commit "$release_commit"'; do
+    grep -F "$release_contract_text" "$release_process" > /dev/null || {
+        printf 'Release-process documentation is missing the required contract text: %s\n' \
+            "$release_contract_text" >&2
+        exit 1
+    }
+done
+
+# Rehearse the documented source-metadata transition in an isolated fixture.
+# The checked-in commit and dirty-state fields remain provenance placeholders;
+# only the version is advanced before the artifact builder creates its staged copy.
+release_fixture="$(mktemp -d "${TMPDIR:-/tmp}/base-bash-release-docs.XXXXXX")" || exit 1
+release_fixture_cleanup() { rm -rf -- "$release_fixture"; }
+trap release_fixture_cleanup EXIT
+cp VERSION "$release_fixture/VERSION" || exit 1
+cp lib/bash/base-bash-libs.release "$release_fixture/base-bash-libs.release" || exit 1
+printf '2.2.0\n' >| "$release_fixture/VERSION" || exit 1
+awk -v candidate=2.2.0 '
+    /^version=/ { print "version=" candidate; next }
+    { print }
+' "$release_fixture/base-bash-libs.release" >| "$release_fixture/base-bash-libs.release.next" || exit 1
+mv -- "$release_fixture/base-bash-libs.release.next" "$release_fixture/base-bash-libs.release" || exit 1
+[[ "$(< "$release_fixture/VERSION")" == "$(sed -n 's/^version=//p' "$release_fixture/base-bash-libs.release")" ]] || {
+    printf 'Release-preparation metadata fixture did not align VERSION and embedded version.\n' >&2
+    exit 1
+}
+grep -Fx 'commit=unknown' "$release_fixture/base-bash-libs.release" > /dev/null || {
+    printf 'Release-preparation metadata fixture must preserve commit=unknown.\n' >&2
+    exit 1
+}
+grep -Fx 'dirty_state=unknown' "$release_fixture/base-bash-libs.release" > /dev/null || {
+    printf 'Release-preparation metadata fixture must preserve dirty_state=unknown.\n' >&2
+    exit 1
+}
+
 printf 'Documentation contract passed.\n'
