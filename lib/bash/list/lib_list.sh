@@ -12,11 +12,21 @@ readonly BASE_BASH_LIBS_LIST_LOADED=1
 
 __base_bash_libs_list_equals_exact__() {
     local __base_bash_libs_list_left="${1-}" __base_bash_libs_list_right="${2-}"
+    local __base_bash_libs_list_restore_nocasematch=0 __base_bash_libs_list_status=1
 
-    (
+    if shopt -q nocasematch; then
+        __base_bash_libs_list_restore_nocasematch=1
         shopt -u nocasematch
-        [[ "$__base_bash_libs_list_left" == "$__base_bash_libs_list_right" ]]
-    )
+    fi
+    if [[ "$__base_bash_libs_list_left" == "$__base_bash_libs_list_right" ]]; then
+        __base_bash_libs_list_status=0
+    else
+        __base_bash_libs_list_status=1
+    fi
+    if ((__base_bash_libs_list_restore_nocasematch)); then
+        shopt -s nocasematch
+    fi
+    return "$__base_bash_libs_list_status"
 }
 
 __base_bash_libs_list_assert_distinct_names__() {

@@ -275,6 +275,7 @@ EOF
     fi
 
     base_str_split parts "aB" "b"
+    shopt -q nocasematch
     shopt -u nocasematch
 
     [ "${#parts[@]}" -eq 1 ]

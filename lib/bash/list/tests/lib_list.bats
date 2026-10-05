@@ -129,6 +129,7 @@ create_script() {
         return 1
     fi
     base_list_contains A values
+    shopt -q nocasematch
     shopt -u nocasematch
 
     [ "${#values[@]}" -eq 1 ]
