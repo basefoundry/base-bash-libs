@@ -415,20 +415,16 @@ base_git_update_repo() {
         return 1
     fi
 
-    local requested_root discovered_root
-    if ! requested_root=$(cd -P -- "$git_repo" && pwd -P); then
-        base_std_log_error -l base_bash_libs.git "Unable to resolve Git repository path '$git_repo'."
-        return 1
-    fi
-    if ! discovered_root=$(git -C "$git_repo" rev-parse --show-toplevel 2> /dev/null); then
+    local repo_prefix discovered_root
+    if ! repo_prefix=$(git -C "$git_repo" rev-parse --show-prefix 2> /dev/null); then
         base_std_log_error -l base_bash_libs.git "'$git_repo' is not a Git repository."
         return 1
     fi
-    if ! discovered_root=$(cd -P -- "$discovered_root" && pwd -P); then
-        base_std_log_error -l base_bash_libs.git "Unable to resolve Git repository root for '$git_repo'."
-        return 1
-    fi
-    if [[ "$requested_root" != "$discovered_root" ]]; then
+    if [[ -n "$repo_prefix" ]]; then
+        if ! discovered_root=$(git -C "$git_repo" rev-parse --show-toplevel 2> /dev/null); then
+            base_std_log_error -l base_bash_libs.git "Unable to resolve Git repository root for '$git_repo'."
+            return 1
+        fi
         base_std_log_error -l base_bash_libs.git \
             "'$git_repo' is not a Git repository root; refusing to update ancestor '$discovered_root'."
         return 1

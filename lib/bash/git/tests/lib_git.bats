@@ -599,6 +599,19 @@ setup() {
     [ -z "$(git -C "$repo" status --porcelain)" ]
 }
 
+@test "base_git_update_repo accepts a case-variant root on case-insensitive filesystems" {
+    local repo="$TEST_TMPDIR/repo"
+    local remote="$TEST_TMPDIR/remote.git"
+    local case_variant="$TEST_TMPDIR/REPO"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "data.txt" "base"
+    [[ -d "$case_variant" ]] || skip "filesystem is case-sensitive"
+
+    capture_command base_git_update_repo "$case_variant" "" main
+
+    [ "$status" -eq 0 ]
+}
+
 @test "caller DEBUG does not enable reusable Git DEBUG by default" {
     local repo="$TEST_TMPDIR/repo"
 
