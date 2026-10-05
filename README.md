@@ -311,6 +311,8 @@ The first-party v2 release handoff is tracked in
 release contract lives in [`base_manifest.yaml`](base_manifest.yaml), and the
 machine-readable module/API contract lives in
 [`base_api_manifest.yaml`](base_api_manifest.yaml).
+The historical promotion sequence and verification record are documented in
+[`docs/first-party-cutover.md`](docs/first-party-cutover.md).
 
 ## Base
 
