@@ -46,7 +46,7 @@ git() {
 main() {
     local expected_major="${1-}" expected_minor="${2-}" expected_patch="${3-}"
     local script_dir repo_root release_script release_driver release_artifact
-    local capture_path output_path artifact_output source_commit artifact_fixture
+    local capture_path output_path artifact_output source_commit artifact_fixture source_repo
 
     if (($# != 0 && $# != 3)); then
         release_smoke_fail "usage: $0 [expected-major expected-minor expected-patch]"
@@ -117,11 +117,17 @@ main() {
         artifact_output="$artifact_fixture"
     else
         artifact_output="$release_smoke_dir/artifact"
-        source_commit="$(command git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2> /dev/null)" || {
+        source_repo="$release_smoke_dir/source-repo"
+        command git clone --local "$repo_root" "$source_repo" > /dev/null 2>&1 || {
+            release_smoke_fail "unable to create a clean source clone for artifact verification."
+            return 1
+        }
+        source_commit="$(command git -C "$source_repo" rev-parse --verify 'HEAD^{commit}' 2> /dev/null)" || {
             release_smoke_fail "unable to resolve the source commit for artifact verification."
             return 1
         }
-        if ! "$release_artifact" build --version 2.0.0 --commit "$source_commit" \
+        if ! BASE_BASH_RELEASE_SOURCE_ROOT="$source_repo" \
+            "$release_artifact" build --version 2.0.0 --commit "$source_commit" \
             --output "$artifact_output" > "$output_path" 2>&1; then
             release_smoke_fail "canonical artifact build failed on Bash $BASH_VERSION."
             return 1
