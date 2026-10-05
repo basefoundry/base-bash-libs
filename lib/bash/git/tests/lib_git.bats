@@ -571,6 +571,34 @@ setup() {
     [[ "$output" == *"has local changes; skipping auto-update"* ]]
 }
 
+@test "base_git_update_repo rejects a descendant without mutating its repository" {
+    local before_head
+    local other="$TEST_TMPDIR/other"
+    local remote="$TEST_TMPDIR/remote.git"
+    local repo="$TEST_TMPDIR/repo"
+    local nested="$repo/nested"
+
+    create_tracked_repo_with_upstream "$repo" "$remote" "data.txt" "first"
+    before_head="$(git -C "$repo" rev-parse HEAD)"
+
+    git clone "$remote" "$other" >/dev/null 2>&1
+    git -C "$other" config user.name "Bats Test"
+    git -C "$other" config user.email "bats@example.com"
+    printf '%s\n' second > "$other/data.txt"
+    git -C "$other" add data.txt
+    git -C "$other" commit -m "Second commit" >/dev/null 2>&1
+    git -C "$other" push origin main >/dev/null 2>&1
+    mkdir -p "$nested"
+
+    capture_command base_git_update_repo "$nested" "" main
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not a Git repository root"* ]]
+    [ "$(git -C "$repo" rev-parse HEAD)" = "$before_head" ]
+    [ "$(cat "$repo/data.txt")" = first ]
+    [ -z "$(git -C "$repo" status --porcelain)" ]
+}
+
 @test "caller DEBUG does not enable reusable Git DEBUG by default" {
     local repo="$TEST_TMPDIR/repo"
 

@@ -71,6 +71,9 @@ base_git_worktree_path_for_branch --result worktree_path feature/topic "$PWD"
   helper's `--result` form whenever a path may end in one or more newlines;
   command substitution necessarily strips those bytes from stdout.
 - `base_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
+- `base_git_update_repo` requires `git_repo` to be the repository root (including
+  a symlink that resolves to that root); it rejects ordinary descendants rather
+  than implicitly updating an ancestor repository.
 - `base_git_update_repo` retries `git pull --ff-only` twice by default. Set
   `BASE_BASH_LIBS_GIT_PULL_MAX_ATTEMPTS` to a positive integer to change the retry count.
 - `base_git_get_current_branch` uses `git -C` so it does not change the caller's
