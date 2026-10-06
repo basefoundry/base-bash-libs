@@ -135,7 +135,7 @@ __base_bash_libs_app_trim__() {
 }
 
 __base_bash_libs_app_validate_value__() {
-    local model="$1" key="$2" value="$3" type enum validator item
+    local model="$1" key="$2" value="$3" type enum validator item __base_bash_libs_app_integer_normalized
     local -a __base_bash_libs_app_enum_values=()
     type="${__base_bash_libs_app_config["$model|$key|type"]-}"
     enum="${__base_bash_libs_app_config["$model|$key|enum"]-}"
@@ -150,7 +150,8 @@ __base_bash_libs_app_validate_value__() {
         }
         ;;
     integer)
-        [[ "$value" =~ ^-?[0-9]+$ ]] || {
+        [[ "$value" =~ ^[-+]?[0-9]+$ ]] &&
+            __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_app_integer_normalized "$value" || {
             __base_bash_libs_app_error__ "configuration '$key' expects an integer."
             return 2
         }
@@ -632,8 +633,16 @@ base_app_config_get() {
         "$__base_bash_libs_app_config_get_result_name" \
         "$__base_bash_libs_app_config_get_output_kind" || return 2
     [[ -n "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]+set}" ]] || return 1
-    printf -v "$__base_bash_libs_app_config_get_result_name" '%s' \
-        "${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"
+    local __base_bash_libs_app_config_get_value="${__base_bash_libs_app_values["$__base_bash_libs_app_config_get_model|$__base_bash_libs_app_config_get_key"]}"
+    local __base_bash_libs_app_config_get_declaration=""
+    if __base_bash_libs_app_config_get_declaration=$(declare -p "$__base_bash_libs_app_config_get_result_name" 2> /dev/null) &&
+        [[ "$__base_bash_libs_app_config_get_declaration" == declare\ -i* ]]; then
+        __base_bash_libs_std_decimal_integer_value__ __base_bash_libs_app_config_get_value "$__base_bash_libs_app_config_get_value" || {
+            __base_bash_libs_app_error__ "configuration '$__base_bash_libs_app_config_get_key' is outside the supported integer range."
+            return 2
+        }
+    fi
+    printf -v "$__base_bash_libs_app_config_get_result_name" '%s' "$__base_bash_libs_app_config_get_value"
 }
 
 # base_app_config_provenance - Copies the source of one effective value.
