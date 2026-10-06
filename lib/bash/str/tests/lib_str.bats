@@ -260,6 +260,28 @@ EOF
     fi
 }
 
+@test "string predicates and split remain exact under nocasematch" {
+    local -a parts=()
+
+    shopt -s nocasematch
+    if base_str_contains "aB" "b"; then
+        return 1
+    fi
+    if base_str_starts_with "aB" "A"; then
+        return 1
+    fi
+    if base_str_ends_with "aB" "b"; then
+        return 1
+    fi
+
+    base_str_split parts "aB" "b"
+    shopt -q nocasematch
+    shopt -u nocasematch
+
+    [ "${#parts[@]}" -eq 1 ]
+    [ "${parts[0]}" = "aB" ]
+}
+
 @test "string predicate helpers reject incorrect argument counts" {
     local script="$TEST_TMPDIR/string-predicate-arity.sh"
 

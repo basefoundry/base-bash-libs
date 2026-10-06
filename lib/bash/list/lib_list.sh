@@ -10,6 +10,25 @@ if [[ "${BASE_BASH_LIBS_STDLIB_LOADED:-}" != "1" ]]; then
 fi
 readonly BASE_BASH_LIBS_LIST_LOADED=1
 
+__base_bash_libs_list_equals_exact__() {
+    local __base_bash_libs_list_left="${1-}" __base_bash_libs_list_right="${2-}"
+    local __base_bash_libs_list_restore_nocasematch=0 __base_bash_libs_list_status=1
+
+    if shopt -q nocasematch; then
+        __base_bash_libs_list_restore_nocasematch=1
+        shopt -u nocasematch
+    fi
+    if [[ "$__base_bash_libs_list_left" == "$__base_bash_libs_list_right" ]]; then
+        __base_bash_libs_list_status=0
+    else
+        __base_bash_libs_list_status=1
+    fi
+    if ((__base_bash_libs_list_restore_nocasematch)); then
+        shopt -s nocasematch
+    fi
+    return "$__base_bash_libs_list_status"
+}
+
 __base_bash_libs_list_assert_distinct_names__() {
     local __base_bash_libs_list_operation="${1-}" __base_bash_libs_list_result_name="${2-}" __base_bash_libs_list_source_name="${3-}"
 
@@ -79,7 +98,8 @@ base_list_remove() {
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     for __base_bash_libs_list_item in "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}"; do
-        [[ "$__base_bash_libs_list_item" == "$__base_bash_libs_list_needle" ]] && continue
+        __base_bash_libs_list_equals_exact__ \
+            "$__base_bash_libs_list_item" "$__base_bash_libs_list_needle" && continue
         __base_bash_libs_list_filtered+=("$__base_bash_libs_list_item")
     done
 
@@ -104,7 +124,8 @@ base_list_contains() {
 
     eval "if [[ -n \"\${${__base_bash_libs_list_array_name}[@]+set}\" ]]; then __base_bash_libs_list_current=(\"\${${__base_bash_libs_list_array_name}[@]}\"); fi"
     for __base_bash_libs_list_item in "${__base_bash_libs_list_current[@]+"${__base_bash_libs_list_current[@]}"}"; do
-        [[ "$__base_bash_libs_list_item" == "$__base_bash_libs_list_needle" ]] && return 0
+        __base_bash_libs_list_equals_exact__ \
+            "$__base_bash_libs_list_item" "$__base_bash_libs_list_needle" && return 0
     done
 
     return 1
