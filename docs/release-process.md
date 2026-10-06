@@ -19,30 +19,52 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 1. Create or choose a release issue and set its repository Project metadata.
 2. Create a release-preparation branch and dedicated worktree from
    `origin/main`.
-3. Move the relevant `Unreleased` entries in `CHANGELOG.md` into a dated
-   release section. Update `VERSION` and the top release row in `README.md` to
-   the same version. Ordinary pull requests do not change `VERSION`.
-4. Build and verify the canonical release asset set from the tagged commit:
+3. Prepare the release metadata in the release-preparation branch. Move the
+   relevant `Unreleased` entries in `CHANGELOG.md` into a dated release
+   section. Update `VERSION`, the top release row in `README.md`, and the
+   `version=` line in `lib/bash/base-bash-libs.release` to the same version.
+   Leave that checked-in metadata's `commit=unknown` and
+   `dirty_state=unknown` placeholders intact: the release artifact builder
+   writes the final commit identity into its private staged copy. Ordinary
+   pull requests do not change `VERSION` or the embedded release version.
+4. Validate the candidate and perform a candidate rehearsal before merging the
+   preparation pull request. The rehearsal is intentionally bound to the
+   clean preparation-branch commit, not to a tag that does not exist yet:
 
    ```bash
-   scripts/release-artifact build --version X.Y.Z --commit <full-tag-sha> \
+   candidate_commit="$(git rev-parse HEAD)"
+   scripts/release-artifact build --version X.Y.Z --commit "$candidate_commit" \
      --output /private/tmp/base-bash-libs-X.Y.Z
-   scripts/release-artifact verify /private/tmp/base-bash-libs-X.Y.Z
+   scripts/release-artifact verify /private/tmp/base-bash-libs-X.Y.Z \
+     --commit "$candidate_commit"
    ```
 
-   After the GitHub Release exists, perform the remote completion check from a
-   clean checkout as well:
+   Run the full validation before opening the pull request:
 
    ```bash
-   scripts/release-artifact verify-remote --version X.Y.Z --commit <full-tag-sha> \
-     --output /private/tmp/base-bash-libs-X.Y.Z-remote
+   ./tests/validate.sh
+   git diff --check
    ```
 
-   This check reads the published release, rejects draft or mismatched tags,
-   requires all four canonical assets, downloads them into private staging,
-   and runs the same offline verifier against the expected commit. A missing
-   or partial upload fails closed and leaves no verification directory, so a
-   retry cannot accidentally consume a partial asset set.
+5. Open and merge the reviewed release-preparation pull request. Then sync a
+   clean local `main` checkout and capture the merge commit that will be the
+   immutable source for the release:
+
+   ```bash
+   git fetch origin main
+   git checkout --detach origin/main
+   release_commit="$(git rev-parse HEAD)"
+   scripts/release refs --version X.Y.Z
+   scripts/release-artifact build --version X.Y.Z --commit "$release_commit" \
+     --output /private/tmp/base-bash-libs-X.Y.Z-final
+   scripts/release-artifact verify /private/tmp/base-bash-libs-X.Y.Z-final \
+     --commit "$release_commit"
+   ```
+
+   The final asset is built from the real merged commit while the tag is still
+   absent. Do not invent a tag or use a future tag SHA: `scripts/release refs`
+   is the read-only guard that confirms the name is available, and publication
+   creates the immutable annotated tag only after the final checks pass.
 
    The output contains a deterministic archive, an SPDX 2.3 SBOM, a
    reproducibility/provenance statement, and a checksum manifest. The archive
@@ -60,19 +82,13 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    uses the `C` locale, and archive creation supports GNU tar and bsdtar only;
    other tar implementations fail closed rather than claiming reproducibility.
    Generate the repository component row for the ecosystem BOM from the same
-   immutable commit:
+   immutable merged commit:
 
    ```bash
-   scripts/release-bom-row --version X.Y.Z --commit <full-tag-sha> \
+   scripts/release-bom-row --version X.Y.Z --commit "$release_commit" \
      --platform macos-14 --platform ubuntu-24.04 \
      --evidence run://base-bash-libs/validation \
      --output /private/tmp/base-bash-libs-X.Y.Z-row.json
-   ```
-5. Run the full library validation and inspect the diff:
-
-   ```bash
-   ./tests/validate.sh
-   git diff --check
    ```
 
    The release-invariant stage derives two API references from the checked-out
@@ -83,11 +99,9 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    remains available for explicit audited fixture overrides, but is not needed
    for the documented local or CI command.
 
-6. Open and merge the release-preparation pull request.
-7. Sync local `main`, then inspect the release from the repository root:
+6. Inspect the release from the merged repository root:
 
    ```bash
-   scripts/release refs --version X.Y.Z
    scripts/release check --version X.Y.Z --manifest base_manifest.yaml \
      --bom /private/tmp/base-ecosystem-X.Y.Z.json
    scripts/release plan --version X.Y.Z --manifest base_manifest.yaml
@@ -100,7 +114,7 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    fails closed if the candidate tag exists locally or on `origin`, or if
    either side cannot be inspected.
 
-8. Publish only after the readiness checks pass. Use `--yes` only from a
+7. Publish only after the readiness checks pass. Use `--yes` only from a
    trusted non-interactive release shell:
 
    ```bash
@@ -108,8 +122,20 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
      --bom /private/tmp/base-ecosystem-X.Y.Z.json --yes
    ```
 
-9. Verify the annotated `vX.Y.Z` tag and the GitHub Release for
-   `basefoundry/base-bash-libs`.
+8. Verify the annotated `vX.Y.Z` tag and the GitHub Release for
+   `basefoundry/base-bash-libs`. Then perform the remote completion check from
+   a clean checkout:
+
+   ```bash
+   scripts/release-artifact verify-remote --version X.Y.Z --commit "$release_commit" \
+     --output /private/tmp/base-bash-libs-X.Y.Z-remote
+   ```
+
+   This check reads the published release, rejects draft or mismatched tags,
+   requires all four canonical assets, downloads them into private staging,
+   and runs the same offline verifier against the expected commit. A missing
+   or partial upload fails closed and leaves no verification directory, so a
+   retry cannot accidentally consume a partial asset set.
 
 ## SBOM Interoperability
 
