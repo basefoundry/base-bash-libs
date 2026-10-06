@@ -51,7 +51,7 @@ while IFS= read -r job_id; do
             }
         }
         END { exit !found }
-    ' <<<"$product_needs_line" ||
+    ' <<< "$product_needs_line" ||
         contract_fail "product validation does not cover job: $job_id"
 done < <(
     awk '
