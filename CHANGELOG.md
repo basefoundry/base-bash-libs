@@ -7,7 +7,59 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+<!-- The v2.2.0 release-preparation issue will move these entries into the
+dated release section after the final merged commit is selected. -->
+
+### Added
+
+- Added a consumer-kit contribution path, Bash support and validation
+  quickstart, startup benchmarks, and a Discussions-based community funnel.
+- Added release-invariant checks that compare the candidate stable API with the
+  published GA baseline and keep release artifacts tied to one canonical
+  source commit.
+
+### Changed
+
+- Strengthened CLI contracts for flag values, built-in route collisions,
+  positional result bounds, repeatable positional defaults, completion cursor
+  boundaries, and validator traversal isolation.
+- Strengthened application contracts for named-output attributes, explicit
+  color modes, configuration-loader/report isolation, and caller-local safety.
+- Strengthened bundle, vendor, launcher, and initialization workflows with
+  repository-root anchoring, staged payload verification, complete inventory
+  status, collision-safe locals, and consistent launcher options.
+- Improved release and CI workflows with canonical remote-asset verification,
+  standards-valid SPDX identifiers, timezone-independent archives,
+  ShellCheck fail-fast behavior, dirty-worktree isolation, stdin-safe aggregate
+  BATS execution, and quota-independent project intake.
+
+### Fixed
+
+- Fixed nested configuration and validator state leaking across application
+  loads and nested CLI traversals.
+- Fixed generated completion handling at the cursor/end-of-array boundary and
+  completion of option values without traversing an invalid command path.
+- Fixed standalone application metadata preservation and vendor payload
+  boundary handling during bundle creation and installation.
+- Fixed release and bundle diagnostics so failures preserve their originating
+  status and immutable source identity instead of being masked by a later
+  helper failure.
+
+### Security
+
+- Made staged vendor verification fail closed before an atomic install and
+  constrained standalone payload entries to the declared application boundary.
+- Made release verification bind the canonical archive, checksum manifest,
+  SBOM, provenance, and source commit together, including semantic SPDX
+  validation and standards-compliant file identifiers.
+- Added an actionable private vulnerability-reporting path and ensured
+  generated release actions remain pinned to immutable revisions.
+
+### Documentation
+
+- Documented the verified launcher quickstart, Bash support matrix, consumer
+  contribution path, release and ecosystem policy, contributor funnel, and
+  community discussion boundary.
 
 ## [2.1.0] - 2026-09-08
 

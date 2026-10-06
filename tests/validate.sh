@@ -64,6 +64,7 @@ required_files=(
     tests/concurrency-contract.sh
     tests/quality-contract.sh
     tests/shfmt-contract.sh
+    tests/changelog-guard.sh
     tests/release-invariants.sh
     tests/release-invariants.bats
     examples/std-usage.sh
@@ -145,6 +146,7 @@ check_no_strict_mode() {
         tests/concurrency-contract.sh
         tests/quality-contract.sh
         tests/shfmt-contract.sh
+        tests/changelog-guard.sh
         tests/release-invariants.sh
         tests/validate.sh
         tests/lint-warnings.sh
@@ -225,6 +227,8 @@ fi
 
 # shellcheck source=../scripts/release-version-policy.sh
 source "$repo_root/scripts/release-version-policy.sh" || exit 1
+# shellcheck source=changelog-guard.sh
+source "$repo_root/tests/changelog-guard.sh" || exit 1
 version_kind="$(base_bash_release_version_kind "$version")" || {
     printf 'VERSION is outside the supported Base Bash v2 release policy: %s\n' "$version" >&2
     exit 1
@@ -322,10 +326,7 @@ if [[ -n "$release_metadata_unknown_keys" ]]; then
     exit 1
 fi
 
-if [[ "$(grep -c '^## \[Unreleased\]' CHANGELOG.md)" != 1 ]]; then
-    printf 'CHANGELOG.md must contain exactly one [Unreleased] section.\n' >&2
-    exit 1
-fi
+check_changelog_unreleased_placeholder "$repo_root" "$version" || exit $?
 if [[ "$(grep -c -F "## [$version]" CHANGELOG.md)" -gt 1 ]]; then
     printf 'CHANGELOG.md contains duplicate release sections for %s.\n' "$version" >&2
     exit 1
