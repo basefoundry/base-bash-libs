@@ -6,6 +6,20 @@ out of the containerized compatibility and lint checks. Actions and container
 images are pinned to full immutable commit or digest references; changing one
 requires a reviewable dependency update.
 
+Each workflow ends with a stable, fail-closed aggregate context:
+
+- `Product validation` depends on Linux and macOS repository validation, the
+  Bash 4.2.53 minimum-runtime smoke, the representative Bash compatibility
+  matrix, release/provenance gates, and the pinned Beacon downstream smoke.
+- `Quality contract` depends on the ShellCheck, repository-contract, shfmt, and
+  actionlint quality lane.
+
+Both aggregates run with `always()` so a cancelled, failed, or unexpectedly
+skipped dependency cannot leave a green required context. They explicitly
+require every dependency result to equal `success`. The individual lanes remain
+visible for diagnosis, while the aggregate contexts are the merge-policy
+surface.
+
 The workflows emitted by `base-bash init` follow the same policy: every
 third-party action is pinned to a full commit SHA and carries a human-readable
 release comment. Generated consumer workflows can therefore be reviewed and
@@ -26,12 +40,29 @@ puts its complete contents under the formatter gate.
   `base/issue-branch-policy` status, and prevents deletion and non-fast-forward
   updates;
 - administrators remain subject to branch protection; and
-- no approval count or individual Tests/Quality job is a default merge
-  requirement.
+- no approval count is a default merge requirement.
+
+After the aggregate jobs land on `main`, the effective ruleset should require
+these exact GitHub Actions contexts in addition to `base/issue-branch-policy`:
+
+| Context | Actions integration | Coverage |
+| --- | ---: | --- |
+| `Product validation` | `15368` | Supported-platform, minimum-runtime, compatibility, release-contract, and Beacon evidence |
+| `Quality contract` | `15368` | ShellCheck, repository quality, shfmt, and actionlint evidence |
+
+The repository owner must add those contexts through the normal reviewed
+ruleset/configuration workflow, then read back both the effective ruleset and
+classic branch protection. The readback must confirm the exact context names,
+integration ID `15368`, strictness, review/thread settings, and any existing
+stronger controls. `base/issue-branch-policy` remains required; project metadata
+intake remains outside these product gates. Until that administrative readback
+is complete, the aggregate checks are present and fail closed but are not yet
+merge-blocking.
 
 This is a merge-policy choice, not a validation waiver. The `Tests` and
-`Quality` workflows still run on pull requests and `main`, and they remain
-release gates. Run the complete local validation and release readiness checks
+`Quality` workflows still run on pull requests and `main`, and their aggregate
+contexts are the merge-blocking release gates once the ruleset readback is
+complete. Run the complete local validation and release readiness checks
 before publishing a release, even when a pull request can merge after the
 issue-branch policy succeeds.
 

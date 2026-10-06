@@ -37,6 +37,7 @@ lint_files=(
     tests/reference-release-contract.sh
     tests/concurrency-contract.sh
     tests/quality-contract.sh
+    tests/ci-policy-contract.sh
     tests/shfmt-contract.sh
     examples/std-usage.sh
     examples/cookbook-cleanup-temp.sh

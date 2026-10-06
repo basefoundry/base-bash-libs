@@ -77,3 +77,23 @@ jobs:
             --workdir /workspace \
             docker.io/rhysd/actionlint@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
             -color
+
+  quality-contract:
+    name: Quality contract
+    if: ${{ always() }}
+    needs: [quality]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require the quality lane to succeed
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$QUALITY_RESULT" != success ]]; then
+            printf 'Quality contract is blocked by a non-success quality lane: %s\n' \
+              "$QUALITY_RESULT" >&2
+            exit 1
+          fi
+          printf 'Quality contract passed: the quality lane succeeded.\n'
