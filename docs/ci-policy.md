@@ -20,6 +20,11 @@ require every dependency result to equal `success`. The individual lanes remain
 visible for diagnosis, while the aggregate contexts are the merge-policy
 surface.
 
+These aggregates run in the same `pull_request` workflows they protect; they
+are not a trusted `pull_request_target` boundary. That is an intentional
+solo-maintainer trade-off for this repository, and changes to the aggregate
+logic still require review through the repository's existing workflow.
+
 The workflows emitted by `base-bash init` follow the same policy: every
 third-party action is pinned to a full commit SHA and carries a human-readable
 release comment. Generated consumer workflows can therefore be reviewed and
@@ -30,7 +35,7 @@ latest commit on `main`). This prevents new formatting debt while allowing the
 existing v1-to-v2 codebase to be cleaned incrementally; touching a legacy file
 puts its complete contents under the formatter gate.
 
-## Default-branch baseline
+## Default-branch baseline (current)
 
 `base-bash-libs` follows the same modest default-branch baseline as Base:
 
@@ -41,6 +46,8 @@ puts its complete contents under the formatter gate.
   updates;
 - administrators remain subject to branch protection; and
 - no approval count is a default merge requirement.
+
+## Planned required aggregate contexts
 
 After the aggregate jobs land on `main`, the effective ruleset should require
 these exact GitHub Actions contexts in addition to `base/issue-branch-policy`:
@@ -58,6 +65,16 @@ stronger controls. `base/issue-branch-policy` remains required; project metadata
 intake remains outside these product gates. Until that administrative readback
 is complete, the aggregate checks are present and fail closed but are not yet
 merge-blocking.
+
+The repeatable readback commands are:
+
+```bash
+gh api repos/basefoundry/base-bash-libs/rulesets
+gh api repos/basefoundry/base-bash-libs/branches/main/protection
+```
+
+Inspect the returned rules and required-status contexts rather than relying on
+the workflow files alone.
 
 This is a merge-policy choice, not a validation waiver. The `Tests` and
 `Quality` workflows still run on pull requests and `main`, and their aggregate
