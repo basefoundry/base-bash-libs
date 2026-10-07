@@ -66,8 +66,8 @@ grep -F 'record_date: 2026-08-15' "$manifest" > /dev/null || {
     printf 'Cutover manifest must identify the v2.0.0 GA record date.\n' >&2
     exit 1
 }
-grep -F 'last_reconciled: 2026-10-07' "$manifest" > /dev/null || {
-    printf 'Cutover manifest reconciliation date is missing.\n' >&2
+grep -Eq '^last_reconciled: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$manifest" || {
+    printf 'Cutover manifest reconciliation date is missing or malformed.\n' >&2
     exit 1
 }
 grep -F 'target_release: 2.0.0' "$manifest" > /dev/null || {

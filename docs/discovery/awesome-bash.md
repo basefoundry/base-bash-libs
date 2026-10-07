@@ -26,8 +26,8 @@ the following links are public and stable. This record was last reviewed on
 
 ## Maintainer checklist
 
-- [x] v2.0.0 release URL and SHA-256 added to this record
-- [x] release asset, bundle, and provenance links resolve without credentials
-- [x] reference-app and benchmark links resolve on the default branch
+- [ ] v2.0.0 release URL and SHA-256 are recorded in this submission record
+- [ ] release asset, bundle, and provenance links are independently verified here
+- [ ] reference-app and benchmark links are independently verified here
 - [ ] submission PR URL recorded here
 - [ ] upstream acceptance or rejection recorded here
