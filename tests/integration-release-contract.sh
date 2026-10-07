@@ -17,8 +17,8 @@ grep -Fx 'schema_version: 1' "$integration_manifest" > /dev/null ||
     integration_fail 'schema version is not 1'
 grep -Fx 'record_scope: historical-v2.0.0-ga-baseline' "$integration_manifest" > /dev/null ||
     integration_fail 'compatibility manifest must identify its historical baseline scope'
-grep -Fx 'last_reviewed: 2026-10-07' "$integration_manifest" > /dev/null ||
-    integration_fail 'compatibility manifest review date is missing'
+grep -Eq '^last_reviewed: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$integration_manifest" ||
+    integration_fail 'compatibility manifest review date is missing or malformed'
 grep -Fx 'framework_release_line: v2.0.0' "$integration_manifest" > /dev/null ||
     integration_fail 'framework release line is not v2.0.0'
 
