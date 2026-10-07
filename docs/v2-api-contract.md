@@ -147,7 +147,8 @@ semantics.
   malformed launcher invocations write an explanation and usage to stderr and
   return `2`. Application failures are not converted into usage errors.
 
-The launcher itself requires Bash 4.2.53 or newer. On macOS Bash 3.2, a launcher
+The launcher itself requires Bash 4.2 or newer; the tested minimum is Bash 4.2.53.
+On macOS Bash 3.2, a launcher
 invocation that runs an application searches the supported candidate paths and
 re-execs itself with the first usable candidate. `--help`, `--version`, and
 `check` remain diagnostic commands and do not run the application.
@@ -238,7 +239,8 @@ validated, or repeatable (only as the final positional).
 direct caller-owned output contract. It is not silently replaced. Bashly,
 Argc, Argbash, and similar generators may adapt their build output into the
 native model, but they are optional build-time adapters and never runtime
-dependencies. The runtime stays Bash 4.2.53-compatible, avoids `eval`, and has no
+dependencies. The runtime stays compatible with Bash 4.2 or newer; the tested
+minimum is Bash 4.2.53. It avoids `eval` and has no
 mandatory Python, Ruby, Node, or `jq` dependency.
 
 ### Application policy contract

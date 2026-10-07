@@ -79,8 +79,8 @@ versions that support namerefs.
   arguments without mutating the caller's positional parameters.
 - `base_require_version <version>`: returns `1` when the loaded package version
   is older and `2` for malformed usage/version values.
-- `base_std_check_bash_version`: returns zero for Bash 4.2.53 or newer and reports the
-  required version otherwise.
+- `base_std_check_bash_version`: returns zero for Bash 4.2 or newer and reports the
+  required version otherwise. The tested minimum is Bash 4.2.53.
 - `base_std_is_interactive`: returns zero when stdin is attached to an interactive TTY.
 - `base_std_import <path>...`: sources package-relative modules from the loaded
   `lib/bash` root; returns a recoverable failure for missing, unsafe, cyclic,
@@ -216,8 +216,8 @@ main() {
 
 Base entrypoints preload this library through Base's own runtime bootstrap. The
 `base-bash` launcher provides the same stdlib preload pattern without Base
-runtime state. Callers should run on Bash 4.2.53 or newer; the library has passive
-Bash version helpers, but sourcing it does not prompt, install packages, or
+runtime state. Callers should run on Bash 4.2 or newer; the tested minimum is
+Bash 4.2.53. The library has passive Bash version helpers, but sourcing it does not prompt, install packages, or
 re-exec the caller.
 
 ## Initialization Contract
@@ -274,8 +274,8 @@ initializer. A launcher may pass `--source` directly; `BASE_BASH_LIBS_BOOTSTRAP_
 is only a fallback for callers that cannot provide that option.
 
 The library preserves caller-selected `errexit`, `nounset`, and `pipefail`
-settings and supports every combination on Bash 4.2.53 or newer. It does not
-enable or disable those options for the caller. A top-level interactive or
+settings and supports every combination on Bash 4.2 or newer; the tested minimum
+is Bash 4.2.53. It does not enable or disable those options for the caller. A top-level interactive or
 `bash -c` source has no outer `BASH_SOURCE` frame; without a bootstrap override,
 `BASE_BASH_LIBS_SCRIPT_DIR` and `base_std_get_my_source_dir` use the current working directory in
 that case. Predicate helpers can intentionally return nonzero, so callers using
