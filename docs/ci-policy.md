@@ -57,6 +57,10 @@ to `base/issue-branch-policy`:
 | `Product validation` | `15368` | Supported-platform, minimum-runtime, compatibility, release-contract, and Beacon evidence |
 | `Quality contract` | `15368` | ShellCheck, repository quality, shfmt, and actionlint evidence |
 
+Both aggregate contexts are emitted by the repository's GitHub Actions
+integration `15368`, keeping the required-status identity coupled to the
+reviewed workflows that produce the evidence.
+
 The repository owner must keep those contexts in the effective ruleset through
 the normal reviewed ruleset/configuration workflow, then read back both the
 effective ruleset and classic branch protection. The readback must confirm the
