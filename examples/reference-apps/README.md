@@ -34,6 +34,7 @@ examples/reference-apps/release-rehearsal.sh \
 ```
 
 The required evidence schema and platform matrix live in
-[`release-evidence.yaml`](release-evidence.yaml). It records the verified
-canonical `v2.0.0` asset, checksum, and provenance; the repository never treats
-a moving checkout as release evidence.
+[`release-evidence.yaml`](release-evidence.yaml). That file is a historical
+v2.0.0 GA baseline, reviewed on 2026-10-07; it records the verified canonical
+asset, checksum, and provenance, and the repository never treats a moving
+checkout as release evidence.

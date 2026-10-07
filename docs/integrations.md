@@ -52,10 +52,11 @@ in CI rather than making them runtime dependencies.
 ## Package channels
 
 `integrations/package-managers/registry.yaml` is an intentionally conservative
-registry. bpkg, Basher, and Basalt entries remain `planned-after-v2-ga` until an
-immutable v2 asset, checksum, provenance, and a maintained update path exist.
-No package-manager URL in this repository is presented as an official install
-source before those gates pass.
+registry. bpkg, Basher, and Basalt entries remain
+`deferred-until-maintained-update-path`: the immutable v2 asset, checksum, and
+provenance gates have passed, but no maintained owner and update path has been
+verified. No package-manager URL in this repository is presented as an official
+install source before that remaining gate passes.
 
 The exact upstream revisions reviewed for the adapters and project tools are
 recorded in [`integrations/compatibility.yaml`](../integrations/compatibility.yaml).

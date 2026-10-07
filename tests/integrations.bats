@@ -11,11 +11,11 @@ setup() {
     [[ "$output" == *"release=candidate"* ]]
 }
 
-@test "integration recipes remain optional and package registry stays pre-GA" {
-    run grep -F 'status: planned-after-v2-ga' "$repo_root/integrations/package-managers/registry.yaml"
+@test "integration recipes remain optional and package registry records its remaining gate" {
+    run grep -F 'status: deferred-until-maintained-update-path' "$repo_root/integrations/package-managers/registry.yaml"
 
     [ "$status" -eq 0 ]
-    [ "$(grep -c 'status: planned-after-v2-ga' "$repo_root/integrations/package-managers/registry.yaml")" -eq 3 ]
+    [ "$(grep -c 'status: deferred-until-maintained-update-path' "$repo_root/integrations/package-managers/registry.yaml")" -eq 3 ]
 }
 
 @test "project kit declares Bash-aware static-analysis policy" {
