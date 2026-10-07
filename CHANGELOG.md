@@ -35,6 +35,12 @@ dated release section after the final merged commit is selected. -->
 
 ### Fixed
 
+- Preserved literal PATH entries during `base_std_*` PATH deduplication.
+- Rejected non-root Git update paths so `base_git_update_repo` cannot update an
+  ancestor repository from a plain child directory.
+- Preserved exact string and list semantics under Bash `nocasematch`.
+- Validated integer ranges before arithmetic so out-of-range configuration
+  values are rejected instead of being narrowed by conversion.
 - Fixed nested configuration and validator state leaking across application
   loads and nested CLI traversals.
 - Fixed generated completion handling at the cursor/end-of-array boundary and
