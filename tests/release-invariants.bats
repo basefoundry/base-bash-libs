@@ -51,7 +51,10 @@ setup() {
     git clone --local "$BASE_REPO_ROOT" "$candidate_repo" > /dev/null
     git -C "$candidate_repo" config user.name "Release invariant test"
     git -C "$candidate_repo" config user.email "release-invariant-test@example.invalid"
-    printf '2.2.0\n' > "$candidate_repo/VERSION"
+    current_version="$(<"$candidate_repo/VERSION")"
+    IFS=. read -r current_major current_minor current_patch <<< "$current_version"
+    additive_version="${current_major}.${current_minor}.$((current_patch + 1))"
+    printf '%s\n' "$additive_version" > "$candidate_repo/VERSION"
     git -C "$candidate_repo" add VERSION
     git -C "$candidate_repo" commit -m "test: advance candidate version" > /dev/null
 
@@ -59,5 +62,5 @@ setup() {
         "$candidate_repo/tests/release-invariants.sh"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"candidate_version=2.2.0 candidate_ref=HEAD compatibility_ref=v2.0.0"* ]]
+    [[ "$output" == *"candidate_version=$additive_version candidate_ref=HEAD compatibility_ref=v2.0.0"* ]]
 }
