@@ -34,7 +34,7 @@ helpers are available.
 
 Modules that emit line-oriented tab-delimited records share the internal
 `__base_bash_libs_str_escape_tsv_field__` primitive. It escapes backslashes,
-tabs, newlines, and carriage returns as `\\`, `\\t`, `\\n`, and `\\r` in that
+tabs, newlines, and carriage returns as `\`, `\t`, `\n`, and `\r` in that
 order, keeping each record on one physical line without changing ordinary
 values. The Git and application modules import `lib_str.sh` automatically when
 needed; the internal helper is not application API.

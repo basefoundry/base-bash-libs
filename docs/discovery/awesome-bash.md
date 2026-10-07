@@ -20,7 +20,7 @@ the following links are public and stable. This record was last reviewed on
 
 ```text
 - [base-bash-libs](https://github.com/basefoundry/base-bash-libs) - A
-  namespaced Bash 4.2+ runtime and project kit for tested, vendored, and
+  namespaced Bash 4.2.53+ runtime and project kit for tested, vendored, and
   distributable command-line applications.
 ```
 

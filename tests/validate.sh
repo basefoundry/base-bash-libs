@@ -220,7 +220,7 @@ if ! printf '%s\n' "$readme_head" | grep -F "[![Release](https://img.shields.io/
     printf 'README.md is missing the GitHub release badge.\n' >&2
     exit 1
 fi
-if ! printf '%s\n' "$readme_head" | grep -F "[![Bash](https://img.shields.io/badge/Bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)" > /dev/null; then
+if ! printf '%s\n' "$readme_head" | grep -F "[![Bash](https://img.shields.io/badge/Bash-4.2.53%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)" > /dev/null; then
     printf 'README.md is missing the supported Bash version badge.\n' >&2
     exit 1
 fi
@@ -356,8 +356,8 @@ if [[ "$release_status" == pending-ga-asset ]]; then
     fi
 fi
 
-if ! sed -n '1,30p' README.md | grep -F 'Requires Bash 4.2+' > /dev/null; then
-    printf 'README.md must state the Bash 4.2+ requirement near the top-level entry point.\n' >&2
+if ! sed -n '1,30p' README.md | grep -F 'Requires Bash 4.2.53+' > /dev/null; then
+    printf 'README.md must state the Bash 4.2.53+ requirement near the top-level entry point.\n' >&2
     exit 1
 fi
 

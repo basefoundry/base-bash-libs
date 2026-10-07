@@ -14,6 +14,10 @@ when updating an existing script.
 - [Testing, vendoring, bundling, and release](v2/architecture.md#delivery)
 - [Bash support and validation quickstart](bash-validation-quickstart.md)
 - [Consumer-kit contribution path](consumer-kit-contribution.md)
+- [Pinned consumption](pinned-consumption.md), [vendor workflow](vendor-workflow.md),
+  and [single-file distribution](single-file-distribution.md)
+- [Integrations](integrations.md) and [community guidance](community.md)
+- [Versioning policy](versioning-policy.md) and [release process](release-process.md)
 - [CI and default-branch policy](ci-policy.md)
 - [Support and threat model](support-policy.md) · [security reporting](../SECURITY.md)
 
