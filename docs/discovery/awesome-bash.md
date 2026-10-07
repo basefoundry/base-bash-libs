@@ -5,8 +5,9 @@ deliberately not a claim that the project has been accepted upstream.
 
 ## Submission gate
 
-Submit only after the v2.0.0 release has a canonical immutable asset and the
-following links are public and stable:
+Submit only after a published v2 release has a canonical immutable asset and
+the following links are public and stable. This record was last reviewed on
+2026-10-07 against v2.1.0:
 
 1. the five-minute adoption path in [`docs/v2/quickstart.md`](../v2/quickstart.md);
 2. the support and security policies in [`docs/support-policy.md`](../support-policy.md);
@@ -25,8 +26,8 @@ following links are public and stable:
 
 ## Maintainer checklist
 
-- [ ] v2.0.0 release URL and SHA-256 added to this record
-- [ ] release asset, bundle, and provenance links resolve without credentials
-- [ ] reference-app and benchmark links resolve on the default branch
+- [ ] v2.0.0 release URL and SHA-256 are recorded in this submission record
+- [ ] release asset, bundle, and provenance links are independently verified here
+- [ ] reference-app and benchmark links are independently verified here
 - [ ] submission PR URL recorded here
 - [ ] upstream acceptance or rejection recorded here

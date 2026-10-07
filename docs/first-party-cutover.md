@@ -1,4 +1,8 @@
-# First-party v2 cutover
+# Historical first-party v2.0.0 cutover record
+
+Record scope: historical GA handoff completed on 2026-08-15. This page and its
+machine-readable inventory describe the v2.0.0 cutover; they are not the
+current Base or Base Bash release status.
 
 Issue #240 records the first-party promotion handoff. The exact v2 GA asset,
 checksum, and provenance exist, and Base, Base Demo, and Homebrew now point at
@@ -37,8 +41,10 @@ the v2 asset/tag unchanged. Never retag a different commit or silently fall
 back to a moving branch. Record the failure and corrected checksums in the
 release notes, then resume from the failed consumer after a reviewed fix.
 
-## Current state
+## Historical state at v2.0.0 GA
 
 Base's `basectl help` integration defect is fixed in the merged issue-backed PR
-above and validated locally against the v2 API. Base v1.8.0, Base Demo, and the
-Homebrew `base-v1.8.0` bottle release consume the verified v2.0.0 GA asset.
+above and validated locally against the v2 API. At the 2026-08-15 GA cutover,
+Base v1.8.0, Base Demo, and the Homebrew `base-v1.8.0` bottle release consumed
+the verified v2.0.0 GA asset. Later releases and pins belong in their own
+release records.

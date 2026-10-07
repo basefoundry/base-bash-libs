@@ -15,6 +15,10 @@ integration_fail() {
 [[ -f "$integration_manifest" ]] || integration_fail "missing compatibility manifest"
 grep -Fx 'schema_version: 1' "$integration_manifest" > /dev/null ||
     integration_fail 'schema version is not 1'
+grep -Fx 'record_scope: historical-v2.0.0-ga-baseline' "$integration_manifest" > /dev/null ||
+    integration_fail 'compatibility manifest must identify its historical baseline scope'
+grep -Eq '^last_reviewed: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$integration_manifest" ||
+    integration_fail 'compatibility manifest review date is missing or malformed'
 grep -Fx 'framework_release_line: v2.0.0' "$integration_manifest" > /dev/null ||
     integration_fail 'framework release line is not v2.0.0'
 
@@ -37,8 +41,8 @@ done
 
 for channel in bpkg basher basalt; do
     grep -A2 -E "^  - name: ${channel}$" "$integration_repo_root/integrations/package-managers/registry.yaml" |
-        grep -F 'status: planned-after-v2-ga' > /dev/null ||
-        integration_fail "package channel ${channel} must remain fail-closed before GA"
+        grep -F 'status: deferred-until-maintained-update-path' > /dev/null ||
+        integration_fail "package channel ${channel} must remain deferred until a maintained update path exists"
 done
 
 printf 'Integration release contract passed: pins=%s package_channels=3.\n' "$pin_count"
