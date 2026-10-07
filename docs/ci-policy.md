@@ -42,29 +42,31 @@ puts its complete contents under the formatter gate.
 - pull requests are required and merges are squash-only;
 - the `Base branch naming` ruleset protects non-default branches;
 - the `Base default branch protection` ruleset requires the trusted
-  `base/issue-branch-policy` status, and prevents deletion and non-fast-forward
-  updates;
+  `base/issue-branch-policy`, `Product validation`, and `Quality contract`
+  statuses, and prevents deletion and non-fast-forward updates;
 - administrators remain subject to branch protection; and
 - no approval count is a default merge requirement.
 
-## Planned required aggregate contexts
+## Required aggregate contexts
 
-After the aggregate jobs land on `main`, the effective ruleset should require
-these exact GitHub Actions contexts in addition to `base/issue-branch-policy`:
+The effective ruleset requires these exact GitHub Actions contexts in addition
+to `base/issue-branch-policy`:
 
 | Context | Actions integration | Coverage |
 | --- | ---: | --- |
 | `Product validation` | `15368` | Supported-platform, minimum-runtime, compatibility, release-contract, and Beacon evidence |
 | `Quality contract` | `15368` | ShellCheck, repository quality, shfmt, and actionlint evidence |
 
-The repository owner must add those contexts through the normal reviewed
-ruleset/configuration workflow, then read back both the effective ruleset and
-classic branch protection. The readback must confirm the exact context names,
-integration ID `15368`, strictness, review/thread settings, and any existing
-stronger controls. `base/issue-branch-policy` remains required; project metadata
-intake remains outside these product gates. Until that administrative readback
-is complete, the aggregate checks are present and fail closed but are not yet
-merge-blocking.
+Both aggregate contexts are emitted by the repository's GitHub Actions
+integration `15368`, keeping the required-status identity coupled to the
+reviewed workflows that produce the evidence.
+
+The repository owner must keep those contexts in the effective ruleset through
+the normal reviewed ruleset/configuration workflow, then read back both the
+effective ruleset and classic branch protection. The readback must confirm the
+exact context names, integration ID `15368`, strictness, review/thread
+settings, and any existing stronger controls. `base/issue-branch-policy`
+remains required; project metadata intake remains outside these product gates.
 
 The repeatable readback commands are:
 
@@ -78,8 +80,8 @@ the workflow files alone.
 
 This is a merge-policy choice, not a validation waiver. The `Tests` and
 `Quality` workflows still run on pull requests and `main`, and their aggregate
-contexts are the merge-blocking release gates once the ruleset readback is
-complete. Run the complete local validation and release readiness checks
+contexts are the merge-blocking release gates. Run the complete local
+validation and release readiness checks
 before publishing a release, even when a pull request can merge after the
 issue-branch policy succeeds.
 
