@@ -64,9 +64,10 @@ operation must enter through the repository-owned `scripts/release` guard.
    pull request may use `Related to #<issue>` when an issue exists, but no issue
    is required. Fill in the standard `Summary`, `Issue`, and `Validation`
    sections plus any applicable impact sections required by `base_manifest.yaml`.
-7. Run the project checks before opening or updating a pull request. The full
-   hosted tests and quality workflows remain release gates even though the
-   default branch baseline does not require every job as a merge check.
+7. Run the project checks before opening or updating a pull request. The
+   default branch requires `base/issue-branch-policy`, `Product validation`,
+   and `Quality contract` as merge checks; the full hosted tests and quality
+   workflows remain release gates.
 8. Update `CHANGELOG.md` only for notable user-visible or release-worthy
    changes.
 9. After merge, sync the default branch, remove the worktree, and delete merged
