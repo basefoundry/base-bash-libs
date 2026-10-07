@@ -24,12 +24,29 @@ if grep -R -n -E 'checkout[[:space:]]+main|/archive/refs/heads/main|git clone .*
     exit 1
 fi
 
-grep -F "export BASE_BASH_LIBS_REF='v2.0.0'" docs/v2/quickstart.md > /dev/null || {
-    printf 'The v2 quickstart must use the published GA release reference.\n' >&2
+grep -F "export BASE_BASH_LIBS_REF='v2.1.0'" docs/v2/quickstart.md > /dev/null || {
+    printf 'The v2 quickstart must use the current published release reference.\n' >&2
     exit 1
 }
-grep -F 'b4243765726c133499feeabdc50154f99c0fec12' docs/v2/quickstart.md README.md > /dev/null || {
-    printf 'The v2 quickstart and source-checkout example must pin the verified GA commit.\n' >&2
+current_release_commit='36fec50c446dcea8c521a1ba3e7fee2394f169c0'
+grep -F "$current_release_commit" docs/v2/quickstart.md README.md > /dev/null || {
+    printf 'The v2 quickstart and source-checkout example must pin the current release commit.\n' >&2
+    exit 1
+}
+readme_current_release="$(sed -n 's/^`\(v[0-9][^`]*\)` is the current stable release.*$/\1/p' README.md | sed -n '1p')"
+[[ "$readme_current_release" == v2.1.0 ]] || {
+    printf 'README must declare exactly one current stable release.\n' >&2
+    exit 1
+}
+readme_pin="$(sed -n '/^Pin the checkout to the full current release commit/,/^```$/p' README.md |
+    sed -n 's/^[[:space:]]*\([0-9a-f]\{40\}\)$/\1/p' | sed -n '1p')"
+[[ "$readme_pin" == "$current_release_commit" ]] || {
+    printf 'README current-release pin does not match the expected v2.1.0 commit.\n' >&2
+    exit 1
+}
+resolved_current_release="$(git rev-parse --verify "${readme_current_release}^{commit}" 2> /dev/null || true)"
+[[ "$resolved_current_release" == "$readme_pin" ]] || {
+    printf 'README current-release pin does not match its tag.\n' >&2
     exit 1
 }
 grep -F 'framework_launcher' docs/v2/quickstart.md > /dev/null || {

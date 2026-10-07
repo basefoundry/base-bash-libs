@@ -126,15 +126,15 @@ The complete checkout, archive, Homebrew, vendored, and standalone verification
 procedure is maintained in [`pinned-consumption.md`](pinned-consumption.md).
 
 Do not install from an unpinned default-branch checkout. Use the canonical
-`v2.0.0` release asset and verify its checksum, or pin the stable source to the
-full commit resolved from the signed `v2.0.0` tag:
+`v2.1.0` release asset and verify its checksum, or pin the stable source to the
+full commit resolved from the annotated `v2.1.0` tag:
 
 ```bash
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs checkout --detach \
-  b4243765726c133499feeabdc50154f99c0fec12
+  36fec50c446dcea8c521a1ba3e7fee2394f169c0
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
-  b4243765726c133499feeabdc50154f99c0fec12
+  36fec50c446dcea8c521a1ba3e7fee2394f169c0
 ```
 
 Prerelease validation must likewise use an immutable prerelease tag resolved to

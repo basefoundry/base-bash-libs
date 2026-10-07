@@ -40,10 +40,11 @@ platform, license, and release policy](https://github.com/basefoundry/base/blob/
   Git helper functions built on the stdlib for default-branch, worktree,
   upstream, remote, repository update, and script freshness checks.
 - [`lib/bash/gh/lib_gh.sh`](lib/bash/gh/README.md)
-  Preview-only GitHub CLI helper functions on `main`, built on the stdlib and
-  process module for command readiness, authentication diagnostics, remote
-  parsing, API retries, and checked `gh` execution. The immutable `v2.0.0` tree
-  contains the prior stable, self-contained implementation.
+  GitHub CLI helper functions, built on the stdlib and process module for
+  command readiness, authentication diagnostics, remote parsing, API retries,
+  and checked `gh` execution. The public surface remains stable since
+  `v2.0.0`; the current implementation uses the preview `process` module
+  privately.
 - [`lib/bash/str/lib_str.sh`](lib/bash/str/README.md)
   String helpers built on the stdlib for case conversion, trimming,
   predicates, splitting, and joining.
@@ -159,9 +160,9 @@ moving default branch:
 mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs checkout --detach \
-  b4243765726c133499feeabdc50154f99c0fec12
+  36fec50c446dcea8c521a1ba3e7fee2394f169c0
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
-  b4243765726c133499feeabdc50154f99c0fec12
+  36fec50c446dcea8c521a1ba3e7fee2394f169c0
 ```
 
 Source the stdlib from that checkout:
@@ -241,8 +242,8 @@ SemVer compatibility guarantees began at v2.0.0. See the [versioning and
 release-line policy](docs/versioning-policy.md) for immutable consumption and
 the post-GA support contract.
 
-The `process` module remains preview-only. It is present in v2.1.0, while the
-v2.0.0 pin above does not contain it; do not import it from a v2.0.0 checkout.
+The `process` module remains preview-only. It is included in `v2.1.0`, but is
+not part of the stable API; consumers pinned to `v2.0.0` do not have it.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
 documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
