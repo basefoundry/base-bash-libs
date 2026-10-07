@@ -217,8 +217,8 @@ main() {
 Base entrypoints preload this library through Base's own runtime bootstrap. The
 `base-bash` launcher provides the same stdlib preload pattern without Base
 runtime state. Callers should run on Bash 4.2 or newer; the tested minimum is
-Bash 4.2.53. The library has passive Bash version helpers, but sourcing it does not prompt, install packages, or
-re-exec the caller.
+Bash 4.2.53. The library has passive Bash version helpers, but sourcing it does
+not prompt, install packages, or re-exec the caller.
 
 ## Initialization Contract
 
@@ -275,8 +275,9 @@ is only a fallback for callers that cannot provide that option.
 
 The library preserves caller-selected `errexit`, `nounset`, and `pipefail`
 settings and supports every combination on Bash 4.2 or newer; the tested minimum
-is Bash 4.2.53. It does not enable or disable those options for the caller. A top-level interactive or
-`bash -c` source has no outer `BASH_SOURCE` frame; without a bootstrap override,
+is Bash 4.2.53. It does not enable or disable those options for the caller. A
+top-level interactive or `bash -c` source has no outer `BASH_SOURCE` frame;
+without a bootstrap override,
 `BASE_BASH_LIBS_SCRIPT_DIR` and `base_std_get_my_source_dir` use the current working directory in
 that case. Predicate helpers can intentionally return nonzero, so callers using
 `errexit` should invoke them in `if`, `while`, `&&`, or another normal Bash
