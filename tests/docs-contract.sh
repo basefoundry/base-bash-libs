@@ -44,11 +44,15 @@ readme_pin="$(sed -n '/^Pin the checkout to the full current release commit/,/^`
     printf 'README current-release pin does not match the expected v2.1.0 commit.\n' >&2
     exit 1
 }
-resolved_current_release="$(git rev-parse --verify "${readme_current_release}^{commit}" 2> /dev/null || true)"
-[[ "$resolved_current_release" == "$readme_pin" ]] || {
-    printf 'README current-release pin does not match its tag.\n' >&2
-    exit 1
-}
+if resolved_current_release="$(git rev-parse --verify "${readme_current_release}^{commit}" 2> /dev/null)"; then
+    [[ "$resolved_current_release" == "$readme_pin" ]] || {
+        printf 'README current-release pin does not match its tag.\n' >&2
+        exit 1
+    }
+else
+    printf 'Skipping README current-release tag comparison: tag %s is unavailable in this checkout.\n' \
+        "$readme_current_release" >&2
+fi
 grep -F 'framework_launcher' docs/v2/quickstart.md > /dev/null || {
     printf "The v2 quickstart must use the verified launcher path.\n" >&2
     exit 1
