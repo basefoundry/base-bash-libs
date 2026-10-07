@@ -3,7 +3,8 @@
 `lib_process.sh` contains reusable process-supervision primitives for Bash
 scripts. It is an optional companion module layered on `lib_std.sh`; the
 stdlib's stable `base_std_run` and `base_std_run_or_exit` APIs remain in
-`lib_std.sh`.
+`lib_std.sh`. The module was first shipped in `v2.1.0` and remains preview;
+its symbols are not part of the stable API.
 
 This module is preview-only rather than part of the stable API. It is included
 in the immutable `v2.1.0` release but is not part of the immutable `v2.0.0`
