@@ -89,6 +89,36 @@ for link in SECURITY.md docs/support-policy.md docs/threat-model.md; do
     }
 done
 
+if grep -nF '\`' docs/support-matrix.md > /dev/null; then
+    printf 'Support-matrix Markdown must not escape code-span backticks.\n' >&2
+    exit 1
+fi
+if grep -nF '\\t' lib/bash/str/README.md lib/bash/app/README.md > /dev/null; then
+    printf 'String and application docs must show one backslash in escape sequences.\n' >&2
+    exit 1
+fi
+for module in process cli app; do
+    grep -F -- "lib/bash/$module/lib_$module.sh" STANDARDS.md > /dev/null || {
+        printf 'STANDARDS.md is missing the %s module.\n' "$module" >&2
+        exit 1
+    }
+done
+for link in pinned-consumption.md vendor-workflow.md single-file-distribution.md \
+    integrations.md community.md versioning-policy.md release-process.md; do
+    grep -F "$link" docs/README.md > /dev/null || {
+        printf 'Documentation index is missing: %s\n' "$link" >&2
+        exit 1
+    }
+done
+grep -F 'Bash-4.2.53%2B' README.md > /dev/null || {
+    printf 'README must advertise the 4.2.53 Bash floor.\n' >&2
+    exit 1
+}
+grep -F 'Requires Bash 4.2.53+' README.md > /dev/null || {
+    printf 'README must state the 4.2.53 Bash floor.\n' >&2
+    exit 1
+}
+
 release_process=docs/release-process.md
 for release_contract_text in \
     'lib/bash/base-bash-libs.release' \

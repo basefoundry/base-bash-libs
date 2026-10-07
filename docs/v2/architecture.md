@@ -58,7 +58,7 @@ cutover follow [`docs/release-process.md`](../release-process.md) and the
 ## Platform notes
 
 The supported minimum is Bash 4.2.53. macOS `/bin/bash` 3.2 is outside the
-contract; install Homebrew Bash and use `base-bash` or a Bash 4.2+ shebang.
+contract; install Homebrew Bash and use `base-bash` or a Bash 4.2.53+ shebang.
 Ubuntu/glibc and Alpine/musl paths are exercised where the release workflow has
 the required runner/container. BSD and other userlands are advisory until a
 consumer runs the compatibility matrix there. Locale, filesystem permissions,

@@ -35,7 +35,7 @@ The deterministic precedence is `CLI > environment > project > user >
 default`. `base_app_config_report` prints `key`, source, and effective value
 as tab-separated records and redacts values declared with `secret=true`.
 Backslashes, tabs, carriage returns, and newlines in fields are escaped as
-`\\`, `\\t`, `\\r`, and `\\n` so each record remains one safe line. See the
+`\`, `\t`, `\r`, and `\n` so each record remains one safe line. See the
 [shared TSV field escaping contract](../str/README.md#shared-tsv-field-escaping).
 `base_app_config_set_cli` is a programmatic equivalent of `--cli key=value`.
 

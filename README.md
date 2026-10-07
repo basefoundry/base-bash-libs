@@ -2,7 +2,7 @@
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-bash-libs/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-bash-libs/actions/workflows/tests.yml)
 [![Release](https://img.shields.io/github/v/release/basefoundry/base-bash-libs?sort=semver&label=release)](https://github.com/basefoundry/base-bash-libs/releases)
-[![Bash](https://img.shields.io/badge/Bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)
+[![Bash](https://img.shields.io/badge/Bash-4.2.53%2B-4EAA25?logo=gnubash&logoColor=white)](docs/support-matrix.md)
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ paths, cleanup hooks, and import conventions. It is extracted from
 independently through Homebrew, source checkouts, vendored copies, or git
 submodules.
 
-Requires Bash 4.2+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
+Requires Bash 4.2.53+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 The shared Base ecosystem boundary is maintained in the [Base ecosystem
 platform, license, and release policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 

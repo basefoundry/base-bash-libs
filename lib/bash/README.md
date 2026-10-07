@@ -42,7 +42,7 @@ modules.
 
 ## Caller Runtime Contract
 
-All public modules support Bash 4.2 or newer with every combination of caller-
+All public modules support Bash 4.2.53 or newer with every combination of caller-
 selected `errexit`, `nounset`, and `pipefail`. Sourcing a module is passive: it
 does not change those settings, any other `set` or `shopt` option, `IFS`,
 `OPTIND`, the working directory, the umask, traps, exports, or ordinary
