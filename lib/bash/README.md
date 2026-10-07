@@ -9,14 +9,14 @@ Reusable Bash libraries for command wrappers and other Bash tooling.
   shared Bash primitives.
 - `process/`
   Preview-only process-supervision primitives layered on top of the stdlib;
-  this module is present on `main` but is not included in the `v2.0.0` GA
-  release.
+  this module was first shipped in the immutable `v2.1.0` release and is not
+  part of the stable API.
 - `git/`
   Git-related helpers built on top of the stdlib.
 - `gh/`
-  Preview-only GitHub CLI helpers on `main`, built on top of the stdlib and
-  process module; the immutable `v2.0.0` tree contains the prior stable,
-  self-contained implementation.
+  Stable GitHub CLI helpers since `v2.0.0`, built on top of the stdlib and the
+  preview `process` module. The `v2.1.0` release ships that private dependency
+  alongside the stable public surface.
 - `file/`
   File-editing helpers built on top of the stdlib.
 - `str/`

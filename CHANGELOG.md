@@ -60,6 +60,8 @@ dated release section after the final merged commit is selected. -->
 - Documented the verified launcher quickstart, Bash support matrix, consumer
   contribution path, release and ecosystem policy, contributor funnel, and
   community discussion boundary.
+- Clarified that `gh` is stable since `v2.0.0` and `process` is preview since
+  `v2.1.0`, including the private implementation dependency between them.
 
 ## [2.1.0] - 2026-09-08
 
