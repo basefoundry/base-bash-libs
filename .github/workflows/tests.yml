@@ -230,3 +230,33 @@ jobs:
           framework_commit="$(git rev-parse --verify 'HEAD^{commit}')"
           .downstream/base-bash-libs-demo/tests/candidate-smoke.sh \
             "$GITHUB_WORKSPACE" "$(< VERSION)" "$framework_commit"
+
+  product-validation:
+    name: Product validation
+    if: ${{ always() }}
+    needs: [validate, bash-42-logging, representative-bash, release-gates, downstream-demo]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require every product lane to succeed
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          BASH_42_RESULT: ${{ needs.bash-42-logging.result }}
+          REPRESENTATIVE_BASH_RESULT: ${{ needs.representative-bash.result }}
+          RELEASE_GATES_RESULT: ${{ needs.release-gates.result }}
+          DOWNSTREAM_DEMO_RESULT: ${{ needs.downstream-demo.result }}
+        run: |
+          set -euo pipefail
+          failures=()
+          [[ "$VALIDATE_RESULT" == success ]] || failures+=("Validate")
+          [[ "$BASH_42_RESULT" == success ]] || failures+=("Compatibility smoke (Bash 4.2.53)")
+          [[ "$REPRESENTATIVE_BASH_RESULT" == success ]] || failures+=("Compatibility (Bash matrix)")
+          [[ "$RELEASE_GATES_RESULT" == success ]] || failures+=("Release gates (matrix and provenance)")
+          [[ "$DOWNSTREAM_DEMO_RESULT" == success ]] || failures+=("Downstream demo (Beacon)")
+          if (( ${#failures[@]} > 0 )); then
+            printf 'Product validation is blocked by non-success lanes: %s\n' \
+              "${failures[*]}" >&2
+            exit 1
+          fi
+          printf 'Product validation passed: all required product lanes succeeded.\n'

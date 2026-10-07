@@ -63,6 +63,7 @@ required_files=(
     tests/integration-release-contract.sh
     tests/concurrency-contract.sh
     tests/quality-contract.sh
+    tests/ci-policy-contract.sh
     tests/shfmt-contract.sh
     tests/changelog-guard.sh
     tests/release-invariants.sh
@@ -145,6 +146,7 @@ check_no_strict_mode() {
         tests/reference-release-contract.sh
         tests/concurrency-contract.sh
         tests/quality-contract.sh
+        tests/ci-policy-contract.sh
         tests/shfmt-contract.sh
         tests/changelog-guard.sh
         tests/release-invariants.sh
@@ -432,6 +434,7 @@ run_stage "ShellCheck error profile" shellcheck --severity=error \
     tests/reference-release-contract.sh \
     tests/concurrency-contract.sh \
     tests/quality-contract.sh \
+    tests/ci-policy-contract.sh \
     tests/shfmt-contract.sh \
     tests/release-invariants.sh \
     tests/release-invariants.bats \
@@ -506,6 +509,7 @@ run_stage "integration release contract" tests/integration-release-contract.sh |
 run_stage "reference release contract" tests/reference-release-contract.sh || exit $?
 run_stage "concurrency contract" tests/concurrency-contract.sh || exit $?
 run_stage "quality workflow contract" tests/quality-contract.sh || exit $?
+run_stage "CI policy contract" tests/ci-policy-contract.sh || exit $?
 run_stage "support matrix" tests/compatibility-matrix.sh || exit $?
 run_stage "release invariants" tests/release-invariants.sh || exit $?
 run_stage "examples/std-usage.sh" examples/std-usage.sh > /dev/null || exit $?
