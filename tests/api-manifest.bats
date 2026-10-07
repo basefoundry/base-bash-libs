@@ -68,15 +68,15 @@ setup() {
     [[ "$output" == *"supported Base Bash v2 release policy"* ]]
 }
 
-@test "preview modules use explicit unreleased metadata" {
+@test "preview modules record the first release that contains them" {
     run "$BASE_REPO_ROOT/scripts/api-manifest" check
     [ "$status" -eq 0 ]
     grep -F '### `process`' "$BASE_REPO_ROOT/docs/api-reference.md"
-    grep -F -- '- Stability: `preview`; since `unreleased`; deprecated: `false`' \
+    grep -F -- '- Stability: `preview`; since `2.1.0`; deprecated: `false`' \
         "$BASE_REPO_ROOT/docs/api-reference.md"
 
     invalid_metadata="$TEST_TMPDIR/invalid-release-metadata.yaml"
-    perl -0pe 's/(  - name: process\n.*?    stability: )preview/$1stable/s' \
+    perl -0pe 's/(  - name: process\n.*?    stability: )preview/$1stable/s; s/(  - name: process\n.*?    since: )2[.]1[.]0/$1unreleased/s' \
         "$BASE_REPO_ROOT/base_api_manifest.yaml" > "$invalid_metadata"
     run "$BASE_REPO_ROOT/scripts/api-manifest" check "$invalid_metadata"
     [ "$status" -ne 0 ]

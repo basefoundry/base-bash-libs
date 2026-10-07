@@ -81,7 +81,7 @@ modules:
     statuses: usage and contract errors return 2; a false owner relationship returns 1
     side_effects: documented per symbol; sourcing is passive
     stability: preview
-    since: unreleased
+    since: 2.1.0
     deprecated: false
   - name: file
     kind: sourceable-library

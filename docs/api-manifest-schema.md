@@ -44,11 +44,12 @@ metadata:
   signatures and examples. `inputs`, `outputs`, `statuses`, and `side_effects`
   provide the module-level contract inherited by each listed symbol.
 - `stability`, `since`, and `deprecated` are required release metadata. Stable
-  modules must name a supported `2.x` release in `since`; a post-GA module on
-  the moving branch uses `stability: preview` and `since: unreleased` until a
-  release containing it is published. The checker rejects `since: unreleased`
-  for stable modules. A future deprecation must add a migration-inventory
-  entry before changing the symbol.
+  modules must name a supported `2.x` release in `since`. A preview module uses
+  `since: unreleased` only before its first release; once it ships, `since`
+  records the first release that contains it while `stability: preview`
+  remains explicit. The checker rejects `since: unreleased` for stable modules.
+  A future deprecation must add a migration-inventory entry before changing the
+  symbol.
 
 The artifact list makes packaging membership reviewable. Every module must
 package its source, documentation, and tests. Generated files are checked for
