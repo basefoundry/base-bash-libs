@@ -14,6 +14,10 @@ reference_release_fail() {
 [[ -f "$reference_release_evidence" ]] || reference_release_fail 'evidence manifest is missing'
 grep -Fx 'schema_version: 1' "$reference_release_evidence" > /dev/null ||
     reference_release_fail 'schema version is not 1'
+grep -Fx 'record_scope: historical-v2.0.0-ga-baseline' "$reference_release_evidence" > /dev/null ||
+    reference_release_fail 'release evidence must identify its historical baseline scope'
+grep -Fx 'last_reviewed: 2026-10-07' "$reference_release_evidence" > /dev/null ||
+    reference_release_fail 'release evidence review date is missing'
 grep -Fx 'release_line: v2.0.0' "$reference_release_evidence" > /dev/null ||
     reference_release_fail 'release line is not v2.0.0'
 grep -Fx 'rehearsal_command: examples/reference-apps/release-rehearsal.sh' \
