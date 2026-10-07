@@ -1,4 +1,7 @@
 schema_version: 1
+record_scope: historical-v2.0.0-ga-cutover
+record_date: 2026-08-15
+last_reconciled: 2026-10-07
 target_release: 2.0.0
 release_status: published
 required_asset:

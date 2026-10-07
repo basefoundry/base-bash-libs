@@ -1,4 +1,6 @@
 schema_version: 1
+record_scope: historical-v2.0.0-ga-baseline
+last_reviewed: 2026-10-07
 framework_release_line: v2.0.0
 update_policy: review-pins-on-every-upstream-release
 

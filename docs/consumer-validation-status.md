@@ -1,6 +1,10 @@
 # Consumer validation status
 
-Last validated: 2026-09-02
+Ledger reconciled: 2026-10-07
+
+The v2.0.0 rows below are historical GA evidence. The current canary snapshot
+is recorded separately and must not be read as a new first-party release or
+consumer pin.
 
 This is an internal readiness ledger for the #239 adoption work. It records
 what can be reproduced from the current local checkouts; it is not a public
@@ -10,12 +14,21 @@ has approved publication.
 
 ## Framework reference
 
-The release gate used the immutable `base-bash-libs` v2.0.0 GA at merge commit
+Historical GA release gate: immutable `base-bash-libs` v2.0.0 at merge commit
 `b4243765726c133499feeabdc50154f99c0fec12`. The
 [v2.0.0 release](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.0.0)
 archive, SHA256SUMS, SPDX SBOM, and provenance assets were downloaded and
 verified. The canonical archive SHA256 is
 `73d6f92fab8f1a8ded7f3b4312ebbe51aa8ec0c16eacf18c2d8fa23fb5664333`.
+
+## Current canary snapshot
+
+On 2026-10-05, the scheduled [Framework Compatibility run
+#37327900680](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37327900680)
+passed all four candidate jobs: the immutable v2.0.0 baseline and current
+supported v2.1.0 release on Ubuntu 24.04 and macOS 14. This validates the demo's
+black-box compatibility path; it does not change the committed v2.0.0 vendor
+pin or promote the historical GA rows below.
 
 ## Consumer matrix
 
