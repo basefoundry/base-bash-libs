@@ -21,8 +21,13 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    `origin/main`.
 3. Prepare the release metadata in the release-preparation branch. Move the
    relevant `Unreleased` entries in `CHANGELOG.md` into a dated release
-   section. Update `VERSION`, the top release row in `README.md`, and the
-   `version=` line in `lib/bash/base-bash-libs.release` to the same version.
+   section. Update `VERSION`, the top release row in `README.md`, the
+   current-release commit pin in `README.md`, `docs/versioning-policy.md`, and
+   `docs/v2/quickstart.md`, and the `version=` line in
+   `lib/bash/base-bash-libs.release` to the same version. Keep the pin's tag,
+   full commit, and release-asset wording aligned with the release being
+   prepared, and update the documentation-contract expectation in the same
+   pull request.
    Leave that checked-in metadata's `commit=unknown` and
    `dirty_state=unknown` placeholders intact: the release artifact builder
    writes the final commit identity into its private staged copy. Ordinary
