@@ -69,7 +69,7 @@ merge-blocking.
 The repeatable readback commands are:
 
 ```bash
-gh api repos/basefoundry/base-bash-libs/rulesets
+gh api repos/basefoundry/base-bash-libs/rules/branches/main
 gh api repos/basefoundry/base-bash-libs/branches/main/protection
 ```
 
