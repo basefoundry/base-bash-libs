@@ -27,8 +27,8 @@ Verify the release asset checksum before unpacking it. Keep the complete
 release commit (when published), and artifact provenance. Then source the
 stdlib and use only package-relative imports:
 
-The v2.2.0 release's canonical files are the archive,
-`base-bash-libs-v2.2.0.SHA256SUMS`, SPDX SBOM, and provenance statement. Do not
+The v2.2.1 release's canonical files are the archive,
+`base-bash-libs-v2.2.1.SHA256SUMS`, SPDX SBOM, and provenance statement. Do not
 substitute GitHub's automatic tag archive or a moving branch. Maintainers can
 re-run the repository-owned `scripts/release-artifact verify-remote` check to
 confirm that all four files still bind to the annotated tag commit.

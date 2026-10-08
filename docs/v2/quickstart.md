@@ -6,16 +6,16 @@ checks, tests, and a deterministic bundle.
 
 ## 1. Select a verified release
 
-Use the published `v2.2.0` tag and its verified commit. The reference is
+Use the published `v2.2.1` tag and its verified commit. The reference is
 intentionally required rather than defaulting to a moving branch:
 
 ```bash
-export BASE_BASH_LIBS_REF='v2.2.0'
-export EXPECTED_BASE_BASH_LIBS_COMMIT='d8894bf4453e6b6beaa6de7ce2e082497cb236f2'
+export BASE_BASH_LIBS_REF='v2.2.1'
 mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs fetch --tags origin "$BASE_BASH_LIBS_REF"
 git -C vendor/base-bash-libs checkout --detach "$BASE_BASH_LIBS_REF"
+export EXPECTED_BASE_BASH_LIBS_COMMIT="$(git -C vendor/base-bash-libs rev-parse HEAD)"
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$EXPECTED_BASE_BASH_LIBS_COMMIT"
 ```
 
@@ -23,7 +23,7 @@ Do not replace the ref with `main`, a short SHA, or an automatically generated
 archive URL. Verify the published checksum asset before distributing a
 consumer application.
 
-The preview `process` module is present in this v2.2.0 checkout. It first
+The preview `process` module is present in this v2.2.1 checkout. It first
 shipped in v2.1.0, remains outside the stable API, and should be used only
 when a consumer explicitly opts into the preview contract; the stable `gh` API
 may use it privately.
