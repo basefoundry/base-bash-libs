@@ -10,14 +10,47 @@
 
 The v2.2.1 release is published with a deterministic [bundle archive](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.tar.gz), [checksum manifest](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.SHA256SUMS), [SPDX SBOM](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.spdx.json), and [provenance statement](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.provenance.json). First-party consumers and Homebrew can promote to its exact immutable commit through the coordinated release handoff; the original v2.0.0 cutover is recorded in completed issue #240.
 
-Reusable Bash standard library for reliable shell scripts.
+Base Bash is a Bash 4.2+ application framework and standard library for
+declarative CLIs, typed configuration, lifecycle-safe cleanup, and reliable
+shell automation.
 
-base-bash-libs provides sourceable Bash libraries for logging, error handling,
-safe command execution, filesystem edits, Git helpers, string utilities, temp
-paths, cleanup hooks, and import conventions. It is extracted from
+It gives applications safe execution and filesystem primitives, a structured
+command contract, configuration that is data-only and precedence-aware, and
+immutable package identity. It is extracted from
 [Base](https://github.com/basefoundry/base), but can be installed and used
 independently through Homebrew, source checkouts, vendored copies, or git
 submodules.
+
+A minimal v2 application declares its interface and policy before dispatch:
+
+<!-- BEGIN README APPLICATION EXAMPLE -->
+```bash
+#!/usr/bin/env base-bash
+
+base_launcher_import_base_bash_lib cli/lib_cli.sh app/lib_app.sh
+base_cli_model_init hello name=hello version=1.0.0
+base_cli_command hello greet "Greet someone" handler=hello_dispatch
+base_app_init hello_policy name=hello
+base_app_config_define hello_policy name string default=world env=HELLO_NAME
+base_app_add_standard_options hello ""
+hello_cleanup() { :; }
+hello_execute() {
+    local name=""
+    base_app_apply_standard_options hello_policy
+    base_app_config_load hello_policy || return $?
+    base_app_hook hello_policy cleanup hello_cleanup hello_cleanup || return $?
+    base_app_config_get hello_policy name name || return $?
+    printf 'hello=%s\n' "$name"
+}
+hello_dispatch() { base_app_run hello_policy hello_execute; }
+main() { base_cli_run hello -- "$@"; }
+```
+<!-- END README APPLICATION EXAMPLE -->
+
+Run it with `HELLO_NAME=Base ./hello greet` to get `hello=Base`. Start with
+the [v2 quickstart](docs/v2/quickstart.md) and then see the
+[pinned Beacon reference consumer](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/README.md)
+for a complete offline application.
 
 Requires Bash 4.2.53+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 The shared Base ecosystem boundary is maintained in the [Base ecosystem
@@ -25,11 +58,15 @@ platform, license, and release policy](https://github.com/basefoundry/base/blob/
 
 ## Libraries
 
-- [`lib/bash/std/lib_std.sh`](lib/bash/std/README.md)
+The libraries are layered from foundation to application. Start with `std`
+for portable primitives, add the building blocks your script needs, and use
+`cli` plus `app` when it becomes a user-facing application.
+
+- **Foundation:** [`lib/bash/std/lib_std.sh`](lib/bash/std/README.md)
   Foundation helpers for logging, error handling, command execution, PATH
   updates, assertions, prompts, imports, and the public
   `BASE_BASH_LIBS_VERSION` constant.
-- [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
+- **Building blocks:** [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
   Preview-only process-supervision primitives for owner-guardian liveness and
   asynchronous cleanup, layered on the stdlib. This post-GA module first
   shipped in `v2.1.0` and is included in the current immutable `v2.2.1`
@@ -55,7 +92,7 @@ platform, license, and release policy](https://github.com/basefoundry/base/blob/
 - [`lib/bash/list/lib_list.sh`](lib/bash/list/README.md)
   Indexed-array helpers built on the stdlib for in-place mutation,
   membership checks, deduplication, and length results.
-- [`lib/bash/cli/lib_cli.sh`](lib/bash/cli/README.md)
+- **Application framework:** [`lib/bash/cli/lib_cli.sh`](lib/bash/cli/README.md)
   Declarative command contracts with nested subcommands, validation, help,
   completion, and a handler boundary for Bash applications.
 - [`lib/bash/app/lib_app.sh`](lib/bash/app/README.md)

@@ -94,6 +94,66 @@ grep -F 'five-minute, offline Beacon application' README.md > /dev/null || {
     printf 'README must describe Beacon as a runnable learning path.\n' >&2
     exit 1
 }
+grep -F 'Bash 4.2+ application framework and standard library' README.md > /dev/null || {
+    printf 'README must lead with the v2 application-framework value proposition.\n' >&2
+    exit 1
+}
+for readme_application_contract_text in \
+    'BEGIN README APPLICATION EXAMPLE' \
+    'base_cli_model_init hello' \
+    'base_app_config_define hello_policy name string' \
+    'base_app_hook hello_policy cleanup' \
+    'base_app_run hello_policy hello_execute' \
+    'HELLO_NAME=Base'; do
+    grep -F "$readme_application_contract_text" README.md > /dev/null || {
+        printf 'README application example is missing: %s\n' "$readme_application_contract_text" >&2
+        exit 1
+    }
+done
+grep -F 'The libraries are layered from foundation to application.' README.md > /dev/null || {
+    printf 'README must describe the layered library map.\n' >&2
+    exit 1
+}
+grep -F '**Foundation:**' README.md > /dev/null || {
+    printf 'README library map is missing the foundation layer.\n' >&2
+    exit 1
+}
+grep -F '**Building blocks:**' README.md > /dev/null || {
+    printf 'README library map is missing the building-block layer.\n' >&2
+    exit 1
+}
+grep -F '**Application framework:**' README.md > /dev/null || {
+    printf 'README library map is missing the application-framework layer.\n' >&2
+    exit 1
+}
+
+readme_application_example="$(mktemp "${TMPDIR:-/tmp}/base-bash-readme-example.XXXXXX")" || exit 1
+awk '
+    /^<!-- BEGIN README APPLICATION EXAMPLE -->$/ { in_region = 1; next }
+    /^<!-- END README APPLICATION EXAMPLE -->$/ { exit }
+    in_region && /^```bash$/ { in_code = 1; next }
+    in_region && in_code && /^```$/ { in_code = 0; next }
+    in_region && in_code { print }
+' README.md > "$readme_application_example" || exit 1
+[[ -s "$readme_application_example" ]] || {
+    printf 'README application example is empty.\n' >&2
+    exit 1
+}
+shellcheck --shell=bash "$readme_application_example" || exit 1
+readme_application_output="$(
+    HELLO_NAME=Base BASE_BASH_LIBS_DIR="$repo_root/lib/bash" \
+        "$repo_root/bin/base-bash" "$readme_application_example" greet
+)" || {
+    printf 'README application example did not execute.\n' >&2
+    rm -f -- "$readme_application_example"
+    exit 1
+}
+rm -f -- "$readme_application_example"
+[[ "$readme_application_output" == 'hello=Base' ]] || {
+    printf 'README application example produced unexpected output: %s\n' \
+        "$readme_application_output" >&2
+    exit 1
+}
 grep -F 'See a complete application' docs/v2/quickstart.md > /dev/null || {
     printf 'The v2 quickstart must link to the complete Beacon application.\n' >&2
     exit 1
