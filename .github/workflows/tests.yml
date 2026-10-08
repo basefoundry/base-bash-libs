@@ -52,11 +52,11 @@ jobs:
         run: |
           output="$RUNNER_TEMP/spdx-validation-artifact"
           scripts/release-artifact build \
-            --version 2.2.0 \
+            --version 2.2.1 \
             --commit "$(git rev-parse --verify 'HEAD^{commit}')" \
             --output "$output"
           "$RUNNER_TEMP/spdx-tools/bin/python" tests/validate-spdx.py \
-            "$output/base-bash-libs-v2.2.0.spdx.json"
+            "$output/base-bash-libs-v2.2.1.spdx.json"
           "$RUNNER_TEMP/spdx-tools/bin/python" tests/validate-spdx.py \
             --expect-missing-sha1 tests/fixtures/spdx/missing-sha1.spdx.json
 

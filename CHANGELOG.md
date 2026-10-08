@@ -7,11 +7,15 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [2.2.1] - 2026-10-08
+
 ### Documentation
 
 - Aligned the current-release onboarding, pinned-consumption, versioning, and
-  validation references with the published v2.2.0 release and its immutable
-  source commit.
+  validation references with the v2.2.1 release line and its immutable source
+  commit.
 
 ## [2.2.0] - 2026-10-07
 

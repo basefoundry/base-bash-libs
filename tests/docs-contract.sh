@@ -29,9 +29,17 @@ grep -F "export BASE_BASH_LIBS_REF='$current_release'" docs/v2/quickstart.md > /
     printf 'The v2 quickstart must use the current published release reference.\n' >&2
     exit 1
 }
-quickstart_release_commit="$(sed -n "s/^export EXPECTED_BASE_BASH_LIBS_COMMIT='\([0-9a-f]\{40\}\)'$/\1/p" docs/v2/quickstart.md | sed -n '1p')"
-[[ -n "$quickstart_release_commit" ]] || {
-    printf 'The v2 quickstart must pin a full current release commit.\n' >&2
+for quickstart_contract_text in \
+    'git -C vendor/base-bash-libs checkout --detach "$BASE_BASH_LIBS_REF"' \
+    'export EXPECTED_BASE_BASH_LIBS_COMMIT="$(git -C vendor/base-bash-libs rev-parse HEAD)"' \
+    'test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$EXPECTED_BASE_BASH_LIBS_COMMIT"'; do
+    grep -F "$quickstart_contract_text" docs/v2/quickstart.md > /dev/null || {
+        printf 'The v2 quickstart must resolve and verify the current release tag.\n' >&2
+        exit 1
+    }
+done
+grep -F "base_bash_libs_ref='$current_release'" README.md > /dev/null || {
+    printf 'README must use the current published release reference.\n' >&2
     exit 1
 }
 readme_current_release="$(sed -n 's/^`\(v[0-9][^`]*\)` is the current stable release.*$/\1/p' README.md | sed -n '1p')"
@@ -39,17 +47,18 @@ readme_current_release="$(sed -n 's/^`\(v[0-9][^`]*\)` is the current stable rel
     printf 'README must declare exactly one current stable release.\n' >&2
     exit 1
 }
-readme_pin="$(sed -n '/^Pin the checkout to the full current release commit/,/^```$/p' README.md |
-    sed -n 's/^[[:space:]]*\([0-9a-f]\{40\}\)$/\1/p' | sed -n '1p')"
-[[ "$readme_pin" == "$quickstart_release_commit" ]] || {
-    printf 'README current-release pin does not match the v2 quickstart commit.\n' >&2
-    exit 1
-}
-if resolved_current_release="$(git rev-parse --verify "${current_release}^{commit}" 2> /dev/null)"; then
-    [[ "$resolved_current_release" == "$readme_pin" ]] || {
-        printf 'README current-release pin does not match its tag.\n' >&2
+for readme_contract_text in \
+    'git -C vendor/base-bash-libs checkout --detach "$base_bash_libs_ref"' \
+    'base_bash_libs_commit="$(git -C vendor/base-bash-libs rev-parse HEAD)"' \
+    'test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$base_bash_libs_commit"'; do
+    grep -F "$readme_contract_text" README.md > /dev/null || {
+        printf 'README must resolve and verify the current release tag.\n' >&2
         exit 1
     }
+done
+if resolved_current_release="$(git rev-parse --verify "${current_release}^{commit}" 2> /dev/null)"; then
+    printf 'Verified current-release tag locally: %s (%s).\n' "$current_release" \
+        "$resolved_current_release" >&2
 else
     printf 'Skipping current-release tag comparison: tag %s is unavailable in this checkout.\n' \
         "$current_release" >&2
