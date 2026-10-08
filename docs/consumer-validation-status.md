@@ -1,6 +1,6 @@
 # Consumer validation status
 
-Ledger reconciled: 2026-10-07
+Ledger reconciled: 2026-10-08
 
 The v2.0.0 rows below are historical GA evidence. The current canary snapshot
 is recorded separately and must not be read as a new first-party release or
@@ -23,12 +23,16 @@ verified. The canonical archive SHA256 is
 
 ## Current canary snapshot
 
-On 2026-10-05, the scheduled [Framework Compatibility run
-#37327900680](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37327900680)
-passed all four candidate jobs: the immutable v2.0.0 baseline and current
-supported v2.1.0 release on Ubuntu 24.04 and macOS 14. This validates the demo's
-black-box compatibility path; it does not change the committed v2.0.0 vendor
-pin or promote the historical GA rows below.
+The published current release is `base-bash-libs` v2.2.0. The [v2.2.0
+release validation run](https://github.com/basefoundry/base-bash-libs/actions/runs/37647096223)
+passed the release gates, supported Bash compatibility jobs, macOS 14 and
+Ubuntu 24.04 validation, and the downstream Beacon smoke. The corresponding
+[Base Bash Demo v0.1.0 release run](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37652182510)
+passed its macOS Homebrew Bash, Ubuntu, minimum-Bash, and standalone-artifact
+jobs against the immutable v2.2.0 vendor. The earlier [Framework Compatibility
+run #37327900680](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37327900680)
+remains useful v2.1.0 evidence but predates v2.2.0; none of these first-party
+results count as independent adoption evidence.
 
 ## Consumer matrix
 
@@ -36,7 +40,7 @@ pin or promote the historical GA rows below.
 | --- | --- | --- | --- | --- | --- |
 | Base | First-party direct consumer | published [v1.8.0](https://github.com/basefoundry/base/releases/tag/v1.8.0), commit `26b9af5` | CI and source-checkout workflows pin GA commit `b424376` (v2.0.0) | PR [#1936](https://github.com/basefoundry/base/pull/1936) passed Python/pylint, integration, security, BATS, Ubuntu source-checkout, macOS smoke, and branch policy; v1.8.0 release preflight and publication passed | GA pin and release pass |
 | Base Demo | First-party representative consumer | merged [#217](https://github.com/basefoundry/base-demo/pull/217) at `fb7a2b6` | CI and source-checkout workflows pin GA commit `b424376` (v2.0.0) | Local full validation and hosted validate, Ubuntu, and source-checkout checks passed | GA pin and validation pass |
-| Base Bash Demo | First-party isolated reference consumer | flagship [#6](https://github.com/basefoundry/base-bash-libs-demo/pull/6) at `ff99159`; canary [#7](https://github.com/basefoundry/base-bash-libs-demo/pull/7) at `90c0efb` | Commits the verified canonical v2.0.0 bundle, lock, checksum manifest, provenance, and SPDX SBOM; candidate checks use an explicit release tag or full commit without changing the default pin | Ubuntu, exact Bash 4.2.53, macOS Homebrew Bash, stable-tag [run 33659256428](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/33659256428), and full-commit [run 33659260664](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/33659260664) passed | GA vendor pin and external downstream canary pass; excluded from independent count |
+| Base Bash Demo | First-party isolated reference consumer | released [v0.1.0](https://github.com/basefoundry/base-bash-libs-demo/releases/tag/v0.1.0) at `7acf3c6`; docs and vendor now target v2.2.0 | Commits the verified canonical v2.2.0 bundle, lock, checksum manifest, provenance, and SPDX SBOM; candidate checks use an explicit release tag or full commit without changing the default pin | Ubuntu, exact Bash 4.2.53, macOS Homebrew Bash, and standalone artifact jobs passed in [run 37652182510](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37652182510) | v2.2.0 first-party release validation pass; excluded from independent count |
 | BankBuddy | Adjacent repository; no direct `base-bash-libs` reference | `e32561c` | None | Repository validation: **312 passed** | Excluded from the consumer count |
 | BanyanLabs | Adjacent repository; no direct `base-bash-libs` reference | `15ef6cd` | None | Repository baseline present | Excluded from the consumer count |
 | Homebrew | First-party package-manager consumer | merged [#85](https://github.com/basefoundry/homebrew-base/pull/85), bottle release `base-v1.8.0` | `base-bash-libs` v2.0.0 bundle and Base v1.8.0 archive are hash-pinned; both macOS bottles published | Both bottle builds and v2 API smoke tests passed; installed GA upgrade, formula tests, and rollback to Base 1.7.0/base-bash-libs 1.4.0 passed | GA formula, bottles, upgrade, and rollback pass |

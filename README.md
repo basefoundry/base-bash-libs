@@ -31,8 +31,9 @@ platform, license, and release policy](https://github.com/basefoundry/base/blob/
   `BASE_BASH_LIBS_VERSION` constant.
 - [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
   Preview-only process-supervision primitives for owner-guardian liveness and
-  asynchronous cleanup, layered on the stdlib. This post-GA module is included
-  in the immutable `v2.1.0` release but is not part of the stable API.
+  asynchronous cleanup, layered on the stdlib. This post-GA module first
+  shipped in `v2.1.0` and is included in the current immutable `v2.2.0`
+  release, but is not part of the stable API.
 - [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
   File editing helpers built on the stdlib, including idempotent
   marker-delimited file section updates.
@@ -160,9 +161,9 @@ moving default branch:
 mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs checkout --detach \
-  36fec50c446dcea8c521a1ba3e7fee2394f169c0
+  d8894bf4453e6b6beaa6de7ce2e082497cb236f2
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = \
-  36fec50c446dcea8c521a1ba3e7fee2394f169c0
+  d8894bf4453e6b6beaa6de7ce2e082497cb236f2
 ```
 
 Source the stdlib from that checkout:
@@ -237,13 +238,14 @@ The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
 
-`v2.1.0` is the current stable release. It is a post-GA release on the v2 line;
+`v2.2.0` is the current stable release. It is a post-GA release on the v2 line;
 SemVer compatibility guarantees began at v2.0.0. See the [versioning and
 release-line policy](docs/versioning-policy.md) for immutable consumption and
 the post-GA support contract.
 
-The `process` module remains preview-only. It is included in `v2.1.0`, but is
-not part of the stable API; consumers pinned to `v2.0.0` do not have it.
+The `process` module remains preview-only. It first shipped in `v2.1.0` and is
+included in `v2.2.0`, but is not part of the stable API; consumers pinned to
+`v2.0.0` do not have it.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
 documented in [`docs/pinned-consumption.md`](docs/pinned-consumption.md).
