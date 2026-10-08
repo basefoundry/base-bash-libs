@@ -9,6 +9,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Documentation
 
+- Repositioned the README around the v2 application framework, added a
+  runnable CLI/configuration/lifecycle example, and organized the library map
+  by layer.
+
 - Link the pinned Base Bash Demo v0.1.2 learning path from the README,
   documentation index, and v2 quickstart, and refresh the consumer ledger.
 
