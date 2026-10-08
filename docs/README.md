@@ -8,6 +8,10 @@ when updating an existing script.
 ## Start here
 
 - [Five-minute quickstart](v2/quickstart.md)
+- [Beacon reference consumer](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/README.md): a complete, offline application walkthrough
+  using the released v2 API. Continue with the [five-minute tutorial](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/five-minute-tutorial.md),
+  [why Base Bash](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/why-base-bash-libs.md),
+  and the [adoption decision guide](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/should-i-use-base-bash-libs.md).
 - [Architecture and execution model](v2/architecture.md)
 - [API reference](api-reference.md) and [v2 API contract](v2-api-contract.md)
 - [Configuration, lifecycle, and status contracts](v2/architecture.md#application-contract)
