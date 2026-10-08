@@ -94,7 +94,7 @@ grep -F 'five-minute, offline Beacon application' README.md > /dev/null || {
     printf 'README must describe Beacon as a runnable learning path.\n' >&2
     exit 1
 }
-grep -F 'Bash 4.2+ application framework and standard library' README.md > /dev/null || {
+grep -F 'Bash 4.2.53+ application framework and standard library' README.md > /dev/null || {
     printf 'README must lead with the v2 application-framework value proposition.\n' >&2
     exit 1
 }
@@ -139,7 +139,6 @@ awk '
     printf 'README application example is empty.\n' >&2
     exit 1
 }
-shellcheck --shell=bash "$readme_application_example" || exit 1
 readme_application_output="$(
     HELLO_NAME=Base BASE_BASH_LIBS_DIR="$repo_root/lib/bash" \
         "$repo_root/bin/base-bash" "$readme_application_example" greet

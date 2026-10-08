@@ -10,9 +10,11 @@
 
 The v2.2.1 release is published with a deterministic [bundle archive](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.tar.gz), [checksum manifest](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.SHA256SUMS), [SPDX SBOM](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.spdx.json), and [provenance statement](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.provenance.json). First-party consumers and Homebrew can promote to its exact immutable commit through the coordinated release handoff; the original v2.0.0 cutover is recorded in completed issue #240.
 
-Base Bash is a Bash 4.2+ application framework and standard library for
+Base Bash is a Bash 4.2.53+ application framework and standard library for
 declarative CLIs, typed configuration, lifecycle-safe cleanup, and reliable
 shell automation.
+
+Requires Bash 4.2.53+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 
 It gives applications safe execution and filesystem primitives, a structured
 command contract, configuration that is data-only and precedence-aware, and
@@ -52,7 +54,6 @@ the [v2 quickstart](docs/v2/quickstart.md) and then see the
 [pinned Beacon reference consumer](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/README.md)
 for a complete offline application.
 
-Requires Bash 4.2.53+. On macOS, use Homebrew Bash instead of the system `/bin/bash`.
 The shared Base ecosystem boundary is maintained in the [Base ecosystem
 platform, license, and release policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 
