@@ -7,6 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [2.2.2] - 2026-10-08
+
 ### Documentation
 
 - Repositioned the README around the v2 application framework, added a
