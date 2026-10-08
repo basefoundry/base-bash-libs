@@ -2,7 +2,7 @@
 
 ## Current Release Line
 
-`v2.2.1` is the current stable Base Bash release, backed by its verified
+`v2.2.2` is the current stable Base Bash release, backed by its verified
 canonical release asset. `v1.4.0` and earlier releases are historical references;
 the 5/5 initiative has one stable target and will not create a stable `v1.5.0`
 or reset the version to 0.x.
@@ -11,7 +11,7 @@ Those choices would either hide breaking changes inside the current 1.x
 compatibility range or move version precedence backward.
 
 Post-GA releases use one repository-owned v2 SemVer policy. Compatibility
-guarantees began at `v2.0.0`; `v2.2.1` is the current release on that line:
+guarantees began at `v2.0.0`; `v2.2.2` is the current release on that line:
 
 ```text
 2.MINOR.PATCH
@@ -60,9 +60,9 @@ sentinel-file override. Maintainers can inspect any candidate without changing
 GitHub state:
 
 ```bash
-scripts/release check --version 2.2.1 --manifest base_manifest.yaml
-scripts/release plan --version 2.2.1 --manifest base_manifest.yaml
-scripts/release publish --version 2.2.1 --manifest base_manifest.yaml --dry-run
+scripts/release check --version 2.2.2 --manifest base_manifest.yaml
+scripts/release plan --version 2.2.2 --manifest base_manifest.yaml
+scripts/release publish --version 2.2.2 --manifest base_manifest.yaml --dry-run
 ```
 
 The generic `basectl release` command is not a substitute for this guard. Its
@@ -72,7 +72,7 @@ artifact, provenance, or GA gates.
 Before any real publication attempt, run the repository-owned tag preflight:
 
 ```bash
-scripts/release refs --version 2.2.1
+scripts/release refs --version 2.2.2
 ```
 
 The preflight checks both the exact candidate tag in the local checkout and the
@@ -126,13 +126,13 @@ The complete checkout, archive, Homebrew, vendored, and standalone verification
 procedure is maintained in [`pinned-consumption.md`](pinned-consumption.md).
 
 Do not install from an unpinned default-branch checkout. Use the canonical
-`v2.2.1` release asset and verify its checksum, or pin the stable source to the
-full commit resolved from the annotated `v2.2.1` tag:
+`v2.2.2` release asset and verify its checksum, or pin the stable source to the
+full commit resolved from the annotated `v2.2.2` tag:
 
 ```bash
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
-git -C vendor/base-bash-libs fetch --tags origin v2.2.1
-git -C vendor/base-bash-libs checkout --detach v2.2.1
+git -C vendor/base-bash-libs fetch --tags origin v2.2.2
+git -C vendor/base-bash-libs checkout --detach v2.2.2
 base_bash_libs_commit="$(git -C vendor/base-bash-libs rev-parse HEAD)"
 test "$(git -C vendor/base-bash-libs rev-parse HEAD)" = "$base_bash_libs_commit"
 ```

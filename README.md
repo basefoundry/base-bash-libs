@@ -6,9 +6,9 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `2.2.1` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.2.1](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.2.1) |
+| `2.2.2` | [Apache-2.0](LICENSE) | `brew install basefoundry/base/base-bash-libs` | [v2.2.2](https://github.com/basefoundry/base-bash-libs/releases/tag/v2.2.2) |
 
-The v2.2.1 release is published with a deterministic [bundle archive](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.tar.gz), [checksum manifest](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.SHA256SUMS), [SPDX SBOM](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.spdx.json), and [provenance statement](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.1/base-bash-libs-v2.2.1.provenance.json). First-party consumers and Homebrew can promote to its exact immutable commit through the coordinated release handoff; the original v2.0.0 cutover is recorded in completed issue #240.
+The v2.2.2 release is published with a deterministic [bundle archive](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.2/base-bash-libs-v2.2.2.tar.gz), [checksum manifest](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.2/base-bash-libs-v2.2.2.SHA256SUMS), [SPDX SBOM](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.2/base-bash-libs-v2.2.2.spdx.json), and [provenance statement](https://github.com/basefoundry/base-bash-libs/releases/download/v2.2.2/base-bash-libs-v2.2.2.provenance.json). First-party consumers and Homebrew can promote to its exact immutable commit through the coordinated release handoff; the original v2.0.0 cutover is recorded in completed issue #240.
 
 Base Bash is a Bash 4.2.53+ application framework and standard library for
 declarative CLIs, typed configuration, lifecycle-safe cleanup, and reliable
@@ -70,7 +70,7 @@ for portable primitives, add the building blocks your script needs, and use
 - **Building blocks:** [`lib/bash/process/lib_process.sh`](lib/bash/process/README.md)
   Preview-only process-supervision primitives for owner-guardian liveness and
   asynchronous cleanup, layered on the stdlib. This post-GA module first
-  shipped in `v2.1.0` and is included in the current immutable `v2.2.1`
+  shipped in `v2.1.0` and is included in the current immutable `v2.2.2`
   release, but is not part of the stable API.
 - [`lib/bash/file/lib_file.sh`](lib/bash/file/README.md)
   File editing helpers built on the stdlib, including idempotent
@@ -201,7 +201,7 @@ Pin the checkout to the full current release commit instead of consuming the
 moving default branch:
 
 ```bash
-base_bash_libs_ref='v2.2.1'
+base_bash_libs_ref='v2.2.2'
 mkdir -p vendor
 git clone https://github.com/basefoundry/base-bash-libs.git vendor/base-bash-libs
 git -C vendor/base-bash-libs fetch --tags origin "$base_bash_libs_ref"
@@ -282,13 +282,13 @@ The repo-root `VERSION` file is the source of truth for the package version.
 The top strip in this README and the runtime `BASE_BASH_LIBS_VERSION` constant
 are validated against that file.
 
-`v2.2.1` is the current stable release. It is a post-GA release on the v2 line;
+`v2.2.2` is the current stable release. It is a post-GA release on the v2 line;
 SemVer compatibility guarantees began at v2.0.0. See the [versioning and
 release-line policy](docs/versioning-policy.md) for immutable consumption and
 the post-GA support contract.
 
 The `process` module remains preview-only. It first shipped in `v2.1.0` and is
-included in `v2.2.1`, but is not part of the stable API; consumers pinned to
+included in `v2.2.2`, but is not part of the stable API; consumers pinned to
 `v2.0.0` do not have it.
 
 Pinned checkout, archive, Homebrew, vendored, and standalone consumption is
