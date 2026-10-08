@@ -71,10 +71,15 @@ Production-shaped reference applications and transparent startup benchmarks
 are in [`examples/reference-apps`](examples/reference-apps) and
 [`benchmarks/reference-apps.sh`](benchmarks/reference-apps.sh).
 The isolated first-party
-[`base-bash-libs-demo`](https://github.com/basefoundry/base-bash-libs-demo)
-repository consumes the canonical release bundle and runs its Beacon
-application as a downstream compatibility canary. It is regression evidence,
-not an independent-adoption claim.
+[`base-bash-libs-demo`](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/README.md)
+repository is a five-minute, offline Beacon application that shows the v2
+CLI, configuration, lifecycle, and cleanup contracts in a complete consumer.
+Start with its [pinned five-minute tutorial](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/five-minute-tutorial.md),
+then read [why Base Bash](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/why-base-bash-libs.md)
+and the [adoption decision guide](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/should-i-use-base-bash-libs.md).
+The repository also consumes the canonical release bundle as a downstream
+compatibility canary. It is regression evidence, not an independent-adoption
+claim.
 For the rest of the documentation, use the map near the end of this README.
 
 ## When to reach for Base Bash

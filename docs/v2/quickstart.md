@@ -78,3 +78,12 @@ their caller-relative meaning.
 
 The complete process is also available offline in the
 [`tests/consumer-kit`](../../tests/consumer-kit/README.md) fixture.
+
+## 4. See a complete application
+
+For a consumer that applies these contracts to a small offline application,
+continue with [Beacon's pinned five-minute tutorial](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/five-minute-tutorial.md).
+Then read [why Base Bash](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/why-base-bash-libs.md)
+and the [adoption decision guide](https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/should-i-use-base-bash-libs.md).
+This is a first-party reference consumer and compatibility canary, not an
+independent-adoption claim.

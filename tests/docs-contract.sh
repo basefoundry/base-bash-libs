@@ -80,6 +80,28 @@ grep -F 'v2/quickstart.md' docs/README.md > /dev/null || {
     printf 'Documentation link is missing: v2/quickstart.md\n' >&2
     exit 1
 }
+for demo_contract_url in \
+    'https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/README.md' \
+    'https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/five-minute-tutorial.md' \
+    'https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/why-base-bash-libs.md' \
+    'https://github.com/basefoundry/base-bash-libs-demo/blob/v0.1.2/docs/should-i-use-base-bash-libs.md'; do
+    grep -R -F "$demo_contract_url" README.md docs/README.md docs/v2/quickstart.md > /dev/null || {
+        printf 'Pinned Beacon learning-path link is missing: %s\n' "$demo_contract_url" >&2
+        exit 1
+    }
+done
+grep -F 'five-minute, offline Beacon application' README.md > /dev/null || {
+    printf 'README must describe Beacon as a runnable learning path.\n' >&2
+    exit 1
+}
+grep -F 'See a complete application' docs/v2/quickstart.md > /dev/null || {
+    printf 'The v2 quickstart must link to the complete Beacon application.\n' >&2
+    exit 1
+}
+grep -F 'released [v0.1.2]' docs/consumer-validation-status.md > /dev/null || {
+    printf 'Consumer validation status must reference the current Beacon release.\n' >&2
+    exit 1
+}
 grep -F 'v2/architecture.md' docs/README.md > /dev/null || {
     printf 'Documentation link is missing: v2/architecture.md\n' >&2
     exit 1

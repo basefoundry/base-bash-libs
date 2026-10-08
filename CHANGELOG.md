@@ -7,7 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Documentation
+
+- Link the pinned Base Bash Demo v0.1.2 learning path from the README,
+  documentation index, and v2 quickstart, and refresh the consumer ledger.
 
 ## [2.2.1] - 2026-10-08
 
