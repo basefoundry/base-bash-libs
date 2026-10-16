@@ -28,7 +28,9 @@ release-contract patch with no intended public API or runtime behavior changes.
 The latest completed full runtime validation is the [v2.2.0 release validation
 run](https://github.com/basefoundry/base-bash-libs/actions/runs/37647096223), which
 passed the release gates, supported Bash compatibility jobs, macOS 14 and
-Ubuntu 24.04 validation, and the downstream Beacon smoke. The corresponding
+Ubuntu 24.04 validation, and the downstream Beacon smoke. This historical run
+used the macOS 14 hosted image; current validation uses the pinned macOS 15
+runner for the same macOS 14 compatibility contract. The corresponding
 [Base Bash Demo v0.1.0 release run](https://github.com/basefoundry/base-bash-libs-demo/actions/runs/37652182510)
 passed its macOS Homebrew Bash, Ubuntu, minimum-Bash, and standalone-artifact
 jobs against the immutable v2.2.0 vendor. The earlier [Framework Compatibility

@@ -8,7 +8,7 @@ unreported pass.
 | Dimension | Supported contract | Evidence |
 | --- | --- | --- |
 | Bash | 4.2.53 minimum; representative 4.4.23 and 5.0.18/5.2.37; current 5.x | Pinned networkless Bash containers, current runner validation, `tests/compatibility-matrix.sh`, deterministic property, artifact, and concurrency contracts |
-| macOS | Pinned GitHub-hosted macOS 14 with Homebrew Bash; system Bash 3.2 is rejected with remediation | macOS validation and unsupported-system-Bash smoke |
+| macOS | macOS 14 compatibility exercised on the pinned GitHub-hosted macOS 15 runner with Homebrew Bash; system Bash 3.2 is rejected with remediation | macOS validation and unsupported-system-Bash smoke |
 | Linux/glibc | Pinned Ubuntu 24.04 runner and Bash 4.2.53/4.4.23/5.0.18/5.2.37 containers | Ubuntu validation and compatibility workflow |
 | Linux/musl | Alpine/musl syntax and option-contract probe when the runner provides Docker | `tests/compatibility-matrix.sh --container alpine` |
 | BSD userland | Best-effort portability checks; no release guarantee until a maintained CI runner is available | Explicitly reported as advisory |
