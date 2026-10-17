@@ -87,7 +87,8 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
    uses the `C` locale, and archive creation supports GNU tar and bsdtar only;
    other tar implementations fail closed rather than claiming reproducibility.
    Generate the repository component row for the ecosystem BOM from the same
-   immutable merged commit:
+   immutable merged commit. Keep the logical macOS 14 support-platform value in
+   the row; the active hosted validation for that platform runs on macOS 15:
 
    ```bash
    scripts/release-bom-row --version X.Y.Z --commit "$release_commit" \

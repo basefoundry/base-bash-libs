@@ -7,7 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Changed
+
+- Moved hosted macOS validation to the pinned macOS 15 runner while preserving
+  the logical macOS 14 compatibility and release-platform contract.
 
 ## [2.2.2] - 2026-10-08
 
