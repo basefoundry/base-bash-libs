@@ -165,6 +165,7 @@ statuses, and side effects are normative in the linked module README and
 - `base_git_list_worktree_branches` — signature: see [`lib/bash/git/README.md`](../lib/bash/git/README.md).
 - `base_git_update_repo` — signature: see [`lib/bash/git/README.md`](../lib/bash/git/README.md).
 - `base_git_worktree_path_for_branch` — signature: see [`lib/bash/git/README.md`](../lib/bash/git/README.md).
+- `base_git_worktree_path_is_valid` — signature: see [`lib/bash/git/README.md`](../lib/bash/git/README.md).
 
 ### `gh`
 

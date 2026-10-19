@@ -556,7 +556,7 @@ release_module_check() {
 check_release_tree() {
     local manifest="$1"
     local release_ref="$2"
-    local symbol
+    local symbol release_manifest="$manifest" historical_manifest=""
     local -a fields=()
     local -A release_module_sources=()
     local -A release_module_docs=()
@@ -569,6 +569,19 @@ check_release_tree() {
         error "release reference is not a local commit: $release_ref"
         return 1
     }
+    if [[ "$manifest" == "$default_manifest" ]]; then
+        historical_manifest="$(mktemp "${TMPDIR:-/tmp}/base-api-release-manifest.XXXXXX")" || return 1
+        if ! git -C "$repo_root" show "$release_ref:base_api_manifest.yaml" > "$historical_manifest" 2> /dev/null; then
+            rm -f "$historical_manifest"
+            error "release reference '$release_ref' does not contain base_api_manifest.yaml"
+            return 1
+        fi
+        # The compatibility check above verifies that every historical stable
+        # symbol remains available. The release tree check must inspect the
+        # historical manifest so additive stable APIs are allowed in a minor
+        # v2 release without pretending they were present in v2.0.0.
+        release_manifest="$historical_manifest"
+    fi
     while IFS=$'\t' read -r -a fields; do
         [[ -n "${fields[0]-}" ]] || continue
         release_module_sources["${fields[0]}"]="${fields[2]}"
@@ -576,11 +589,15 @@ check_release_tree() {
         release_module_tests["${fields[0]}"]="${fields[4]}"
         release_module_symbols["${fields[0]}"]="${fields[8]}"
         release_module_dependencies["${fields[0]}"]="${fields[5]}"
-    done < <(manifest_rows "$manifest")
+    done < <(manifest_rows "$release_manifest")
     while IFS=$'\t' read -r -a fields; do
         [[ -n "${fields[0]-}" && "${fields[14]}" == stable ]] || continue
-        release_module_check "${fields[0]}" "${fields[0]}" || return 1
-    done < <(manifest_rows "$manifest")
+        release_module_check "${fields[0]}" "${fields[0]}" || {
+            rm -f "$historical_manifest"
+            return 1
+        }
+    done < <(manifest_rows "$release_manifest")
+    rm -f "$historical_manifest"
     printf 'Stable API release reference is valid: %s\n' "$release_ref"
 }
 

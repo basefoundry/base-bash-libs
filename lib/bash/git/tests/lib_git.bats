@@ -44,6 +44,7 @@ setup() {
             base_git_branch_merged_to_ref \
             base_git_update_repo \
             base_git_get_current_branch \
+            base_git_worktree_path_is_valid \
             base_git_check_script_up_to_date; do
             bats_run "$BASH" -c '
                 mode="$1"
@@ -203,6 +204,42 @@ setup() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"Unable to list Git worktrees."* ]]
     unset -f git
+}
+
+@test "base_git_worktree_path_is_valid accepts linked worktrees and rejects other paths" {
+    local repo="$TEST_TMPDIR/repo"
+    local linked="$TEST_TMPDIR/linked worktree"
+    local detached="$TEST_TMPDIR/detached worktree"
+    local clone="$TEST_TMPDIR/clone"
+    local stale="$TEST_TMPDIR/stale worktree"
+
+    init_git_repo "$repo"
+    printf 'base\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial commit"
+    git -C "$repo" worktree add -b feature "$linked" >/dev/null 2>&1
+    git -C "$repo" worktree add --detach "$detached" HEAD >/dev/null 2>&1
+    git clone --quiet "$repo" "$clone"
+    mkdir -p "$stale"
+    printf 'gitdir: %s\n' "$TEST_TMPDIR/missing-worktree-admin" > "$stale/.git"
+
+    base_git_worktree_path_is_valid "$linked"
+    base_git_worktree_path_is_valid "$detached"
+    ! base_git_worktree_path_is_valid "$repo"
+    ! base_git_worktree_path_is_valid "$clone"
+    ! base_git_worktree_path_is_valid "$stale"
+    ! base_git_worktree_path_is_valid "$TEST_TMPDIR/missing"
+}
+
+@test "base_git_worktree_path_is_valid suppresses stale metadata diagnostics" {
+    local stale="$TEST_TMPDIR/stale-worktree"
+
+    mkdir -p "$stale"
+    printf 'gitdir: %s\n' "$TEST_TMPDIR/missing-worktree-admin" > "$stale/.git"
+
+    capture_command base_git_worktree_path_is_valid "$stale"
+
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
 }
 
 @test "git worktree helpers parse canonical porcelain output" {

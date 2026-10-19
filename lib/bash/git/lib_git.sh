@@ -161,6 +161,18 @@ base_git_worktree_path_for_branch() {
     fi
 }
 
+base_git_worktree_path_is_valid() {
+    if (($# != 1)); then
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_is_valid <path>"
+        return 2
+    fi
+
+    local path="$1"
+
+    [[ -d "$path" && -f "$path/.git" ]] || return 1
+    git -C "$path" rev-parse --is-inside-work-tree > /dev/null 2>&1 || return 1
+}
+
 base_git_list_worktree_branches() {
     if (($# > 1)); then
         base_std_log_error -l base_bash_libs.git "Usage: base_git_list_worktree_branches [repo_dir]"
