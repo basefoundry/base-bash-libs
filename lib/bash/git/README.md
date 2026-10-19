@@ -18,6 +18,10 @@ Source `lib/bash/std/lib_std.sh` before this library so logging and shared error
 - `base_git_worktree_path_for_branch [--result VAR] <branch> [repo]`
   Print the worktree path attached to a local branch, or store its exact value
   in `VAR` when it can contain trailing newlines.
+- `base_git_worktree_path_is_valid <path>`
+  Return success only when `path` is a valid linked Git worktree. Detached
+  linked worktrees are valid; ordinary repositories, missing paths, and stale
+  linked-worktree metadata return `1` without printing Git diagnostics.
 - `base_git_list_worktree_branches [repo]`
   Print tab-separated worktree path and branch rows. Backslash, tab, newline,
   and carriage-return bytes in paths are escaped as `\\`, `\t`, `\n`, and
@@ -70,6 +74,11 @@ base_git_worktree_path_for_branch --result worktree_path feature/topic "$PWD"
 - Worktree helpers parse Git's NUL-delimited porcelain format. Use the lookup
   helper's `--result` form whenever a path may end in one or more newlines;
   command substitution necessarily strips those bytes from stdout.
+- `base_git_worktree_path_is_valid` is intentionally limited to linked
+  worktrees: it requires a `.git` file and a successful `git -C <path>
+  rev-parse --is-inside-work-tree` probe. A `.git` directory is an ordinary
+  repository checkout, not a linked worktree, and a `.git` file whose Git
+  administrative record is stale is invalid.
 - `base_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
 - `base_git_update_repo` requires `git_repo` to be the repository root (including
   a symlink that resolves to that root); it rejects ordinary descendants rather
