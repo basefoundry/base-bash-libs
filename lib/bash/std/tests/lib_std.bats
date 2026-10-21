@@ -3212,7 +3212,7 @@ EOF
 
 @test "base_std_run reports external timeout-clock failures as infrastructure without retrying" {
     local fake_bin="$TEST_TMPDIR/broken-timeout-clock"
-    local counter_file="$TEST_TMPDIR/broken-timeout-counter"
+    local clock_count_file="$TEST_TMPDIR/broken-timeout-clock-count"
     local stderr_file="$TEST_TMPDIR/broken-timeout.err"
     local rc
 
@@ -3223,20 +3223,18 @@ if [[ "${1-}" == --version ]]; then
     printf 'timeout (GNU coreutils) 9.5\n'
     exit 0
 fi
-exit 7
-EOF
-    create_script "$TEST_TMPDIR/should-not-run.sh" <<'EOF'
-#!/usr/bin/env bash
 count=0
-[[ -f "$1" ]] && count="$(cat "$1")"
-printf '%s\n' "$((count + 1))" > "$1"
-/bin/sleep 3
+[[ -f "$BASE_TEST_TIMEOUT_CLOCK_COUNT" ]] && count="$(< "$BASE_TEST_TIMEOUT_CLOCK_COUNT")"
+printf '%s\n' "$((count + 1))" > "$BASE_TEST_TIMEOUT_CLOCK_COUNT"
+exit 7
 EOF
     ln -s "$(command -v mktemp)" "$fake_bin/mktemp"
     ln -s "$(command -v rm)" "$fake_bin/rm"
 
-    if PATH="$fake_bin" base_std_run --no-exit --max-attempts 3 --timeout 1 \
-        /bin/bash "$TEST_TMPDIR/should-not-run.sh" "$counter_file" \
+    # A broken clock can stop the child before its first instruction. Count
+    # clock executions to prove no retry without depending on child scheduling.
+    if BASE_TEST_TIMEOUT_CLOCK_COUNT="$clock_count_file" PATH="$fake_bin" \
+        base_std_run --no-exit --max-attempts 3 --timeout 1 /bin/sleep 3 \
         2>"$stderr_file"; then
         rc=0
     else
@@ -3244,7 +3242,7 @@ EOF
     fi
 
     [ "$rc" -eq 125 ]
-    [ "$(cat "$counter_file")" = "1" ]
+    [ "$(< "$clock_count_file")" = "1" ]
     [[ "$(cat "$stderr_file")" == *"could not be supervised safely"* ]]
     [[ "$(cat "$stderr_file")" != *"attempt 1 of 3; retrying"* ]]
 }
