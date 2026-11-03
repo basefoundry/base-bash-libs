@@ -76,9 +76,11 @@ base_git_worktree_path_for_branch --result worktree_path feature/topic "$PWD"
   command substitution necessarily strips those bytes from stdout.
 - `base_git_worktree_path_is_valid` is intentionally limited to linked
   worktrees: it requires a `.git` file and a successful `git -C <path>
-  rev-parse --is-inside-work-tree` probe. A `.git` directory is an ordinary
-  repository checkout, not a linked worktree, and a `.git` file whose Git
-  administrative record is stale is invalid.
+  rev-parse --is-inside-work-tree` probe whose resolved Git directory is below
+  the repository's `worktrees/` administrative directory. A `.git` directory
+  is an ordinary repository checkout, a submodule `.git` file points below
+  `modules/`, and a `.git` file whose Git administrative record is stale; all
+  three cases are invalid linked worktrees.
 - `base_git_update_repo` only attempts updates when the checked-out branch is the detected default branch, or an explicit expected branch passed by the caller.
 - `base_git_update_repo` requires `git_repo` to be the repository root (including
   a symlink that resolves to that root); it rejects ordinary descendants rather

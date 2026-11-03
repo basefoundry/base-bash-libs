@@ -230,6 +230,22 @@ setup() {
     ! base_git_worktree_path_is_valid "$TEST_TMPDIR/missing"
 }
 
+@test "base_git_worktree_path_is_valid rejects submodule checkouts" {
+    local source_repo="$TEST_TMPDIR/submodule-source"
+    local repo="$TEST_TMPDIR/repo"
+
+    init_git_repo "$source_repo"
+    printf 'submodule\n' > "$source_repo/data.txt"
+    commit_all "$source_repo" "Initial submodule commit"
+
+    init_git_repo "$repo"
+    printf 'superproject\n' > "$repo/data.txt"
+    commit_all "$repo" "Initial superproject commit"
+    git -C "$repo" -c protocol.file.allow=always submodule add "$source_repo" submodule >/dev/null 2>&1
+
+    ! base_git_worktree_path_is_valid "$repo/submodule"
+}
+
 @test "base_git_worktree_path_is_valid suppresses stale metadata diagnostics" {
     local stale="$TEST_TMPDIR/stale-worktree"
 
