@@ -12,6 +12,10 @@ and versions are tracked in the repo-root `VERSION` file.
 - Moved hosted macOS validation to the pinned macOS 15 runner while preserving
   the logical macOS 14 compatibility and release-platform contract.
 
+### Fixed
+
+- Reject Git submodule checkouts when validating linked worktree paths.
+
 ## [2.2.2] - 2026-10-08
 
 ### Documentation

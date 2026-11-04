@@ -108,7 +108,7 @@ modules:
     dependencies: std,str
     optional_commands: git,awk,grep,mktemp,rm,sleep
     artifacts: lib/bash/git/lib_git.sh,lib/bash/git/README.md,lib/bash/git/tests/lib_git.bats
-    public_symbols: base_git_branch_merged_to_ref,base_git_branch_upstream,base_git_check_script_up_to_date,base_git_detect_default_branch,base_git_get_current_branch,base_git_list_remote_branches,base_git_list_worktree_branches,base_git_update_repo,base_git_worktree_path_for_branch
+    public_symbols: base_git_branch_merged_to_ref,base_git_branch_upstream,base_git_check_script_up_to_date,base_git_detect_default_branch,base_git_get_current_branch,base_git_list_remote_branches,base_git_list_worktree_branches,base_git_update_repo,base_git_worktree_path_for_branch,base_git_worktree_path_is_valid
     signature_source: lib/bash/git/README.md
     inputs: documented per symbol in the module README and API charter
     outputs: documented per symbol; named outputs are caller-owned

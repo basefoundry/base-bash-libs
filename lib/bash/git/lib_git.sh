@@ -161,6 +161,31 @@ base_git_worktree_path_for_branch() {
     fi
 }
 
+base_git_worktree_path_is_valid() {
+    if (($# != 1)); then
+        base_std_log_error -l base_bash_libs.git "Usage: base_git_worktree_path_is_valid <path>"
+        return 2
+    fi
+
+    local path="$1"
+    local git_dir common_dir git_dir_abs common_dir_abs worktrees_dir
+
+    [[ -d "$path" && -f "$path/.git" ]] || return 1
+    git -C "$path" rev-parse --is-inside-work-tree > /dev/null 2>&1 || return 1
+
+    git_dir="$(git -C "$path" rev-parse --git-dir 2> /dev/null)" || return 1
+    common_dir="$(git -C "$path" rev-parse --git-common-dir 2> /dev/null)" || return 1
+    git_dir_abs="$(cd -- "$git_dir" 2> /dev/null && pwd -P)" || return 1
+    common_dir_abs="$(cd -- "$common_dir" 2> /dev/null && pwd -P)" || return 1
+    worktrees_dir="$common_dir_abs/worktrees"
+
+    [[ -d "$worktrees_dir" ]] || return 1
+    case "$git_dir_abs" in
+    "$worktrees_dir"/*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
 base_git_list_worktree_branches() {
     if (($# > 1)); then
         base_std_log_error -l base_bash_libs.git "Usage: base_git_list_worktree_branches [repo_dir]"
